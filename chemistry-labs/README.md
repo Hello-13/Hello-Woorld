@@ -1,6 +1,6 @@
 # Chem Bench
 
-Interactive labs for every chapter of an introductory chemistry course (organized to match Tro, *Introductory Chemistry*, Ch 2–17).
+Interactive labs for every chapter of an introductory chemistry course (organized to match Tro, *Introductory Chemistry*, Ch 2–19), plus study tools.
 
 Open `index.html` in any browser. No install or build step. Progress is saved in your browser.
 
@@ -9,6 +9,14 @@ Each lab has three parts:
 - **Bench**: interactive models you can change and watch respond.
 - **Key ideas**: the chapter's rules and formulas, short enough to review in a minute.
 - **Practice**: endless randomized problems with worked solutions. Filter by problem type to drill one skill. Ten correct answers marks a lab as mastered.
+- **Ask Claude** (when opened as a claude.ai Artifact): a hint button that doesn't give away the answer, a step-by-step explanation of any problem, and a chat box for each chapter. Everywhere else these controls stay hidden.
+
+Study tools (top navigation):
+
+- **Table**: interactive periodic table of all 118 elements. Color by family, block, state or electronegativity; tap an element for its mass, configuration, common ions and more.
+- **Cards**: flashcard decks (polyatomic ions, element symbols, ion charges, metric and Greek prefixes, acids and bases, constants and formulas). Cards you miss come back more often.
+- **Test**: a mixed quiz from the chapters you choose, with a score by chapter and worked solutions for everything you missed.
+- **Weak spots**: the home page lists the problem types you miss most and links straight to drilling them.
 
 | Ch | Lab | Bench | Practice |
 |----|-----|-------|----------|
@@ -28,6 +36,8 @@ Each lab has three parts:
 | 15 | Equilibrium & Le Châtelier | Ammonia equilibrium simulator (Q vs K) | Writing K, calculating K, Q vs K, Le Châtelier, Ksp |
 | 16 | Oxidation & Reduction | Oxidation number calculator, activity series | Oxidation numbers, oxidized/reduced/agents, activity series |
 | 17 | Radioactivity & Half-Life | Decay simulator, nuclear equation builder | Decay products, half-life amounts, carbon dating, identifying particles |
+| 18 | Organic Molecules | Hydrocarbon builder with structural formulas, functional groups | Naming hydrocarbons, formulas, alkane/alkene/alkyne, functional groups, isomers |
+| 19 | DNA to Protein | Transcription and translation with point mutations, biomolecule classes | Complementary DNA, mRNA, codons, translation, biomolecule classes, building blocks |
 
 ## Files
 
@@ -37,5 +47,8 @@ Each lab has three parts:
 - `js/labs-atoms.js`: Ch 4, 5, 6, 9, 10
 - `js/labs-reactions.js`: Ch 7, 8, 15, 16
 - `js/labs-states.js`: Ch 11–14, 17
+- `js/labs-life.js`: Ch 18–19
+- `js/tools.js`: periodic table, flashcards, test mode
+- `js/tutor.js`: Ask Claude hints, explanations and chat (claude.ai Artifact runtime only)
 
 To add a lab, call `registerLab({ id, ch, sym, fam, title, chapter, blurb, ideas, bench(el), problems })` in any lab file.
