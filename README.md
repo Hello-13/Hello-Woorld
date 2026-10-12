@@ -64,3 +64,9 @@ src/
   state/       settings and practice log (localStorage)
   tools/       one file per pedal, plus the Home pedalboard
 ```
+
+---
+
+## Chem Bench
+
+[`chemistry-labs/`](chemistry-labs/) has interactive labs for every chapter of my chemistry course. Open `chemistry-labs/index.html` in a browser.
