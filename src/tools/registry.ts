@@ -3,6 +3,8 @@ export type ToolId = 'tuner' | 'metronome' | 'chords' | 'scales' | 'jam' | 'chan
 export interface ToolInfo {
   id: ToolId;
   name: string;
+  /** Label in the top navigation. */
+  short: string;
   /** Model number printed on the pedal. */
   code: string;
   color: string;
@@ -16,6 +18,7 @@ export const TOOLS: ToolInfo[] = [
   {
     id: 'tuner',
     name: 'Tuner',
+    short: 'Tuner',
     code: 'ST-01',
     color: 'var(--p-tuner)',
     blurb: 'Tune with the mic or by ear. Strobe and needle, ten tunings.',
@@ -24,6 +27,7 @@ export const TOOLS: ToolInfo[] = [
   {
     id: 'metronome',
     name: 'Metronome',
+    short: 'Metronome',
     code: 'ST-02',
     color: 'var(--p-metro)',
     blurb: 'A steady click with accents, subdivisions and a speed trainer.',
@@ -32,6 +36,7 @@ export const TOOLS: ToolInfo[] = [
   {
     id: 'chords',
     name: 'Chord Lab',
+    short: 'Chords',
     code: 'ST-03',
     color: 'var(--p-chords)',
     lightEnclosure: true,
@@ -41,6 +46,7 @@ export const TOOLS: ToolInfo[] = [
   {
     id: 'scales',
     name: 'Scale Map',
+    short: 'Scales',
     code: 'ST-04',
     color: 'var(--p-scales)',
     blurb: 'Light up any scale across the neck, one hand position at a time.',
@@ -49,6 +55,7 @@ export const TOOLS: ToolInfo[] = [
   {
     id: 'jam',
     name: 'Backing Band',
+    short: 'Band',
     code: 'ST-05',
     color: 'var(--p-jam)',
     blurb: 'Drums and strummed chords to play along with. Pick a progression or write your own.',
@@ -57,6 +64,7 @@ export const TOOLS: ToolInfo[] = [
   {
     id: 'changes',
     name: 'Chord Changes',
+    short: 'Changes',
     code: 'ST-06',
     color: 'var(--p-changes)',
     blurb: 'The one-minute changes drill. Switch between two chords and beat your best.',
@@ -65,6 +73,7 @@ export const TOOLS: ToolInfo[] = [
   {
     id: 'hunt',
     name: 'Note Hunt',
+    short: 'Note Hunt',
     code: 'ST-07',
     color: 'var(--p-hunt)',
     blurb: 'A 60-second game for learning every note on the neck. Tap it, or play it.',
@@ -73,6 +82,7 @@ export const TOOLS: ToolInfo[] = [
   {
     id: 'ear',
     name: 'Ear Trainer',
+    short: 'Ear',
     code: 'ST-08',
     color: 'var(--p-ear)',
     blurb: 'Intervals, chord qualities and single notes, with songs to remember them by.',
@@ -81,6 +91,7 @@ export const TOOLS: ToolInfo[] = [
   {
     id: 'piano',
     name: 'Piano Bridge',
+    short: 'Piano',
     code: 'ST-09',
     color: 'var(--p-piano)',
     lightEnclosure: true,

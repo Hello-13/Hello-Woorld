@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { dayKey, recentDays, streak, type PracticeData } from './practice';
+import { dayKey, huntHeat, recentDays, streak, type PracticeData } from './practice';
 
-const base: PracticeData = { days: {}, huntBest: {}, ear: {}, changes: [], lastBpm: 90 };
+const base: PracticeData = { days: {}, huntBest: {}, huntStats: {}, ear: {}, changes: [], lastBpm: 90 };
 
 describe('practice log', () => {
   it('formats local day keys', () => {
@@ -41,5 +41,13 @@ describe('practice log', () => {
     ]);
     expect(days[0].minutes).toBe(10);
     expect(days[6].minutes).toBe(3);
+  });
+});
+
+describe('note hunt heat', () => {
+  it('is cool for quick right answers and hot for misses', () => {
+    expect(huntHeat({ seen: 5, miss: 0, ms: 5 * 900 })).toBeLessThan(0.05);
+    expect(huntHeat({ seen: 4, miss: 4, ms: 0 })).toBeGreaterThan(0.95);
+    expect(huntHeat({ seen: 4, miss: 0, ms: 4 * 4000 })).toBeGreaterThan(huntHeat({ seen: 4, miss: 0, ms: 4 * 1500 }));
   });
 });

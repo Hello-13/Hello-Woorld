@@ -3,9 +3,9 @@ import type { NoteRole } from './Fretboard';
 
 const BLACK = new Set([1, 3, 6, 8, 10]);
 const WHITE_W = 24;
-const WHITE_H = 120;
+const WHITE_H = 104;
 const BLACK_W = 15;
-const BLACK_H = 76;
+const BLACK_H = 66;
 
 const ROLE_FILL: Partial<Record<NoteRole, string>> = {
   root: 'var(--n-root)',
@@ -59,7 +59,7 @@ export function Piano(props: PianoProps) {
 
   return (
     <div class="piano-wrap">
-      <svg class="piano" viewBox={`-1 -1 ${width} ${height}`} role="img" aria-label="Piano keyboard">
+      <svg class="piano" viewBox={`-1 -1 ${width} ${height}`} role="img" aria-label="Piano keyboard" style={{ minWidth: `${whiteIndex * 17}px` }}>
         {whites.map((k) => {
           const mark = markFor(k.midi);
           return (
@@ -69,8 +69,8 @@ export function Piano(props: PianoProps) {
               </rect>
               {mark && (
                 <>
-                  <circle cx={k.x + WHITE_W / 2} cy={WHITE_H - 20} r={9.5} fill={ROLE_FILL[mark.role] ?? 'var(--accent)'} pointer-events="none" />
-                  <text class="pk-label" x={k.x + WHITE_W / 2} y={WHITE_H - 16.5} text-anchor="middle" fill={mark.role === 'ext' ? '#22180a' : '#fff'} font-weight={700}>
+                  <circle cx={k.x + WHITE_W / 2} cy={WHITE_H - 18} r={9.5} fill={ROLE_FILL[mark.role] ?? 'var(--accent)'} pointer-events="none" />
+                  <text class="pk-label" x={k.x + WHITE_W / 2} y={WHITE_H - 14.5} text-anchor="middle" fill={mark.role === 'ext' ? '#22180a' : '#fff'} font-weight={700}>
                     {pretty(mark.label ?? pcName(k.midi, props.flats))}
                   </text>
                 </>
@@ -92,8 +92,8 @@ export function Piano(props: PianoProps) {
               </rect>
               {mark && (
                 <>
-                  <circle cx={k.x + BLACK_W / 2} cy={BLACK_H - 14} r={7} fill={ROLE_FILL[mark.role] ?? 'var(--accent)'} pointer-events="none" />
-                  <text class="pk-label" x={k.x + BLACK_W / 2} y={BLACK_H - 11} text-anchor="middle" fill="#fff" font-size={7.5} font-weight={700}>
+                  <circle cx={k.x + BLACK_W / 2} cy={BLACK_H - 12} r={7} fill={ROLE_FILL[mark.role] ?? 'var(--accent)'} pointer-events="none" />
+                  <text class="pk-label" x={k.x + BLACK_W / 2} y={BLACK_H - 9} text-anchor="middle" fill="#fff" font-size={7.5} font-weight={700}>
                     {pretty(mark.label ?? pcName(k.midi, props.flats))}
                   </text>
                 </>

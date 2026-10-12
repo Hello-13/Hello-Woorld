@@ -326,23 +326,23 @@ export function BackingBand() {
               <span key={b} class={beatNow === b ? 'now' : ''} />
             ))}
           </div>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="bar-strip">
-          {shapes.map((s, i) => (
-            <div key={i} class={`bar-cell ${pos && !pos.countIn && pos.chordIndex === i ? 'now' : ''}`}>
-              <span class="mono">{preset ? preset.bars.split(' ')[i] : i + 1}</span>
-              <b>{pretty(chordSymbol(s.chord))}</b>
+          <div>
+            <span class="eyebrow">Progression</span>
+            <div class="bar-strip" style={{ marginTop: '6px' }}>
+              {shapes.map((s, i) => (
+                <div key={i} class={`bar-cell ${pos && !pos.countIn && pos.chordIndex === i ? 'now' : ''}`}>
+                  <span class="mono">{preset ? preset.bars.split(' ')[i] : i + 1}</span>
+                  <b>{pretty(chordSymbol(s.chord))}</b>
+                </div>
+              ))}
             </div>
-          ))}
+            {parsed.errors.length > 0 && (
+              <p class="notice bad" style={{ marginTop: '10px' }}>
+                Skipped {parsed.errors.map((e) => `“${e}”`).join(', ')}: not a chord name or roman numeral.
+              </p>
+            )}
+          </div>
         </div>
-        {parsed.errors.length > 0 && (
-          <p class="notice bad" style={{ marginTop: '10px' }}>
-            Skipped {parsed.errors.map((e) => `“${e}”`).join(', ')}: not a chord name or roman numeral.
-          </p>
-        )}
       </section>
 
       <section class="panel stack" style={{ gap: '16px' }}>

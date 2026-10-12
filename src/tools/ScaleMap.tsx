@@ -14,6 +14,13 @@ import { bestVoicing } from '../theory/voicings';
 
 type LabelMode = 'notes' | 'degrees' | 'none';
 
+const PARENT: Record<string, string> = {
+  'minor-pentatonic': 'minor',
+  blues: 'minor',
+  'major-pentatonic': 'major',
+  'major-blues': 'major',
+};
+
 const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
 
 interface ScaleChord {
@@ -75,7 +82,9 @@ export function ScaleMap() {
   const names = useMemo(() => spellScale(root, scale), [root, scaleId]);
   const positions = useMemo(() => positionsFor(pcs, tuning.strings[0]), [pcs, tuning.id]);
   const pos = position >= 0 ? positions[Math.min(position, positions.length - 1)] : null;
-  const triads = useMemo(() => scaleTriads(root, scale), [root, scaleId]);
+  // Pentatonic and blues scales borrow their chords from the major or minor key they live in.
+  const parent = scale.degrees.length === 7 ? scale : PARENT[scaleId] ? getScale(PARENT[scaleId]) : null;
+  const triads = useMemo(() => (parent ? scaleTriads(root, parent) : []), [root, scaleId]);
 
   useEffect(() => setPosition((p) => (p >= positions.length ? -1 : p)), [positions.length]);
 
@@ -295,7 +304,11 @@ export function ScaleMap() {
           <h3>Chords in this scale</h3>
           {triads.length ? (
             <>
-              <p class="muted">Stack every other note and you get the scale’s own chords. Tap one to hear it.</p>
+              <p class="muted">
+                {parent === scale
+                  ? 'Stack every other note and you get the scale’s own chords. Tap one to hear it.'
+                  : `${scale.name} sits inside ${pretty(root)} ${parent!.name.toLowerCase()}, so it fits over these chords. Tap one to hear it.`}
+              </p>
               <div class="triad-grid">
                 {triads.map((t) => (
                   <button
@@ -316,7 +329,7 @@ export function ScaleMap() {
             </>
           ) : (
             <p class="muted">
-              Chords are built from seven-note scales. {scale.name} has {scale.degrees.length} notes, so try soloing it over the chords of the matching major or minor key instead.
+              The whole-tone scale has no major or minor chords of its own: every triad it makes is augmented. Use it over a dominant 7th chord with a raised fifth for that dream-sequence sound.
             </p>
           )}
         </section>

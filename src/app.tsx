@@ -141,7 +141,7 @@ export function App() {
             {TOOLS.map((t) => (
               <a key={t.id} href={'#' + t.id} aria-current={route === t.id ? 'page' : undefined}>
                 <span class="led" style={{ '--c': t.color }} />
-                {t.name}
+                {t.short}
               </a>
             ))}
           </nav>

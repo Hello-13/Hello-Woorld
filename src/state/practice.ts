@@ -7,10 +7,19 @@ export interface ChangesResult {
   at: string;
 }
 
+export interface HuntStat {
+  seen: number;
+  miss: number;
+  /** Total milliseconds taken on correct answers. */
+  ms: number;
+}
+
 export interface PracticeData {
   /** Day ("2026-10-12") → tool id → seconds practised. */
   days: Record<string, Record<string, number>>;
   huntBest: Record<string, number>;
+  /** Note Hunt answers per fretboard position, keyed "string:fret" (string 0 = low E). */
+  huntStats: Record<string, HuntStat>;
   /** Ear-training answers per question type ("interval:7", "chord:min"…). */
   ear: Record<string, { right: number; total: number }>;
   changes: ChangesResult[];
@@ -20,6 +29,7 @@ export interface PracticeData {
 export const practiceStore = createStore<PracticeData>('string-theory:practice', {
   days: {},
   huntBest: {},
+  huntStats: {},
   ear: {},
   changes: [],
   lastBpm: 90,
@@ -85,6 +95,26 @@ export function recordHunt(mode: string, score: number): boolean {
   if (score <= best) return false;
   practiceStore.set((p) => ({ huntBest: { ...p.huntBest, [mode]: score } }));
   return true;
+}
+
+export function recordHuntAnswer(pos: string, correct: boolean, ms: number) {
+  practiceStore.set((p) => {
+    const prev = p.huntStats[pos] ?? { seen: 0, miss: 0, ms: 0 };
+    return {
+      huntStats: {
+        ...p.huntStats,
+        [pos]: { seen: prev.seen + 1, miss: prev.miss + (correct ? 0 : 1), ms: prev.ms + (correct ? ms : 0) },
+      },
+    };
+  });
+}
+
+/** 0 (solid) … 1 (needs work), from misses and slow answers. */
+export function huntHeat(stat: HuntStat): number {
+  const missRate = stat.miss / stat.seen;
+  const right = stat.seen - stat.miss;
+  const avg = right > 0 ? stat.ms / right : 6000;
+  return Math.min(1, 0.65 * missRate + 0.35 * Math.min(1, Math.max(0, (avg - 800) / 5000)));
 }
 
 export function recordChanges(pair: string, count: number) {

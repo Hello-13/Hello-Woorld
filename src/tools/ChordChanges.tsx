@@ -27,6 +27,13 @@ const CLASSIC: [string, string][] = [
   ['Am', 'Dm'],
 ];
 
+/** Illustrative two weeks of runs, shown (and labelled) until the player has their own. */
+const EXAMPLE_RUNS: ChangesResult[] = [18, 21, 20, 25, 27, 26, 31, 33, 32, 37, 40, 43].map((count, i) => ({
+  pair: 'example',
+  count,
+  at: new Date(2026, 0, 1 + i).toISOString(),
+}));
+
 export function pairKey(a: string, b: string): string {
   return [a, b].sort().join('–');
 }
@@ -40,7 +47,7 @@ function niceMax(v: number): number {
 }
 
 /** Changes per run for one chord pair, oldest to newest. */
-function RunsChart(props: { runs: ChangesResult[] }) {
+function RunsChart(props: { runs: ChangesResult[]; example?: boolean }) {
   const [hover, setHover] = useState<number | null>(null);
   const runs = props.runs.slice(-12);
   const W = 360;
@@ -54,7 +61,7 @@ function RunsChart(props: { runs: ChangesResult[] }) {
   const area = `${line} L${x(runs.length - 1).toFixed(1)} ${y(0)} L${x(0).toFixed(1)} ${y(0)} Z`;
   const last = runs.length - 1;
   return (
-    <div class="runs-chart">
+    <div class={`runs-chart ${props.example ? 'example' : ''}`}>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Changes per minute over the last ${runs.length} runs`}>
         {[0, max / 2, max].map((t) => (
           <g key={t}>
@@ -398,7 +405,12 @@ export function ChordChanges() {
               </details>
             </>
           ) : (
-            <p class="muted">Your results for this pair will chart here. Most players start around 15–25 changes a minute and pass 50 within a few weeks.</p>
+            <>
+              <RunsChart example runs={EXAMPLE_RUNS} />
+              <p class="muted">
+                <span class="example-tag">Example</span> Your own runs for this pair will chart here. Most players start around 15–25 changes a minute and pass 50 within a few weeks of daily runs.
+              </p>
+            </>
           )}
         </section>
       </div>
