@@ -1,5 +1,6 @@
 import { useRef, useState } from 'preact/hooks';
 import { playNote } from '../audio/guitar';
+import { Coach } from '../components/Coach';
 import { Fretboard, type FretMark } from '../components/Fretboard';
 import { markActive, recentDays, streak, usePractice, daySeconds, dayKey } from '../state/practice';
 import { useSettings, useTuning } from '../state/settings';
@@ -195,6 +196,8 @@ export function Home() {
           ))}
         </div>
       </section>
+
+      <Coach practice={p} />
 
       <Playground />
     </div>

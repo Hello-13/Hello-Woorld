@@ -2313,3 +2313,58 @@ main {
   white-space: pre;
   overflow: auto;
 }
+
+/* ───────────── Coach ───────────── */
+
+.coach-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 24px;
+}
+.plan {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.plan ol {
+  margin: 10px 0 0;
+  padding-left: 1.3em;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.plan li p {
+  color: var(--ink-2);
+  margin-top: 2px;
+}
+.plan-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 650;
+  text-decoration: none;
+}
+.plan-tool:hover {
+  text-decoration: underline;
+}
+.plan-min {
+  font-size: 0.75rem;
+  margin-left: 8px;
+}
+.plan-tip {
+  margin-top: 12px;
+  font-style: italic;
+  color: var(--ink-2);
+}
+.coach-answer {
+  white-space: pre-wrap;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  line-height: 1.55;
+}
+@media (max-width: 760px) {
+  .coach-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
