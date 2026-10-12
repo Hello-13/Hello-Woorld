@@ -89,7 +89,15 @@ function RunsChart(props: { runs: ChangesResult[]; example?: boolean }) {
         ))}
         {/* Direct labels: the best run and the latest one only */}
         {[...new Set([best, last])].map((i) => (
-          <text key={'l' + i} x={x(i)} y={y(runs[i].count) - 10} text-anchor="middle" font-size="11" font-weight="600" style={{ fill: 'var(--ink)' }}>
+          <text
+            key={'l' + i}
+            x={x(i)}
+            y={y(runs[i].count) - 10}
+            text-anchor={x(i) > W - 60 ? 'end' : x(i) < pad.l + 30 ? 'start' : 'middle'}
+            font-size="11"
+            font-weight="600"
+            style={{ fill: 'var(--ink)' }}
+          >
             {i === best && i === last ? `${runs[i].count} · best` : i === best ? `best ${runs[i].count}` : runs[i].count}
           </text>
         ))}

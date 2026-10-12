@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'preact/hooks';
 import { mod12, pcName, pretty } from '../theory/notes';
 import type { NoteRole } from './Fretboard';
 
@@ -32,6 +33,8 @@ export interface PianoProps {
   /** Show C3, C4… under the C keys. */
   octaveLabels?: boolean;
   flats?: boolean;
+  /** Scroll so this note is in the middle when the keyboard is wider than the screen. */
+  centerOn?: number;
 }
 
 export function Piano(props: PianoProps) {
@@ -51,6 +54,13 @@ export function Piano(props: PianoProps) {
   const blacks = keys.filter((k) => k.black);
 
   const markFor = (midi: number) => props.marks?.get(midi);
+  const wrap = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = wrap.current;
+    const key = keys.find((k) => k.midi === props.centerOn);
+    if (!el || !key || el.scrollWidth <= el.clientWidth) return;
+    el.scrollLeft = (key.x / width) * el.scrollWidth - el.clientWidth / 2;
+  }, []);
 
   const press = (midi: number) => (e: PointerEvent) => {
     e.preventDefault();
@@ -58,7 +68,7 @@ export function Piano(props: PianoProps) {
   };
 
   return (
-    <div class="piano-wrap">
+    <div class="piano-wrap" ref={wrap}>
       <svg class="piano" viewBox={`-1 -1 ${width} ${height}`} role="img" aria-label="Piano keyboard" style={{ minWidth: `${whiteIndex * 17}px` }}>
         {whites.map((k) => {
           const mark = markFor(k.midi);

@@ -698,7 +698,7 @@ main {
 .fretboard {
   display: block;
   width: 100%;
-  min-width: 760px;
+  margin-inline: auto;
   height: auto;
   touch-action: manipulation;
   user-select: none;
@@ -742,6 +742,26 @@ main {
 }
 .fb-string.ringing {
   animation: ring 0.5s ease-out;
+}
+.fb-string.ringing-v {
+  animation: ring-v 0.5s ease-out;
+}
+@keyframes ring-v {
+  20% {
+    transform: translateX(-1.2px);
+  }
+  40% {
+    transform: translateX(1px);
+  }
+  60% {
+    transform: translateX(-0.6px);
+  }
+}
+.fretboard-wrap.vertical {
+  overflow: visible;
+}
+.fretboard.vertical {
+  max-width: 360px;
 }
 @keyframes ring {
   0% {
@@ -2141,4 +2161,10 @@ main {
   padding: 1px 5px;
   margin-right: 4px;
   color: var(--ink-2);
+}
+
+@media (max-width: 640px) {
+  .topbar-inner .icon-btn {
+    margin-left: auto;
+  }
 }

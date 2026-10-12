@@ -1,5 +1,13 @@
 import { getEngine } from './engine';
 
+function isEmbedded(): boolean {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
 /** Live microphone input for the tuner and the listening games. */
 export class MicInput {
   private constructor(
@@ -10,8 +18,11 @@ export class MicInput {
   ) {}
 
   static async open(): Promise<MicInput> {
+    const embedded = isEmbedded();
+    const embeddedMessage =
+      'This view doesn’t allow microphone access (it’s embedded in another page). Open String Theory in its own browser tab to use the mic.';
     if (!navigator.mediaDevices?.getUserMedia) {
-      throw new MicError('unsupported', 'This browser view does not offer microphone access.');
+      throw new MicError('unsupported', embedded ? embeddedMessage : 'This browser doesn’t offer microphone access here. Microphones need a secure (https) page.');
     }
     const { ctx } = getEngine();
     let stream: MediaStream;
@@ -22,7 +33,7 @@ export class MicInput {
     } catch (err) {
       const name = (err as { name?: string })?.name;
       if (name === 'NotAllowedError' || name === 'SecurityError') {
-        throw new MicError('blocked', 'Microphone access was blocked. Allow it in your browser’s site settings, then try again.');
+        throw new MicError('blocked', embedded ? embeddedMessage : 'Microphone access was blocked. Allow it in your browser’s site settings, then try again.');
       }
       if (name === 'NotFoundError' || name === 'OverconstrainedError') {
         throw new MicError('missing', 'No microphone was found. Plug one in or check your input settings.');

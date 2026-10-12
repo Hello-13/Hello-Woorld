@@ -180,7 +180,7 @@ export function PianoBridge() {
           </div>
           {midiStatus && <span class="eyebrow">{midiStatus}</span>}
         </div>
-        <Piano from={LOW} to={HIGH} marks={pianoMarks} onPress={toggle} octaveLabels flats={settings.flats} />
+        <Piano from={LOW} to={HIGH} marks={pianoMarks} onPress={toggle} octaveLabels flats={settings.flats} centerOn={held[0] ?? 60} />
         <p class="muted" style={{ fontSize: '0.82rem' }}>
           Guitar music is written an octave higher than it sounds: the open low E string is the E below the bass clef’s bottom line, E2 here.
         </p>

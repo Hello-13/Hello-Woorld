@@ -45,7 +45,7 @@ export function Seg<T extends string | number>(props: {
 
 export function Field(props: { label: string; htmlFor?: string; children: ComponentChildren; grow?: boolean }) {
   return (
-    <div class="field" style={props.grow ? { flex: 1 } : undefined}>
+    <div class="field" style={props.grow ? { flex: '1 1 200px' } : undefined}>
       {props.htmlFor ? <label for={props.htmlFor}>{props.label}</label> : <span class="label">{props.label}</span>}
       {props.children}
     </div>
