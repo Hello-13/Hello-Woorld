@@ -14,6 +14,8 @@ export interface Settings {
   frets: number;
   /** Prefer flats when naming notes outside a key. */
   flats: boolean;
+  /** Measured round-trip audio latency for the timing check, in ms (null until calibrated). */
+  latencyMs: number | null;
 }
 
 export const settingsStore = createStore<Settings>('string-theory:settings', {
@@ -24,6 +26,7 @@ export const settingsStore = createStore<Settings>('string-theory:settings', {
   volume: 0.8,
   frets: 15,
   flats: false,
+  latencyMs: null,
 });
 
 export function useSettings(): Settings {

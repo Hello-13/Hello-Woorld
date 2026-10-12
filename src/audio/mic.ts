@@ -12,7 +12,7 @@ function isEmbedded(): boolean {
 export class MicInput {
   private constructor(
     private stream: MediaStream,
-    private source: MediaStreamAudioSourceNode,
+    readonly source: MediaStreamAudioSourceNode,
     readonly analyser: AnalyserNode,
     readonly buffer: Float32Array<ArrayBuffer>,
   ) {}

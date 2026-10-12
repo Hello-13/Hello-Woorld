@@ -82,6 +82,11 @@ export class Transport {
     }
   }
 
+  /** Recently scheduled steps, oldest first (a copy). */
+  recentSteps(): StepEvent[] {
+    return [...this.queue];
+  }
+
   /** The most recent step that has actually sounded by audio time `t` (for drawing). */
   stepAt(t: number): StepEvent | null {
     let current: StepEvent | null = null;

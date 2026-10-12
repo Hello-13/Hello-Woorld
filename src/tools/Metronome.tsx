@@ -4,6 +4,7 @@ import { click, type ClickSound } from '../audio/kit';
 import { Transport } from '../audio/scheduler';
 import { Field, PlayIcon, Seg, StopIcon, ToolHeader } from '../components/ui';
 import { markActive, practiceStore } from '../state/practice';
+import { TimingCheck } from './TimingCheck';
 
 interface Meter {
   id: string;
@@ -365,6 +366,7 @@ export function Metronome() {
               Land back on beat one with the click.
             </p>
           </div>
+          <TimingCheck transport={transport} running={running} />
           {running && (
             <p class="mono muted" style={{ fontSize: '0.8rem' }}>
               Bar {barCount + 1}
