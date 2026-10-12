@@ -86,7 +86,12 @@ function WeekBars(props: { days: { key: string; date: Date; minutes: number }[] 
   return (
     <div class="week-bars" role="img" aria-label="Minutes practised over the last seven days">
       {props.days.map((d) => (
-        <div key={d.key} class={`week-day ${d.key === today ? 'today' : ''}`} title={`${d.date.toLocaleDateString(undefined, { weekday: 'long' })}: ${Math.round(d.minutes)} min`}>
+        <div
+          key={d.key}
+          class={`week-day ${d.key === today ? 'today' : ''}`}
+          tabIndex={0}
+          data-tip={`${d.date.toLocaleDateString(undefined, { weekday: 'short' })} · ${Math.round(d.minutes)} min`}
+        >
           <div class="week-track">
             <div class="week-bar" style={{ height: d.minutes > 0 ? `${Math.max(6, (d.minutes / max) * 100)}%` : '0' }} />
           </div>
