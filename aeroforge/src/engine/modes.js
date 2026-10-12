@@ -68,7 +68,7 @@ export function pressureMaterial() {
         }
         vec3 col = diverge(cp);
         float lit = 0.55 + 0.45 * max(dot(normalize(vN), normalize(vec3(0.3, 0.8, 0.5))), 0.0);
-        float rim = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 3.0);
+        float rim = pow(max(1.0 - abs(dot(normalize(vN), normalize(vV))), 0.0), 3.0);
         gl_FragColor = vec4(col * lit + rim * 0.08, 1.0);
       }`,
   });

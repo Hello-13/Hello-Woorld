@@ -1,4 +1,4 @@
-// Render stage: renderer, HDR/MSAA post-processing chain (GTAO → outline → bloom → AgX → grade),
+// Render stage: renderer, HDR/MSAA post-processing chain (GTAO → outline → NaN guard → bloom → AgX → grade),
 // environment sets, camera rig, quality presets and the frame loop.
 
 import * as THREE from 'three';
@@ -53,6 +53,21 @@ class SceneAOPass extends GTAOPass {
   }
   setSize(w, h) { super.setSize(Math.max(1, Math.round(w * this.resScale)), Math.max(1, Math.round(h * this.resScale))); }
 }
+
+// One NaN/Inf pixel in the HDR buffer is enough for bloom's blur chain to smear it into a black
+// block across the frame. Zero such pixels (from the scene, AO or outline) before bloom runs.
+const SanitizeShader = {
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse; varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      // the comparison is false for NaN and for +/-Inf, so it catches both
+      bool ok = all(lessThan(abs(c), vec4(60000.0))) && !any(isnan(c)) && !any(isinf(c));
+      gl_FragColor = ok ? c : vec4(0.0, 0.0, 0.0, 1.0);
+    }`,
+};
 
 const GradeShader = {
   uniforms: { tDiffuse: { value: null }, time: { value: 0 }, vignette: { value: 0.32 }, grain: { value: 0.028 } },
@@ -167,6 +182,7 @@ export class Stage {
     this.outline.hiddenEdgeColor.set(0x6b4a06);
     if (this._outlined) this.outline.selectedObjects = this._outlined;
     composer.addPass(this.outline);
+    composer.addPass(new ShaderPass(SanitizeShader));     // before bloom, the pass that spreads pixels
     this.bloom = new UnrealBloomPass(new THREE.Vector2(2, 2), 0.38, 0.45, 1.9);
     composer.addPass(this.bloom);
     composer.addPass(new OutputPass());

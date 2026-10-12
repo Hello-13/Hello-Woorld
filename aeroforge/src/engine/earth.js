@@ -46,7 +46,8 @@ const surfaceFrag = /* glsl */`
     vec3 r1 = cross(dpdy, N), r2 = cross(N, dpdx);
     float det = dot(dpdx, r1);
     vec3 g = sign(det) * (dhdx * r1 + dhdy * r2);
-    return normalize(abs(det) * N - bumpScale * g);
+    vec3 n = abs(det) * N - bumpScale * g;
+    return dot(n, n) > 1e-30 ? normalize(n) : N;
   }
 
   void main() {

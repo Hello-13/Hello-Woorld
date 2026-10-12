@@ -20,7 +20,7 @@ export function xrayMaterial(color = 0x5fd4ff, power = 2.2, base = 0.035) {
       uniform vec3 color; uniform float power; uniform float base;
       varying vec3 vN; varying vec3 vV;
       void main() {
-        float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), power);
+        float f = pow(max(1.0 - abs(dot(normalize(vN), normalize(vV))), 0.0), power);
         float a = clamp(f + base, 0.0, 1.0);
         gl_FragColor = vec4(color * (f * 1.6 + base), a);
       }`,
@@ -82,12 +82,12 @@ export function plumeMaterial({ core = 0xfff1d0, outer = 0xff7a1c, diamonds = 1 
       varying vec2 vUv; varying vec3 vN; varying vec3 vV;
       float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       void main() {
-        float s = 1.0 - vUv.y;
-        float facing = abs(dot(normalize(vN), normalize(vV)));
+        float s = clamp(1.0 - vUv.y, 0.0, 1.0);    // MSAA can extrapolate uv past the edge
+        float facing = min(abs(dot(normalize(vN), normalize(vV))), 1.0);
         float body = pow(facing, 1.6);
         float fade = pow(1.0 - s, 1.4) * smoothstep(0.0, 0.03, s);
         float cells = 0.5 + 0.5 * cos(s * 34.0 - 1.2);
-        float shock = diamonds * pow(cells, 6.0) * (1.0 - smoothstep(0.1, 0.75, s));
+        float shock = diamonds * pow(max(cells, 0.0), 6.0) * (1.0 - smoothstep(0.1, 0.75, s));
         float flick = 0.85 + 0.15 * hash(vec2(floor(time * 30.0), floor(vUv.x * 12.0)));
         vec3 col = mix(outerColor, coreColor, clamp(body * (1.2 - s) + shock, 0.0, 1.0));
         float a = (body * fade * 0.9 + shock * 0.8) * intensity * flick;
@@ -125,7 +125,7 @@ export function vaporConeMaterial() {
       varying vec2 vUv; varying vec3 vN; varying vec3 vV;
       float n(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
       void main() {
-        float rim = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 1.3);
+        float rim = pow(max(1.0 - abs(dot(normalize(vN), normalize(vV))), 0.0), 1.3);
         float along = smoothstep(0.0, 0.35, vUv.y) * (1.0 - smoothstep(0.75, 1.0, vUv.y));
         float grain = 0.75 + 0.25 * n(floor(vUv * vec2(90.0, 40.0)) + floor(time * 20.0));
         float a = strength * (0.18 + rim * 0.6) * along * grain;
@@ -180,7 +180,7 @@ export function gridFloor(size = 400) {
       uniform float minor; uniform float major; uniform vec3 color; uniform vec3 accent; uniform float fadeDist; uniform float opacity;
       varying vec3 vW;
       float line(vec2 p, float s, float w) {
-        vec2 g = abs(fract(p / s - 0.5) - 0.5) / fwidth(p / s);
+        vec2 g = abs(fract(p / s - 0.5) - 0.5) / max(fwidth(p / s), vec2(1e-6));
         return 1.0 - min(min(g.x, g.y) / w, 1.0);
       }
       void main() {
@@ -188,7 +188,7 @@ export function gridFloor(size = 400) {
         float d = length(p);
         float l1 = line(p, minor, 1.0) * 0.35;
         float l2 = line(p, major, 1.4) * 0.8;
-        float axis = (1.0 - min(abs(p.x) / fwidth(p.x) / 1.5, 1.0)) + (1.0 - min(abs(p.y) / fwidth(p.y) / 1.5, 1.0));
+        float axis = (1.0 - min(abs(p.x) / max(fwidth(p.x), 1e-6) / 1.5, 1.0)) + (1.0 - min(abs(p.y) / max(fwidth(p.y), 1e-6) / 1.5, 1.0));
         float fade = 1.0 - smoothstep(fadeDist * 0.35, fadeDist, d);
         vec3 c = color * max(l1, l2) + accent * clamp(axis, 0.0, 1.0) * 0.25;
         float a = clamp(max(max(l1, l2), axis * 0.5), 0.0, 1.0) * fade * opacity;
@@ -333,7 +333,7 @@ export function earthMaterial() {
         c += city * vec3(1.0, 0.62, 0.22) * 1.4;
         // graticule every 30°
         vec2 deg = vec2(vUv.x * 360.0, vUv.y * 180.0);
-        vec2 gl = abs(fract(deg / 30.0 + 0.5) - 0.5) * 30.0 / fwidth(deg);
+        vec2 gl = abs(fract(deg / 30.0 + 0.5) - 0.5) * 30.0 / max(fwidth(deg), vec2(1e-6));
         float grat = 1.0 - min(min(gl.x, gl.y), 1.0);
         c += grat * vec3(0.12, 0.22, 0.32) * 0.6;
         float rim = pow(1.0 - max(dot(normalize(vNw), vV), 0.0), 3.0);
