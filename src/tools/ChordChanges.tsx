@@ -212,7 +212,7 @@ export function ChordChanges() {
       raf = requestAnimationFrame(loop);
       const now = performance.now();
       const remaining = Math.max(0, (endAt.current - now) / 1000);
-      setLeft(remaining);
+      setLeft(Math.ceil(remaining * 10) / 10);
       if (mic.current) {
         const level = rms(mic.current.read());
         if (detector.push(level, now)) bump();

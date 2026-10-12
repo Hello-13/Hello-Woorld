@@ -40,6 +40,8 @@ npm run build:artifact   # everything inlined into one HTML file in artifact/
 
 The tuner and the listening games need microphone access, which browsers only allow on `https://` pages or `localhost`.
 
+On the hosted site String Theory is an installable app: use your browser's *Add to Home Screen* or *Install* option and it works offline after the first visit.
+
 ### Deploy
 
 `.github/workflows/pages.yml` builds and publishes the site to GitHub Pages on every push to `master`. Turn it on once under **Settings → Pages → Build and deployment → Source: GitHub Actions**. The site then lives at `https://hello-13.github.io/Hello-Woorld/`.

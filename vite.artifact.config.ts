@@ -6,6 +6,9 @@ import preact from '@preact/preset-vite';
 export default defineConfig({
   base: './',
   plugins: [preact({ prerender: { enabled: false } })],
+  define: { __ARTIFACT__: 'true' },
+  // The single page inlines everything; manifest, icons and service worker are for the hosted site.
+  publicDir: false,
   build: {
     outDir: 'dist-artifact',
     target: 'es2022',

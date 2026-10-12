@@ -162,7 +162,8 @@ export function NoteHunt() {
     const loop = () => {
       raf = requestAnimationFrame(loop);
       const remaining = Math.max(0, (endAt.current - performance.now()) / 1000);
-      setLeft(remaining);
+      // Tenths are plenty for the timer bar and spare the fretboard sixty re-renders a second.
+      setLeft(Math.ceil(remaining * 10) / 10);
       if (remaining <= 0) {
         cancelAnimationFrame(raf);
         endGame();
