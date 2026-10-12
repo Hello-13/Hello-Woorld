@@ -47,6 +47,10 @@ function pedalStat(t: ToolInfo, p: ReturnType<typeof usePractice>, a4: number): 
       const best = p.changes.reduce((b, c) => (c.count > (b?.count ?? -1) ? c : b), null as null | { pair: string; count: number });
       return best ? `BEST ${best.count} · ${pretty(best.pair)}` : 'NO RUNS YET';
     }
+    case 'tab': {
+      const scores = Object.values(p.tabBest);
+      return scores.length ? `BEST ${Math.max(...scores)}% · ${scores.length} TUNE${scores.length > 1 ? 'S' : ''}` : '9 TUNES';
+    }
     case 'ear': {
       const all = Object.values(p.ear);
       const total = all.reduce((s, x) => s + x.total, 0);
@@ -161,7 +165,7 @@ export function Home() {
           <span class="eyebrow">Hey Paul. Pick a pedal.</span>
           <h1>Your guitar practice rig</h1>
           <p>
-            Nine tools that tune, keep time, show shapes, back you up and quiz you. Your piano knowledge comes along too: the Piano Bridge maps keys to frets.
+            Ten tools that tune, keep time, show shapes, back you up, teach you tunes and quiz you. Your piano knowledge comes along too: the Piano Bridge maps keys to frets.
           </p>
         </div>
         <div class="home-stats panel">

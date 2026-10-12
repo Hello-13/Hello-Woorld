@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { dayKey, huntHeat, recentDays, streak, type PracticeData } from './practice';
 
-const base: PracticeData = { days: {}, huntBest: {}, huntStats: {}, ear: {}, changes: [], lastBpm: 90 };
+const base: PracticeData = { days: {}, huntBest: {}, huntStats: {}, ear: {}, changes: [], lastBpm: 90, tabBest: {} };
 
 describe('practice log', () => {
   it('formats local day keys', () => {

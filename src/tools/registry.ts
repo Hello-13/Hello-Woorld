@@ -1,4 +1,4 @@
-export type ToolId = 'tuner' | 'metronome' | 'chords' | 'scales' | 'jam' | 'changes' | 'hunt' | 'ear' | 'piano';
+export type ToolId = 'tuner' | 'metronome' | 'chords' | 'scales' | 'jam' | 'changes' | 'hunt' | 'ear' | 'piano' | 'tab';
 
 export interface ToolInfo {
   id: ToolId;
@@ -97,6 +97,15 @@ export const TOOLS: ToolInfo[] = [
     lightEnclosure: true,
     blurb: 'Play what you know on the keys and see where it lives on the fretboard.',
     knobs: ['Keys', 'Neck'],
+  },
+  {
+    id: 'tab',
+    name: 'Tab Trainer',
+    short: 'Tab',
+    code: 'ST-10',
+    color: 'var(--p-tab)',
+    blurb: 'Learn melodies from tab. It plays them, counts you in, or waits until you hit each note.',
+    knobs: ['Tempo', 'Loop'],
   },
 ];
 

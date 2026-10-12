@@ -13,6 +13,7 @@ import { ChordChanges } from './tools/ChordChanges';
 import { NoteHunt } from './tools/NoteHunt';
 import { EarTrainer } from './tools/EarTrainer';
 import { PianoBridge } from './tools/PianoBridge';
+import { TabTrainer } from './tools/TabTrainer';
 
 const VIEWS: Record<ToolId, () => preact.JSX.Element> = {
   tuner: Tuner,
@@ -24,6 +25,7 @@ const VIEWS: Record<ToolId, () => preact.JSX.Element> = {
   hunt: NoteHunt,
   ear: EarTrainer,
   piano: PianoBridge,
+  tab: TabTrainer,
 };
 
 function currentRoute(): ToolId | 'home' {

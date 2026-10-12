@@ -50,6 +50,7 @@
   --p-ear: #8756c2;
   --p-piano: #ddd6ca;
   --p-changes: #da5b94;
+  --p-tab: #2f3237;
   --board-rail: #2a2522;
   --board-rail-2: #1f1b19;
 
@@ -99,6 +100,7 @@
     --n-ext: #e0a332;
     --n-other: #6f7b84;
     --p-piano: #cfc7b9;
+    --p-tab: #3b3f46;
     --board-rail: #0b0908;
     --board-rail-2: #060505;
     --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 30px -16px rgba(0, 0, 0, 0.8);
@@ -139,6 +141,7 @@
   --n-ext: #e0a332;
   --n-other: #6f7b84;
   --p-piano: #cfc7b9;
+  --p-tab: #3b3f46;
   --board-rail: #0b0908;
   --board-rail-2: #060505;
   --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 30px -16px rgba(0, 0, 0, 0.8);
@@ -2167,4 +2170,83 @@ main {
   .topbar-inner .icon-btn {
     margin-left: auto;
   }
+}
+
+/* ───────────── Tab Trainer ───────────── */
+
+.tab-scroll {
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.tab-staff {
+  display: block;
+}
+.tab-line {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+}
+.tab-bar {
+  stroke: var(--ink-2);
+  stroke-width: 1.2;
+}
+.tab-clef {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 15px;
+  fill: var(--ink-2);
+}
+.tab-rest {
+  font-size: 20px;
+  fill: var(--ink-3);
+}
+.tab-note {
+  cursor: pointer;
+}
+.tab-note rect {
+  fill: var(--surface-2);
+}
+.tab-note text {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  fill: var(--ink);
+}
+.tab-len {
+  stroke: var(--ink-3);
+  stroke-width: 3;
+  stroke-linecap: round;
+  opacity: 0.35;
+}
+.tab-note.current rect {
+  fill: var(--accent);
+}
+.tab-note.current text {
+  fill: var(--accent-ink);
+}
+.tab-note.current .tab-len {
+  stroke: var(--accent);
+  opacity: 1;
+}
+.tab-note.hit rect {
+  fill: var(--good);
+}
+.tab-note.hit text {
+  fill: #fff;
+}
+.tab-note.miss rect {
+  fill: var(--bad);
+}
+.tab-note.miss text {
+  fill: #fff;
+}
+.tab-playhead {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+.tab-status {
+  font-size: 0.88rem;
 }
