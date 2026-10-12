@@ -51,6 +51,10 @@ jobs:
         run: npx electron-builder ${{ matrix.target }} --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Check the Mac app's signature
+        if: runner.os == 'macOS'
+        run: |
+          for app in dist/mac*/*.app; do codesign --verify --deep --strict --verbose=2 "$app"; done
       - name: Launch test of the packaged app
         if: runner.os == 'Linux'
         run: npm run smoke
