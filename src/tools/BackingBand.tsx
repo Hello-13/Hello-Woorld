@@ -8,9 +8,10 @@ import { Field, PlayIcon, Seg, StopIcon, ToolHeader } from '../components/ui';
 import { markActive } from '../state/practice';
 import { useSettings, useTuning } from '../state/settings';
 import { createStore, useStore } from '../state/store';
-import { chordSymbol, makeChord, type Chord } from '../theory/chords';
+import { chordSymbol } from '../theory/chords';
+import { transposeChord } from '../theory/songsheet';
 import { parseProgression, PROGRESSIONS } from '../theory/keys';
-import { COMMON_ROOT_NAMES, keyPrefersFlats, mod12, pcName, pretty, prettyRoman } from '../theory/notes';
+import { COMMON_ROOT_NAMES, keyPrefersFlats, mod12, pretty, prettyRoman } from '../theory/notes';
 import { generateVoicings, type Voicing } from '../theory/voicings';
 
 type Drums = 'rock' | 'halftime' | 'shuffle' | 'waltz' | 'reggae' | 'none';
@@ -82,12 +83,6 @@ const jamStore = createStore<JamSettings>('string-theory:jam', {
   bass: true,
   countIn: true,
 });
-
-function transposeChord(c: Chord, semis: number, flats: boolean): Chord {
-  const root = pcName(mod12(c.rootPc + semis), flats);
-  const bass = c.bassPc !== undefined ? pcName(mod12(c.bassPc + semis), flats) : undefined;
-  return makeChord(root, c.type.id, bass);
-}
 
 function drumHit(style: Drums, slot: number, beats: number, time: number) {
   const onBeat = slot % 2 === 0;

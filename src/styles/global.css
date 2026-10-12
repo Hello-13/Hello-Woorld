@@ -2250,3 +2250,66 @@ main {
 .tab-status {
   font-size: 0.88rem;
 }
+
+/* ───────────── Song sheet ───────────── */
+
+.sheet-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.sheet-strip .chord-card {
+  flex: 0 0 auto;
+  min-width: 92px;
+}
+
+.sheet {
+  max-height: min(70vh, 640px);
+  overflow: auto;
+  padding: 4px 2px 40px;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.98rem;
+  line-height: 1.35;
+}
+.sheet-pair {
+  margin-bottom: 6px;
+}
+.sheet-chords,
+.sheet-lyric {
+  white-space: pre;
+}
+.sheet-chord {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--accent);
+  cursor: pointer;
+  border-radius: 3px;
+}
+.sheet-chord:hover,
+.sheet-chord.on {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.sheet-section {
+  font-size: 0.95rem;
+  margin: 14px 0 6px;
+  color: var(--ink-2);
+}
+.sheet-gap {
+  height: 10px;
+}
+.sheet-editor {
+  min-height: 340px;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  resize: vertical;
+  white-space: pre;
+  overflow: auto;
+}

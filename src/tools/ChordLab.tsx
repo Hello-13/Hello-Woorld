@@ -10,6 +10,7 @@ import { DEGREE_LABELS } from '../theory/intervals';
 import { COMMON_ROOT_NAMES, mod12, pcName, pretty } from '../theory/notes';
 import { stringName } from '../theory/tunings';
 import { generateVoicings, shapeString, voicingMidi, type Frets } from '../theory/voicings';
+import { SongSheet } from './SongSheet';
 
 const GROUPS: { name: string; ids: string[] }[] = [
   { name: 'Triads', ids: ['maj', 'min', '5', 'sus2', 'sus4', 'dim', 'aug'] },
@@ -347,7 +348,7 @@ function NameIt() {
 }
 
 export function ChordLab() {
-  const [mode, setMode] = useState<'lookup' | 'name'>('lookup');
+  const [mode, setMode] = useState<'lookup' | 'name' | 'sheet'>('lookup');
   return (
     <div class="stack">
       <ToolHeader
@@ -359,13 +360,14 @@ export function ChordLab() {
             options={[
               { value: 'lookup', label: 'Find shapes' },
               { value: 'name', label: 'Name a shape' },
+              { value: 'sheet', label: 'Song sheet' },
             ]}
           />
         }
       >
-        Pick a chord to see every comfortable way to hold it, fingered and ranked from easiest. Tap a diagram to hear it. Switch to “Name a shape” to work backwards from your fingers.
+        Pick a chord to see every comfortable way to hold it, fingered and ranked from easiest. “Name a shape” works backwards from your fingers, and “Song sheet” turns any chord sheet into tappable shapes with transpose and capo.
       </ToolHeader>
-      {mode === 'lookup' ? <LookUp /> : <NameIt />}
+      {mode === 'lookup' ? <LookUp /> : mode === 'name' ? <NameIt /> : <SongSheet />}
     </div>
   );
 }
