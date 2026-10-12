@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="sunburst" cx="50%" cy="40%" r="62%">
+      <stop offset="0" stop-color="#ffd27a"/>
+      <stop offset="0.45" stop-color="#e98a2a"/>
+      <stop offset="0.8" stop-color="#9c2b14"/>
+      <stop offset="1" stop-color="#3b1408"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="#15110f"/>
+  <g transform="translate(106 76) scale(10)">
+    <path d="M15 1.2C24 1.2 29 5.4 29 11.4 29 19.4 21.4 27.6 15 33 8.6 27.6 1 19.4 1 11.4 1 5.4 6 1.2 15 1.2Z" fill="url(#sunburst)"/>
+    <path d="M8 10.5h14M8 14h14M8 17.5h14" stroke="#fff6e5" stroke-width="1.2" stroke-linecap="round" opacity="0.85"/>
+  </g>
+</svg>
