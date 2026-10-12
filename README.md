@@ -78,6 +78,12 @@ A guitar practice widget for my dashboard: tuner, chord of the day, metronome an
 
 ---
 
+## Study Widgets
+
+My claude.ai Dashboard and Academic Hub as movable desktop widgets: frameless windows I can drag, resize and pin on top, with a tray icon and a show/hide shortcut. Installers for macOS, Windows and Linux are built by GitHub Actions. See [`desktop-widgets/`](desktop-widgets/README.md).
+
+---
+
 ## Chem Bench
 
 [`chemistry-labs/`](chemistry-labs/) has interactive labs for every chapter of my chemistry course. Open `chemistry-labs/index.html` in a browser.
