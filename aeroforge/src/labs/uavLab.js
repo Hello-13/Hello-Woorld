@@ -4,6 +4,8 @@
 import { mission, enduranceSweep, KESTREL } from '../physics/endurance.js';
 import { el, slider, toggle, readouts, section, fmt } from '../ui/dom.js';
 import { LineChart } from '../ui/chart.js';
+import * as THREE from 'three';
+import { ForceArrows, kN } from '../engine/forces.js';
 
 export function mountUavLab(root, ctx) {
   const v = ctx.vehicle;
@@ -16,9 +18,22 @@ export function mountUavLab(root, ctx) {
   const sAlt = slider({ label: 'Loiter altitude', min: 0, max: 15000, step: 100, value: p.altitude, unit: 'm', onInput: set('altitude') });
   const sSpd = slider({ label: 'True airspeed', min: 40, max: 140, step: 1, value: p.speed, unit: 'm/s', format: (x) => `${x} (${Math.round(x * 1.944)} kt)`, onInput: set('speed') });
   const sTr = slider({ label: 'Transit to station (each way)', min: 0, max: 1500, step: 10, value: p.transit, unit: 'km', onInput: set('transit') });
-  const tAir = toggle({ label: 'Airborne', value: false, onChange: (on) => { v.setAirborne(on); ctx.log(v.designation, on ? 'Wheels up · climbing to loiter altitude' : 'Recovered to the platform', 'info'); } });
+  const tAir = toggle({ label: 'Airborne', value: false, onChange: (on) => { v.setAirborne(on); ctx.setFlightLook(on); ctx.log(v.designation, on ? 'Wheels up · climbing to loiter altitude' : 'Recovered to the hangar', 'info'); } });
   const tLaser = toggle({ label: 'Laser designator', value: false, onChange: (on) => { v.setLaser(on); ctx.log(v.designation, on ? 'Laser armed · designating' : 'Laser safe', on ? 'warn' : 'info'); } });
 
+  const forces = v.forces || (v.forces = new ForceArrows(v.root, { radius: 0.05 }));
+  const tForces = toggle({ label: 'Force vectors', value: false, onChange: (on) => { forces.setVisible(on); ctx.muteCallouts?.(on); placeForces(); } });
+  let last = null;
+  function placeForces() {
+    if (!last || !forces.group.visible) return;
+    const W = (last.takeoffMass - p.fuel * 0.47) * 9.80665, D = W / last.lOverD;
+    const k = 4.5 / W;
+    const o = new THREE.Vector3(0.2, 0.25, 0).add(v.root.children[0].position);
+    forces.set('lift', { origin: o, dir: new THREE.Vector3(0, 1, 0), length: W * k, text: kN(W), name: 'Lift' });
+    forces.set('weight', { origin: o, dir: new THREE.Vector3(0, -1, 0), length: W * k, text: kN(W), name: 'Weight' });
+    forces.set('drag', { origin: o.clone().add(new THREE.Vector3(-0.6, 0, 0)), dir: new THREE.Vector3(-1, 0, 0), length: D * k * 4, text: `${kN(D)} (×4)`, name: 'Drag', labelOffset: new THREE.Vector3(0, 0.7, 0) });
+    forces.set('thrust', { origin: new THREE.Vector3(-6.1, 0.05, 0).add(v.root.children[0].position), dir: new THREE.Vector3(1, 0, 0), length: D * k * 4, text: `${kN(D)} (×4)`, name: 'Thrust', labelOffset: new THREE.Vector3(0, -0.7, 0) });
+  }
   const status = el('p', { class: 'lab-status', role: 'status' });
   const ro = readouts([
     { key: 'tow', label: 'Take-off mass', unit: 'kg' }, { key: 'cl', label: 'Loiter CL' },
@@ -39,12 +54,16 @@ export function mountUavLab(root, ctx) {
     status,
     section('Performance', ro.el),
     section('Loiter speed', chart.el, el('p', { class: 'lab-note', text: 'Endurance peaks at the minimum-power speed, where CL is √3 times the best-range value. Fly slower than that and induced drag wins; faster and parasite drag does.' })),
-    section('Aircraft', el('div', { class: 'btn-row' }, tAir.el, tLaser.el)),
+    section('Aircraft', el('div', { class: 'btn-row' }, tAir.el, tLaser.el, tForces.el)),
   );
 
   const compute = () => {
     const m = mission(p);
+    last = m;
     v.state.throttle = Math.min(1, m.powerKW / 670);
+    // angle of attack from the finite-wing lift slope a = 2πAR/(AR+2)
+    const ar = 16.8, slope = (2 * Math.PI * ar) / (ar + 2);
+    ctx.modes.setFlow({ alphaDeg: (m.cl / slope) * (180 / Math.PI), mach: p.speed / m.atm.a, stall: m.stall ? 1 : 0, tau: 0.15 });
     ro.set('tow', fmt.n(m.takeoffMass), m.overweight ? 'crit' : '');
     ro.set('cl', m.cl.toFixed(2), m.stall ? 'crit' : m.cl > 1.2 ? 'warn' : '');
     ro.set('ld', m.lOverD.toFixed(1));
@@ -69,7 +88,12 @@ export function mountUavLab(root, ctx) {
   };
 
   return {
-    update() { if (dirty) { dirty = false; compute(); } },
-    dispose() {},
+    update() {
+      if (dirty) { dirty = false; compute(); }
+      ctx.stage.env.cloudSpeed = v.state.airborne * p.speed;
+      if (forces.group.visible) placeForces();
+    },
+    dispose() { forces.setVisible(false); },
+    api: { setLaser(on) { tLaser.set(on); } },
   };
 }

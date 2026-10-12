@@ -4,8 +4,9 @@
 
 import * as THREE from 'three';
 import { Assembly, mesh } from '../engine/assembly.js';
-import { lathe, ogiveProfile, latticePanel, beam, mergeGeometries } from '../engine/geometry.js';
-import { M, rocketBodyTexture, smokeTexture, rng } from '../engine/materials.js';
+import { lathe, ogiveProfile, latticePanel, beam, rod, mergeGeometries } from '../engine/geometry.js';
+import { M, SKIN, rocketBodyTexture, smokeTexture, rng } from '../engine/materials.js';
+import { tankSkin } from '../engine/surface.js';
 import { plumeMaterial, plumeMesh } from '../engine/effects.js';
 
 const R = 1.85;            // core radius (m)
@@ -67,8 +68,38 @@ function legs(radius, mat) {
 }
 
 function stageBody(len, label, { soot = 0.35, band = null } = {}) {
-  const mat = new THREE.MeshStandardMaterial({ color: 0xe4e7ea, map: rocketBodyTexture(label, { soot, band }), roughness: 0.55, metalness: 0.05 });
-  return mesh(lathe([[R, 0], [R, len]], 64, Math.PI), mat);
+  const sk = tankSkin();
+  const normalMap = sk.normalMap.clone(); normalMap.repeat.set(10, len / 3.4); normalMap.needsUpdate = true;
+  const roughnessMap = sk.roughnessMap.clone(); roughnessMap.repeat.set(4, len / 6); roughnessMap.needsUpdate = true;
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: 0xe6e9ec, map: rocketBodyTexture(label, { soot, band }), normalMap, roughnessMap, normalScale: new THREE.Vector2(0.6, 0.6),
+    roughness: 0.9, metalness: 0.04, clearcoat: 0.35, clearcoatRoughness: 0.32,
+  });
+  return mesh(lathe([[R, 0], [R, len]], 96, Math.PI), mat);
+}
+
+/** Per-engine hardware: turbopump, gas-generator exhaust, gimbal actuators and propellant lines. */
+function engineKit(y0) {
+  const dark = [], copper = [];
+  const positions = [[0, 0]];
+  for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2 + Math.PI / 8; positions.push([Math.cos(a) * 1.22, Math.sin(a) * 1.22]); }
+  for (const [x, z] of positions) {
+    const out = Math.hypot(x, z) > 0.1 ? [x / Math.hypot(x, z), z / Math.hypot(x, z)] : [1, 0];
+    const tx = -out[1], tz = out[0];                       // tangential direction
+    const pump = new THREE.CylinderGeometry(0.1, 0.1, 0.34, 14).rotateZ(Math.PI / 2).rotateY(Math.atan2(tz, tx) * -1);
+    pump.translate(x + tx * 0.3, y0 - 0.25, z + tz * 0.3);
+    dark.push(pump.toNonIndexed());
+    const gg = new THREE.CylinderGeometry(0.045, 0.06, 1.6, 10).translate(0, -0.8, 0);
+    gg.translate(x + tx * 0.38, y0 - 0.45, z + tz * 0.38);
+    dark.push(gg.toNonIndexed());
+    for (const sgn of [1, -1]) {
+      copper.push(rod([x + tx * 0.18 * sgn, y0 + 0.02, z + tz * 0.18 * sgn], [x + out[0] * 0.2, y0 - 0.5, z + out[1] * 0.2], 0.025, 6).toNonIndexed());
+    }
+    dark.push(rod([x - out[0] * 0.3, y0 + 0.05, z - out[1] * 0.3], [x - out[0] * 0.12, y0 - 0.42, z - out[1] * 0.12], 0.03, 6).toNonIndexed());
+  }
+  const g = new THREE.Group();
+  g.add(mesh(mergeGeometries(dark), M.darkMetal()), mesh(mergeGeometries(copper), M.copper()));
+  return g;
 }
 
 export function buildRocket() {
@@ -80,9 +111,14 @@ export function buildRocket() {
   stack.position.y = -PIVOT_Y + MOUNT;
   rigPivot.add(stack);
   A.root.add(rigPivot);
+  const UPPER_CENTRE = 56;                  // stack-frame height of the upper stage + payload
+  let followY = PIVOT_Y - MOUNT;
   const P = (name, info, objs) => A.part(name, info, objs, stack);
 
-  const finMat = M.titanium();
+  const finMat = new THREE.MeshStandardMaterial({ color: 0x8c847c, metalness: 1, roughness: 0.38 });
+  const interMat = SKIN.carbon().clone();
+  interMat.map = SKIN.carbon().map.clone(); interMat.map.repeat.set(28, 10); interMat.map.needsUpdate = true;
+  interMat.normalMap = SKIN.carbon().normalMap.clone(); interMat.normalMap.repeat.set(28, 10); interMat.normalMap.needsUpdate = true;
 
   // ----------------------------------------------------------------- core first stage
   const coreBody = stageBody(42, 'HELIOS', { soot: 0.3 });
@@ -94,18 +130,18 @@ export function buildRocket() {
     system: 'Stage 1', material: 'Al-Li 2195 tanks, friction-stir welded', mass: 25600,
     desc: 'Centre core: LOX over RP-1 tanks, 395.7 t of propellant. Throttles to 55 % during the booster phase so it burns longer.',
     callout: true, anchor: [R + 0.2, 28, 0],
-  }, [coreBody, heatShield, raceway, legs(R, M.carbon())]);
+  }, [coreBody, heatShield, raceway, legs(R, SKIN.carbon())]);
   coreStage.userData.part.thermalRole = 'cryoTank';
 
   const coreEngines = P('Core engine cluster', {
     system: 'Propulsion', material: 'Regeneratively cooled Cu-alloy chamber, Inconel nozzle', mass: 4300, explode: [0, -5, 0],
     desc: 'Nine gas-generator engines on an octaweb: 914 kN each in vacuum, Isp 282 s at sea level → 311 s in vacuum.',
     callout: true, anchor: [0, -2.2, R],
-  }, mesh(engineCluster(0), M.bell()));
+  }, [mesh(engineCluster(0), SKIN.bell()), engineKit(0)]);
   coreEngines.userData.part.thermalRole = 'engine1';
 
   // ----------------------------------------------------------------- interstage
-  const inter = mesh(lathe([[R, 42], [R, 48.5]], 64), M.carbon());
+  const inter = mesh(lathe([[R, 42], [R, 48.5]], 96), interMat);
   const interPart = P('Interstage', {
     system: 'Stage 1', material: 'Carbon-fibre / aluminium honeycomb', mass: 1900, explode: [0, 4, 0],
     desc: 'Shrouds the upper-stage vacuum nozzle and carries four titanium grid fins and cold-gas attitude thrusters.',
@@ -188,9 +224,9 @@ export function buildRocket() {
     const nose = mesh(lathe(ogiveProfile(R, 7.5, 42, 22), 64), new THREE.MeshStandardMaterial({ color: 0xf0f2f4, roughness: 0.45, metalness: 0.05 }));
     const shield = mesh(new THREE.CylinderGeometry(R, R, 0.3, 48), M.carbon());
     shield.position.y = 0.15;
-    const engines = mesh(engineCluster(0), M.bell());
+    const engines = mesh(engineCluster(0), SKIN.bell());
     engines.userData.temp = () => vehicleState.firing.booster ? 1850 : 300;
-    g.add(body, nose, shield, engines, gridFins(40.6, R, finMat), legs(R, M.carbon()));
+    g.add(body, nose, shield, engines, engineKit(0), gridFins(40.6, R, finMat), legs(R, SKIN.carbon()));
     for (const y of [5, 39.5]) {
       g.add(mesh(beam([-(R + 0.3) * side + (side > 0 ? 0 : 0), y, 0], [-R * side, y, 0], 0.25, 0.25), M.darkMetal()));
     }
@@ -240,10 +276,86 @@ export function buildRocket() {
   const arm = mesh(beam([-8, 56.5, -4], [-1.9, 56.5, -0.6], 0.5, 0.6), M.pad());
   const armLight = mesh(new THREE.SphereGeometry(0.25, 10, 8), M.navRed(), { cast: false });
   armLight.position.set(-8, 58.3, -4);
+  // tower service levels
+  const levels = [];
+  for (let y = 8; y < 58; y += 9.5) levels.push(new THREE.BoxGeometry(3.6, 0.25, 3.6).translate(-8, y, -4).toNonIndexed());
+  const towerLevels = mesh(mergeGeometries(levels), M.pad());
+
+  // lightning-protection masts joined by catenary wires, cryogenic storage spheres, a water tower and flood-light poles
+  const steel = new THREE.MeshStandardMaterial({ color: 0x8b9096, metalness: 0.7, roughness: 0.5 });
+  const mastFace = latticePanel(2.6, 105, 2.0, 0.14, 0.14, 0.24);
+  const masts = [[72, 58], [-74, 52], [4, -96]];
+  const mastGeos = [];
+  for (const [x, z] of masts) {
+    for (let k = 0; k < 4; k++) mastGeos.push(mastFace.clone().translate(0, 52.5, 1.3).rotateY((k * Math.PI) / 2).translate(x, 0, z));
+    mastGeos.push(new THREE.ConeGeometry(0.5, 12, 6).translate(x, 111, z).toNonIndexed());
+  }
+  const mastMesh = mesh(mergeGeometries(mastGeos.map((g) => (g.index ? g.toNonIndexed() : g))), steel);
+  const wires = [];
+  const catenary = (a, b, sag) => {
+    const pts = [];
+    for (let i = 0; i <= 40; i++) {
+      const t = i / 40;
+      const p = new THREE.Vector3().lerpVectors(a, b, t);
+      p.y -= sag * 4 * t * (1 - t);
+      pts.push(p);
+    }
+    return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, 0.12, 4, false);
+  };
+  for (let i = 0; i < masts.length; i++) {
+    const [x0, z0] = masts[i], [x1, z1] = masts[(i + 1) % masts.length];
+    wires.push(catenary(new THREE.Vector3(x0, 116, z0), new THREE.Vector3(x1, 116, z1), 34));
+    wires.push(catenary(new THREE.Vector3(x0, 116, z0), new THREE.Vector3(x0 * 1.6, 0, z0 * 1.6), 6));
+  }
+  const wireMesh = mesh(mergeGeometries(wires.map((g) => g.toNonIndexed())), M.darkMetal(), { cast: false });
+  const sphereMat = new THREE.MeshStandardMaterial({ color: 0xe8e9e6, roughness: 0.5, metalness: 0.1 });
+  const tanks = new THREE.Group();
+  for (const [x, z, r] of [[128, -64, 10], [-138, -44, 12]]) {
+    const sph = mesh(new THREE.SphereGeometry(r, 40, 24), sphereMat);
+    sph.position.set(x, r + 4, z);
+    tanks.add(sph);
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      tanks.add(mesh(beam([x + Math.cos(a) * r * 0.75, 0, z + Math.sin(a) * r * 0.75], [x + Math.cos(a) * r * 0.85, r + 4, z + Math.sin(a) * r * 0.85], 0.6, 0.6), steel));
+    }
+  }
+  const water = new THREE.Group();
+  {
+    const x = 96, z = -158;
+    const tank = mesh(new THREE.CylinderGeometry(8, 8, 9, 32), sphereMat);
+    tank.position.set(x, 66, z);
+    const roof = mesh(new THREE.ConeGeometry(8.4, 3, 32), sphereMat);
+    roof.position.set(x, 72, z);
+    water.add(tank, roof);
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      water.add(mesh(beam([x + Math.cos(a) * 9, 0, z + Math.sin(a) * 9], [x + Math.cos(a) * 6.5, 62, z + Math.sin(a) * 6.5], 0.8, 0.8), steel));
+    }
+  }
+  const lampMat = new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xeef4ff, emissiveIntensity: 9 });
+  const floods = new THREE.Group();
+  for (const [x, z] of [[48, 30], [-44, 38], [30, -46], [-36, -40]]) {
+    floods.add(mesh(rod([x, 0, z], [x, 34, z], 0.35, 8), steel));
+    const head = mesh(new THREE.BoxGeometry(4, 1.6, 0.6), M.darkMetal());
+    head.position.set(x, 34.5, z);
+    head.lookAt(0, 25, 0);
+    const lamps = mesh(new THREE.PlaneGeometry(3.6, 1.2), lampMat, { cast: false });
+    lamps.position.set(0, 0, 0.32);
+    head.add(lamps);
+    floods.add(head);
+  }
+  const trench = mesh(new THREE.PlaneGeometry(14, 26), new THREE.MeshStandardMaterial({ color: 0x0c0c0c, roughness: 1 }));
+  trench.rotation.x = -Math.PI / 2;
+  trench.position.set(0, 0.02, 14);
+
   const padPart = A.part('Launch mount & tower', {
     system: 'Ground systems', material: 'Structural steel, refractory concrete', mass: null, explode: [0, 0, 0],
     desc: 'Hold-down clamps restrain the vehicle until all 27 engines reach full thrust; the deflector turns the exhaust into the flame trench.',
-  }, [mount, defl, umbilical, arm, armLight], ground);
+  }, [mount, defl, umbilical, towerLevels, arm, armLight], ground);
+  const site = new THREE.Group();
+  site.add(mastMesh, wireMesh, tanks, water, floods, trench);
+  site.traverse((o) => { if (o.isMesh) o.userData.fx = true; });
+  ground.add(site);
   padPart.userData.part.temp = 300;
 
   // ----------------------------------------------------------------- exhaust
@@ -363,7 +475,13 @@ export function buildRocket() {
         default: return info.temp;
       }
     },
+    /** World-space point the chase camera tracks: the stack's centre, then the upper stage. */
+    followPoint(out) {
+      stack.updateWorldMatrix(true, false);
+      return stack.localToWorld(out.set(0, followY, 0));
+    },
     resetFlight() {
+      followY = PIVOT_Y - MOUNT;
       vehicleState.launching = false;
       vehicleState.firing = { booster: false, core: false, upper: false };
       vehicleState.ignition = 0;
@@ -386,6 +504,9 @@ export function buildRocket() {
       vehicleState.altitudeVis = s.h;
       vehicleState.pitch = s.pitch;
       rigPivot.rotation.z = -(s.pitch * Math.PI) / 180;
+      // after staging the camera hands over from the full stack to the upper stage
+      const k = sep.core == null ? 0 : Math.min(1, sep.core / 4);
+      followY = PIVOT_Y - MOUNT + (UPPER_CENTRE - (PIVOT_Y - MOUNT)) * k * k * (3 - 2 * k);
       // boosters drift away after separation
       for (const b of boosters) {
         if (sep.booster == null) { b.group.position.set((2 * R + 0.3) * b.side, 0, 0); b.group.rotation.set(0, 0, 0); b.part.visible = true; continue; }

@@ -4,6 +4,9 @@
 import { flightState, psSweep, FIGHTER } from '../physics/aero.js';
 import { el, slider, toggle, readouts, section, button, fmt } from '../ui/dom.js';
 import { LineChart } from '../ui/chart.js';
+import * as THREE from 'three';
+import { ForceArrows, kN } from '../engine/forces.js';
+import { FIGHTER as F_DATA } from '../physics/aero.js';
 
 export function mountFighterLab(root, ctx) {
   const v = ctx.vehicle;
@@ -24,7 +27,9 @@ export function mountFighterLab(root, ctx) {
   const sRoll = slider({ label: 'Roll (flaperons + ailerons)', min: -1, max: 1, step: 0.01, value: 0, format: (x) => `${Math.round(x * 100)} %`, onInput: (x) => { stick.roll = x; } });
   const sYaw = slider({ label: 'Yaw (rudders)', min: -1, max: 1, step: 0.01, value: 0, format: (x) => `${Math.round(x * 100)} %`, onInput: (x) => { stick.yaw = x; } });
 
-  const tFlight = toggle({ label: 'In flight', value: false, onChange: (on) => { v.setAirborne(on); v.setGear(!on); ctx.log(v.designation, on ? 'Gear up — flight pose' : 'Gear down — parked', 'info'); } });
+  const tFlight = toggle({ label: 'In flight', value: false, onChange: (on) => { v.setAirborne(on); v.setGear(!on); ctx.setFlightLook(on); ctx.log(v.designation, on ? 'Gear up — airborne above the cloud deck' : 'Gear down — back in the hangar', 'info'); } });
+  const forces = v.forces || (v.forces = new ForceArrows(v.root, { radius: 0.07 }));
+  const tForces = toggle({ label: 'Force vectors', value: false, onChange: (on) => { forces.setVisible(on); ctx.muteCallouts?.(on); if (on) placeForces(); } });
   const tBay = toggle({ label: 'Weapons bay', value: false, onChange: (on) => { v.setBay(on); ctx.log(v.designation, on ? 'Main bay doors open · trapeze launchers extended' : 'Main bay doors closed', on ? 'warn' : 'info'); } });
 
   let demo = null;
@@ -57,7 +62,7 @@ export function mountFighterLab(root, ctx) {
     status,
     section('Air data & performance', ro.el),
     section('Energy manoeuvrability', chart.el, el('p', { class: 'lab-note', text: 'Where the curve is above zero the jet can still climb or accelerate at 1 g. Its right-hand zero crossing is the maximum level-flight speed at this altitude.' })),
-    section('Controls', sPitch.el, sRoll.el, sYaw.el, el('div', { class: 'btn-row' }, tFlight.el, tBay.el, demoBtn)),
+    section('Controls', sPitch.el, sRoll.el, sYaw.el, el('div', { class: 'btn-row' }, tFlight.el, tBay.el, tForces.el, demoBtn)),
   );
 
   let dirty = true;
@@ -66,6 +71,7 @@ export function mountFighterLab(root, ctx) {
   const compute = () => {
     const f = flightState(p);
     v.state.flight = f;
+    ctx.modes.setFlow({ alphaDeg: p.alpha, mach: p.mach, stall: f.stalled ? 1 : 0, tau: 0.045 });
     v.state.mach = p.mach;
     v.state.altitude = p.altitude;
     v.state.alpha = p.alpha;
@@ -103,9 +109,26 @@ export function mountFighterLab(root, ctx) {
     });
   };
 
+  // lift ⟂ flight path, drag along it, thrust along the body axis, weight straight down — 6 m per W
+  const cg = new THREE.Vector3(-0.8, 0.1, 0);
+  const UP_NUDGE = new THREE.Vector3(0, 1.1, 0), DOWN_NUDGE = new THREE.Vector3(0, -1.1, 0);
+  function placeForces() {
+    const f = v.state.flight;
+    if (!f || !forces.group.visible) return;
+    const W = F_DATA.massCombat * 9.80665;
+    const k = 4.2 / W;
+    const o = cg.clone().add(v.attitude.position);
+    const a = (p.alpha * Math.PI) / 180 * v.state.airborne * 0.9;
+    forces.set('lift', { origin: o, dir: new THREE.Vector3(0, 1, 0), length: Math.min(f.L, W * 2.5) * k, text: kN(f.L), name: 'Lift' });
+    forces.set('weight', { origin: o, dir: new THREE.Vector3(0, -1, 0), length: W * k, text: kN(W), name: 'Weight' });
+    forces.set('drag', { origin: o.clone().add(new THREE.Vector3(-1.0, 0, 0)), dir: new THREE.Vector3(-1, 0, 0), length: f.D * k, text: kN(f.D), name: 'Drag', labelOffset: UP_NUDGE });
+    forces.set('thrust', { origin: o.clone().add(new THREE.Vector3(-7.5, 0, 0)), dir: new THREE.Vector3(Math.cos(a), Math.sin(a), 0), length: f.T * k, text: kN(f.T), name: 'Thrust', labelOffset: DOWN_NUDGE });
+  }
+
   return {
     update(dt, t) {
       if (dirty) { dirty = false; compute(); }
+      if (forces.group.visible) placeForces();
       if (demo) {
         demo.t += dt;
         const k = demo.t;
@@ -122,7 +145,17 @@ export function mountFighterLab(root, ctx) {
       s.roll += (stick.roll - s.roll) * k;
       s.yaw += (stick.yaw - s.yaw) * k;
       if (t - lastThermal > 0.5) { lastThermal = t; ctx.refreshThermal(); }
+      ctx.stage.env.cloudSpeed = v.state.airborne * (v.state.flight ? v.state.flight.V : 0);
     },
-    dispose() {},
+    dispose() { forces.setVisible(false); },
+    api: {
+      setStick(st) { Object.assign(stick, st); sPitch.set(stick.pitch, true); sRoll.set(stick.roll, true); sYaw.set(stick.yaw, true); },
+      getCondition: () => ({ ...p }),
+      setCondition(c) {
+        Object.assign(p, c);
+        sAlt.set(p.altitude, true); sMach.set(p.mach, true); sAoA.set(p.alpha, true); sThr.set(Math.round(p.throttle * 100), true);
+        dirty = true;
+      },
+    },
   };
 }

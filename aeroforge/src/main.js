@@ -9,6 +9,9 @@ import { Callouts } from './engine/callouts.js';
 import { applyExplode } from './engine/assembly.js';
 import { triangleCount } from './engine/geometry.js';
 import { INFERNO_CSS } from './engine/effects.js';
+import { LOOKS } from './engine/environment.js';
+import { TourPlayer } from './learn/tour.js';
+import { QUALITY } from './engine/stage.js';
 import { EventLog } from './ui/log.js';
 import { el, fmt } from './ui/dom.js';
 import { buildFighter } from './models/fighter.js';
@@ -23,13 +26,13 @@ import { mountOrbitLab } from './labs/orbitLab.js';
 import { mountUavLab } from './labs/uavLab.js';
 
 const FLEET = [
-  { id: 'fighter', key: '1', build: buildFighter, lab: mountFighterLab, labName: 'Flight envelope', lift: 1.4 },
-  { id: 'rocket', key: '2', build: buildRocket, lab: mountRocketLab, labName: 'Launch simulator', lift: 5.5 },
-  { id: 'turbofan', key: '3', build: buildTurbofan, lab: mountEngineLab, labName: 'Brayton cycle', lift: 0.8 },
-  { id: 'satellite', key: '4', build: buildSatellite, lab: mountOrbitLab, labName: 'Orbital transfer', lift: 0 },
-  { id: 'uav', key: '5', build: buildUAV, lab: mountUavLab, labName: 'Mission endurance', lift: 1.2 },
+  { id: 'fighter', key: '1', build: buildFighter, lab: mountFighterLab, labName: 'Flight envelope', lift: 1.4, looks: ['hangar', 'studio'] },
+  { id: 'rocket', key: '2', build: buildRocket, lab: mountRocketLab, labName: 'Launch simulator', lift: 5.5, looks: ['pad', 'hangar', 'studio'] },
+  { id: 'turbofan', key: '3', build: buildTurbofan, lab: mountEngineLab, labName: 'Brayton cycle', lift: 0.8, looks: ['hangar', 'studio'] },
+  { id: 'satellite', key: '4', build: buildSatellite, lab: mountOrbitLab, labName: 'Orbital transfer', lift: 0, looks: ['orbit', 'studio', 'hangar'] },
+  { id: 'uav', key: '5', build: buildUAV, lab: mountUavLab, labName: 'Mission endurance', lift: 1.2, looks: ['hangar', 'studio'] },
 ];
-const MODE_LABEL = { studio: 'Studio', xray: 'X-ray', blueprint: 'Blueprint', thermal: 'Thermal' };
+const MODE_LABEL = { studio: 'Studio', xray: 'X-ray', blueprint: 'Blueprint', thermal: 'Thermal', pressure: 'Pressure' };
 const SYSTEM_HUES = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9', '#e66767', '#7f93a8'];
 
 const $ = (id) => document.getElementById(id);
@@ -107,27 +110,82 @@ async function start() {
     b.addEventListener('click', () => setMode(m));
     modeGroup.append(b);
   }
-  function setMode(m) {
+  function setMode(m, { quiet = false } = {}) {
     if (app.orbit) return;
+    if (m === 'pressure' && !app.current?.aero) m = 'studio';
     app.mode = m;
     for (const b of modeGroup.children) b.setAttribute('aria-checked', String(b.dataset.mode === m));
     modes.apply(app.current, m, app.selected);
-    legend.hidden = m !== 'thermal';
+    legend.hidden = m !== 'thermal' && m !== 'pressure';
     updateLegend();
-    log.push('VIEW', `${MODE_LABEL[m]} render mode`);
+    if (!quiet) log.push('VIEW', `${MODE_LABEL[m]} render mode`);
   }
   function updateLegend() {
     const v = app.current;
     if (!v) return;
+    if (app.mode === 'pressure') {
+      $('legend-title').textContent = 'Pressure coefficient Cp';
+      $('legend-bar').style.background = 'linear-gradient(90deg, #0a1f6b, #2a5fdc 38%, #c7c9cc 64%, #dc3d29)';
+      $('legend-lo').textContent = '−1.6 suction';
+      $('legend-hi').textContent = '+0.9 compression';
+      return;
+    }
     const [lo, hi] = v.thermalRange;
+    $('legend-title').textContent = 'Surface temperature';
     $('legend-bar').style.background = `linear-gradient(90deg, ${INFERNO_CSS})`;
     $('legend-lo').textContent = `${lo} K`;
     $('legend-hi').textContent = `${hi.toLocaleString('en-US')} K`;
   }
+  function syncModeButtons() {
+    for (const b of modeGroup.children) b.hidden = b.dataset.mode === 'pressure' && !app.current?.aero;
+  }
+
+  // ------------------------------------------------------------------ environment sets & quality
+  const lookGroup = $('looks');
+  app.looks = {};
+  function renderLooks() {
+    const f = app.entry;
+    lookGroup.replaceChildren(...f.looks.map((k) => {
+      const b = el('button', { type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(k === app.look), 'data-look': k, text: LOOKS[k].label });
+      b.addEventListener('click', () => setLook(k));
+      return b;
+    }));
+  }
+  function setLook(k, { remember = true } = {}) {
+    if (app.orbit || !LOOKS[k]) return;
+    app.look = k;
+    if (remember) app.looks[app.entry.id] = k;
+    stage.env.applyLook(k);
+    modes.apply(app.current, app.mode, app.selected);
+    for (const b of lookGroup.children) b.setAttribute('aria-checked', String(b.dataset.look === k));
+    stage.frameVehicle(app.current);
+  }
+  let groundLook = null;
+  function setFlightLook(on) {
+    if (on) { groundLook = app.look === 'sky' ? groundLook : app.look; setLook('sky', { remember: false }); }
+    else setLook(groundLook && groundLook !== 'sky' ? groundLook : app.entry.looks[0], { remember: false });
+  }
+  const qualitySel = $('quality');
+  for (const [k, q] of Object.entries(QUALITY)) qualitySel.append(el('option', { value: k, text: q.label }));
+  qualitySel.value = stage.quality;
+  qualitySel.addEventListener('change', () => { stage.setQuality(qualitySel.value); log.push('VIEW', `Render quality: ${QUALITY[qualitySel.value].label}`); });
+  stage.onQualityChange = (k, manual) => {
+    qualitySel.value = k;
+    if (!manual) log.push('VIEW', `Render quality lowered to ${QUALITY[k].label} to keep the frame rate up`, 'warn');
+  };
 
   // ------------------------------------------------------------------ tools
   explodeInput.addEventListener('input', () => { app.explodeTarget = +explodeInput.value / 100; explodeOut.textContent = `${explodeInput.value} %`; });
-  const setExplode = (x) => { app.explodeTarget = x; explodeInput.value = String(Math.round(x * 100)); explodeOut.textContent = `${explodeInput.value} %`; };
+  const setExplode = (x, { instant = false } = {}) => {
+    app.explodeTarget = x;
+    if (instant && app.current) {
+      app.explode = x;
+      applyExplode(app.current.parts, x);
+      app.current.root.position.y = app.current._baseY + app.current.explodeLift * x * app.current._fitScale;
+    }
+    explodeInput.value = String(Math.round(x * 100));
+    explodeOut.textContent = `${explodeInput.value} %`;
+  };
   const pressed = (b, v) => b.setAttribute('aria-pressed', String(v));
   labelsBtn.addEventListener('click', () => { app.labels = !app.labels; pressed(labelsBtn, app.labels); callouts.setVisible(app.labels && !app.orbit); });
   const setAutoRotate = (v) => { app.autoRotate = v; pressed(spinBtn, v); };
@@ -163,7 +221,7 @@ async function start() {
     onSelect: (part) => selectPart(part),
   });
   function refreshOutline() {
-    stage.outline.selectedObjects = [app.selected, app.hovered].filter(Boolean);
+    stage.setOutlined([app.selected, app.hovered].filter(Boolean));
   }
 
   function partTemp(part) {
@@ -219,6 +277,25 @@ async function start() {
     renderPartCard();
   }
 
+  // ------------------------------------------------------------------ guided tours
+  const tourBtn = $('tour-start');
+  const tour = new TourPlayer($('tour'), {
+    stage, modes, callouts,
+    getVehicle: () => app.current,
+    getLab: () => app.lab,
+    setMode, setExplode,
+    log: (src, msg, level) => log.push(src, msg, level),
+    onStart: () => {
+      selectPart(null); setAutoRotate(false); document.body.classList.add('is-touring');
+      tourBtn.textContent = 'Exit tour';
+      // keep the subject clear of the tour card: beside it on wide screens, above it on phones
+      if (stage.container.clientWidth > 700) stage.setViewShift(0.17);
+      else stage.setViewShift(0, 0.22);
+    },
+    onStop: () => { document.body.classList.remove('is-touring'); stage.setViewShift(0); tourBtn.textContent = 'Start guided tour'; },
+  });
+  tourBtn.addEventListener('click', () => (tour.active ? tour.stop() : tour.start(app.entry.id)));
+
   // ------------------------------------------------------------------ inspector: specs & parts
   function renderSpecs(v) {
     const systems = [...new Set(v.parts.map((p) => p.userData.part.system))];
@@ -256,10 +333,10 @@ async function start() {
     document.body.classList.toggle('is-orbit', on);
     if (on) {
       if (app.mode !== 'studio') modes.apply(app.current, 'studio', null);
-      stage.setEnvironment('space');
+      stage.env.setSpaceView(true);
       selectPart(null);
     } else {
-      stage.setEnvironment(app.mode === 'blueprint' ? 'blueprint' : 'hangar');
+      stage.env.setSpaceView(false);
       modes.apply(app.current, app.mode, app.selected);
       stage.frameVehicle(app.current);
     }
@@ -281,6 +358,7 @@ async function start() {
   function select(id) {
     const f = FLEET.find((x) => x.id === id) || FLEET[0];
     if (app.entry === f) return;
+    if (tour.active) tour.stop({ silent: true });
     app.lab?.dispose();
     if (app.orbit) setOrbitMode(false);
     if (app.current) { isolate(false); for (const p of app.current.parts) p.visible = true; }
@@ -288,8 +366,14 @@ async function start() {
     app.entry = f;
     const v = f.vehicle;
     app.current = v;
+    groundLook = null;
+    app.look = app.looks[f.id] || f.looks[0];
+    stage.env.applyLook(app.look);
+    renderLooks();
     stage.setVehicle(v);
     if (v._baseY == null) v._baseY = v.root.position.y;
+    syncModeButtons();
+    if (app.mode === 'pressure' && !v.aero) setMode('studio', { quiet: true });
     modes.apply(v, app.mode);
     applyExplode(v.parts, app.explode);
     callouts.attach(v);
@@ -308,7 +392,10 @@ async function start() {
       refreshThermal: () => { modes.refreshThermal(app.current); if (app.selected && !partCard.hidden) renderPartCard(); },
       setExplode, setAutoRotate,
       refit: () => stage.frameVehicle(v),
+      setFlightLook,
+      setLook,
       setOrbitMode, cloneForOrbit,
+      muteCallouts: (m) => callouts.setMuted(m),
     });
     orbitApi = f.id === 'satellite' ? { frame: () => stage.frameVehicle(v) } : null;
     $('tris').textContent = fmt.n(f.tris);
@@ -319,6 +406,12 @@ async function start() {
   // ------------------------------------------------------------------ keyboard
   window.addEventListener('keydown', (e) => {
     if (e.target.closest?.('input[type="text"], textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (tour.active) {
+      if (e.key === 'ArrowRight') { tour.next(); e.preventDefault(); return; }
+      if (e.key === 'ArrowLeft') { tour.prev(); e.preventDefault(); return; }
+      if (e.key === 'Escape') { tour.stop(); return; }
+    }
+    if (e.target.closest?.('input[type="range"]') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) return;
     const f = FLEET.find((x) => x.key === e.key);
     if (f) { select(f.id); return; }
     const k = e.key.toLowerCase();
@@ -341,8 +434,9 @@ async function start() {
       v.root.position.y = v._baseY + v.explodeLift * app.explode * v._fitScale;
     }
     v.update?.(dt, t);
+    modes.tick(t);
+    tour.update(dt);
     app.lab?.update(dt, t);
-    stage.stepEnv(dt);
     stage.controls.autoRotate = app.autoRotate && !stage.tween && !(v.state?.launching);
     clockAcc += dt;
     if (clockAcc > 0.5) {
@@ -354,6 +448,11 @@ async function start() {
 
   const initial = FLEET.find((f) => f.id === location.hash.slice(1)) ? location.hash.slice(1) : 'fighter';
   select(initial);
+  // deep links also work after load (pasted or edited URL, back/forward)
+  window.addEventListener('hashchange', () => {
+    const id = location.hash.slice(1);
+    if (FLEET.some((f) => f.id === id)) select(id);
+  });
   setTab('lab');
   log.push('SYS', 'AEROFORGE online · render core, physics and labs nominal', 'ok');
   boot.classList.add('is-done');

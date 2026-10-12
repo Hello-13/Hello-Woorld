@@ -1,6 +1,7 @@
 // Shared PBR materials and procedurally painted canvas textures.
 
 import * as THREE from 'three';
+import { aircraftSkin, mliSurface, carbonWeave, tubeWall, perforated } from './surface.js';
 
 const cache = new Map();
 const once = (key, make) => {
@@ -196,13 +197,80 @@ export const smokeTexture = () => once('tex.smoke', () => {
 const std = (key, params) => once(key, () => new THREE.MeshStandardMaterial(params));
 const phys = (key, params) => once(key, () => new THREE.MeshPhysicalMaterial(params));
 
+/** Clone a surface map set with its own tiling (metres per tile for metric UVs). */
+function tiled(set, rx, ry = rx) {
+  const out = {};
+  for (const [k, t] of Object.entries(set)) {
+    if (!t) continue;
+    const c = t.clone();
+    c.repeat.set(rx, ry);
+    c.needsUpdate = true;
+    out[k] = c;
+  }
+  return out;
+}
+
+/** Materials that carry procedural surface detail (normal / roughness / albedo variation). */
+export const SKIN = {
+  stealth: () => once('s.stealth', () => {
+    const t = tiled(aircraftSkin({ seed: 7 }), 1 / 2.6);
+    return new THREE.MeshStandardMaterial({ color: 0x5c646c, ...t, normalScale: new THREE.Vector2(0.55, 0.55), roughness: 1, metalness: 0.3 });
+  }),
+  stealthWing: () => once('s.stealthWing', () => {
+    const t = tiled(aircraftSkin({ seed: 13 }), 1 / 2.2);
+    return new THREE.MeshStandardMaterial({ color: 0x545c64, ...t, normalScale: new THREE.Vector2(0.5, 0.5), roughness: 1, metalness: 0.3 });
+  }),
+  uav: () => once('s.uav', () => {
+    const t = tiled(aircraftSkin({ seed: 29, sawtooth: false }), 1 / 2.4);
+    return new THREE.MeshStandardMaterial({ color: 0xa3aab1, ...t, normalScale: new THREE.Vector2(0.35, 0.35), roughness: 1, metalness: 0.08 });
+  }),
+  uavDark: () => once('s.uavDark', () => {
+    const t = tiled(aircraftSkin({ seed: 31, sawtooth: false, rivets: false }), 1 / 2.4);
+    return new THREE.MeshStandardMaterial({ color: 0x6a7178, ...t, normalScale: new THREE.Vector2(0.3, 0.3), roughness: 1, metalness: 0.1 });
+  }),
+  nacelle: () => once('s.nacelle', () => {
+    const t = tiled(aircraftSkin({ seed: 41, sawtooth: false }), 2.5, 1);
+    return new THREE.MeshPhysicalMaterial({ color: 0xdfe3e7, normalMap: t.normalMap, normalScale: new THREE.Vector2(0.35, 0.35), roughness: 0.38, metalness: 0.2, clearcoat: 0.6, clearcoatRoughness: 0.25, side: THREE.DoubleSide });
+  }),
+  liner: () => once('s.liner', () => {
+    const t = tiled(perforated(), 60, 8);
+    return new THREE.MeshStandardMaterial({ color: 0x8a9096, normalMap: t.normalMap, roughness: 0.55, metalness: 0.7, side: THREE.DoubleSide });
+  }),
+  carbon: () => once('s.carbon', () => {
+    const t = tiled(carbonWeave(), 6, 6);
+    return new THREE.MeshPhysicalMaterial({ color: 0xffffff, ...t, roughness: 1, metalness: 0.2, clearcoat: 0.8, clearcoatRoughness: 0.18 });
+  }),
+  mli: () => once('s.mli', () => {
+    const t = tiled(mliSurface(), 1.6);
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map: mliTexture(), normalMap: t.normalMap, roughnessMap: t.roughnessMap, normalScale: new THREE.Vector2(1.4, 1.4), roughness: 1, metalness: 1 });
+  }),
+  bell: () => once('s.bell', () => {
+    const t = tiled(tubeWall({ tubes: 180 }), 1, 1);
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map: bellTint(), normalMap: t.normalMap, roughnessMap: t.roughnessMap, roughness: 1, metalness: 0.92, side: THREE.DoubleSide });
+  }),
+};
+
+/** Regeneratively cooled bell: copper chamber, blued throat, bronze-to-straw skirt (lathe v runs down the nozzle). */
+export const bellTint = () => once('tex.bellTint', () => {
+  const c = canvas(8, 256, (ctx) => {
+    const g = ctx.createLinearGradient(0, 0, 0, 256);
+    [[0, '#8a8e93'], [0.06, '#a0623c'], [0.2, '#7a4a35'], [0.3, '#4c3d6e'], [0.38, '#3d5590'], [0.5, '#6b4f63'], [0.66, '#9a6c3e'], [0.84, '#b39a6e'], [1, '#8d8a84']]
+      .forEach(([o, col]) => g.addColorStop(o, col));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, 8, 256);
+  });
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.flipY = false;
+  return t;
+});
+
 export const M = {
   stealth: () => std('m.stealth', { color: 0x4f575e, roughness: 0.58, metalness: 0.32, map: panelTexture(), flatShading: true }),
   stealthSmooth: () => std('m.stealthSmooth', { color: 0x4f575e, roughness: 0.55, metalness: 0.3, map: panelTexture() }),
   stealthDark: () => std('m.stealthDark', { color: 0x434a51, roughness: 0.6, metalness: 0.35, flatShading: true }),
   canopy: () => phys('m.canopy', {
-    color: 0x8f6c2c, metalness: 0.35, roughness: 0.28, clearcoat: 0.3, clearcoatRoughness: 0.3,
-    transparent: true, opacity: 0.86, envMapIntensity: 0.6,
+    color: 0x6e5326, metalness: 0.62, roughness: 0.1, clearcoat: 1, clearcoatRoughness: 0.05,
+    transparent: true, opacity: 0.9, envMapIntensity: 1.0,
   }),
   intake: () => std('m.intake', { color: 0x0b0c0e, roughness: 0.95, metalness: 0.1, side: THREE.DoubleSide }),
   darkMetal: () => std('m.darkMetal', { color: 0x2c2f33, roughness: 0.42, metalness: 0.85 }),
@@ -232,11 +300,11 @@ export const M = {
   section: () => std('m.section', { color: 0xc4532e, roughness: 0.6, metalness: 0.1, side: THREE.DoubleSide }),
   pad: () => std('m.pad', { color: 0x31373e, roughness: 0.75, metalness: 0.4 }),
   // emissive
-  navRed: () => std('m.navRed', { color: 0x220000, emissive: 0xff2a1a, emissiveIntensity: 3 }),
-  navGreen: () => std('m.navGreen', { color: 0x002200, emissive: 0x2bff6a, emissiveIntensity: 3 }),
-  formation: () => std('m.formation', { color: 0x0c1a10, emissive: 0x7dffa0, emissiveIntensity: 1.6 }),
+  navRed: () => std('m.navRed', { color: 0x220000, emissive: 0xff2a1a, emissiveIntensity: 7 }),
+  navGreen: () => std('m.navGreen', { color: 0x002200, emissive: 0x2bff6a, emissiveIntensity: 7 }),
+  formation: () => std('m.formation', { color: 0x0c1a10, emissive: 0x7dffa0, emissiveIntensity: 3.6 }),
   strobe: () => std('m.strobe', { color: 0x222222, emissive: 0xffffff, emissiveIntensity: 0 }),
-  burner: () => std('m.burner', { color: 0x200800, emissive: 0xff6a1a, emissiveIntensity: 2.2, side: THREE.DoubleSide }),
+  burner: () => std('m.burner', { color: 0x200800, emissive: 0xff6a1a, emissiveIntensity: 3.5, side: THREE.DoubleSide }),
   turbineGlow: () => std('m.turbineGlow', { color: 0x1a0800, emissive: 0xff4a10, emissiveIntensity: 0.6 }),
-  laser: () => std('m.laser', { color: 0x200000, emissive: 0xff2030, emissiveIntensity: 4 }),
+  laser: () => std('m.laser', { color: 0x200000, emissive: 0xff2030, emissiveIntensity: 9 }),
 };

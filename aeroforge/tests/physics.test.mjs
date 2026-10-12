@@ -63,6 +63,19 @@ test('HELIOS-H reaches a near-circular LEO with the default mission', () => {
   assert.ok(mid.h > 20e3 && mid.h < 150e3, 'altitude at T+100 s');
 });
 
+test('launch samples carry the forces drawn by the force-vector overlay', () => {
+  const { samples } = simulateAscent({ payload: 15000 });
+  const g0 = MU_EARTH / (R_EARTH * R_EARTH);
+  const first = samples[0];
+  close(first.weight, first.mass * g0, first.mass * 0.01, 'weight at liftoff');
+  assert.ok(first.thrust / first.weight > 1.2, 'liftoff thrust exceeds weight');
+  // drag peaks in the dense lower atmosphere, then vanishes in vacuum
+  const peak = samples.reduce((a, s) => (s.drag > a.drag ? s : a));
+  assert.ok(peak.h > 5e3 && peak.h < 25e3, `peak drag at ${peak.h} m`);
+  assert.ok(sampleAt(samples, 400).drag < 1, 'no drag above the atmosphere');
+  for (const s of samples) assert.ok(s.drag >= 0 && s.weight > 0);
+});
+
 test('an overloaded HELIOS-H fails to reach orbit', () => {
   const { result } = simulateAscent({ payload: 90000 });
   assert.equal(result.success, false);

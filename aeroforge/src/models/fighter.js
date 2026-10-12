@@ -1,5 +1,5 @@
 // AX-7 WRAITH — fictional fifth-generation air-superiority fighter.
-// Faceted chined fuselage, 42° diamond wing with NACA 0004.5→0003 sections, all-moving tails,
+// Smooth chined fuselage, 42° diamond wing with NACA 0004.5→0003 sections, all-moving tails,
 // canted twin fins, caret intakes, 2-D thrust-vectoring nozzles and an internal weapons bay.
 
 import * as THREE from 'three';
@@ -8,7 +8,8 @@ import {
   loftRings, orientOutward, orientTubeOutward, mirrorZ, wingPanel, wingPoint, hingedMesh, lathe, ogiveProfile,
   rod, interpKeys, mergeGeometries,
 } from '../engine/geometry.js';
-import { M } from '../engine/materials.js';
+import { M, SKIN } from '../engine/materials.js';
+import { decal, tailCode, emblem, stencilText, danger, rescue, panelOutline } from '../engine/decals.js';
 import { plumeMaterial, plumeMesh, vaporConeMaterial } from '../engine/effects.js';
 import { recoveryTemperature } from '../physics/atmosphere.js';
 
@@ -19,13 +20,26 @@ const HT = [[0, 0.015], [0.8, 0.22], [2.2, 0.46], [3.6, 0.62], [5.0, 0.72], [6.4
 const HB = [[0, 0.015], [0.8, 0.2], [2.2, 0.38], [3.6, 0.48], [5.0, 0.54], [6.4, 0.58], [7.6, 0.6], [9, 0.62], [11.5, 0.6], [14, 0.56], [16.5, 0.5], [18.6, 0.44]];
 const Y0 = [[0, -0.1], [2.2, -0.04], [5, 0], [18.6, 0]];
 
+const bez = (p0, p1, p2, p3, t) => {
+  const u = 1 - t;
+  return [0, 1].map((i) => u * u * u * p0[i] + 3 * u * u * t * p1[i] + 3 * u * t * t * p2[i] + t * t * t * p3[i]);
+};
+
+/**
+ * Smooth chined cross-section: a cubic upper surface that slopes down to a sharp chine and a
+ * flatter lower surface. The chine point is duplicated so the loft gets a crisp crease there.
+ */
 function section(s) {
   const w = interpKeys(W, s), ht = interpKeys(HT, s), hb = interpKeys(HB, s), y0 = interpKeys(Y0, s);
-  const pts = [
-    [0, ht], [w * 0.32, ht * 0.97], [w * 0.66, ht * 0.62], [w, 0], [w * 0.8, -hb * 0.42], [w * 0.45, -hb * 0.9],
-    [0, -hb], [-w * 0.45, -hb * 0.9], [-w * 0.8, -hb * 0.42], [-w, 0], [-w * 0.66, ht * 0.62], [-w * 0.32, ht * 0.97],
-  ];
-  return pts.map(([z, y]) => [X(s), y + y0, z]);
+  const up = [[0, ht], [w * 0.55, ht], [w * 0.7, Math.min(w * 0.17, ht * 0.6)], [w, 0]];
+  const lo = [[w, 0], [w * 0.78, Math.max(-w * 0.2, -hb * 0.6)], [w * 0.45, -hb], [0, -hb]];
+  const right = [];
+  for (let i = 0; i <= 10; i++) right.push(bez(...up, i / 10));
+  right.push([w, 0]);                                     // crease
+  for (let i = 1; i <= 8; i++) right.push(bez(...lo, i / 8));
+  // ring: right side top→bottom, then left side bottom→top (mirrored, skipping the centre points)
+  const left = right.slice(1, -1).reverse().map(([z, y]) => [-z, y]);
+  return right.concat(left).map(([z, y]) => [X(s), y + y0, z]);
 }
 
 function fuselageSegment(s0, s1, steps) {
@@ -36,7 +50,7 @@ function fuselageSegment(s0, s1, steps) {
     const s = s0 + (s1 - s0) * (s0 === 0 ? t * t * 0.5 + t * 0.5 : t);
     rings.push(section(s));
   }
-  return orientOutward(loftRings(rings, { capStart: true, capEnd: true }));
+  return orientOutward(loftRings(rings, { capStart: true, capEnd: true, uvMode: 'metric-x' }));
 }
 
 function missileGeometry(length = 3.66, r = 0.089) {
@@ -68,7 +82,7 @@ export function buildFighter() {
     system: 'Avionics', material: 'Quartz-cyanate composite, frequency-selective', mass: 85, explode: [3.2, 0, 0],
     desc: 'Bandpass radome passes the radar\'s own X-band and scatters everything else — a key low-observable feature.',
     callout: true, anchor: [X(1.0), 0.35, 0],
-  }, mesh(fuselageSegment(0, 2.6, 16), M.stealth()));
+  }, mesh(fuselageSegment(0, 2.6, 16), SKIN.stealth()));
   radome.userData.part.thermalRole = 'stagnation';
 
   const aesa = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.08, 40), M.gunmetal());
@@ -87,15 +101,15 @@ export function buildFighter() {
   P('Forward fuselage', {
     system: 'Structure', material: 'Ti-6Al-4V frames, RAM-coated composite skin', mass: 2300, explode: [1.2, 0, 0],
     desc: 'Houses the cockpit, avionics bays and nose landing gear. Chine edges align with the wing leading edge.',
-  }, mesh(fuselageSegment(2.6, 8.2, 14), M.stealth()));
+  }, mesh(fuselageSegment(2.6, 8.2, 14), SKIN.stealth()));
   P('Centre fuselage', {
     system: 'Structure', material: 'Titanium bulkheads, composite skins', mass: 4100, explode: [0, 0, 0],
     desc: 'Carries the wing attachments, main weapons bay, main gear wells and most of the internal fuel.',
-  }, mesh(fuselageSegment(8.2, 14.2, 12), M.stealth()));
+  }, mesh(fuselageSegment(8.2, 14.2, 12), SKIN.stealth()));
   P('Aft fuselage', {
     system: 'Structure', material: 'Titanium, high-temperature BMI composite', mass: 1900, explode: [-2.0, 0, 0],
     desc: 'Engine bays and tail booms; high-temperature structure around the afterburners.',
-  }, mesh(fuselageSegment(14.2, 18.6, 10), M.stealth()));
+  }, mesh(fuselageSegment(14.2, 18.6, 10), SKIN.stealth()));
 
   // ----------------------------------------------------------------- canopy & cockpit
   const canopyGeo = new THREE.SphereGeometry(1, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2);
@@ -134,8 +148,8 @@ export function buildFighter() {
         return [X(s) + shear, y, z * side];
       });
     });
-    const g = orientTubeOutward(loftRings(rings));
-    const outer = mesh(g, M.stealth());
+    const g = orientTubeOutward(loftRings(rings, { uvMode: 'metric' }));
+    const outer = mesh(g, SKIN.stealth());
     const inner = mesh(g, intakeLining);
     const back = new THREE.Shape(rings[2].map(([, y, z]) => new THREE.Vector2(z, y)));
     const plate = mesh(new THREE.ShapeGeometry(back), M.intake(), { cast: false });
@@ -162,13 +176,13 @@ export function buildFighter() {
       system: 'Airframe', material: 'Ti-6Al-4V spars, composite skins', mass: 1350, explode: [0, 0.2, 2.6 * side],
       desc: '42° leading-edge sweep, 78 m² total area. Diamond planform aligns edges with the fuselage chines and tails.',
       callout: side > 0, anchor: [-1.4, 0.0, 4.6 * side],
-    }, [mesh(box, M.stealthDark()), mesh(tipFill, M.stealthDark())]);
+    }, [mesh(box, SKIN.stealthWing()), mesh(tipFill, SKIN.stealthWing())]);
     wing.userData.part.thermalRole = 'leadingEdge';
 
     const fl = flip(wingPanel({ root: wRoot, tip: wTip, c0: 0.78, c1: 1, eta0: 0.04, eta1: 0.5, stations: 3 }));
-    const flH = hingedMesh(fl, M.stealthDark(), mz(wingPoint(wRoot, wTip, 0.04, 0.78)), mz(wingPoint(wRoot, wTip, 0.5, 0.78)));
+    const flH = hingedMesh(fl, SKIN.stealthWing(), mz(wingPoint(wRoot, wTip, 0.04, 0.78)), mz(wingPoint(wRoot, wTip, 0.5, 0.78)));
     const ai = flip(wingPanel({ root: wRoot, tip: wTip, c0: 0.78, c1: 1, eta0: 0.52, eta1: 0.96, stations: 3 }));
-    const aiH = hingedMesh(ai, M.stealthDark(), mz(wingPoint(wRoot, wTip, 0.52, 0.78)), mz(wingPoint(wRoot, wTip, 0.96, 0.78)));
+    const aiH = hingedMesh(ai, SKIN.stealthWing(), mz(wingPoint(wRoot, wTip, 0.52, 0.78)), mz(wingPoint(wRoot, wTip, 0.96, 0.78)));
     [flH, aiH].forEach((h) => { h.mesh.castShadow = true; h.mesh.receiveShadow = true; });
     wing.add(flH.pivot, aiH.pivot);
     surfaces.flaperon.push({ h: flH, side });
@@ -185,7 +199,7 @@ export function buildFighter() {
     const sRoot = { le: [-6.3, 0.0, 1.2], chord: 3.3, t: 0.04 };
     const sTip = { le: [-6.3 - 3.1 * Math.tan((42 * Math.PI) / 180), 0.0, 4.3], chord: 1.05, t: 0.03 };
     const stabGeo = flip(wingPanel({ root: sRoot, tip: sTip, stations: 4 }));
-    const stabH = hingedMesh(stabGeo, M.stealthDark(), new THREE.Vector3(-7.6, 0, 0), new THREE.Vector3(-7.6, 0, side));
+    const stabH = hingedMesh(stabGeo, SKIN.stealthWing(), new THREE.Vector3(-7.6, 0, 0), new THREE.Vector3(-7.6, 0, side));
     stabH.mesh.castShadow = true;
     P(side > 0 ? 'Right stabilator' : 'Left stabilator', {
       system: 'Flight controls', material: 'Composite over titanium spindle', mass: 280, explode: [-1.8, 0, 1.9 * side],
@@ -199,11 +213,11 @@ export function buildFighter() {
     fin.rotation.x = -Math.PI / 2 + 0.47 * side;
     const vRoot = { le: [0, 0, 0], chord: 3.5, t: 0.04 };
     const vTip = { le: [-2.6 * Math.tan((24 * Math.PI) / 180), 0, 2.6], chord: 1.35, t: 0.03 };
-    fin.add(mesh(wingPanel({ root: vRoot, tip: vTip, c0: 0, c1: 0.7, stations: 4 }), M.stealthDark()));
-    fin.add(mesh(wingPanel({ root: vRoot, tip: vTip, c0: 0.7, c1: 1, eta0: 0, eta1: 0.12, stations: 1 }), M.stealthDark()));
-    fin.add(mesh(wingPanel({ root: vRoot, tip: vTip, c0: 0.7, c1: 1, eta0: 0.88, eta1: 1, stations: 1 }), M.stealthDark()));
+    fin.add(mesh(wingPanel({ root: vRoot, tip: vTip, c0: 0, c1: 0.7, stations: 4 }), SKIN.stealthWing()));
+    fin.add(mesh(wingPanel({ root: vRoot, tip: vTip, c0: 0.7, c1: 1, eta0: 0, eta1: 0.12, stations: 1 }), SKIN.stealthWing()));
+    fin.add(mesh(wingPanel({ root: vRoot, tip: vTip, c0: 0.7, c1: 1, eta0: 0.88, eta1: 1, stations: 1 }), SKIN.stealthWing()));
     const rud = wingPanel({ root: vRoot, tip: vTip, c0: 0.7, c1: 1, eta0: 0.12, eta1: 0.88, stations: 3 });
-    const rudH = hingedMesh(rud, M.stealthDark(), wingPoint(vRoot, vTip, 0.12, 0.7), wingPoint(vRoot, vTip, 0.88, 0.7));
+    const rudH = hingedMesh(rud, SKIN.stealthWing(), wingPoint(vRoot, vTip, 0.12, 0.7), wingPoint(vRoot, vTip, 0.88, 0.7));
     rudH.mesh.castShadow = true;
     fin.add(rudH.pivot);
     const finStrip = mesh(new THREE.BoxGeometry(0.6, 0.06, 0.03), M.formation(), { cast: false });
@@ -235,8 +249,8 @@ export function buildFighter() {
       }
       return pts;
     };
-    const duct = orientTubeOutward(loftRings([rr(1.05, 0.74, X(18.0)), rr(1.02, 0.7, X(18.8)), rr(0.98, 0.62, X(19.4))]));
-    const nozOuter = mesh(duct, M.stealthDark());
+    const duct = orientTubeOutward(loftRings([rr(1.05, 0.74, X(18.0)), rr(1.02, 0.7, X(18.8)), rr(0.98, 0.62, X(19.4))], { uvMode: 'metric' }));
+    const nozOuter = mesh(duct, SKIN.stealthWing());
     const nozInner = mesh(duct, new THREE.MeshStandardMaterial({ color: 0x2b2522, roughness: 0.5, metalness: 0.85, side: THREE.BackSide }));
     const face = mesh(new THREE.CircleGeometry(0.32, 24), turbineMat, { cast: false });
     face.rotation.y = -Math.PI / 2;
@@ -268,24 +282,47 @@ export function buildFighter() {
 
   // ----------------------------------------------------------------- landing gear
   const gear = [];
+  const chrome = new THREE.MeshStandardMaterial({ color: 0xdfe4e8, metalness: 1, roughness: 0.08 });
+  const gearPaint = new THREE.MeshStandardMaterial({ color: 0xd9dcde, metalness: 0.2, roughness: 0.45 });
   const wheel = (r, w) => {
     const g = new THREE.Group();
-    const tyre = mesh(new THREE.TorusGeometry(r * 0.72, r * 0.28, 12, 24), M.rubber());
-    const hub = mesh(new THREE.CylinderGeometry(r * 0.5, r * 0.5, w * 0.9, 16), M.aluminium());
-    hub.rotation.x = Math.PI / 2;
+    const tyre = mesh(new THREE.TorusGeometry(r * 0.72, r * 0.28, 16, 36), new THREE.MeshStandardMaterial({ color: 0x161616, roughness: 0.85 }));
     tyre.scale.z = w / (r * 0.56);
-    g.add(tyre, hub);
+    const hub = mesh(new THREE.CylinderGeometry(r * 0.48, r * 0.48, w * 0.82, 24), M.aluminium());
+    hub.rotation.x = Math.PI / 2;
+    const cap = mesh(new THREE.CylinderGeometry(r * 0.16, r * 0.16, w * 0.9, 12), M.gunmetal());
+    cap.rotation.x = Math.PI / 2;
+    g.add(tyre, hub, cap);
+    for (let k = 0; k < 6; k++) {
+      const sp = mesh(new THREE.BoxGeometry(r * 0.08, r * 0.62, w * 0.86), M.gunmetal());
+      sp.rotation.z = (k / 6) * Math.PI;
+      g.add(sp);
+    }
+    return g;
+  };
+  // oleo strut: painted cylinder over a polished chrome slider, with a scissor torque link
+  const oleo = (len, r, wheelR) => {
+    const g = new THREE.Group();
+    g.add(mesh(rod([0, 0, 0], [0, -len * 0.58, 0], r), gearPaint));
+    g.add(mesh(rod([0, -len * 0.55, 0], [0, -len, 0], r * 0.72), chrome));
+    g.add(mesh(rod([r * 1.2, -len * 0.45, 0], [r * 2.6, -len * 0.62, 0], r * 0.28), gearPaint));
+    g.add(mesh(rod([r * 2.6, -len * 0.62, 0], [r * 1.0, -len * 0.84, 0], r * 0.28), gearPaint));
+    g.add(mesh(rod([-r * 1.1, -0.05, r * 0.4], [-r * 1.1, -len * 0.9, r * 0.4], r * 0.12), M.darkMetal()));   // brake line
+    const axle = mesh(new THREE.CylinderGeometry(r * 0.5, r * 0.5, wheelR * 0.9, 10), chrome);
+    axle.rotation.x = Math.PI / 2;
+    axle.position.y = -len;
+    g.add(axle);
     return g;
   };
   {
     const strut = new THREE.Group();
     strut.position.set(X(3.9), -0.42, 0);
-    strut.add(mesh(rod([0, 0, 0], [0, -1.75, 0], 0.07), M.aluminium()));
-    strut.add(mesh(rod([0, -0.4, 0], [-0.3, -1.1, 0], 0.03), M.aluminium()));
-    const wh = wheel(0.3, 0.18); wh.position.set(0.05, -1.98, 0);
+    strut.add(oleo(1.95, 0.07, 0.3));
+    strut.add(mesh(rod([0, -0.4, 0], [-0.3, -1.1, 0], 0.03), gearPaint));
+    const wh = wheel(0.3, 0.18); wh.position.set(0.0, -1.98, 0);
     strut.add(wh);
     const taxi = mesh(new THREE.SphereGeometry(0.05, 8, 8), M.strobe().clone(), { cast: false });
-    taxi.material.emissiveIntensity = 2;
+    taxi.material.emissiveIntensity = 6;
     taxi.position.set(0.12, -0.9, 0);
     strut.add(taxi);
     gear.push({ g: strut, axis: 'z', up: 1.75 });
@@ -293,8 +330,11 @@ export function buildFighter() {
   for (const side of [1, -1]) {
     const strut = new THREE.Group();
     strut.position.set(X(11.5), -0.46, 1.45 * side);
-    strut.add(mesh(rod([0, 0, 0], [0, -1.86, 0], 0.09), M.aluminium()));
-    strut.add(mesh(rod([0, -0.2, 0], [0.4, -1.2, -0.25 * side], 0.035), M.aluminium()));
+    strut.add(oleo(1.86, 0.09, 0.42));
+    strut.add(mesh(rod([0, -0.2, 0], [0.4, -1.2, -0.25 * side], 0.035), gearPaint));
+    const door = mesh(new THREE.BoxGeometry(1.1, 1.0, 0.025), SKIN.stealth());
+    door.position.set(0.05, -0.55, 0.16 * side);
+    strut.add(door);
     const wh = wheel(0.42, 0.26); wh.position.set(0, -1.86, 0.05 * side);
     strut.add(wh);
     gear.push({ g: strut, axis: 'x', up: 1.7 * side });
@@ -311,7 +351,7 @@ export function buildFighter() {
   for (const side of [1, -1]) {
     const pivot = new THREE.Group();
     pivot.position.set(-1.7, -0.64, 0.7 * side);
-    const d = mesh(doorGeo(side), M.stealth());
+    const d = mesh(doorGeo(side), SKIN.stealth());
     pivot.add(d);
     bay.doors.push({ pivot, side });
     bayParts.push(pivot);
@@ -357,6 +397,85 @@ export function buildFighter() {
   vapor.renderOrder = 11;
   attitude.add(vapor);
 
+  // ----------------------------------------------------------------- fine detail: antennas, nozzle internals
+  const bladeShape = (h, c) => {
+    const sh = new THREE.Shape();
+    sh.moveTo(0, 0); sh.lineTo(c, 0); sh.lineTo(c * 0.55, h); sh.lineTo(c * 0.25, h); sh.closePath();
+    const g = new THREE.ExtrudeGeometry(sh, { depth: 0.02, bevelEnabled: true, bevelSize: 0.006, bevelThickness: 0.006, bevelSegments: 1 });
+    g.translate(-c / 2, 0, -0.01);
+    return g;
+  };
+  const antennas = [[-1.2, 0.6, 1, 0.16, 0.28], [-4.0, 0.53, 1, 0.12, 0.22], [2.4, -0.6, -1, 0.14, 0.24]].map(([x, y, up, h, c]) => {
+    const m = mesh(bladeShape(h, c), SKIN.stealthWing());
+    m.rotation.y = Math.PI;
+    if (up < 0) m.rotation.x = Math.PI;
+    m.position.set(x, y, 0);
+    return m;
+  });
+  const dispensers = [1, -1].map((side) => {
+    const m = mesh(new THREE.BoxGeometry(0.42, 0.12, 0.02), M.darkMetal());
+    m.position.set(X(16.2), -0.34, 1.33 * side);
+    m.rotation.x = 0.55 * side;
+    return m;
+  });
+  P('Antennas & countermeasures', {
+    system: 'Avionics', material: 'Composite blade antennas, flare dispensers', mass: 40, explode: [0, 1.2, 0],
+    desc: 'Communication, navigation and IFF blades sit flush or in-line with the airflow; flare dispensers are buried in the lower aft fuselage.',
+  }, [...antennas, ...dispensers]);
+
+  // nozzle internals: afterburner spray rings and the last turbine stage glowing at the back of each duct
+  const hot = new THREE.MeshStandardMaterial({ color: 0x3a3336, metalness: 0.9, roughness: 0.42 });
+  for (const side of [1, -1]) {
+    const eng = A.parts.find((q) => q.name.startsWith(side > 0 ? 'Right engine' : 'Left engine'));
+    for (const [r, x] of [[0.27, X(18.55)], [0.17, X(18.6)]]) {
+      const ring = mesh(new THREE.TorusGeometry(r, 0.014, 6, 32), hot);
+      ring.rotation.y = Math.PI / 2;
+      ring.position.set(x, 0, 0.62 * side);
+      eng.add(ring);
+    }
+    const bladeRow = [];
+    for (let k = 0; k < 36; k++) {
+      const b = new THREE.BoxGeometry(0.01, 0.2, 0.035).translate(0, 0.14, 0).rotateY(0.6).rotateX((k / 36) * Math.PI * 2);
+      bladeRow.push(b.toNonIndexed());
+    }
+    const blades = mesh(mergeGeometries(bladeRow), turbineMat);
+    blades.position.set(X(18.92), 0, 0.62 * side);
+    eng.add(blades);
+  }
+
+  // ----------------------------------------------------------------- markings (projected decals)
+  attitude.updateMatrixWorld(true);
+  const partMesh = (name, i = 0) => {
+    const part = A.parts.find((q) => q.name === name);
+    const list = [];
+    part.traverse((o) => { if (o.isMesh) list.push(o); });
+    return { part, mesh: list[i] };
+  };
+  const c27 = 0.47;
+  for (const side of [1, -1]) {
+    const tail = partMesh(side > 0 ? 'Right vertical tail' : 'Left vertical tail');
+    const n = [0, -Math.sin(c27), Math.cos(c27) * side];
+    const at = [-6.35, 0.3 + 1.25 * Math.cos(c27), side * (1.2 + 1.25 * Math.sin(c27))].map((v, i) => v + n[i] * 0.045);
+    tail.part.add(decal(tail.mesh, tailCode('AF', '07-4021'), { at, dir: n, size: [1.35, 1.35, 0.07] }));
+    const intake = partMesh(side > 0 ? 'Right caret intake' : 'Left caret intake');
+    const ni = [0, -0.3, 0.95 * side];
+    intake.part.add(decal(intake.mesh, emblem(), { at: [2.0, -0.3, 1.52 * side + 0.03 * side], dir: ni, size: [0.95, 0.48, 0.2] }));
+    const fwd = partMesh('Forward fuselage');
+    fwd.part.add(decal(fwd.mesh, danger('WARNING · INTAKE'), { at: [X(5.6), -0.12, 1.02 * side], dir: [0, 0, side], size: [0.95, 0.3, 0.3], roughness: 0.5 }));
+    fwd.part.add(decal(fwd.mesh, rescue(), { at: [X(4.6), 0.45, 0.72 * side], dir: [0, 0.65, 0.76 * side], size: [0.5, 0.25, 0.3] }));
+    const wing = partMesh(side > 0 ? 'Right wing' : 'Left wing');
+    for (const [x, z] of [[-3.4, 2.6], [-2.6, 4.2]]) {
+      wing.part.add(decal(wing.mesh, stencilText('NO STEP', 'rgba(30,34,38,0.85)', true), { at: [x, 0.08, z * side], dir: [0, 1, 0], size: [0.6, 0.15, 0.2], angle: Math.PI / 2 }));
+    }
+  }
+  const spine = partMesh('Centre fuselage');
+  spine.part.add(decal(spine.mesh, panelOutline('ar'), { at: [0.6, 0.66, 0], dir: [0, 1, 0], size: [0.62, 0.62, 0.3] }));
+  spine.part.add(decal(spine.mesh, panelOutline('gun'), { at: [0.2, 0.5, 1.15], dir: [0, 1, 0.25], size: [0.5, 0.32, 0.3] }));
+  const leftWing = partMesh('Left wing');
+  leftWing.part.add(decal(leftWing.mesh, emblem(), { at: [-1.2, 0.08, -4.1], dir: [0, 1, 0], size: [1.5, 0.75, 0.25], angle: -Math.PI / 2 }));
+  const radomeMesh = partMesh('Forward fuselage');
+  radomeMesh.part.add(decal(radomeMesh.mesh, stencilText('AX-7  07-4021', 'rgba(36,40,46,0.9)'), { at: [X(6.6), -0.36, 1.3], dir: [0, -0.2, 1], size: [1.0, 0.25, 0.3] }));
+
   A.finalize();
 
   // ----------------------------------------------------------------- behaviour
@@ -380,6 +499,7 @@ export function buildFighter() {
       ['Ceiling', '19,800 m'], ['Load limit', '+9 / −3 g'],
     ],
     fleetTag: 'Mach 2.25',
+    aero: true,
     root: A.root,
     attitude,
     parts: A.parts,
@@ -433,7 +553,7 @@ export function buildFighter() {
         const isCore = i % 2 === 1;
         pm.uniforms.intensity.value = isCore ? (thr > 0.04 ? 0.05 + thr * 0.35 + ab * 0.6 : 0) : ab * 1.1;
       }
-      turbineMat.emissiveIntensity = 0.3 + thr * 2.4 + ab * 2;
+      turbineMat.emissiveIntensity = 0.5 + thr * 3.6 + ab * 3;
 
       const m = state.mach;
       const transonic = Math.max(0, 1 - Math.abs(m - 1.0) / 0.06);
@@ -443,7 +563,7 @@ export function buildFighter() {
       vapor.visible = vcMat.uniforms.strength.value > 0.01;
 
       state.strobeT += dt;
-      strobe.material.emissiveIntensity = (state.strobeT % 1.2) < 0.08 ? 8 : 0;
+      strobe.material.emissiveIntensity = (state.strobeT % 1.2) < 0.08 ? 18 : 0;
 
       // flight pose: lift off the platform and take up attitude
       const air = state.airborne;

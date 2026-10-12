@@ -31,6 +31,7 @@
       <span class="readout"><b id="utc">--:--:--</b> UTC</span>
       <span class="readout"><b id="fps">--</b> FPS</span>
       <span class="readout"><b id="tris">--</b> triangles</span>
+      <label class="readout quality" for="quality">Quality <select id="quality"></select></label>
     </div>
   </header>
 
@@ -47,8 +48,15 @@
       <span class="hud-desig" id="hud-desig">—</span>
       <span class="hud-name" id="hud-name">—</span>
       <span class="hud-role" id="hud-role"></span>
+      <button type="button" class="btn btn-primary tour-start" id="tour-start">Start guided tour</button>
+      <p class="hud-hint">Drag to orbit · scroll or pinch to zoom · click a part · keys 1–5, M, X, L, R</p>
+      <p class="orbit-note" id="orbit-note" hidden>Orbit view · Earth-centred inertial frame · spacecraft not to scale</p>
     </div>
-    <div class="hud-modes seg" id="modes" role="radiogroup" aria-label="Render mode"></div>
+    <aside class="tour-card" id="tour" aria-live="polite" hidden></aside>
+    <div class="hud-right">
+      <div class="hud-modes seg" id="modes" role="radiogroup" aria-label="Render mode"></div>
+      <div class="hud-looks seg" id="looks" role="radiogroup" aria-label="Environment"></div>
+    </div>
     <aside class="part-card" id="part-card" aria-live="polite" hidden></aside>
     <div class="hud-tools">
       <label class="explode" for="explode">
@@ -61,12 +69,10 @@
       <button type="button" class="btn btn-ghost" id="reset-view">Reset view</button>
     </div>
     <div class="hud-legend" id="legend" hidden>
-      <span class="ctl-label">Surface temperature</span>
+      <span class="ctl-label" id="legend-title">Surface temperature</span>
       <span class="legend-bar" id="legend-bar"></span>
       <span class="legend-scale"><span id="legend-lo"></span><span id="legend-hi"></span></span>
     </div>
-    <p class="hud-hint">Drag to orbit · scroll or pinch to zoom · click a part · keys 1–5, M, X, L, R</p>
-    <p class="orbit-note" id="orbit-note" hidden>Orbit view · Earth-centred inertial frame · spacecraft not to scale</p>
   </main>
 
   <aside class="inspector" aria-label="Inspector">

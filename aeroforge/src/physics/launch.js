@@ -187,6 +187,8 @@ export function simulateAscent({
         enginesOn: { booster: mdotB > 0, core: mdotC > 0, upper: mdotU > 0 },
         coreThrottle: phase === 'BOOST' ? coreThrottle : (phase === 'CORE' ? 1 : 0),
         ambientP: atm.p,
+        drag: aDrag * m,
+        weight: m * (MU_EARTH / (r * r)),
       });
       nextSample += sampleDt;
     }
@@ -251,6 +253,7 @@ export function simulateAscent({
     downrange: R_EARTH * (th - wEff * t), accel: 0, pitch: (lastPitch * 180) / Math.PI,
     mass: mass(), phase, thrust: 0, boostersAttached, coreAttached, fairingAttached,
     enginesOn: { booster: false, core: false, upper: false }, coreThrottle: 0, ambientP: atmF.p,
+    drag: 0, weight: mass() * (MU_EARTH / (r * r)),
   });
 
   events.push({ t: maxQ.t, code: 'MAXQ', label: `Max-Q · ${(maxQ.q / 1000).toFixed(1)} kPa` });
@@ -280,7 +283,7 @@ export function sampleAt(samples, t) {
   const a = samples[lo], b = samples[hi];
   const f = (t - a.t) / (b.t - a.t || 1);
   const out = { ...a };
-  for (const k of ['h', 'v', 'vAir', 'mach', 'q', 'downrange', 'accel', 'pitch', 'mass', 'thrust', 'ambientP']) {
+  for (const k of ['h', 'v', 'vAir', 'mach', 'q', 'downrange', 'accel', 'pitch', 'mass', 'thrust', 'ambientP', 'drag', 'weight']) {
     out[k] = a[k] + (b[k] - a[k]) * f;
   }
   out.t = t;

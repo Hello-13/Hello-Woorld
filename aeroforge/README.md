@@ -9,10 +9,27 @@ that runs real physics and drives the model live.
 | 1 | **AX-7 WRAITH** | Fifth-generation stealth air-superiority fighter | **Flight envelope**: ISA atmosphere, DATCOM lift slope, transonic drag rise, load factor, specific excess power (Ps) vs Mach |
 | 2 | **HELIOS-H HEAVY** | Tri-core heavy-lift launcher, 27 engines at liftoff | **Launch simulator**: RK4 ascent over a rotating spherical Earth, back-pressure-dependent Isp, gravity turn + closed-loop upper-stage guidance, staging and fairing jettison, played back in 3-D |
 | 3 | **TF-90 CYCLONE** | High-bypass two-spool turbofan, museum cutaway | **Brayton cycle**: non-ideal separate-exhaust turbofan cycle with fan/LPT work matching, station table and T–s diagram; drives spool speeds, combustor glow and flow particles |
-| 4 | **SENTINEL-4** | Earth-observation satellite | **Orbital transfer**: Hohmann transfer with a combined apogee plane change, rocket-equation propellant budget, Kepler-timed animation around a dot-matrix Earth |
+| 4 | **SENTINEL-4** | Earth-observation satellite | **Orbital transfer**: Hohmann transfer with a combined apogee plane change, rocket-equation propellant budget, Kepler-timed animation around a photoreal Earth |
 | 5 | **MQ-X KESTREL** | MALE remotely piloted aircraft | **Mission endurance**: Breguet endurance and range for a propeller aircraft, time on station, best-endurance vs best-range speed |
 
 All five designs are fictional and modelled from public engineering principles.
+
+## Learn with it
+
+- **Guided tours** — every vehicle has a step-by-step lesson (six to nine steps). Each step flies
+  the camera, ghosts everything except the parts it is talking about, switches render mode or
+  explodes the airframe, and runs a live demonstration on the model: control surfaces sweeping
+  through roll, pitch and yaw, thrust vectoring, the weapons bay opening, a Mach 2 dash in
+  thermal view, solar arrays deploying, the laser designator firing, flow through the engine.
+  The step card can be folded away to see the whole model.
+- **Force vectors** — lift, weight, thrust and drag drawn to scale from the physics, with
+  magnitudes in kN, for the fighter, the launcher (through the whole ascent) and the UAV.
+- **Pressure view** — the surface pressure coefficient on the wings from thin-airfoil theory,
+  corrected for compressibility (Prandtl–Glauert subsonic, Ackeret supersonic) and stall; it
+  follows angle of attack and Mach live.
+- **Engine station planes** — the SAE ARP755 stations (2, 13, 19, 3, 4, 45, 5) as glowing planes
+  in the cutaway, each labelled with the cycle's total temperature and pressure, shown in a side
+  elevation like a textbook station diagram.
 
 ## Features
 
@@ -23,9 +40,19 @@ All five designs are fictional and modelled from public engineering principles.
 - **Moving parts** — flaperons, ailerons, all-moving stabilators, rudders, 2-D thrust-vectoring
   nozzles, landing-gear retraction, weapons-bay doors with trapeze launchers, independent N1/N2
   spools, a propeller, a gimballed EO/IR turret with laser designator, solar-array deployment.
-- **Four render modes** — Studio (PBR + bloom), X-ray (fresnel hologram), Blueprint (feature edges
-  on drafting blue) and Thermal (per-part temperature on an inferno scale, computed from the
-  physics: stagnation heating, cycle station temperatures, cryogenic tanks, sunlit vs shadowed panels).
+- **Photographic rendering** — image-based lighting from real HDR environment maps, a physically
+  based sky, AgX tone mapping, multisampled HDR post-processing with ground-truth ambient occlusion,
+  bloom on emissives only, and procedural PBR surfaces (panel lines, rivets, weathering, carbon
+  weave, multi-layer insulation, concrete) with decals and stencils. Quality presets (Ultra, High,
+  Balanced, Performance) step down automatically if the frame rate drops.
+- **Environments** — hangar, photo studio, open sky above a cloud deck, a dawn launch pad with
+  floodlights, and low Earth orbit. During a launch the sky darkens with altitude, the stars come
+  out and the curved Earth (NASA Blue Marble by day, city lights by night, clouds and an
+  atmospheric rim) rises into view at its true angular size for the current altitude.
+- **Five render modes** — Studio, X-ray (fresnel hologram), Blueprint (feature edges on drafting
+  blue), Thermal (per-part temperature on an inferno scale, computed from the physics: stagnation
+  heating, cycle station temperatures, cryogenic tanks, sunlit vs shadowed panels) and Pressure
+  (surface Cp on the aircraft).
 - **Exploded view** for every vehicle, **click-to-inspect** parts with material, mass and
   temperature, focus and isolate, plus screen-space callouts.
 - **Effects** — exhaust plumes with shock diamonds that expand in vacuum, afterburners, a
@@ -34,7 +61,7 @@ All five designs are fictional and modelled from public engineering principles.
 ## Run it
 
 It is a static site with no build step. Three.js r170 loads from jsDelivr, so you need a
-network connection.
+network connection; the HDR environments and Earth textures ship in `assets/` (about 3.5 MB).
 
 ```bash
 cd aeroforge
@@ -56,6 +83,7 @@ file system will not work because browsers block ES modules on `file://`.
 | `L` | Toggle callouts |
 | `R` | Reset the camera |
 | `Esc` | Clear the selection |
+| **Start guided tour** | Step through the vehicle's lesson (Back / Next, or click a progress dot) |
 
 A vehicle can be deep-linked with `#fighter`, `#rocket`, `#turbofan`, `#satellite` or `#uav`.
 
@@ -79,11 +107,14 @@ aeroforge/
 ├── src/
 │   ├── main.js            app shell: fleet, modes, picking, explode, inspector, labs, event log
 │   ├── physics/           atmosphere, aero, launch, turbofan, orbital, endurance (no DOM)
-│   ├── engine/            stage (renderer + post-processing), render modes, picking, callouts,
+│   ├── engine/            stage (renderer + post-processing), environments, Earth, render modes,
+│   │                      picking, callouts, force arrows, decals, procedural surfaces,
 │   │                      geometry toolkit (loft / NACA wing / lathe / lattice), shaders, orbit scene
 │   ├── models/            fighter, rocket, turbofan, satellite, uav
 │   ├── labs/              one engineering lab per vehicle
+│   ├── learn/             guided-tour content and player
 │   └── ui/                controls, canvas charts, event log
+├── assets/                HDR environments, Earth textures (see assets/CREDITS.md)
 └── tests/physics.test.mjs
 ```
 
@@ -103,3 +134,8 @@ aeroforge/
 
 These are conceptual-design models meant to show the right trends and magnitudes, not
 certified performance data.
+
+## Credits
+
+The 3-D models are all procedural. Image assets come from public-domain and CC0 sources; see
+[`assets/CREDITS.md`](assets/CREDITS.md).

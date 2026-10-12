@@ -4,6 +4,8 @@
 import { solveTurbofan, DEFAULT_CYCLE } from '../physics/turbofan.js';
 import { el, slider, toggle, readouts, section, segmented, fmt } from '../ui/dom.js';
 import { LineChart } from '../ui/chart.js';
+import * as THREE from 'three';
+import { solidBounds } from '../engine/stage.js';
 
 const PRESETS = {
   takeoff: { altitude: 0, mach: 0, label: 'Take-off' },
@@ -31,6 +33,18 @@ export function mountEngineLab(root, ctx) {
   const sBpr = slider({ label: 'Bypass ratio', min: 3, max: 14, step: 0.1, value: p.bpr, format: (x) => x.toFixed(1), onInput: set('bpr') });
   const tCut = toggle({ label: 'Cutaway', value: true, onChange: (on) => v.setCutaway(on) });
   const tFlow = toggle({ label: 'Flow particles', value: true, onChange: (on) => v.setFlow(on) });
+  const showStations = (on) => { v.setStationPlanes(on); ctx.muteCallouts?.(on); };
+  const tStations = toggle({ label: 'Station planes', value: false, onChange: (on) => { showStations(on); if (on) sideView(); } });
+  // the classic station diagram: a side elevation with headroom above the nacelle for the labels
+  function sideView() {
+    const { stage } = ctx;
+    ctx.setAutoRotate(false);
+    const sph = solidBounds(v.root).getBoundingSphere(new THREE.Sphere());
+    const fovH = 2 * Math.atan(Math.tan((stage.camera.fov * Math.PI) / 360) * stage.camera.aspect);
+    const dist = (sph.radius / Math.sin(fovH / 2)) * 1.15;
+    const target = sph.center.clone().add(new THREE.Vector3(0, sph.radius * 0.3, 0));
+    stage.flyTo(target.clone().addScaledVector(new THREE.Vector3(0.18, 0.2, 1).normalize(), dist), target, 1.2);
+  }
   v.setFlow(true);
 
   const status = el('p', { class: 'lab-status', role: 'status' });
@@ -57,7 +71,7 @@ export function mountEngineLab(root, ctx) {
     section('Performance', ro.el),
     section('Cycle', ts.el),
     section('Stations', el('div', { class: 'table-wrap' }, table)),
-    section('Display', el('div', { class: 'btn-row' }, tCut.el, tFlow.el)),
+    section('Display', el('div', { class: 'btn-row' }, tCut.el, tFlow.el, tStations.el)),
   );
 
   let lastLimited = false;
@@ -122,6 +136,13 @@ export function mountEngineLab(root, ctx) {
 
   return {
     update() { if (dirty) { dirty = false; compute(); } },
-    dispose() {},
+    dispose() { v.setStationPlanes(false); },
+    api: {
+      setDisplay({ flow, stations, cutaway } = {}) {
+        if (flow != null) tFlow.set(flow);
+        if (stations != null) { tStations.set(stations, true); showStations(stations); }
+        if (cutaway != null) tCut.set(cutaway);
+      },
+    },
   };
 }

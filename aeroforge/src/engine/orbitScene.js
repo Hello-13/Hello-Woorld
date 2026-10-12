@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { earthMaterial, atmosphereShell } from './effects.js';
+import { createEarth } from './earth.js';
 import { glowTexture } from './materials.js';
 import { RE, hohmann, positionOnEllipse } from '../physics/orbital.js';
 
@@ -22,9 +22,14 @@ export class OrbitScene {
     this.group = new THREE.Group();
     this.group.visible = false;
     stage.scene.add(this.group);
-    this.earth = new THREE.Mesh(new THREE.SphereGeometry(2, 96, 64), earthMaterial());
+    this.planet = createEarth(2, { segments: 160, atmosphere: 1 });
+    this.planet.setSun(new THREE.Vector3(1, 0.25, 0.45));
+    this.earth = this.planet.group;
     this.earth.rotation.y = -1.2;
-    this.group.add(this.earth, atmosphereShell(2));
+    this.group.add(this.earth);
+    const sun = new THREE.DirectionalLight(0xffffff, 3.2);
+    sun.position.set(10, 2.5, 4.5);
+    this.group.add(sun);
     this.lines = new THREE.Group();
     this.group.add(this.lines);
     this.sat = new THREE.Group();
@@ -35,7 +40,7 @@ export class OrbitScene {
     this.satLabel.position.set(0, 0.25, 0);
     this.sat.add(this.satLabel);
     this.group.add(this.sat);
-    this.flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffd27a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
     this.group.add(this.flare);
     this.phase = 'parking';
     this.nu = 0.4;
@@ -120,7 +125,7 @@ export class OrbitScene {
     if (!this.group.visible || !this.cfg) return;
     const c = this.cfg;
     this.earth.rotation.y += dt * 0.04;
-    this.earth.material.uniforms.time.value += dt;
+    this.planet.update(dt);
     const pos = new THREE.Vector3();
     if (this.phase === 'parking') {
       const prev = this.nu;
@@ -157,9 +162,9 @@ export class OrbitScene {
     this.sat.position.copy(pos);
     if (this.model) this.model.lookAt(0, 0, 0);
     if (this.flareT > 0) {
-      this.flareT = Math.max(0, this.flareT - dt * 0.8);
-      this.flare.material.opacity = this.flareT;
-      this.flare.scale.setScalar(0.5 + (1 - this.flareT) * 2.5);
+      this.flareT = Math.max(0, this.flareT - dt * 1.4);
+      this.flare.material.opacity = this.flareT * this.flareT;
+      this.flare.scale.setScalar(0.3 + (1 - this.flareT) * 0.7);
     }
   }
 }

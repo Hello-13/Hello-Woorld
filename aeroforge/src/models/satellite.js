@@ -5,7 +5,9 @@
 import * as THREE from 'three';
 import { Assembly, mesh } from '../engine/assembly.js';
 import { lathe, rod, mergeGeometries } from '../engine/geometry.js';
-import { M } from '../engine/materials.js';
+import { M, SKIN } from '../engine/materials.js';
+import { decal, stencilText, emblem } from '../engine/decals.js';
+import { carbonWeave, decalTexture } from '../engine/surface.js';
 
 const BX = 2.2, BY = 2.6, BZ = 2.2;   // bus dimensions (m)
 
@@ -27,19 +29,30 @@ export function buildSatellite({ compact = false } = {}) {
   // ----------------------------------------------------------------- bus panels (each explodes along its normal)
   const panel = (w, h, d, mat, pos) => { const m = mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(...pos); return m; };
   const t = 0.04;
+  // optical solar reflector radiator: a grid of small quartz mirror tiles
+  const osrTex = decalTexture('osr', 512, 512, (ctx, w) => {
+    ctx.fillStyle = '#b8c2cc'; ctx.fillRect(0, 0, w, w);
+    const n = 16, c = w / n;
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const v = 190 + ((i * 7 + j * 13) % 9) * 5;
+      ctx.fillStyle = `rgb(${v},${v + 6},${v + 12})`;
+      ctx.fillRect(i * c + 2, j * c + 2, c - 4, c - 4);
+    }
+  });
+  const osr = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: osrTex, metalness: 0.75, roughness: 0.16, clearcoat: 1, clearcoatRoughness: 0.05 });
   P('Nadir deck (+X)', { system: 'Structure', material: 'Al honeycomb, MLI blanket', mass: 38, temp: 300, explode: [1.6, 0, 0], desc: 'Instrument deck. Carries the telescope and its optical bench, aligned to the star trackers within arc-seconds.' },
-    panel(t, BY, BZ, M.mli(), [BX / 2, 0, 0]));
+    panel(t, BY, BZ, SKIN.mli(), [BX / 2, 0, 0]));
   P('Aft deck (−X)', { system: 'Structure', material: 'Al honeycomb, MLI blanket', mass: 36, temp: 250, explode: [-1.5, 0, 0], desc: 'Propulsion deck: apogee engine, RCS thrusters and the fill-and-drain valves.' },
-    panel(t, BY, BZ, M.mli(), [-BX / 2, 0, 0]));
+    panel(t, BY, BZ, SKIN.mli(), [-BX / 2, 0, 0]));
   P('Zenith radiator (+Y)', { system: 'Thermal control', material: 'Optical solar reflectors on Al', mass: 30, temp: 265, explode: [0, 1.7, 0], desc: 'Second-surface mirrors reject sunlight but radiate the electronics\' heat to deep space.' },
-    panel(BX, t, BZ, M.osr(), [0, BY / 2, 0]));
+    panel(BX, t, BZ, osr, [0, BY / 2, 0]));
   P('Anti-zenith radiator (−Y)', { system: 'Thermal control', material: 'Optical solar reflectors on Al', mass: 30, temp: 240, explode: [0, -1.7, 0], desc: 'Radiator panel; heat pipes embedded in the honeycomb spread the load from the avionics boxes.' },
-    panel(BX, t, BZ, M.osr(), [0, -BY / 2, 0]));
+    panel(BX, t, BZ, osr, [0, -BY / 2, 0]));
   for (const s of [1, -1]) {
     const p = P(s > 0 ? 'Starboard side panel (+Z)' : 'Port side panel (−Z)', {
       system: 'Structure', material: 'Al honeycomb, MLI blanket', mass: 34, temp: s > 0 ? 375 : 175, explode: [0, 0, 1.4 * s],
       desc: s > 0 ? 'Sun-facing side: the gold Kapton outer layer runs hot in direct sunlight.' : 'Shadowed side: radiates to space and runs far below freezing without heaters.',
-    }, panel(BX, BY, t, M.mli(), [0, 0, (BZ / 2) * s]));
+    }, panel(BX, BY, t, SKIN.mli(), [0, 0, (BZ / 2) * s]));
     p.userData.part.thermalRole = s > 0 ? 'sunlit' : 'shadow';
   }
 
@@ -89,7 +102,7 @@ export function buildSatellite({ compact = false } = {}) {
     }
     barrelGeo.computeVertexNormals();
   }
-  const barrel = mesh(barrelGeo, M.mli());
+  const barrel = mesh(barrelGeo, SKIN.mli());
   const inner = mesh(barrelGeo, new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 1, side: THREE.BackSide }));
   const mirror = mesh(new THREE.CircleGeometry(0.5, 40), new THREE.MeshStandardMaterial({ color: 0xe8edf2, roughness: 0.02, metalness: 1 }));
   mirror.rotation.x = -Math.PI / 2;
@@ -177,7 +190,9 @@ export function buildSatellite({ compact = false } = {}) {
   const arrays = [];
   const panelGeo = new THREE.BoxGeometry(0.035, 2.4, 2.0);
   panelGeo.translate(0, 0, 1.0);
-  const backMat = new THREE.MeshStandardMaterial({ color: 0x2e3238, roughness: 0.7, metalness: 0.3 });
+  const cw = carbonWeave();
+  const backMat = new THREE.MeshPhysicalMaterial({ color: 0x9aa0a6, map: cw.map, normalMap: cw.normalMap, roughness: 0.55, metalness: 0.3, clearcoat: 0.4 });
+  const cellMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: M.solar().map, roughness: 0.18, metalness: 0.55, clearcoat: 1, clearcoatRoughness: 0.03, iridescence: 0.25, iridescenceIOR: 1.6 });
   for (const side of [1, -1]) {
     const drive = new THREE.Group();                // solar-array drive: rotates the wing to track the Sun
     drive.position.set(0.0, 0, (BZ / 2) * side);
@@ -191,7 +206,7 @@ export function buildSatellite({ compact = false } = {}) {
     for (let i = 0; i < 4; i++) {
       const hinge = new THREE.Group();
       hinge.position.z = i === 0 ? 0.95 : 2.0;
-      const front = mesh(panelGeo, [M.solar(), backMat, backMat, backMat, backMat, backMat]);
+      const front = mesh(panelGeo, [cellMat, backMat, backMat, backMat, backMat, backMat]);
       hinge.add(front);
       parent.add(hinge);
       hinges.push(hinge);
@@ -205,6 +220,18 @@ export function buildSatellite({ compact = false } = {}) {
     part.userData.part.thermalRole = 'array';
     arrays.push({ drive, hinges, side });
   }
+
+  // markings on the nadir-deck side panel
+  A.root.updateMatrixWorld(true);
+  const side = A.parts.find((p) => p.name === 'Starboard side panel (+Z)');
+  const sideMesh = side.children[0];
+  side.add(decal(sideMesh, emblem('rgba(40,30,10,0.9)'), { at: [-0.45, 0.65, BZ / 2 + 0.02], dir: [0, 0, 1], size: [0.9, 0.45, 0.2], roughness: 0.4, metalness: 0.6 }));
+  side.add(decal(sideMesh, stencilText('SENTINEL-4', 'rgba(40,30,10,0.92)'), { at: [-0.3, -0.75, BZ / 2 + 0.02], dir: [0, 0, 1], size: [1.2, 0.3, 0.2], roughness: 0.4, metalness: 0.6 }));
+  // separation ring / launch-vehicle adapter interface on the aft deck
+  const ring = mesh(new THREE.TorusGeometry(0.6, 0.035, 10, 64), M.aluminium());
+  ring.rotation.y = Math.PI / 2;
+  ring.position.x = -BX / 2 - 0.04;
+  A.parts.find((p) => p.name === 'Aft deck (−X)').add(ring);
 
   A.finalize();
 

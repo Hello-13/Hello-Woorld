@@ -11,6 +11,7 @@ export class Callouts {
 
   attach(vehicle) {
     this.clear();
+    this.muted = false;
     for (const part of vehicle.parts) {
       const info = part.userData.part;
       if (!info.callout || !info.anchor) continue;
@@ -40,7 +41,19 @@ export class Callouts {
 
   setVisible(v) {
     this.visible = v;
-    for (const { obj } of this.objects) obj.visible = v;
+    for (const { obj, part } of this.objects) obj.visible = v && !this.muted && (!this.filter || this.filter.has(part));
+  }
+
+  /** Temporarily hide every callout (e.g. while another label layer is showing). */
+  setMuted(m) {
+    this.muted = m;
+    this.setVisible(this.visible);
+  }
+
+  /** Show only the callouts of these parts (null shows all). */
+  setFilter(set) {
+    this.filter = set;
+    this.setVisible(this.visible);
   }
 
   setSelected(part) {

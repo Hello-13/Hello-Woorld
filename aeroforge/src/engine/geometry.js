@@ -11,7 +11,7 @@ export { mergeGeometries };
  * rings: Array<Array<[x,y,z]>>. Options: capStart, capEnd, closed (ring closure).
  * UVs: u runs along the loft, v around each ring (by arc length).
  */
-export function loftRings(rings, { capStart = false, capEnd = false, closed = true } = {}) {
+export function loftRings(rings, { capStart = false, capEnd = false, closed = true, uvMode = 'normalized' } = {}) {
   const n = rings[0].length;
   const m = rings.length;
   const positions = [];
@@ -43,7 +43,10 @@ export function loftRings(rings, { capStart = false, capEnd = false, closed = tr
     for (let j = 0; j < cols; j++) {
       const p = ring[j % n];
       positions.push(p[0], p[1], p[2]);
-      uvs.push(along[i] / total, per[j] / perTotal);
+      // 'metric': u = metres along the loft, v = metres around; 'metric-x': u = −x (fuselage stations)
+      if (uvMode === 'metric') uvs.push(along[i], per[j]);
+      else if (uvMode === 'metric-x') uvs.push(-centroids[i][0], per[j]);
+      else uvs.push(along[i] / total, per[j] / perTotal);
     }
   }
   for (let i = 0; i < m - 1; i++) {
@@ -141,7 +144,7 @@ export function airfoilLoop(t, n = 24, c0 = 0, c1 = 1, camber = 0) {
  * root/tip: { le: [x, y, z], chord, t }. Nose of the vehicle points +x, so chord runs toward −x.
  * Options: c0/c1 chord-fraction window, stations, twist (deg at tip), camber.
  */
-export function wingPanel({ root, tip, c0 = 0, c1 = 1, stations = 6, twist = 0, camber = 0, n = 22, eta0 = 0, eta1 = 1 }) {
+export function wingPanel({ root, tip, c0 = 0, c1 = 1, stations = 6, twist = 0, camber = 0, n = 22, eta0 = 0, eta1 = 1, uvMode = 'metric', withChord = true }) {
   const rings = [];
   for (let k = 0; k <= stations; k++) {
     const eta = eta0 + ((eta1 - eta0) * k) / stations;
@@ -158,7 +161,23 @@ export function wingPanel({ root, tip, c0 = 0, c1 = 1, stations = 6, twist = 0, 
       return [le[0] + rx, le[1] + ry, le[2]];
     }));
   }
-  return orientOutward(loftRings(rings, { capStart: true, capEnd: true }));
+  const g = orientOutward(loftRings(rings, { capStart: true, capEnd: true, uvMode }));
+  if (withChord) {
+    // per-vertex chord fraction and surface side (+1 upper, −1 lower) for pressure visualisation
+    const loop = airfoilLoop(0.1, n, c0, c1, camber);
+    const per = loop.length + 1;
+    const count = g.attributes.position.count;
+    const chord = new Float32Array(count), side = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      const j = (i % per) % loop.length;
+      const k = i < (stations + 1) * per ? j : 0;
+      chord[i] = loop[k][0];
+      side[i] = k < n + 1 ? 1 : -1;
+    }
+    g.setAttribute('chord', new THREE.BufferAttribute(chord, 1));
+    g.setAttribute('side', new THREE.BufferAttribute(side, 1));
+  }
+  return g;
 }
 
 /** Point on a wing's hinge line at spanwise fraction eta and chord fraction cf (mid-thickness). */

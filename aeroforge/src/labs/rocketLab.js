@@ -3,25 +3,9 @@
 
 import * as THREE from 'three';
 import { simulateAscent, sampleAt, tsiolkovsky, HELIOS } from '../physics/launch.js';
-import { el, slider, readouts, section, button, segmented, fmt } from '../ui/dom.js';
+import { el, slider, readouts, section, button, segmented, toggle, fmt } from '../ui/dom.js';
+import { ForceArrows, kN } from '../engine/forces.js';
 import { LineChart } from '../ui/chart.js';
-
-const SKY = [
-  // altitude (m), top, horizon, bottom, stars
-  [0, 0x0f2747, 0xd2753f, 0x1a1a22, 0],
-  [8000, 0x0b1d3c, 0x7a6a8a, 0x101420, 0],
-  [25000, 0x050c1e, 0x2c4d82, 0x070a12, 0.15],
-  [60000, 0x010206, 0x0d1d3d, 0x020306, 0.75],
-  [120000, 0x000000, 0x050b18, 0x000000, 1],
-];
-function skyAt(h) {
-  let i = 1;
-  while (i < SKY.length - 1 && h > SKY[i][0]) i++;
-  const a = SKY[i - 1], b = SKY[i];
-  const f = Math.min(1, Math.max(0, (h - a[0]) / (b[0] - a[0])));
-  const mix = (x, y) => new THREE.Color(x).lerp(new THREE.Color(y), f);
-  return [mix(a[1], b[1]), mix(a[2], b[2]), mix(a[3], b[3]), a[4] + (b[4] - a[4]) * f];
-}
 
 const SHORT = { BECO: 'BECO', MECO: 'MECO', SES: 'SES', SECO: 'SECO', MAXQ: 'Max-Q', FAIRING: 'Fairing' };
 
@@ -38,6 +22,21 @@ export function mountRocketLab(root, ctx) {
   const sTgt = slider({ label: 'Target orbit altitude', min: 180, max: 600, step: 5, value: p.target, unit: 'km', onInput: (x) => { p.target = x; rerun(); } });
   const warpCtl = segmented({ label: 'Time warp', value: '5', options: [['1', '1×'], ['5', '5×'], ['20', '20×'], ['50', '50×']], onChange: (x) => { warp = +x; } });
 
+  const forces = v.forces || (v.forces = new ForceArrows(v.root, { radius: 0.9 }));
+  const tForces = toggle({ label: 'Force vectors', value: false, onChange: (on) => { forces.setVisible(on); ctx.muteCallouts?.(on); placeForces(lastSample); } });
+  let lastSample = null;
+  function placeForces(s) {
+    if (!s || !forces.group.visible) return;
+    const k = 26 / s.weight;                                  // 26 m of arrow per vehicle weight
+    const pr = (s.pitch * Math.PI) / 180;
+    const axis = new THREE.Vector3(Math.sin(pr), Math.cos(pr), 0);
+    const o = v.rigPivot.position.clone();
+    forces.set('thrust', { origin: o.clone().addScaledVector(axis, -30), dir: axis.clone().negate(), length: s.thrust * k, text: kN(s.thrust), name: 'Thrust' });
+    forces.set('weight', { origin: o, dir: new THREE.Vector3(0, -1, 0), length: s.weight * k, text: kN(s.weight), name: 'Weight' });
+    forces.set('drag', { origin: o.clone().addScaledVector(axis, 38), dir: axis.clone().negate(), length: s.drag * k, text: kN(s.drag), name: 'Drag' });
+    // thrust arrow points down the plume; flip it so it reads as the push on the vehicle
+    forces.arrows.thrust.g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+  }
   const launchBtn = button('Launch', () => startCountdown(), { kind: 'primary' });
   const resetBtn = button('Reset to pad', () => reset());
   resetBtn.disabled = true;
@@ -72,6 +71,7 @@ export function mountRocketLab(root, ctx) {
     outcome,
     section('Δv budget (Tsiolkovsky)', budget.el),
     el('div', { class: 'btn-row' }, launchBtn, resetBtn, el('span', { class: 'ctl-label inline', text: 'Time warp' }), warpCtl.el),
+    el('div', { class: 'btn-row' }, tForces.el),
     section('Telemetry', tele.el),
     section('Ascent profile', altChart.el, velChart.el),
     section('Flight events', events),
@@ -100,6 +100,8 @@ export function mountRocketLab(root, ctx) {
     drawCharts(null);
     renderEvents(-Infinity);
     showSample(sim.samples[0], -10);
+    lastSample = { ...sim.samples[0], thrust: 0 };
+    placeForces(lastSample);
   }
 
   function drawCharts(tNow) {
@@ -143,7 +145,8 @@ export function mountRocketLab(root, ctx) {
     ctx.log(v.designation, `Countdown started · payload ${fmt.n(p.payload / 1000, 1)} t → ${p.target} km`, 'info');
     ctx.setExplode(0);
     ctx.setAutoRotate(false);
-    stage.setEnvironment('custom');
+    if (ctx.stage.env.look !== 'pad') ctx.setLook('pad');
+    stage.ascending = true;
     prevRocket = null;
   }
 
@@ -152,7 +155,8 @@ export function mountRocketLab(root, ctx) {
     v.resetFlight();
     stage.hangar.position.y = 0;
     stage.hangar.visible = true;
-    stage.setEnvironment('hangar');
+    stage.ascending = false;
+    stage.env.applyLook(stage.env.look || 'pad');
     launchBtn.disabled = false; resetBtn.disabled = true;
     [sPay, sKick, sTgt].forEach((s) => { s.input.disabled = false; });
     ctx.refit();
@@ -209,11 +213,9 @@ export function mountRocketLab(root, ctx) {
       stage.hangar.visible = scroll < 5000;
 
       // camera follows the rocket's centre, preserving the user's orbit offset
-      v.rigPivot.getWorldPosition(rocketWorld);
+      v.followPoint(rocketWorld);
       if (prevRocket) {
-        camDelta.subVectors(rocketWorld, prevRocket);
-        stage.camera.position.add(camDelta);
-        stage.controls.target.add(camDelta);
+        stage.shiftView(camDelta.subVectors(rocketWorld, prevRocket));
       }
       prevRocket = (prevRocket || new THREE.Vector3()).copy(rocketWorld);
       if (!stage.reducedMotion && t > -2 && t < 20 && h < 2000) {
@@ -222,19 +224,22 @@ export function mountRocketLab(root, ctx) {
         stage.camera.position.y += (Math.random() - 0.5) * shake;
       }
 
-      const [top, hor, bot, stars] = skyAt(h);
-      stage.setSky(top, hor, bot, stars);
+      stage.env.setAscent(h, t >= 0 ? s.downrange / 6371000 : 0);
 
       showSample(s, t);
+      lastSample = t >= 0 ? s : { ...s, thrust: 0 };
+      placeForces(lastSample);
       if (Math.floor(time * 4) !== Math.floor((time - dt) * 4)) { drawCharts(t); ctx.refreshThermal(); }
     },
     dispose() {
+      forces.setVisible(false);
       if (flight) {
         flight = null;
         v.resetFlight();
         stage.hangar.position.y = 0;
         stage.hangar.visible = true;
-        stage.setEnvironment('hangar', true);
+        stage.ascending = false;
+        stage.env.applyLook(stage.env.look || 'pad');
       }
     },
   };
