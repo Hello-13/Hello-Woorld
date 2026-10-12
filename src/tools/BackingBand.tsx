@@ -10,7 +10,7 @@ import { useSettings, useTuning } from '../state/settings';
 import { createStore, useStore } from '../state/store';
 import { chordSymbol, makeChord, type Chord } from '../theory/chords';
 import { parseProgression, PROGRESSIONS } from '../theory/keys';
-import { COMMON_ROOT_NAMES, keyPrefersFlats, mod12, pcName, pretty } from '../theory/notes';
+import { COMMON_ROOT_NAMES, keyPrefersFlats, mod12, pcName, pretty, prettyRoman } from '../theory/notes';
 import { generateVoicings, type Voicing } from '../theory/voicings';
 
 type Drums = 'rock' | 'halftime' | 'shuffle' | 'waltz' | 'reggae' | 'none';
@@ -19,7 +19,10 @@ export interface Feel {
   id: string;
   name: string;
   beats: 3 | 4;
-  /** One character per eighth note: D down, U up, X muted chuck, u short up-chop, - rest. */
+  /**
+   * One character per eighth note: D down, U up, X muted chuck, u short up-chop, - rest.
+   * Fingerpicking: B bass string, b alternate bass, 1–3 a single treble string (1 = high e).
+   */
   slots: string;
   drums: Drums;
   swing?: number;
@@ -34,7 +37,23 @@ export const FEELS: Feel[] = [
   { id: 'shuffle', name: 'Blues shuffle', beats: 4, slots: 'DUDUDUDU', drums: 'shuffle', swing: 0.33 },
   { id: 'reggae', name: 'Reggae skank', beats: 4, slots: '-u-u-u-u', drums: 'reggae' },
   { id: 'waltz', name: 'Waltz (3/4)', beats: 3, slots: 'D-DUDU', drums: 'waltz' },
+  { id: 'arp68', name: 'Fingerpicked arpeggio (6/8)', beats: 3, slots: 'B32123', drums: 'none' },
+  { id: 'travis', name: 'Travis picking', beats: 4, slots: 'B2b1B2b1', drums: 'none' },
+  { id: 'folk-arp', name: 'Folk arpeggio (4/4)', beats: 4, slots: 'B321b321', drums: 'none' },
 ];
+
+/** The string a picking-pattern character plays in a voicing, or null if it has nothing to play. */
+export function pickString(ch: string, frets: number[]): number | null {
+  const sounding = frets.map((f, i) => (f >= 0 ? i : -1)).filter((i) => i >= 0);
+  if (!sounding.length) return null;
+  if (ch === 'B') return sounding[0];
+  if (ch === 'b') return sounding[Math.min(1, sounding.length - 1)];
+  const n = Number(ch);
+  if (!(n >= 1 && n <= 6)) return null;
+  // String n counted from the top; fall back to the nearest sounding string below it.
+  for (let i = frets.length - n; i >= 0; i--) if (frets[i] >= 0) return i;
+  return null;
+}
 
 interface JamSettings {
   key: string;
@@ -194,6 +213,9 @@ export function BackingBand() {
         else if (ch === 'u') {
           strum(notes, { time, direction: 'up', velocity: 0.62, maxStrings: 4, channelPrefix: 'jam-g', a4 });
           stopChannels('jam-g', time + 0.13);
+        } else {
+          const s = pickString(ch, voicing.frets);
+          if (s !== null && notes[s] !== null) playNote(notes[s]!, { time, channel: 'jam-g' + s, velocity: ch === 'B' || ch === 'b' ? 0.78 : 0.64, a4 });
         }
       }
 
@@ -311,11 +333,13 @@ export function BackingBand() {
             )}
           </div>
           <div>
-            <span class="eyebrow">Strum</span>
+            <span class="eyebrow">{/[Bb1-6]/.test(feel.slots) ? 'Picking' : 'Strum'}</span>
             <div class="strum-row" style={{ gridTemplateColumns: `repeat(${perBar}, minmax(0, 1fr))` }}>
               {feel.slots.split('').map((ch, i) => (
                 <div key={i} class={`strum-slot ${pos && !pos.countIn && pos.slot === i ? 'now' : ''} ${i % 2 === 0 ? 'on' : 'off'}`}>
-                  <span class="arrow">{ch === 'D' ? '↓' : ch === 'U' || ch === 'u' ? '↑' : ch === 'X' ? '×' : '·'}</span>
+                  <span class="arrow" title={/[Bb1-6]/.test(ch) ? (ch === 'B' ? 'Bass string' : ch === 'b' ? 'Alternate bass string' : `String ${ch}`) : undefined}>
+                    {ch === 'D' ? '↓' : ch === 'U' || ch === 'u' ? '↑' : ch === 'X' ? '×' : /[Bb1-6]/.test(ch) ? ch : '·'}
+                  </span>
                   <span class="count mono">{i % 2 === 0 ? i / 2 + 1 : '&'}</span>
                 </div>
               ))}
@@ -331,7 +355,7 @@ export function BackingBand() {
             <div class="bar-strip" style={{ marginTop: '6px' }}>
               {shapes.map((s, i) => (
                 <div key={i} class={`bar-cell ${pos && !pos.countIn && pos.chordIndex === i ? 'now' : ''}`}>
-                  <span class="mono">{preset ? preset.bars.split(' ')[i] : i + 1}</span>
+                  <span class="mono">{preset ? prettyRoman(preset.bars.split(' ')[i]) : i + 1}</span>
                   <b>{pretty(chordSymbol(s.chord))}</b>
                 </div>
               ))}
@@ -358,13 +382,30 @@ export function BackingBand() {
         </Field>
         <div class="controls">
           <Field label="Progression" htmlFor="jam-prog" grow>
-            <select id="jam-prog" class="select" value={jam.progressionId} onChange={(e) => set({ progressionId: e.currentTarget.value })}>
-              {PROGRESSIONS.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}: {p.bars.split(' ').slice(0, 8).join(' ')}
-                  {p.bars.split(' ').length > 8 ? '…' : ''}
-                </option>
-              ))}
+            <select
+              id="jam-prog"
+              class="select"
+              value={jam.progressionId}
+              onChange={(e) => {
+                const next = PROGRESSIONS.find((p) => p.id === e.currentTarget.value);
+                set({ progressionId: e.currentTarget.value, ...(next?.feel ? { feelId: next.feel } : {}), ...(next?.key ? { key: next.key } : {}) });
+              }}
+            >
+              <optgroup label="Progressions">
+                {PROGRESSIONS.filter((p) => !p.song).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}: {p.bars.split(' ').slice(0, 8).join(' ')}
+                    {p.bars.split(' ').length > 8 ? '…' : ''}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Traditional songs">
+                {PROGRESSIONS.filter((p) => p.song).map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </optgroup>
               <option value="custom">Write my own…</option>
             </select>
           </Field>
@@ -380,7 +421,8 @@ export function BackingBand() {
         </div>
         {preset ? (
           <p class="muted" style={{ fontSize: '0.9rem' }}>
-            Heard in: {preset.heardIn}
+            {preset.song ? preset.heardIn : `Heard in: ${preset.heardIn}`}
+            {feel.slots.match(/[Bb1-6]/) ? ' · Picking: B is the bass string, b the next one up, and numbers are strings counted from the thinnest.' : ''}
           </p>
         ) : (
           <Field label="Your chords (names or roman numerals, one per bar)" htmlFor="jam-custom">

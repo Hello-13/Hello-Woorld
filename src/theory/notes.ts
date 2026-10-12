@@ -106,6 +106,11 @@ export function pretty(name: string): string {
     .replace(/(^|[^A-Za-z])#(\d)/g, '$1♯$2');
 }
 
+/** Roman numerals with real accidentals: "bVII" → "♭VII", "#iv°" → "♯iv°". */
+export function prettyRoman(roman: string): string {
+  return roman.replace(/^b/, '♭').replace(/^#/, '♯');
+}
+
 /** Keys whose signatures use flats. */
 const FLAT_MAJOR_TONICS = new Set([5, 10, 3, 8, 1, 6]); // F Bb Eb Ab Db Gb
 const FLAT_MINOR_TONICS = new Set([2, 7, 0, 5, 10, 3]); // d g c f bb eb

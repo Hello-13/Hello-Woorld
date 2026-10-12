@@ -114,6 +114,11 @@ export interface ProgressionPreset {
   bars: string;
   /** Songs built on (or close to) this progression. */
   heardIn: string;
+  /** A whole traditional song rather than a loop. */
+  song?: boolean;
+  /** Backing Band feel and key that suit it. */
+  feel?: string;
+  key?: string;
 }
 
 export const PROGRESSIONS: ProgressionPreset[] = [
@@ -135,6 +140,56 @@ export const PROGRESSIONS: ProgressionPreset[] = [
   { id: 'andalusian', name: 'Andalusian cadence', mode: 'minor', bars: 'i bVII bVI V', heardIn: 'Hit the Road Jack, Stray Cat Strut, flamenco' },
   { id: 'minor-epic', name: 'Minor epic', mode: 'minor', bars: 'i bVI bIII bVII', heardIn: 'Numb (Linkin Park)' },
   { id: 'minor-blues', name: 'Minor shuffle', mode: 'minor', bars: 'i iv i v', heardIn: 'The Thrill Is Gone (simplified)' },
+  {
+    id: 'rising-sun',
+    name: 'House of the Rising Sun',
+    mode: 'minor',
+    bars: 'i bIII IV bVI i bIII V V i bIII IV bVI i V i V',
+    heardIn: 'Traditional American folk song',
+    song: true,
+    feel: 'arp68',
+    key: 'A',
+  },
+  {
+    id: 'greensleeves',
+    name: 'Greensleeves',
+    mode: 'minor',
+    bars: 'i bIII bVII v i bVI V V i bIII bVII v i V i i',
+    heardIn: 'Traditional English ballad (16th century)',
+    song: true,
+    feel: 'arp68',
+    key: 'A',
+  },
+  {
+    id: 'amazing-grace',
+    name: 'Amazing Grace',
+    mode: 'major',
+    bars: 'I I IV I I I V V I I IV I I V I I',
+    heardIn: 'Traditional hymn (“New Britain”)',
+    song: true,
+    feel: 'waltz',
+    key: 'G',
+  },
+  {
+    id: 'saints',
+    name: 'When the Saints Go Marching In',
+    mode: 'major',
+    bars: 'I I I I I I V V I I7 IV IV I V I I',
+    heardIn: 'Traditional spiritual',
+    song: true,
+    feel: 'faithful',
+    key: 'C',
+  },
+  {
+    id: 'scarborough',
+    name: 'Scarborough Fair',
+    mode: 'minor',
+    bars: 'i i bVII i bIII i IV i i bIII bVII i i bVII i i',
+    heardIn: 'Traditional English ballad',
+    song: true,
+    feel: 'arp68',
+    key: 'A',
+  },
 ];
 
 export interface ParsedProgression {
