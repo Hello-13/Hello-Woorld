@@ -88,9 +88,18 @@ export function fingerFrets(frets: Frets): Fingering | null {
       if (candidates[a].fret !== candidates[b].fret) combos.push([candidates[a], candidates[b]]);
     }
   }
-  // Prefer fewer barres, then fewer fingers, then an index barre at the lowest fret.
+  // Prefer fewer barres, then fewer fingers, then an index barre at the lowest fret, but never
+  // two separate fingers on one fret with three or more strings between them (a twisted hand).
+  const twists = (units: Unit[]) => {
+    const singles = units.filter((u) => !u.barre);
+    let n = 0;
+    for (let a = 0; a < singles.length; a++)
+      for (let b = a + 1; b < singles.length; b++)
+        if (singles[a].fret === singles[b].fret && Math.abs(singles[a].strings[0] - singles[b].strings[0]) >= 3) n++;
+    return n;
+  };
   const rank = (units: Unit[], combo: Unit[]) =>
-    combo.length * 10 + units.length - (combo.some((u) => u.fret === lowest) ? 0.5 : 0);
+    combo.length * 10 + units.length + twists(units) * 15 - (combo.some((u) => u.fret === lowest) ? 0.5 : 0);
   let best: { fing: Fingering; rank: number } | null = null;
   for (const combo of combos) {
     const covered = new Set(combo.flatMap((u) => u.strings));
