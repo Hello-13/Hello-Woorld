@@ -31,6 +31,7 @@
       "output": "dist",
       "buildResources": "build"
     },
+    "publish": null,
     "mac": {
       "target": [
         {
@@ -62,5 +63,10 @@
       "category": "Education",
       "artifactName": "Study-Widgets-${version}-linux-${arch}.${ext}"
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Hello-13/Hello-Woorld.git",
+    "directory": "desktop-widgets"
   }
 }

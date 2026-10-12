@@ -1,6 +1,7 @@
 'use strict';
 // Launch test: starts the real app against a local page, exercises the title bar, and checks what it saved.
 // Usage: npm run smoke   (on Linux without a display it runs under xvfb-run)
+//        SMOKE_APP=dist/linux-unpacked/study-widgets npm run smoke   (tests a packaged build)
 
 const http = require('http');
 const fs = require('fs');
@@ -27,9 +28,10 @@ server.listen(0, '127.0.0.1', () => {
     openAtLogin: false,
   }));
 
+  // SMOKE_APP points at a packaged build (e.g. dist/linux-unpacked/study-widgets) to test the installer's contents.
   const appDir = path.join(__dirname, '..');
-  let cmd = electronPath;
-  let args = [appDir];
+  let cmd = process.env.SMOKE_APP || electronPath;
+  let args = process.env.SMOKE_APP ? [] : [appDir];
   if (process.platform === 'linux') {
     args.unshift('--no-sandbox');
     if (!process.env.DISPLAY) { args = ['-a', cmd, ...args]; cmd = 'xvfb-run'; }
