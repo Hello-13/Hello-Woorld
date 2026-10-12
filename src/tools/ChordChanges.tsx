@@ -131,6 +131,7 @@ export function ChordChanges() {
   const mic = useRef<MicInput | null>(null);
   const transport = useRef<Transport | null>(null);
   const countRef = useRef(0);
+  const timers = useRef<number[]>([]);
 
   const key = pairKey(a, b);
   const runs = practice.changes.filter((c) => c.pair === key);
@@ -148,6 +149,8 @@ export function ChordChanges() {
   };
 
   const cleanup = () => {
+    timers.current.forEach(clearTimeout);
+    timers.current = [];
     mic.current?.close();
     mic.current = null;
     transport.current?.stop();
@@ -185,9 +188,9 @@ export function ChordChanges() {
     const t0 = e.ctx.currentTime + 0.1;
     [0, 1, 2].forEach((i) => click(t0 + i * 0.8, i === 0 ? 'accent' : 'beat', 'wood'));
     click(t0 + 2.4, 'accent', 'cowbell');
-    setTimeout(() => setCountdown(2), 900);
-    setTimeout(() => setCountdown(1), 1700);
-    setTimeout(() => {
+    timers.current.push(window.setTimeout(() => setCountdown(2), 900));
+    timers.current.push(window.setTimeout(() => setCountdown(1), 1700));
+    timers.current.push(window.setTimeout(() => {
       endAt.current = performance.now() + seconds * 1000;
       setLeft(seconds);
       setPhase('running');
@@ -197,7 +200,7 @@ export function ChordChanges() {
         tr.start(0.02);
         transport.current = tr;
       }
-    }, 2500);
+    }, 2500));
   };
 
   // Clock and (optionally) the strum counter.

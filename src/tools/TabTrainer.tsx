@@ -103,14 +103,16 @@ export function TabTrainer() {
   const mic = useRef<MicInput | null>(null);
   const playheadRef = useRef<SVGLineElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const live = useRef({ current, results });
-  live.current = { current, results };
+  const live = useRef({ current, results, loop });
+  live.current = { current, results, loop };
+  const endTimer = useRef<number | undefined>(undefined);
 
   const melody = useMemo(() => prepareTune(tune, tuning.strings), [tuneId, tuning.id]);
   const playableCount = melody.notes.filter((n) => n.midi !== null).length;
   const best = practice.tabBest[tuneId];
 
   const resetRun = () => {
+    clearTimeout(endTimer.current);
     transport.current?.stop();
     transport.current = null;
     stopChannels('tab-');
@@ -168,7 +170,7 @@ export function TabTrainer() {
   const finish = (res: Result[]) => {
     const hits = res.filter((r) => r === 'hit').length;
     const percent = Math.round((100 * hits) / Math.max(1, playableCount));
-    const isBest = mode !== 'listen' && (micOn || mode === 'wait') ? recordTab(tuneId, percent) : false;
+    const isBest = recordTab(tuneId, percent);
     setSummary({ percent, best: isBest });
   };
 
@@ -192,16 +194,19 @@ export function TabTrainer() {
       }
       let s = step - countIn;
       if (s >= totalSteps) {
-        if (!loop) {
+        if (!live.current.loop) {
           if (s === totalSteps) {
             const delay = Math.max(0, (time - e.ctx.currentTime) * 1000) + 300;
-            window.setTimeout(() => {
+            endTimer.current = window.setTimeout(() => {
               const res = [...live.current.results];
               // Anything not heard by the end counts as missed.
               melody.notes.forEach((n, i) => n.midi !== null && res[i] === undefined && (res[i] = 'miss'));
-              setResults(res);
               resetRun();
-              if (mode === 'along') finish(res);
+              // Only a run the mic was scoring has a score.
+              if (mode === 'along' && mic.current) {
+                setResults(res);
+                finish(res);
+              }
             }, delay);
           }
           return;
@@ -240,7 +245,7 @@ export function TabTrainer() {
       if (!ev) return;
       let beat = ev.step / 4 + (t - ev.time) / (60 / tr.bpm) - countIn;
       if (beat < 0) return;
-      if (loop && beat >= melody.totalBeats) beat %= melody.totalBeats;
+      if (live.current.loop && beat >= melody.totalBeats) beat %= melody.totalBeats;
       const x = X0 + beat * BEAT_W + NOTE_PAD;
       if (playheadRef.current) {
         playheadRef.current.style.transform = `translateX(${x.toFixed(1)}px)`;
@@ -276,7 +281,7 @@ export function TabTrainer() {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [running, mode, loop, melody]);
+  }, [running, mode, melody]);
 
   // ── Wait-for-me: advance only when the right note is played (mic) or tapped ──
   const advance = (hit: boolean) => {

@@ -1,19 +1,26 @@
 import { midiToFreq } from '../theory/notes';
-import { getEngine } from './engine';
+import { getEngine, peekEngine } from './engine';
 import { naturalT60, renderPluck } from './pluck';
 
+/** Rendered notes, most recently used last. Bounded so a long session doesn't hoard memory on a phone. */
 const cache = new Map<string, AudioBuffer>();
+const CACHE_LIMIT = 72;
 
 function pluckBuffer(ctx: AudioContext, midi: number, muted: boolean, a4: number): AudioBuffer {
   const key = `${midi}:${muted ? 1 : 0}:${a4}:${ctx.sampleRate}`;
   let buf = cache.get(key);
-  if (!buf) {
+  if (buf) {
+    cache.delete(key);
+    cache.set(key, buf);
+  } else {
     const freq = midiToFreq(midi, a4);
-    const duration = muted ? 0.35 : Math.min(5, naturalT60(freq) * 0.9);
+    // By 70% of the 60 dB ring time a note is ~40 dB down and lost under the next one.
+    const duration = muted ? 0.35 : Math.min(3.6, naturalT60(freq) * 0.7);
     const data = renderPluck({ freq, sampleRate: ctx.sampleRate, duration, muted, seed: midi * 7 + (muted ? 1 : 0) });
     buf = ctx.createBuffer(1, data.length, ctx.sampleRate);
     buf.getChannelData(0).set(data);
     cache.set(key, buf);
+    if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value!);
   }
   return buf;
 }
@@ -76,7 +83,9 @@ export function playNote(midi: number, opts: NoteOptions = {}) {
 
 /** Stop every note on channels starting with a prefix ("jam-" stops the backing guitar). */
 export function stopChannels(prefix: string, time?: number) {
-  const e = getEngine();
+  // Nothing can be playing before the engine exists, and creating it here would start audio without a tap.
+  const e = peekEngine();
+  if (!e) return;
   const t = time ?? e.ctx.currentTime;
   for (const [key, v] of voices) {
     if (key.startsWith(prefix)) {
