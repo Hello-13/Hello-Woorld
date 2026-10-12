@@ -67,6 +67,17 @@ src/
 
 ---
 
+## Fretboard Companion
+
+A guitar practice widget for my dashboard: tuner, chord of the day, metronome and practice streak tracker in one drop-in card. See [`fretboard-companion/`](fretboard-companion/README.md).
+
+```html
+<script src="fretboard-companion.js" defer></script>
+<fretboard-companion weekly-goal="150"></fretboard-companion>
+```
+
+---
+
 ## Chem Bench
 
 [`chemistry-labs/`](chemistry-labs/) has interactive labs for every chapter of my chemistry course. Open `chemistry-labs/index.html` in a browser.
