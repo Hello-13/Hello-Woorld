@@ -13,8 +13,9 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
 /** Tyre + hub + brake (optional) about the local z axis. */
 function wheelGeos(R, W, brake) {
-  const tyre = new THREE.TorusGeometry(R - W * 0.32, W * 0.5, 14, 40);
-  tyre.scale(1, 1, 0.62);
+  const tube = Math.min(W * 0.5, R * 0.32);
+  const tyre = new THREE.TorusGeometry(R - tube, tube, 14, 40);
+  tyre.scale(1, 1, (W * 0.5) / tube);
   const hub = new THREE.CylinderGeometry(R * 0.5, R * 0.5, W * 0.8, 28).rotateX(Math.PI / 2);
   const cap = new THREE.CylinderGeometry(R * 0.16, R * 0.2, W * 0.95, 14).rotateX(Math.PI / 2);
   const spokes = [];
@@ -177,10 +178,10 @@ export function buildGear(ctx) {
 
   // ------------------------------------------------------------------ arresting hook
   {
-    const g = [rodV(V(X(15.7), -0.56, 0), V(X(17.15), -0.62, 0), 0.04, 10)];
-    g.push(new THREE.BoxGeometry(0.14, 0.08, 0.16).translate(X(17.18), -0.64, 0));
-    g.push(new THREE.CylinderGeometry(0.05, 0.05, 0.2, 12).rotateX(Math.PI / 2).translate(X(15.7), -0.56, 0));
-    g.push(rodV(V(X(15.9), -0.5, 0), V(X(16.4), -0.45, 0), 0.035, 10));
+    const g = [rodV(V(X(15.7), -0.5, 0), V(X(17.1), -0.5, 0), 0.04, 10)];
+    g.push(new THREE.BoxGeometry(0.14, 0.08, 0.16).translate(X(17.12), -0.52, 0));
+    g.push(new THREE.CylinderGeometry(0.05, 0.05, 0.2, 12).rotateX(Math.PI / 2).translate(X(15.7), -0.5, 0));
+    g.push(rodV(V(X(15.9), -0.45, 0), V(X(16.4), -0.4, 0), 0.035, 10));
     const door = new THREE.BoxGeometry(1.7, 0.02, 0.2).translate(X(16.45), -FR.bD(16.45) + 0.004, 0);
     P('Arresting hook', {
       system: 'Landing gear', material: 'Steel shank and hook point, composite door', mass: 45,

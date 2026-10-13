@@ -6,17 +6,16 @@
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
-import { MAT, DEG, V3, merge, box, cyl, tube, pipe, place, mirror } from './common.js';
+import { MAT, V3, merge, box, cyl, tube, pipe, place } from './common.js';
 
 /** A blade antenna standing on point p with its root along the surface normal n. */
-function bladeAntenna(p, n, h = 0.22, c = 0.26, along = V3(1, 0, 0)) {
+function bladeAntenna(p, n, h = 0.22, c = 0.26) {
+  // swept blade in the x–y plane (chord fore-aft), stood up along the normal (a rotation about x)
   const sh = new THREE.Shape();
-  sh.moveTo(-c / 2, 0); sh.lineTo(c / 2, 0); sh.lineTo(c * 0.05, h); sh.lineTo(-c * 0.25, h); sh.closePath();
+  sh.moveTo(c / 2, 0); sh.lineTo(-c / 2, 0); sh.lineTo(-c * 0.3, h); sh.lineTo(-c * 0.05, h); sh.closePath();
   const g = new THREE.ExtrudeGeometry(sh, { depth: 0.018, bevelEnabled: false }).translate(0, 0, -0.009);
-  const q = new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), n.clone().normalize());
-  const fwd = along.clone().applyQuaternion(q.clone().invert());
-  g.rotateY(-Math.atan2(-fwd.z, fwd.x) * 0);
-  g.applyQuaternion(q);
+  const nn = V3(0, n.y, n.z).normalize();
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), nn));
   g.translate(p.x, p.y, p.z);
   return g;
 }
@@ -40,7 +39,7 @@ function slingSeat(x, z, facing = 1, ceiling = 1.98, floor = 0.62) {
   return { frame, fabric };
 }
 
-export function buildCabin({ A, P, surfPoint }) {
+export function buildCabin({ A, P, surfPoint, surfNormal }) {
   const handles = {};
   const fl = 0.66;   // cockpit floor
 
@@ -62,7 +61,7 @@ export function buildCabin({ A, P, surfPoint }) {
   const panelG = [place(new THREE.BoxGeometry(0.06, 0.52, 1.92), [3.72, 1.2, 0], [0, 0, 0.22]), box(0.24, 0.05, 1.96, [3.66, 1.47, 0])];
   const mfd = [], bezel = [];
   for (const z of [-0.75, -0.3, 0.3, 0.75]) {
-    const g = new THREE.PlaneGeometry(0.17, 0.22).rotateY(-Math.PI / 2).rotateZ(0.22).translate(3.685, 1.2, z);
+    const g = new THREE.PlaneGeometry(0.17, 0.22).rotateY(-Math.PI / 2).rotateZ(0.22).translate(3.676, 1.2, z);
     mfd.push(g);
     bezel.push(place(new THREE.BoxGeometry(0.03, 0.27, 0.22), [3.7, 1.2, z], [0, 0, 0.22]));
   }
@@ -72,7 +71,7 @@ export function buildCabin({ A, P, surfPoint }) {
     desc: 'The M model\'s glass cockpit: four multifunction displays show flight, engine, navigation and moving-map pages, replacing dozens of round gauges; one standby instrument backs them up.',
     callout: true, anchor: [3.66, 1.55, -0.3],
   }, [mesh(merge(panelG), MAT.black()), mesh(merge(bezel), MAT.avionics()), mesh(merge(mfd), MAT.screen(), { cast: false })]);
-  const cdu = [new THREE.PlaneGeometry(0.13, 0.1).rotateX(-Math.PI / 2 + 0.6).translate(3.32, 1.02, 0.0)];
+  const cdu = [new THREE.PlaneGeometry(0.13, 0.1).rotateX(-Math.PI / 2).rotateZ(0.6).translate(3.3, 1.04, 0.0)];
   P('Centre console & flight-management CDUs', {
     system: 'Crew systems', material: 'Console with two control-display units, radio and AFCS panels', mass: 18, explode: [1.2, 0.6, 0],
     desc: 'Between the seats: two control-display units for the dual flight-management system, plus radio, transponder and flight-director controls.',
@@ -183,7 +182,7 @@ export function buildCabin({ A, P, surfPoint }) {
   for (const dz of [0.05, 0.1]) {
     const pts = [[1.2, 2.4, dz], [-0.8, 2.33, dz + 0.1], [-3.6, 2.12, dz]];
     for (let x = -4.4; x >= -8.2; x -= 0.95) pts.push([x, 1.98 - (x + 4.4) * -0.015, dz]);
-    pts.push([-9.4, 2.7, pts.length ? -0.15 : 0], [-9.75, 2.95, -0.3]);
+    pts.push([-8.9, 2.25, -0.05], [-9.4, 2.7, -0.2], [-9.75, 2.95, -0.32]);
     cab.push(pipe(pts, 0.006, 4));
   }
   P('Tail rotor control cables', {
@@ -263,9 +262,7 @@ export function buildCabin({ A, P, surfPoint }) {
   // ------------------------------------------------------------------ antennas & sensors
   const ant = [];
   for (const [x, a] of [[2.45, 1.2], [2.45, Math.PI - 1.2], [1.0, -1.45], [-0.6, -1.65], [-1.4, -1.57], [-4.8, Math.PI / 2 + 0.55]]) {
-    const p = surfPoint(x, a), n = p.clone().sub(V3(x, a < 0 || a > Math.PI ? 1.2 : 1.0, 0));
-    n.x = 0;
-    ant.push(bladeAntenna(p, n, 0.22, 0.26));
+    ant.push(bladeAntenna(surfPoint(x, a, -0.004), surfNormal(x, a), 0.22, 0.26));
   }
   P('VHF/UHF/FM blade antennas', {
     system: 'Communications', material: 'Composite blade antennas', mass: 8, count: 6, explode: [0, 0.6, 0],
@@ -283,7 +280,7 @@ export function buildCabin({ A, P, surfPoint }) {
   P('GPS & SATCOM antennas', {
     system: 'Communications', material: 'Flush patch antennas', mass: 3, count: 3, explode: [-0.6, 2.4, 0],
     desc: 'Patch antennas on top of the aft fairing see the sky: two for the embedded GPS units and one for satellite communications.',
-  }, [mesh(merge([cyl(0.07, 0.07, 0.02, [-2.0, 2.645, 0.14], 'y', 16), cyl(0.07, 0.07, 0.02, [-2.0, 2.645, -0.14], 'y', 16), cyl(0.1, 0.1, 0.025, [-2.7, 2.56, 0], 'y', 18)]), MAT.offWhiteLike ? MAT.offWhiteLike() : MAT.lens())]);
+  }, [mesh(merge([cyl(0.07, 0.07, 0.02, [-2.0, 2.645, 0.14], 'y', 16), cyl(0.07, 0.07, 0.02, [-2.0, 2.645, -0.14], 'y', 16), cyl(0.1, 0.1, 0.025, [-2.7, 2.56, 0], 'y', 18)]), MAT.radome())]);
   const ra = [];
   for (const x of [-4.4, -4.9]) { const p = surfPoint(x, -Math.PI / 2); ra.push(box(0.16, 0.02, 0.16, [p.x, p.y - 0.008, 0])); }
   P('Radar altimeter antennas', {

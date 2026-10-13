@@ -209,7 +209,7 @@ export function buildSystems(ctx) {
       const z = side;
       g.push(FR.pipe([[14.2, -0.42, z * 1.38], [13.6, -0.5, z * 1.0], [12.6, -0.7, z * 0.84], [10.5, -0.74, z * 0.84], [8.5, -0.7, z * 0.84], [6.0, -0.5, z * 0.6], [4.4, -0.32, z * 0.2]], 0.016, 5, 60));
       g.push(FR.pipe([[14.2, -0.42, z * 1.38], [15.5, -0.35, z * 1.4], [16.4, -0.26, z * 1.38]], 0.016, 5));
-      g.push(FR.pipe([[14.6, -0.35, z * 1.4], [14.6, 0.25, z * 1.42], [14.9, 0.4, z * 1.45]], 0.014, 5));
+      g.push(FR.pipe([[14.6, -0.35, z * 1.4], [14.6, 0.15, z * 1.42], [14.9, 0.24, z * 1.42]], 0.014, 5));
       g.push(FR.pipe([[13.2, -0.55, z * 1.0], [13.4, -0.15, z * 1.6], [13.6, -0.1, z * 2.6], [13.9, -0.15, z * 4.2]], 0.014, 5));
       g.push(FR.pipe([[11.0, -0.72, z * 0.84], [11.3, -0.6, z * 1.2]], 0.014, 5));
     }
@@ -245,9 +245,8 @@ export function buildSystems(ctx) {
     desc: 'Batteries power the APU start and hold essential systems for a short time if all generation is lost.',
   }, mesh(merge([box(6.5, -0.55, 0.5, 0.3, 0.16, 0.22), box(6.5, -0.55, -0.5, 0.3, 0.16, 0.22)]), F.box()));
   {
-    const g = [box(5.6, -0.28, 0.72, 0.6, 0.26, 0.14), box(5.6, -0.28, -0.72, 0.6, 0.26, 0.14)];
-    g.push(FR.pipe([[3.0, -0.35, 0.3], [5.0, -0.42, 0.62], [7.5, -0.5, 0.75], [10.5, -0.2, 0.55], [13.0, 0.45, 0.6], [16.5, 0.4, 1.2]], 0.025, 6));
-    g.push(FR.pipe([[3.0, -0.35, -0.3], [5.0, -0.42, -0.62], [7.5, -0.5, -0.75], [10.5, -0.2, -0.55], [13.0, 0.45, -0.6], [16.5, 0.4, -1.2]], 0.025, 6));
+    const g = [box(5.6, -0.3, 0.42, 0.6, 0.24, 0.12), box(5.6, -0.3, -0.42, 0.6, 0.24, 0.12)];
+    for (const z of [1, -1]) g.push(FR.pipe([[3.0, -0.2, z * 0.25], [5.0, -0.3, z * 0.42], [7.5, -0.5, z * 0.6], [10.5, -0.18, z * 0.5], [13.0, 0.5, z * 0.4], [16.5, 0.28, z * 1.05]], 0.025, 6));
     P('Power distribution (270 V DC)', {
       system: 'Electrical', material: 'Solid-state power controllers, wiring harnesses', mass: 160,
       explode: [0.5, -0.65, 0],
@@ -271,9 +270,9 @@ export function buildSystems(ctx) {
     explode: [0.8, -0.25, 0],
     desc: 'A liquid loop of PAO coolant runs through cold plates under the radar\'s transmit/receive modules and the integrated processors, then back to the fuel–PAO heat exchangers.',
   }, mesh(merge([
-    FR.pipe([[2.62, 0.0, 0.42], [2.9, -0.3, 0.45], [4.5, -0.45, 0.55], [7.2, -0.6, 0.4]], 0.02, 6),
-    FR.pipe([[2.62, 0.0, -0.42], [2.9, -0.3, -0.45], [4.5, -0.45, -0.55], [7.2, -0.6, -0.4]], 0.02, 6),
-    FR.pipe([[3.0, 0.35, 0.3], [3.4, 0.4, 0.0], [3.0, 0.35, -0.3]], 0.016, 6),
+    FR.pipe([[2.62, 0.0, 0.36], [3.0, -0.12, 0.38], [4.5, -0.28, 0.42], [6.0, -0.45, 0.42], [7.2, -0.6, 0.38]], 0.02, 6),
+    FR.pipe([[2.62, 0.0, -0.36], [3.0, -0.12, -0.38], [4.5, -0.28, -0.42], [6.0, -0.45, -0.42], [7.2, -0.6, -0.38]], 0.02, 6),
+    FR.pipe([[3.05, 0.3, 0.2], [3.3, 0.36, 0.0], [3.05, 0.3, -0.2]], 0.016, 6),
   ]), F.ductDark()));
   P('OBOGS oxygen concentrator', {
     system: 'Environmental control', material: 'Molecular-sieve oxygen concentrator', mass: 18,
@@ -286,42 +285,42 @@ export function buildSystems(ctx) {
     system: 'Avionics', material: 'Liquid-cooled modular processor racks', mass: 120, count: 2,
     explode: [1.9, 1.2, 0],
     desc: 'Two liquid-cooled processor racks (with space for a third) run the radar, EW, CNI and fusion software. Sensor fusion merges every sensor\'s tracks into one picture before the pilot sees it.',
-  }, mesh(merge([box(3.0, 0.12, 0.27, 0.6, 0.34, 0.3), box(3.0, 0.12, -0.27, 0.6, 0.34, 0.3)]), F.box()));
+  }, mesh(merge([box(3.27, 0.14, 0.2, 0.55, 0.3, 0.25), box(3.27, 0.14, -0.2, 0.55, 0.3, 0.25)]), F.box()));
   P('CNI suite', {
     system: 'Avionics', material: 'Integrated comm / nav / identification modules', mass: 70,
     explode: [2.1, -0.75, 0],
     desc: 'Communication, navigation and identification functions (radios, IFF, TACAN, landing aids) share common modules rather than separate boxes for each radio.',
-  }, mesh(merge([box(3.05, -0.25, 0.2, 0.7, 0.18, 0.32), box(3.05, -0.25, -0.2, 0.7, 0.18, 0.32)]), F.boxLight()));
+  }, mesh(merge([box(3.22, -0.19, 0.16, 0.6, 0.2, 0.24), box(3.22, -0.19, -0.16, 0.6, 0.2, 0.24)]), F.boxLight()));
   P('Intra-flight data link', {
     system: 'Avionics', material: 'Low-probability-of-intercept data link', mass: 15,
     explode: [0.6, 0.6, 1.1],
     desc: 'IFDL shares sensor tracks silently between F-22s in a flight using narrow, hard-to-detect transmissions.',
-  }, mesh(merge([box(5.0, -0.22, 0.72, 0.4, 0.2, 0.12)]), F.box()));
+  }, mesh(merge([box(4.9, -0.22, 0.42, 0.4, 0.18, 0.12)]), F.box()));
   P('Inertial navigation & GPS', {
     system: 'Avionics', material: 'Ring-laser-gyro inertial reference with embedded GPS', mass: 18,
     explode: [2.0, 1.75, 0],
     desc: 'Measures the jet\'s attitude, velocity and position, corrected by GPS, for navigation, weapons and the flight controls.',
-  }, mesh(box(3.45, 0.18, 0, 0.18, 0.18, 0.22), F.box()));
+  }, mesh(box(2.86, 0.08, 0, 0.18, 0.18, 0.22), F.box()));
   P('Vehicle management system computers', {
     system: 'Flight controls', material: 'Redundant flight-control processors', mass: 25, count: 3,
     explode: [2.2, 1.95, 0.6],
     desc: 'Fly-by-wire computers turn stick and throttle inputs into surface and nozzle commands many times a second. The airframe is unstable in pitch for agility, so they never stop correcting (channel count illustrative).',
-  }, mesh(merge([box(3.45, 0.06, 0.3, 0.16, 0.24, 0.12), box(3.45, 0.06, -0.3, 0.16, 0.24, 0.12), box(3.45, -0.14, 0, 0.16, 0.14, 0.2)]), F.boxLight()));
+  }, mesh(merge([box(4.3, -0.22, 0.36, 0.3, 0.16, 0.12), box(4.3, -0.22, -0.36, 0.3, 0.16, 0.12), box(4.7, -0.22, -0.36, 0.3, 0.16, 0.12)]), F.boxLight()));
 
   // ================================================================== AN/APG-77 radar
   {
     const tilt = 20 * FR.DEG;
-    const face = new THREE.CircleGeometry(1, 48).scale(0.47, 0.33, 1).rotateY(Math.PI / 2).rotateZ(-tilt).translate(X(2.42), -0.02, 0);
-    const back = new THREE.CylinderGeometry(1, 1, 0.06, 48).rotateX(Math.PI / 2).scale(0.47, 0.33, 1).rotateY(Math.PI / 2).rotateZ(-tilt).translate(X(2.46), -0.02, 0);
+    const face = new THREE.CircleGeometry(1, 48).scale(0.45, 0.31, 1).rotateY(Math.PI / 2).rotateZ(-tilt).translate(X(2.46), -0.03, 0);
+    const back = new THREE.CylinderGeometry(1, 1, 0.06, 48).rotateX(Math.PI / 2).scale(0.45, 0.31, 1).rotateY(Math.PI / 2).rotateZ(-tilt).translate(X(2.5), -0.03, 0);
     // tile rows: thin strips that read as the subarrays of transmit/receive modules
     const rows = [];
     for (let k = -6; k <= 6; k++) {
       const yy = k * 0.05;
-      const half = 0.47 * Math.sqrt(Math.max(0, 1 - (yy / 0.33) ** 2));
+      const half = 0.45 * Math.sqrt(Math.max(0, 1 - (yy / 0.31) ** 2));
       if (half < 0.05) continue;
       rows.push(new THREE.BoxGeometry(0.004, 0.006, half * 2).translate(0, yy, 0));
     }
-    const grid = merge(rows).rotateZ(-tilt).translate(X(2.415), -0.02, 0);
+    const grid = merge(rows).rotateZ(-tilt).translate(X(2.455), -0.03, 0);
     const array = P('AN/APG-77 AESA array', {
       system: 'Sensors', material: 'Gallium-arsenide transmit/receive modules on a cooled backplane', mass: 220,
       explode: [2.5, 0.35, 0], callout: true, anchor: [X(2.4), 0.3, 0],
@@ -329,8 +328,8 @@ export function buildSystems(ctx) {
     }, [mesh(face, F.array()), mesh(back, F.alu()), mesh(grid, F.tile(), { cast: false })]);
     void array;
     const m = [];
-    for (const [a, b] of [[[2.48, 0.25, 0.3], [2.58, 0.2, 0.3]], [[2.48, 0.25, -0.3], [2.58, 0.2, -0.3]], [[2.44, -0.3, 0.3], [2.58, -0.3, 0.3]], [[2.44, -0.3, -0.3], [2.58, -0.3, -0.3]]]) m.push(FR.pipe([a, b], 0.03, 6, 2));
-    m.push(new THREE.TorusGeometry(1, 0.03, 6, 48).scale(0.42, 0.29, 1).rotateY(Math.PI / 2).rotateZ(-tilt).translate(X(2.5), -0.02, 0));
+    for (const [a, b] of [[[2.55, 0.18, 0.25], [2.6, 0.16, 0.25]], [[2.55, 0.18, -0.25], [2.6, 0.16, -0.25]], [[2.5, -0.22, 0.25], [2.6, -0.22, 0.25]], [[2.5, -0.22, -0.25], [2.6, -0.22, -0.25]]]) m.push(FR.pipe([a, b], 0.03, 6, 2));
+    m.push(new THREE.TorusGeometry(1, 0.03, 6, 48).scale(0.4, 0.27, 1).rotateY(Math.PI / 2).rotateZ(-tilt).translate(X(2.53), -0.03, 0));
     P('APG-77 array mount & coolant manifold', {
       system: 'Sensors', material: 'Aluminium mount, PAO manifold', mass: 40,
       explode: [2.0, 0.35, 0],
@@ -340,7 +339,7 @@ export function buildSystems(ctx) {
       system: 'Sensors', material: 'Radar receiver, exciter and power-supply modules', mass: 60,
       explode: [1.6, 0.85, 0],
       desc: 'Generates the radar waveforms and digitises the returns; the signal processing itself runs in the common integrated processors.',
-    }, mesh(merge([box(2.68, 0.25, 0, 0.18, 0.16, 0.6), box(2.68, -0.25, 0, 0.18, 0.12, 0.5)]), F.boxLight()));
+    }, mesh(merge([box(2.7, 0.18, 0, 0.16, 0.12, 0.4), box(2.7, -0.22, 0, 0.16, 0.1, 0.36)]), F.boxLight()));
   }
 
   // ================================================================== distributed sensors

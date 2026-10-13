@@ -193,25 +193,25 @@ export function buildWeapons(ctx) {
 
   // ------------------------------------------------------------------ M61A2 gun and ammunition system
   {
-    const gz = 1.52, gy = 0.3;
+    const gz = 1.72, gy = 0.0;
     const g = [];
     for (let k = 0; k < 6; k++) {
       const a = (k / 6) * Math.PI * 2;
-      g.push(FR.cylX(9.15, gy + Math.cos(a) * 0.06, gz + Math.sin(a) * 0.06, 1.6, 0.019, 0.022, 8));
+      g.push(FR.cylX(9.3, gy + Math.cos(a) * 0.06, gz + Math.sin(a) * 0.06, 1.6, 0.019, 0.022, 8));
     }
-    g.push(FR.cylX(8.48, gy, gz, 0.06, 0.1, 0.1, 16));
-    g.push(FR.cylX(9.4, gy, gz, 0.06, 0.1, 0.1, 16));
-    g.push(FR.cylX(10.05, gy, gz, 0.42, 0.11, 0.09, 16));
-    g.push(new THREE.BoxGeometry(0.3, 0.16, 0.18).translate(X(10.2), gy - 0.06, gz - 0.12));
+    g.push(FR.cylX(8.6, gy, gz, 0.06, 0.1, 0.1, 16));
+    g.push(FR.cylX(9.55, gy, gz, 0.06, 0.1, 0.1, 16));
+    g.push(FR.cylX(10.25, gy, gz, 0.42, 0.11, 0.09, 16));
+    g.push(new THREE.BoxGeometry(0.3, 0.14, 0.14).translate(X(10.35), gy - 0.05, gz - 0.1));
     P('M61A2 20 mm cannon', {
       system: 'Weapons', material: 'Steel barrels, lightweight composite housing', mass: 92,
-      explode: [0.9, 1.35, 1.4], callout: true, anchor: [X(9.3), gy + 0.15, gz],
+      explode: [0.9, 1.35, 1.4], callout: true, anchor: [X(9.4), gy + 0.18, gz],
       desc: 'A six-barrel 20 mm Gatling gun buried in the right wing root above the intake, firing up to 6,000 rounds per minute (about 100 per second). It is a lighter version of the M61A1 used since the 1960s.',
     }, mesh(merge(g), F.gun()));
     const a = [];
-    a.push(new THREE.BoxGeometry(2.3, 0.15, 0.36).translate(X(11.5), 0.5, 1.15));
-    a.push(FR.pipe([[10.35, 0.5, 1.18], [10.25, 0.42, 1.35], [10.2, 0.34, 1.45]], 0.05, 6));
-    a.push(FR.pipe([[10.4, 0.44, 1.05], [10.25, 0.3, 1.32]], 0.04, 6));
+    a.push(new THREE.BoxGeometry(2.1, 0.17, 0.2).translate(X(11.6), -0.04, 1.74));
+    a.push(FR.pipe([[10.55, -0.02, 1.74], [10.45, 0.0, 1.73]], 0.05, 6, 3));
+    a.push(FR.pipe([[10.6, -0.08, 1.68], [10.48, -0.07, 1.66]], 0.04, 6, 3));
     P('Linear linkless ammunition system', {
       system: 'Weapons', material: 'Aluminium conveyor and storage container', mass: 230,
       explode: [0.2, 1.45, 1.2],
@@ -219,14 +219,14 @@ export function buildWeapons(ctx) {
     }, mesh(merge(a), F.boxLight()));
     // gun-port door: flush panel on the upper glove ahead of the muzzle
     const grid = [];
-    for (const s of [8.0, 8.15, 8.3]) grid.push([1.43, 1.52, 1.61].map((z) => [X(s), FR.topAt(s, z) + 0.004, z]));
+    for (const s of [8.45, 8.6, 8.75]) grid.push([1.64, 1.72, 1.8].map((z) => [X(s), FR.topAt(s, z) + 0.004, z]));
     const door = slab(grid, () => [0, -0.02, 0], V(0, 1, 0));
     const dm = F.skin().clone();
     dm.polygonOffset = true; dm.polygonOffsetFactor = -2; dm.polygonOffsetUnits = -2;
-    const h = hinge(mesh(door, dm), V(X(8.3), FR.topAt(8.3, 1.43), 1.43), V(X(8.3), FR.topAt(8.3, 1.61), 1.61), V(X(8.0), 0.4, 1.52), V(0, -1, 0));
+    const h = hinge(mesh(door, dm), V(X(8.75), FR.topAt(8.75, 1.64), 1.64), V(X(8.75), FR.topAt(8.75, 1.8), 1.8), V(X(8.45), 0.2, 1.72), V(0, -1, 0));
     P('Gun-port door', {
       system: 'Weapons', skin: true, material: 'Composite door', mass: 4,
-      explode: [1.2, 1.6, 1.4],
+      explode: [1.2, 1.75, 1.45],
       desc: 'Covers the muzzle in normal flight and snaps open hydraulically only while the gun fires, so the port adds nothing to the radar signature the rest of the time.',
     }, h.pivot);
     anim.gunDoor = h;

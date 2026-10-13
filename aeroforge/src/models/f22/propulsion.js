@@ -130,7 +130,7 @@ export function buildPropulsion(ctx) {
         system: 'Propulsion', material: 'Titanium and nickel blisks', mass: 210,
         explode: [0.6, 0.55, 0.55 * side],
         desc: 'Six stages squeeze the core air before combustion; the HP spool turns opposite to the LP spool, which lets the engine drop a row of turbine vanes and save weight (stage count from Pratt & Whitney).',
-      }, [mesh(merge(g), F.blade()), mesh(cas, new THREE.MeshStandardMaterial({ color: 0x8b9298, roughness: 0.35, metalness: 0.9, side: THREE.DoubleSide }))]);
+      }, [mesh(merge(g), F.blade()), mesh(cas, F.tiDull())]);
       hpc.userData.part.thermalRole = 'compressor';
     }
     // ---------------------------------------------------------------- combustor
@@ -213,12 +213,10 @@ export function buildPropulsion(ctx) {
       const acts = [];
       for (const dz of [-0.6, 0.6]) for (const y of [0.28, -0.3]) acts.push(new THREE.CylinderGeometry(0.035, 0.03, 0.5, 10).rotateZ(Math.PI / 2).translate(sx(17.85), yc + y, zc + dz * (side > 0 ? 1 : 1)));
       // moving flaps: convergent + divergent about the throat, external flaps about their front edges
-      const plate = (pts, w) => slab([pts.map(([s, y]) => [sx(s), y, zc - w / 2]), pts.map(([s, y]) => [sx(s), y, zc + w / 2])], () => [0, 0, 0]);
       const flapGeo = (sgn) => merge([
         slab([[[sx(17.72), sgn * 0.32 + yc, zc - 0.46], [sx(17.72), sgn * 0.32 + yc, zc + 0.46]], [[sx(17.96), sgn * 0.21 + yc, zc - 0.46], [sx(17.96), sgn * 0.21 + yc, zc + 0.46]]], () => [0, sgn * 0.035, 0]),
         slab([[[sx(17.96), sgn * 0.21 + yc, zc - 0.46], [sx(17.96), sgn * 0.21 + yc, zc + 0.46]], [[sx(18.52), sgn * 0.25 + yc, zc - 0.46], [sx(18.52), sgn * 0.25 + yc, zc + 0.46]]], () => [0, sgn * 0.035, 0]),
       ]);
-      void plate;
       const throat = new THREE.Vector3(sx(17.96), yc, zc);
       const pivot = new THREE.Group();
       pivot.position.copy(throat);
@@ -278,8 +276,8 @@ export function buildPropulsion(ctx) {
       }, mesh(merge(g), F.boxLight()));
       const m = [];
       for (const dz of [-0.6, 0.6]) m.push(FR.pipe([[13.9, yc, zc + dz * 0.95], [13.75, yc + 0.05, zc + dz * 1.12]], 0.03, 6));
-      m.push(FR.pipe([[16.6, yc + 0.52, zc], [16.4, yc + 0.6, zc + 0.1 * side]], 0.028, 6));
-      m.push(FR.pipe([[14.1, yc + 0.54, zc], [13.6, yc + 0.62, zc]], 0.025, 6));
+      m.push(FR.pipe([[16.6, yc + 0.5, zc], [16.4, yc + 0.55, zc + 0.08 * side]], 0.025, 6));
+      m.push(FR.pipe([[14.1, yc + 0.54, zc], [13.7, yc + 0.6, zc]], 0.022, 6));
       P(`Engine mounts (${R})`, {
         system: 'Propulsion', material: 'Steel trunnions and links', mass: 35,
         explode: [0.2, 1.0, 0.7 * side],

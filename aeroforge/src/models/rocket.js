@@ -82,9 +82,15 @@ export function buildRocket() {
 
   A.finalize();
 
-  // a solid pad mesh used to tell whether the render modes have swapped materials
+  // The pad site is context, not the subject: it shows only in the launch-pad look and only while
+  // the hardstand wears its studio material. X-ray, Systems, Blueprint and Thermal (and tour steps
+  // that ghost the pad) then show the vehicle alone. A getter keeps this synchronous with every
+  // visibility check (rendering, framing, picking) instead of lagging a frame behind mode changes.
   let probe = null;
   site.traverse((o) => { if (!probe && o.isMesh && !o.userData.fx) probe = o; });
+  let onPad = true;
+  const siteShown = () => onPad && (!probe || !probe.userData.studio || probe.material === probe.userData.studio);
+  Object.defineProperty(site, 'visible', { get: siteShown, set() {}, configurable: true });
 
   const st = {
     firing: { booster: false, core: false, upper: false },
@@ -96,7 +102,6 @@ export function buildRocket() {
     launching: false,
   };
   let followY = FOLLOW_STACK;
-  let look = 'pad';
 
   const allFins = [...centre.fins, ...boosters.flatMap((b) => b.fins)];
   const setFins = (fins, k) => { for (const m of fins) m.rotation.x = (-Math.PI / 2) * smooth(k); };
@@ -130,15 +135,14 @@ export function buildRocket() {
     rigPivot, stack, ground,
     pivotY: STACK0 + PIVOT,
     parts: A.parts,
-    view: { dir: [1.0, 0.2, 1.35], fill: 1.0 },
+    // with the pad showing, frame a little tighter so the vehicle, not the hardstand, fills the view
+    view: { dir: [1.0, 0.2, 1.35], get fill() { return siteShown() ? 0.8 : 1.0; } },
     displaySize: 13,
     thermalRange: [60, 1800],
     state: st,
     /** The pad site (hardstand, trench, tower, TE, scenery) belongs to the launch-pad look only. */
     setLook(k) {
-      look = k;
-      const onPad = k === 'pad';
-      site.visible = onPad;
+      onPad = k === 'pad';
       // without the hardstand the launch mount stands on the floor
       world.position.y = onPad ? 0 : -PAD.hardstand;
     },
@@ -257,10 +261,6 @@ export function buildRocket() {
       // steam and smoke out of the flame trench
       const emit = (ign > 0.2 || (st.launching && fire > 0)) && st.altitudeVis < 900;
       smoke.update(dt, emit, st.altitudeVis < 200 ? 1 : 0.5);
-
-      // site scenery has no X-ray / systems / thermal form: show it only with studio materials
-      if (probe) pad.scenery.visible = !probe.userData.studio || probe.material === probe.userData.studio;
-      void look;
     },
   };
   for (const m of allPlumeMats) m.uniforms.intensity.value = 0;

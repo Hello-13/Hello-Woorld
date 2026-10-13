@@ -205,6 +205,7 @@ export const MAT = {
   navGreen: () => std('h.navGreen', { color: 0x002200, emissive: 0x2bff6a, emissiveIntensity: 5 }),
   navWhite: () => std('h.navWhite', { color: 0x222222, emissive: 0xffffff, emissiveIntensity: 3 }),
   formation: () => std('h.formation', { color: 0x0c1a10, emissive: 0x7dffa0, emissiveIntensity: 1.6 }),
+  radome: () => std('h.radome', { color: 0xc4c8bf, roughness: 0.62, metalness: 0.02 }),
   lens: () => std('h.lens', { color: 0xdfe6ea, roughness: 0.15, metalness: 0.2, emissive: 0x333333, emissiveIntensity: 0.4 }),
 };
 

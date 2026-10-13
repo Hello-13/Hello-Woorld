@@ -148,7 +148,8 @@ export function buildAirframe(ctx) {
     system: 'Skin & fairings', skin: true, material: 'Titanium panels (hot structure near the nozzles)',
     mass: 210, explode: [-0.6, -1.3, 0],
     desc: 'The underside of the engine bays and the aft closure around the nozzles. Titanium is used where exhaust heat would soften aluminium or composites.',
-  }, [mesh(FR.gridSurface(rAft, { closed: true, keep: keepB(stAft, false) }), F.skin()), mesh(capAft(rAft[rAft.length - 1]), F.black())]);
+  }, [mesh(FR.gridSurface(rAft, { closed: true, keep: keepB(stAft, false) }), F.skin()), mesh(capAft(rAft[rAft.length - 1]), F.black()),
+    mesh(FR.gridSurface([[17.45, -0.03, 0.44, 1.12], [17.8, -0.04, 0.4, 0.92], [18.1, -0.05, 0.3, 0.56], [18.32, -0.06, 0.14, 0.24]].map(([s, y, w, h]) => FR.superRing(X(s), 0, y, w, h, 16, 3.2)), { closed: true, uv: 'n' }), F.skin())]);
 
   // ================================================================== primary structure
   // forward fuselage: radar bulkhead, cockpit bulkheads and U-frames around the cockpit
@@ -202,7 +203,7 @@ export function buildAirframe(ctx) {
     g.push(slab([grid[0].map((p) => [p[0], p[1], -0.02]), grid[1].map((p) => [p[0], p[1], -0.02])], () => [0, 0, 0.04]));
     // weapons-bay longerons along the door edges and the bay ceiling
     for (const z of [-0.81, 0.81]) {
-      g.push(FR.pipe([[8.0, -0.86, z], [10, -0.88, z], [12.6, -0.87, z], [13.6, -0.8, z]], 0.035, 6));
+      g.push(FR.pipe([[8.45, -0.84, z], [10, -0.86, z], [12.6, -0.85, z], [13.6, -0.78, z]], 0.035, 6));
       g.push(FR.pipe([[8.3, -0.24, z * 0.75], [12.4, -0.26, z * 0.75]], 0.03, 6));
     }
     P('Keel & weapons-bay longerons', {

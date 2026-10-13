@@ -121,7 +121,7 @@ export function rotorPower({ thrust, rho, a = 340.3, V = 0, Vc = 0, groundZ = In
   const CT = thrust / (rho * A * vtip * vtip);
   // collective at 0.75 R from blade-element/momentum trim: CT = (σa/2)[θ.75(1/3 + μ²/2) − λ/2]
   const lambda = (V * Math.sin(alphaDisc) + vi * kG + Math.max(0, Vc)) / vtip;
-  const theta75 = ((2 * CT) / (sigma * rotor.liftSlope) + lambda / 2) / (1 / 3 + (mu * mu) / 2);
+  const theta75 = ((2 * CT) / (sigma * (rotor.liftSlope ?? 5.73)) + lambda / 2) / (1 / 3 + (mu * mu) / 2);
   return {
     A, omega, vtip, sigma, vh, vi, mu, kG, induced, profile, climb, P0hover,
     total: induced + profile + climb, ideal: thrust * vh, CT, CTs: CT / sigma, lambda, theta75, mAdv, torque: (induced + profile + climb) / omega,

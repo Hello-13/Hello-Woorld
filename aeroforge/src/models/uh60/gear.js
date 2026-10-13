@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { loftRings, orientOutward, lathe } from '../../engine/geometry.js';
-import { MAT, V3, merge, box, cyl, tube, pipe, place } from './common.js';
+import { MAT, V3, merge, box, cyl, tube, pipe } from './common.js';
 
 const AXLE = { x: 2.3, y: 0.33, z: 1.355 };   // track 2.71 m
 
@@ -96,12 +96,11 @@ export function buildGear({ A, P }) {
     const [fz0, fz1] = z(0.05, 0.92), [rz0, rz1] = z(0.05, 0.66);
     const g = cell({ x: -1.84, y0: 0.56, y1: 1.5, z0: fz0, z1: fz1 }, { x: -3.0, y0: 0.84, y1: 1.5, z0: rz0, z1: rz1 });
     const fittings = [cyl(0.06, 0.06, 0.06, [-2.3, 1.52, 0.5 * s], 'y', 14), cyl(0.05, 0.05, 0.05, [-2.6, 0.9, 0.5 * s], 'y', 12)];
-    const part = P(side > 0 ? 'Fuel cell (right)' : 'Fuel cell (left)', {
-      system: 'Fuel', material: 'Crash-resistant, self-sealing rubberised-fabric bladder', mass: 520, explode: [-0.3, -1.4, 0.9 * s],
-      desc: 'One of two cells holding 360 US gal (1,360 L, ≈1,090 kg of JP-8) between them. Each must survive a 20 m (65 ft) drop test full of water without leaking, and the self-sealing layers close up after small-arms penetration. Mass shown includes fuel.',
+    P(side > 0 ? 'Fuel cell (right)' : 'Fuel cell (left)', {
+      system: 'Fuel', material: 'Crash-resistant, self-sealing rubberised-fabric bladder', mass: 40, explode: [-0.3, -1.4, 0.9 * s],
+      desc: 'One of two cells holding 360 US gal (1,360 L, ≈1,090 kg of JP-8) between them. Each must survive a 20 m (65 ft) drop test full of water without leaking, and the self-sealing layers close up after small-arms penetration. Mass shown is the empty cell.',
       callout: side > 0, anchor: [-2.4, 1.25, 0.95],
     }, [mesh(g, MAT.fuelCell()), mesh(merge(fittings), MAT.casting())]);
-    void part;
   }
   const lines = [];
   for (const s of [1, -1]) {
