@@ -118,9 +118,9 @@ export function buildNacelle(ctx) {
   const bif = cut(cutPair((keep) => {
     const list = [];
     for (const phi of [UP, DOWN]) {
-      const a = keep(phi - 0.07) ? phi - 0.07 : phi, b = keep(phi + 0.07) ? phi + 0.07 : phi;
-      if (b - a < 1e-3) continue;
-      list.push(sector(1.04, 1.6, -2.0, -3.8, a, b, 3));
+      const lo = keep(phi - 0.06), hi = keep(phi + 0.06);
+      if (lo && hi) list.push(boxAt(1.32, -2.9, phi, [0.56, 1.8, 0.16]));
+      else if (lo || hi) list.push(boxAt(1.32, -2.9, phi + (hi ? 0.03 : -0.03), [0.56, 1.8, 0.08]));
     }
     return merge(list);
   }, GM.coreCowl(), 'nacelle'));

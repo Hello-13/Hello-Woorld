@@ -203,8 +203,21 @@ export function tangentCyl(r, y, phi, radius, length, seg = 16) {
 
 /** A curved box (sector of an annulus) between radii r0…r1, stations y0…y1, angles p0…p1. */
 export function sector(r0, r1, y0, y1, p0, p1, seg = 12) {
-  const prof = [[r0, y0], [r1, y0], [r1, y1], [r0, y1], [r0, y0]];
-  const g = lathe(prof, seg, p0, p1 - p0);
+  const loop = ccw([[r0, Math.min(y0, y1)], [r1, Math.min(y0, y1)], [r1, Math.max(y0, y1)], [r0, Math.max(y0, y1)]]);
+  const g = lathe(loop.concat([loop[0]]), seg, p0, p1 - p0);
+  // end faces: ShapeGeometry faces +z, which the rotation turns towards decreasing phi
+  const shape = new THREE.Shape(loop.map(([r, y]) => new THREE.Vector2(r, y)));
+  const c0 = new THREE.ShapeGeometry(shape).rotateY(p0 - Math.PI / 2);
+  const c1 = flipFaces(new THREE.ShapeGeometry(shape)).rotateY(p1 - Math.PI / 2);
+  return mergeGeometries([g, c0, c1]);
+}
+
+/** Reverse triangle winding and normals of an indexed geometry. */
+export function flipFaces(g) {
+  const idx = g.index.array;
+  for (let i = 0; i < idx.length; i += 3) { const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t; }
+  const n = g.attributes.normal;
+  for (let i = 0; i < n.count; i++) n.setXYZ(i, -n.getX(i), -n.getY(i), -n.getZ(i));
   return g;
 }
 
