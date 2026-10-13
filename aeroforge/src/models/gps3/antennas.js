@@ -105,7 +105,7 @@ export function buildAntennas(P) {
     const a = Math.atan2(y, x);
     uf.push(pipeG([[Math.cos(a) * 0.58, Math.sin(a) * 0.58, DECK + 0.025], [x, y, DECK + 0.025], [x, y, PANEL_Z - PANEL_T]], 0.006));
   }
-  uf.push(pipeG([[-0.12, 0.567, DECK + 0.025], [-0.12, 0.7, DECK + 0.025], [-0.12, 0.7, IZ - 0.04], [-0.12, IY - 0.12, IZ - 0.06], [-0.12, IY - 0.12, 0.3], [-0.3, IY - 0.1, 0.3], [-0.42, IY - 0.09, 0.25]], 0.01));
+  uf.push(pipeG([[-0.12, 0.567, DECK + 0.025], [-0.12, 0.7, DECK + 0.025], [-0.12, 0.7, IZ - 0.04], [-0.12, IY - 0.12, IZ - 0.06], [-0.12, IY - 0.12, 0.27], [-0.3, IY - 0.1, 0.27], [-0.42, IY - 0.09, 0.25]], 0.01));
   P('UHF feed network', {
     system: 'Communications', material: 'Coaxial cables, hybrid combiners', mass: 6, temp: 270, explode: [0, 0, 1.9],
     desc: 'Combines the twelve UHF elements and carries the crosslink signal through the Earth deck to the crosslink transponder on the payload radiator (routing estimated).',
