@@ -89,11 +89,21 @@ export const G = {
   blackBox: () => once('blackBox', () => new THREE.MeshStandardMaterial({ color: 0x1e2024, roughness: 0.5, metalness: 0.35 })),
   connector: () => once('connector', () => new THREE.MeshStandardMaterial({ color: 0x5b5f64, roughness: 0.4, metalness: 0.9 })),
   harness: () => once('harness', () => new THREE.MeshStandardMaterial({ color: 0xd8d2bf, roughness: 0.7, metalness: 0.05 })),
-  tank: () => M.titanium(),
+  /** Propellant tanks: Orbital ATK composite tanks, titanium liner under a carbon-fibre overwrap
+   *  (a satin resin finish rather than a polished metal). */
+  tank: () => once('tank', () => {
+    const cw = carbonWeave();
+    return new THREE.MeshPhysicalMaterial({ color: 0x8a8f95, map: tile(cw.map, 6), roughness: 0.48, metalness: 0.25, clearcoat: 0.45, clearcoatRoughness: 0.35 });
+  }),
   copv: () => once('copv', () => {
     const cw = carbonWeave();
-    return new THREE.MeshPhysicalMaterial({ color: 0x6b6f73, map: tile(cw.map, 4), roughness: 0.42, metalness: 0.3, clearcoat: 0.8, clearcoatRoughness: 0.2 });
+    return new THREE.MeshPhysicalMaterial({ color: 0x777b80, map: tile(cw.map, 4), roughness: 0.46, metalness: 0.25, clearcoat: 0.5, clearcoatRoughness: 0.3 });
   }),
+  /** Satin titanium for fittings and bosses (not mirror-polished). */
+  satinTi: () => once('satinTi', () => new THREE.MeshStandardMaterial({ color: 0xa7a39c, roughness: 0.46, metalness: 0.8 })),
+  /** Beryllium-copper STEM tape of the deployable monopoles. */
+  stem: () => once('stem', () => new THREE.MeshStandardMaterial({ color: 0xc9a46a, roughness: 0.34, metalness: 0.9 })),
+  redTag: () => once('redTag', () => new THREE.MeshStandardMaterial({ color: 0xb3261e, roughness: 0.6, metalness: 0.0 })),
   tubing: () => once('tubing', () => new THREE.MeshStandardMaterial({ color: 0xb7bcc1, roughness: 0.3, metalness: 1.0 })),
   nozzle: () => once('nozzle', () => new THREE.MeshStandardMaterial({ color: 0x3a3532, roughness: 0.4, metalness: 0.85, side: THREE.DoubleSide })),
   heater: () => once('heater', () => new THREE.MeshStandardMaterial({ color: 0xb4682a, roughness: 0.5, metalness: 0.3 })),
