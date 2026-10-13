@@ -26,6 +26,8 @@ export function mountRocketLab(root, ctx) {
 
   const forces = v.forces || (v.forces = new ForceArrows(v.root, { radius: 0.9 }));
   const tForces = toggle({ label: 'Force vectors', value: false, onChange: (on) => { forces.setVisible(on); ctx.muteCallouts?.(on); placeForces(lastSample); } });
+  // landing legs: swing all twelve out to the landing stance (the mount steps aside while they are out)
+  const tLegs = toggle({ label: 'Landing legs', value: false, onChange: (on) => { v.setLegs?.(on ? 1 : 0); ctx.log(v.designation, on ? 'Landing legs deployed: nested helium pistons, ≈ 18 m stance' : 'Landing legs stowed', 'info'); } });
   let lastSample = null;
   function placeForces(s) {
     if (!s || !forces.group.visible) return;
@@ -74,7 +76,7 @@ export function mountRocketLab(root, ctx) {
     outcome,
     section('Δv budget (Tsiolkovsky)', budget.el),
     el('div', { class: 'btn-row' }, launchBtn, resetBtn, el('span', { class: 'ctl-label inline', text: 'Time warp' }), warpCtl.el),
-    el('div', { class: 'btn-row' }, tForces.el),
+    el('div', { class: 'btn-row' }, tForces.el, tLegs.el),
     section('Telemetry', tele.el),
     section('Ascent profile', altChart.el, velChart.el),
     section('Flight events', events),
@@ -152,6 +154,8 @@ export function mountRocketLab(root, ctx) {
     ctx.log(v.designation, `Countdown started · payload ${fmt.n(p.payload / 1000, 1)} t → ${p.target} km`, 'info');
     ctx.setExplode(0);
     ctx.setAutoRotate(false);
+    tLegs.set(false, true); tLegs.el.disabled = true;
+    v.setLegs?.(0, { animate: false });
     // an open part card would sit where the chase camera holds the vehicle: close it (the app has
     // no context call for this, so press the card's own close button)
     document.querySelector('#part-card:not([hidden]) .pc-head .icon-btn')?.click();
@@ -183,6 +187,7 @@ export function mountRocketLab(root, ctx) {
     stage.env.applyLook(stage.env.look || 'pad');
     launchBtn.disabled = false; resetBtn.disabled = true;
     [sPay, sKick, sTgt].forEach((s) => { s.input.disabled = false; });
+    tLegs.el.disabled = false;
     ctx.refit();
     rerun();
     ctx.log(v.designation, 'Vehicle reset to the pad', 'info');
@@ -261,6 +266,7 @@ export function mountRocketLab(root, ctx) {
     },
     dispose() {
       forces.setVisible(false);
+      if (tLegs.get()) v.setLegs?.(0);
       if (flight) {
         flight = null;
         v.resetFlight();

@@ -2,7 +2,7 @@
 //
 // Three Falcon 9-derived first-stage cores — a reinforced centre core and two side boosters with
 // composite nose cones — each with nine Merlin 1D on an Octaweb, titanium grid fins and four
-// carbon landing legs; a Falcon 9 second stage with one Merlin Vacuum; the 13.1 m × 5.2 m
+// carbon landing legs; a Falcon 9 second stage with one Merlin Vacuum; the 13.2 m × 5.2 m
 // composite fairing over a representative payload. Real scale in metres: y up from the
 // centre-core nozzle exit plane, side boosters on ±x (see falcon/dims.js for the station plan).
 // The pad (falcon/pad.js) is shown in the launch-pad look; the launch mount always.
@@ -104,6 +104,11 @@ export function buildRocket() {
   const siteShown = () => onPad && !exploded() && (!probe || !probe.userData.studio || probe.material === probe.userData.studio);
   Object.defineProperty(site, 'visible', { get: siteShown, set() {}, configurable: true });
   Object.defineProperty(bed, 'visible', { get: () => onPad, set() {}, configurable: true });
+  // Landing legs: every core's four legs swing together (0 stowed, 1 landing stance). While they
+  // are out the launch mount, clamps and masts step aside, since the stance reaches below the deck.
+  let legK = 0, legTarget = 0, legDelay = 0, legDemoClock = null;
+  const setLegsAll = (k) => { legK = k; centre.setLegs(k); for (const b of boosters) b.setLegs(k); };
+  Object.defineProperty(base, 'visible', { get: () => legK < 0.005, set() {}, configurable: true });
 
   const st = {
     firing: { booster: false, core: false, upper: false },
@@ -139,7 +144,7 @@ export function buildRocket() {
       ['Height', '70 m'], ['Width', '12.2 m'], ['Core diameter', '3.66 m'], ['Liftoff mass', '1,420,788 kg'],
       ['Liftoff thrust', '22,819 kN (27 × Merlin 1D)'], ['Vacuum thrust', '24,681 kN'], ['Merlin 1D', '845 kN SL · 914 kN vac · Isp 282 / 311 s'],
       ['Merlin Vacuum', '981 kN · Isp 348 s · 165 : 1 · 3.3 m exit (SpaceX\'s Falcon Heavy page lists the stage at 934 kN)'], ['Payload to LEO', '63,800 kg'], ['Payload to GTO', '26,700 kg'], ['Payload to Mars', '16,800 kg'],
-      ['Fairing', '13.1 m × 5.2 m'], ['Propellants', 'RP-1 / LOX'], ['Pad', 'LC-39A, Kennedy Space Center'],
+      ['Fairing', '13.2 m × 5.2 m (Falcon User\'s Guide; SpaceX\'s Falcon Heavy page gives 13.1 m)'], ['Propellants', 'RP-1 / LOX'], ['Pad', 'LC-39A, Kennedy Space Center'],
     ],
     heroStats: [['63.8', 't', 'Payload to LEO'], ['22,819', 'kN', 'Liftoff thrust'], ['27', '', 'Merlin engines at liftoff']],
     sources: 'SpaceX Falcon Heavy and Falcon 9 vehicle pages and Falcon User\'s Guide; NASA KSC LC-39 fact sheets (FSS, flame trench, lightning protection); NASA Commercial Crew blog (crew access arm); Spaceflight Now Falcon Heavy launch timelines (Arabsat-6A) and its February 2026 report on the crew-arm removal; NASASpaceflight; Wikipedia: Falcon Heavy (specification table after Espace & Exploration no. 51: per-core 287.4 t LOX, 123.5 t RP-1, 22.2 t dry; fairing 1.7 t), Falcon 9, Falcon 9 Full Thrust, SpaceX Merlin, Kennedy Space Center LC-39A, AMOS-6 and CRS-7 investigations.',
@@ -182,6 +187,7 @@ export function buildRocket() {
       return stack.localToWorld(out.set(0, followY, 0));
     },
     resetFlight() {
+      legTarget = 0; legDemoClock = null; setLegsAll(0);
       followY = FOLLOW_STACK;
       st.launching = false;
       st.firing = { booster: false, core: false, upper: false };
@@ -240,7 +246,30 @@ export function buildRocket() {
         p.visible = t < 16;
       }
     },
+    /** Landing legs: k 0 (stowed) … 1 (landing stance); animate eases there over ≈ 2.5 s. */
+    setLegs(k, { animate = true } = {}) {
+      legTarget = Math.min(1, Math.max(0, k)); legDelay = 0;
+      if (!animate) setLegsAll(legTarget);
+    },
+    get legDeploy() { return legK; },
+    /**
+     * The tour's 'deploy' demonstration (see learn/tour.js): a value below 1 starts it — the legs
+     * swing out after the camera has arrived — and the next call with 1 ends it and stows them,
+     * except the tour's own call 1.4–1.5 s into the step, which is ignored. The step clock counts
+     * the same frame time the tour does, so the two agree however slowly frames are drawn.
+     */
+    setDeploy(k) {
+      if (k < 1) { legDemoClock = 0; legTarget = 1; legDelay = 1.0; return; }
+      if (legDemoClock != null && legDemoClock > 1.35 && legDemoClock < 1.6) return;
+      legDemoClock = null; legTarget = 0; legDelay = 0;
+    },
     update(dt, t) {
+      if (legDemoClock != null) legDemoClock += dt;
+      if (legDelay > 0) legDelay = Math.max(0, legDelay - dt);
+      else if (legK !== legTarget) {
+        const step = Math.min(dt, 0.25) / 2.5;
+        setLegsAll(legTarget > legK ? Math.min(legTarget, legK + step) : Math.max(legTarget, legK - step));
+      }
       const amb = Math.min(1, st.ambient);
       const ign = st.ignition;                                   // pre-liftoff ramp 0..1
       const ease = Math.min(1, dt * 6);

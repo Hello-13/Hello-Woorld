@@ -51,6 +51,67 @@ const LEG = {
   tube: [3.0, 3.0, 3.0],          // nested piston sections (outer, middle, inner)
 };
 
+const pistonB = (a) => at(LEG.pistonB[0], a, LEG.pistonB[1]);
+
+/**
+ * The engine section is identical on all three cores (nine Merlins and their plumbing, the TEA-TEB
+ * supply, the leg-deployment helium and the engine controllers), so its geometry is built once and
+ * shared by the three cores' meshes.
+ */
+let ENGINE_GEO = null;
+function engineGeometry() {
+  if (ENGINE_GEO) return ENGINE_GEO;
+  const midKit = merlinKit({ level: 'mid' });
+  const fullKit = merlinKit({ level: 'full' });
+  const bellGeo = merlinBell(28);
+  const placeFor = (kit, a) => {
+    const f = engineFrame(a);
+    const o = {};
+    for (const key of Object.keys(kit)) o[key] = placeAll(kit[key], f.x, 0, f.z, f.yaw);
+    return o;
+  };
+  const ring = { bells: [], pump: [], gg: [], duct: [], line: [], valve: [], ign: [], act: [] };
+  const tvcLines = [], bleeds = [];
+  for (const a of OUTER) {
+    const [x, z] = polar(ENGINE_RING, a);
+    const b = bellGeo.clone(); b.translate(x, 0, z); ring.bells.push(b);
+    const e = placeFor(midKit, a);
+    for (const key of ['pump', 'gg', 'duct', 'line', 'valve', 'ign', 'act']) ring[key].push(...e[key]);
+    tvcLines.push(...e.tvc); bleeds.push(...e.bleed);
+  }
+  const ce = placeFor(fullKit, null);
+  tvcLines.push(...ce.tvc); bleeds.push(...ce.bleed);
+  // TEA-TEB tank and the lines to the three relight engines
+  const teaTop = at(1.58, 112.5, 2.84);
+  const ig = (a) => toCore(a, [-0.3, 2.36, 0.1]);
+  const relight = [
+    pipe([teaTop, at(1.5, 108, 2.7), ig(112.5)], 0.01, { seg: 4, tubular: 10 }),
+    pipe([teaTop, at(1.35, 110, 2.6), at(0.9, 115, 2.32), at(0.55, 140, 2.34), ig(null)], 0.01, { seg: 4, tubular: 16 }),
+    pipe([teaTop, at(1.52, 118, 2.4), ...arc(1.52, 2.15, 125, 270, 10), at(1.4, 275, 2.25), ig(292.5)], 0.01, { seg: 4, tubular: 40 }),
+  ];
+  // pneumatic helium bottles and the leg-deployment lines to the base of each piston
+  const pb = [22.5, 202.5].map((a) => new THREE.SphereGeometry(0.12, 16, 10).translate(...at(1.58, a, 2.7)));
+  const legHe = [];
+  for (const [b, legs] of [[22.5, [45, 315]], [202.5, [135, 225]]]) {
+    for (const la of legs) {
+      const dlt = ((la - b + 540) % 360) - 180, side = Math.sign(dlt);
+      const a1 = b + dlt - side * 6;
+      legHe.push(pipe([at(1.58, b, 2.82), at(1.45, b + side * 4, 2.95), ...arc(1.45, 2.95, b + side * 8, a1, 5).slice(1), at(R - 0.01, a1, 2.95), at(R + 0.05, b + dlt - side * 3, 3.1), pistonB(la)], 0.0115, { seg: 4, tubular: 28, tension: 0.1 }));
+    }
+  }
+  const ec = OUTER.map((a) => unit(1.64, a + 8, 1.8, 0.16, 0.2, 0.12));
+  ec.push(unit(0.55, 180, 1.7, 0.16, 0.2, 0.12));
+  ENGINE_GEO = {
+    bells: merge(ring.bells), pump: merge(ring.pump), gg: merge(ring.gg), duct: merge(ring.duct),
+    lines: merge([...ring.line, ...ring.ign]), valves: merge(ring.valve), act: merge(ring.act),
+    chamber: merlinChamber(48), inj: merge(pintleInjector()), nozzle: merlinNozzle(56),
+    cePump: merge(ce.pump), ceGG: merge(ce.gg), ceDuct: merge(ce.duct), ceLines: merge([...ce.line, ...ce.ign]), ceValves: merge(ce.valve), ceAct: merge(ce.act),
+    tvc: merge(tvcLines), bleed: merge(bleeds), tea: merge([bottle(...at(1.58, 112.5, 2.62), 0.12, 0.42, 14)]), relight: merge(relight),
+    pb: merge(pb), legHe: merge(legHe), ec: merge(ec),
+  };
+  return ENGINE_GEO;
+}
+
 /** Stowed landing leg in leg frame: x tangential, y along the leg (0 → len), z radial outward. */
 function legGeometry(len) {
   const rings = [];
@@ -388,27 +449,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   }, mesh(merge(hold), FM.aluDark()));
 
   // ------------------------------------------------------------------ Merlin 1D engines
-  const midKit = merlinKit({ level: 'mid' });
-  const fullKit = merlinKit({ level: 'full' });
-  const bellGeo = merlinBell(28);
-  const placeFor = (kit, a) => {
-    const f = engineFrame(a);
-    const put = (list) => placeAll(list, f.x, 0, f.z, f.yaw);
-    const o = {};
-    for (const key of Object.keys(kit)) o[key] = put(kit[key]);
-    return o;
-  };
-  const ring = { bells: [], pump: [], gg: [], duct: [], line: [], valve: [], ign: [], act: [] };
-  const tvcLines = [], bleeds = [];
-  for (const a of OUTER) {
-    const [x, z] = polar(ENGINE_RING, a);
-    const b = bellGeo.clone(); b.translate(x, 0, z); ring.bells.push(b);
-    const e = placeFor(midKit, a);
-    for (const key of ['pump', 'gg', 'duct', 'line', 'valve', 'ign', 'act']) ring[key].push(...e[key]);
-    tvcLines.push(...e.tvc); bleeds.push(...e.bleed);
-  }
-  const ce = placeFor(fullKit, null);
-  tvcLines.push(...ce.tvc); bleeds.push(...ce.bleed);
+  const EG = engineGeometry();
   const O = (name, info, objs) => {
     const p = P(name, { system: 'Propulsion', count: 8, xrayWeight: 0.3, ...info }, objs);
     if (info.hot) p.userData.part.thermalRole = thermal;
@@ -420,33 +461,33 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
       ? 'Eight of the centre core\'s nine engines, each 845 kN at sea level and 914 kN in vacuum and ≈ 467 kg with its TVC actuators. The centre core throttles them back shortly after liftoff so it still has propellant when the side boosters separate. Merlin 1D throttles from 845 kN to 482 kN (≈ 57 %, Falcon User\'s Guide).'
       : 'Eight Merlin 1D on the Octaweb ring, 845 kN each at sea level (7.6 MN per core with the centre engine) and ≈ 467 kg each with TVC. Each bell expands the exhaust 16 : 1; fuel flowing through channels in the copper liner cools the chamber and nozzle before it is burned.',
     explode: [0, -4.2, 0],
-  }, mesh(merge(ring.bells), SKIN.bell()));
+  }, mesh(EG.bells, SKIN.bell()));
   O('outer Merlin 1D turbopumps', {
     material: 'Single shaft: LOX impeller, RP-1 impeller, turbine', mass: 8 * 70,
     desc: 'Each engine\'s own turbopump: one shaft carries the LOX impeller, the RP-1 impeller and the turbine that drives them, raising both propellants to injection pressure. The 1D\'s pump speed and power are not published (the Merlin 1C\'s ran at 36,000 rpm and ≈ 10,000 hp).',
     explode: [0, -3.4, 1.6],
-  }, mesh(merge(ring.pump), FM.pump()));
+  }, mesh(EG.pump, FM.pump()));
   O('outer Merlin 1D gas generators', {
     material: 'Inconel combustors', mass: 8 * 12, hot: true,
     desc: 'Small fuel-rich combustors that burn a few per cent of the propellants to spin each turbine. On 2 October 2020 a Falcon 9 aborted at T-2 s because a gas-generator port was blocked with masking lacquer; the engines were swapped and the mission flew a month later.',
     explode: [0, -3.0, 2.2],
-  }, mesh(merge(ring.gg), FM.inconel()));
+  }, mesh(EG.gg, FM.inconel()));
   O('outer Merlin 1D turbine exhaust ducts', {
     material: 'Inconel ducts', mass: 8 * 10, hot: true,
     desc: 'Dump the sooty, fuel-rich turbine gas overboard through the heat shield beside each nozzle — the open part of the open gas-generator cycle, and the dark stream visible beside each Merlin plume.',
     explode: [0, -4.8, 1.0],
-  }, mesh(merge(ring.duct), FM.inconel()));
+  }, mesh(EG.duct, FM.inconel()));
   O('outer Merlin 1D propellant ducts & valves', {
     material: 'Stainless ducts; main LOX and fuel valves, GG valve, mixture-ratio trim valve, TEA-TEB igniter lines', mass: 8 * 30,
     desc: 'Each engine\'s pump-discharge ducts to the injector and cooling jacket, its main oxidiser and fuel valves, gas-generator valve and dual TEA-TEB igniter lines. The mixture ratio is set mainly by the sizing of these lines; a servo-driven butterfly valve on the fuel side trims it.',
     explode: [0, -3.8, 2.8],
-  }, [mesh(merge([...ring.line, ...ring.ign]), FM.steelLine()), mesh(merge(ring.valve), FM.gold())]);
+  }, [mesh(EG.lines, FM.steelLine()), mesh(EG.valves, FM.gold())]);
   P('outer-engine TVC actuators', {
     system: 'Flight controls', count: 16, xrayWeight: 0.5, material: 'Hydraulic actuators powered by high-pressure RP-1, gimbal blocks',
     mass: 16 * 14,
     desc: 'Two actuators per engine gimbal the nozzle a few degrees in pitch and yaw to steer; with all eight outer engines gimballing, the stage can roll too. Their working fluid is RP-1 tapped from the engine\'s own fuel pump.',
     explode: [0, -2.6, 1.4],
-  }, mesh(merge(ring.act), FM.steelLine()));
+  }, mesh(EG.act, FM.steelLine()));
 
   // the centre engine, broken out into its components
   {
@@ -456,105 +497,83 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
       return p;
     };
     const who = centre ? 'Centre engine of the centre core' : 'Centre engine of the side booster';
-    const inj = mesh(merge(pintleInjector()), FM.gold());
+    const inj = mesh(EG.inj, FM.gold());
     inj.userData.xrayWeight = 1;                  // reads through the chamber wall in X-ray
     E('Merlin 1D thrust chamber & pintle injector', {
       material: 'Milled copper-alloy liner, Inconel jacket; pintle injector, faceplate, LOX dome and fuel manifold inside', mass: 140, hot: true,
       desc: `${who}. RP-1 and LOX meet at a single pintle injector — a central post whose sleeve sprays fuel across a sheet of oxidiser, which gives inherent combustion stability (the same idea first flew on the Apollo Lunar Module descent engine). They burn at about 9.7 MPa and roughly 3,600 K.`,
       explode: [0, -2.3, 4.6],
-    }, [mesh(merlinChamber(48), FM.copper()), inj]);
+    }, [mesh(EG.chamber, FM.copper()), inj]);
     E('Merlin 1D nozzle', {
       material: 'Regeneratively cooled channel-wall nozzle', mass: 110, hot: true,
       desc: 'Expands the exhaust 16 : 1 to a ≈ 0.92 m exit. Sized for sea level: a bigger bell would over-expand at liftoff and the flow would separate from the wall.',
       explode: [0, -3.3, 4.6],
-    }, mesh(merlinNozzle(56), SKIN.bell()));
+    }, mesh(EG.nozzle, SKIN.bell()));
     E('Merlin 1D turbopump', {
       material: 'Single shaft: LOX impeller, RP-1 impeller, turbine', mass: 120,
       desc: 'One shaft carries the LOX impeller (top), the RP-1 impeller and the turbine (bottom), so a single bearing system and a single turbine drive both pumps. The 36,000 rpm and ≈ 10,000 hp often quoted are for the Merlin 1C\'s Barber-Nichols pump; the 1D, with more than twice the thrust, has no published figure.',
       anchor: [0.5, 1.5, 0.2], explode: [1.0, -1.9, 4.6],
-    }, [mesh(merge(ce.pump), FM.pump())]);
+    }, [mesh(EG.cePump, FM.pump())]);
     E('Merlin 1D gas generator', {
       material: 'Inconel combustor', mass: 18, hot: true,
       desc: 'Burns a few per cent of the propellants, fuel-rich and therefore cool enough for the turbine blades, to drive the turbine. In this open cycle the turbine gas is dumped overboard instead of entering the main chamber — simpler and lighter than staged combustion, at the cost of a few seconds of Isp.',
       explode: [1.3, -2.5, 5.3],
-    }, mesh(merge(ce.gg), FM.inconel()));
+    }, mesh(EG.ceGG, FM.inconel()));
     E('Merlin 1D turbine exhaust duct', {
       material: 'Inconel', mass: 12, hot: true,
       desc: 'Carries the sooty, fuel-rich turbine exhaust out through the heat shield — the dark stream visible beside each Merlin plume.',
       explode: [1.7, -3.0, 4.6],
-    }, mesh(merge(ce.duct), FM.inconel()));
+    }, mesh(EG.ceDuct, FM.inconel()));
     E('Merlin 1D valves & TEA-TEB igniter', {
       material: 'Main valves, GG valve, mixture-ratio trim valve and servo, stainless ducts and igniter lines', mass: 30,
       desc: centre
         ? 'Main oxidiser and fuel valves, the gas-generator valve, a servo-motor butterfly valve that trims the mixture ratio, and the dual-redundant ignition lines: a slug of pyrophoric TEA-TEB, which ignites on contact with LOX, lights the gas generator and the chamber.'
         : 'Main valves, GG valve, mixture-ratio trim valve and the dual TEA-TEB ignition lines. This is one of the three engines per core that relight for the boost-back, entry and landing burns, so its igniters fire up to four times a flight.',
       explode: [-1.0, -1.9, 4.6],
-    }, [mesh(merge([...ce.line, ...ce.ign]), FM.steelLine()), mesh(merge(ce.valve), FM.gold())]);
+    }, [mesh(EG.ceLines, FM.steelLine()), mesh(EG.ceValves, FM.gold())]);
     E('Merlin 1D gimbal & TVC actuators', {
       system: 'Flight controls', count: 2, material: 'Gimbal bearing block, hydraulic actuators (RP-1 working fluid)', mass: 40,
       desc: 'The centre engine gimbals too: it is the Merlin that usually relights alone for the landing burn, so it must steer.',
       explode: [-0.8, -1.3, 5.3],
-    }, mesh(merge(ce.act), FM.steelLine()));
+    }, mesh(EG.ceAct, FM.steelLine()));
   }
   P('TVC hydraulic supply & return lines', {
     system: 'Hydraulics', count: 36, xrayWeight: 0.6, material: 'Stainless high-pressure lines, Ø ≈ 20 mm', mass: 9 * 3,
     desc: 'Merlin needs no separate hydraulic system: each turbopump supplies high-pressure RP-1 to its two TVC actuators, and the fluid returns to the pump\'s low-pressure inlet, so there is no hydraulic fluid to run out. Two lines per actuator; routing estimated.',
     explode: [0, -2.2, 2.4],
-  }, mesh(merge(tvcLines), FM.steelLine()));
+  }, mesh(EG.tvc, FM.steelLine()));
   P('engine-chill bleed valves & lines', {
     system: 'Propulsion', count: 9, xrayWeight: 0.5, material: 'Bleed valves and overboard lines', mass: 9 * 2,
     desc: 'About seven minutes before launch the engines begin "engine chill": bleed valves open and LOX flows through each turbopump and overboard through the heat shield, so the hardware is already cold when subcooled propellant arrives at start and does not suffer cold shock.',
     explode: [0, -2.9, 3.0],
-  }, mesh(merge(bleeds), FM.steelLine()));
+  }, mesh(EG.bleed, FM.steelLine()));
 
   // engine-bay equipment: TEA-TEB supply, pneumatic helium bottles, engine controllers
-  const teaTop = at(1.58, 112.5, 2.84);
-  const tea = [bottle(...at(1.58, 112.5, 2.62), 0.12, 0.42, 14)];
   P('TEA-TEB ignition tank', {
     system: 'Propulsion', material: 'Stainless pressure vessel', mass: 25,
     desc: 'Holds the pyrophoric triethylaluminium-triethylborane that lights the engines. Spaceflight Now (2010) listed igniter fluid among the ground supplies at the T-0 plate, which suggests the liftoff starts draw it from the ground and this tank serves the in-flight relights; current Block 5 practice is not published. Its green flash shows in the exhaust at every ignition. Tank position estimated.',
     explode: [0, -1.4, 4.2],
-  }, mesh(merge(tea), FM.steelLine()));
-  const ig = (a) => toCore(a, [-0.3, 2.36, 0.1]);
-  const relight = [
-    pipe([teaTop, at(1.5, 108, 2.7), ig(112.5)], 0.01, { seg: 4, tubular: 10 }),
-    pipe([teaTop, at(1.35, 110, 2.6), at(0.9, 115, 2.32), at(0.55, 140, 2.34), ig(null)], 0.01, { seg: 4, tubular: 16 }),
-    pipe([teaTop, at(1.52, 118, 2.4), ...arc(1.52, 2.15, 125, 270, 10), at(1.4, 275, 2.25), ig(292.5)], 0.01, { seg: 4, tubular: 40 }),
-  ];
+  }, mesh(EG.tea, FM.steelLine()));
   P('TEA-TEB relight lines', {
     system: 'Propulsion', count: 3, material: 'Stainless lines, Ø ≈ 10 mm', mass: 4,
     desc: 'Three engines per core relight for the boost-back, entry and landing burns: the centre engine and two outer ones. Each restart needs a fresh slug of TEA-TEB from the tank. Which two outer engines are the relight engines is not published; they are shown opposite each other.',
     explode: [0, -1.8, 4.8],
-  }, mesh(merge(relight), FM.steelLine()));
-  const pb = [];
-  for (const a of [22.5, 202.5]) pb.push(new THREE.SphereGeometry(0.12, 16, 10).translate(...at(1.58, a, 2.7)));
+  }, mesh(EG.relight, FM.steelLine()));
   P('pneumatic helium bottles', {
     system: 'Recovery', count: 2, material: 'Composite-overwrapped high-pressure helium bottles', mass: 2 * 12,
     desc: 'Supply the high-pressure helium that deploys the landing legs and works the engine-bay pneumatic valves. Bottle count and position estimated.',
     explode: [0, -0.8, 5.0],
-  }, mesh(merge(pb), FM.copv()));
-  const legHe = [];
-  const pistonB = (a) => at(LEG.pistonB[0], a, LEG.pistonB[1]);
-  for (const [b, legs] of [[22.5, [45, 315]], [202.5, [135, 225]]]) {
-    for (const la of legs) {
-      const dlt = ((la - b + 540) % 360) - 180, side = Math.sign(dlt);
-      const a1 = b + dlt - side * 6;
-      legHe.push(pipe([at(1.58, b, 2.82), at(1.45, b + side * 4, 2.95), ...arc(1.45, 2.95, b + side * 8, a1, 5).slice(1), at(R - 0.01, a1, 2.95), at(R + 0.05, b + dlt - side * 3, 3.1), pistonB(la)], 0.0115, { seg: 4, tubular: 28, tension: 0.1 }));
-    }
-  }
+  }, mesh(EG.pb, FM.copv()));
   P('leg-deployment helium lines', {
     system: 'Recovery', count: 4, xrayWeight: 1, material: 'Stainless high-pressure lines, Ø ≈ 12 mm', mass: 4 * 1.5,
     desc: 'Run from the two engine-bay helium bottles through the skirt to the base of each leg\'s telescoping piston. Opening the valve drives the pistons out and swings the legs down in the last seconds before touchdown. Routing estimated.',
     explode: [0, -1.2, 5.6],
-  }, mesh(merge(legHe), FM.steelLine()));
-  const ec = [];
-  for (const a of OUTER) ec.push(unit(1.64, a + 8, 1.8, 0.16, 0.2, 0.12));
-  ec.push(unit(0.55, 180, 1.7, 0.16, 0.2, 0.12));
+  }, mesh(EG.legHe, FM.steelLine()));
   P('engine controllers', {
     system: 'Avionics', count: 9, material: 'Radiation-tolerant engine computers', mass: 9 * 4,
     desc: 'Each Merlin has its own controller made of three computers that vote, each with two processors checking each other (the flight software is C++ on Linux). It runs start-up, throttle and shutdown sequences and reports health to the flight computers, which can shut an engine down and re-plan around it. Positions estimated.',
     explode: [0, -1.8, 2.0],
-  }, mesh(merge(ec), FM.avionics()));
+  }, mesh(EG.ec, FM.avionics()));
 
   // ------------------------------------------------------------------ forward structure
   let finY;

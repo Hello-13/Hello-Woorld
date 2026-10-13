@@ -7,7 +7,7 @@ import { mesh } from '../../engine/assembly.js';
 import { wingPanel, wingPoint, mirrorZ, naca00 } from '../../engine/geometry.js';
 import { F } from './materials.js';
 import * as FR from './frame.js';
-import { merge, dedupe, frameBand, platePoly, slab, hinge, ribPlate, sparWeb, mirror } from './util.js';
+import { merge, dedupe, frameBand, platePoly, slab, hinge, ribPlate, sparWeb, mirror, toothedGrid } from './util.js';
 
 const { X, P3, lerp, DEG } = FR;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -87,6 +87,19 @@ export function cavity(st, edge, inward, depth) {
   return g;
 }
 
+/** Spar caps: flat flanges along the upper and lower skins at chord fraction f. */
+function sparCaps(secs, f, w, t, scale) {
+  const geo = [];
+  for (const sgn of [1, -1]) {
+    const grid = secs.map((sec) => {
+      const x = sec.le[0] - f * sec.chord, h = naca00(f, sec.t) * sec.chord * scale;
+      return [[x + w / 2, sec.le[1] + sgn * h, sec.le[2]], [x - w / 2, sec.le[1] + sgn * h, sec.le[2]]];
+    });
+    geo.push(slab(grid, () => [0, -sgn * t, 0]));
+  }
+  return merge(geo);
+}
+
 export function buildAirframe(ctx) {
   const { P, anim } = ctx;
 
@@ -163,25 +176,22 @@ export function buildAirframe(ctx) {
     const R = side > 0 ? 'right' : 'left';
     const { s0, s1, q0, q1 } = FR.ENGINE_DOOR;
     const st = sB.filter((s) => s >= s0 - 1e-6 && s <= s1 + 1e-6);
-    const grid = st.map((s) => {
-      const zs = FR.bottomSamples(s).slice(q0 - 27, q1 - 27 + 1);
-      return zs.map((z) => [X(s), -FR.bD(s) - 0.002, side * z]);
-    });
+    const zAt = (s, u) => { const zs = FR.bottomSamples(s); return lerp(zs[q0 - 27], zs[q1 - 27], u); };
+    const grid = toothedGrid((s, u) => [X(s), -FR.bD(s) - 0.002, side * zAt(s, u)], st, { width: 1.02 });
     const door = slab(grid, () => [0, 0.025, 0], V(0, -1, 0));
     const seams = [];
     for (const s of [s0 + 0.02, (s0 + s1) / 2, s1 - 0.02]) seams.push(new THREE.BoxGeometry(0.03, 0.012, 1.0).translate(X(s), -FR.bD(s) + 0.012, side * 0.8));
     P(`Engine-change door (${R})`, {
       system: 'Skin & fairings', skin: true, material: 'Titanium / composite door on quick-release hinges and latches', mass: 70,
       explode: [-0.4, -1.9, 0.45 * side],
-      desc: 'A large door under each engine bay. To change an F119 the door is opened, the engine is lowered straight down onto a trailer and a spare is raised in; the axially split case and colour-coded harnesses keep the job short (layout approximate).',
-    }, [mesh(door, F.skin()), mesh(merge(seams), F.tiDull())]);
+      desc: 'A large door under each engine bay, saw-toothed fore and aft. To change an F119 the door is opened, the engine is lowered straight down onto a trailer and a spare is raised in; the axially split case and colour-coded harnesses keep the job short (layout approximate).',
+    }, [mesh(door, F.door()), mesh(merge(seams), F.tiDull())]);
   }
 
   // ================================================================== primary structure
   // forward fuselage: radar bulkhead, cockpit bulkheads and U-frames around the cockpit
   {
     const g = [];
-    g.push(platePoly(2.55, zy(FR.ringA(2.55).pts), 0.03));
     // forward cockpit pressure bulkhead: from the cockpit floor up to the panel (the nose-gear well is below)
     g.push(platePoly(FR.HOLE_S0, clipAbove(clipBelow(zy(FR.ringA(FR.HOLE_S0).pts), 0.3), -0.075), 0.025));
     g.push(platePoly(7.0, zy(FR.ringA(7.0).pts), 0.025));
@@ -192,24 +202,47 @@ export function buildAirframe(ctx) {
     }
     P('Forward fuselage frames & bulkheads', {
       system: 'Structure', material: 'Aluminium and titanium machined frames', mass: 410, explode: [1.7, 0.4, 0],
-      desc: 'The radar bulkhead at the front carries the AN/APG-77 array; behind the forward avionics bay the forward and aft cockpit pressure bulkheads close the cockpit, and U-shaped frames pass under the canopy sills. Built by Lockheed Martin at Marietta.',
+      desc: 'Behind the forward avionics bay the forward and aft cockpit pressure bulkheads close the cockpit, and U-shaped frames pass under the canopy sills. Lockheed Martin built the forward fuselage at Marietta, about half aluminium and half composite.',
     }, mesh(merge(g), F.alu()));
+    // radar bulkhead: a stiffened plate across the whole nose section, with the radome attach ring
+    const rb = [platePoly(2.55, zy(FR.ringA(2.55).pts), 0.03)];
+    rb.push(frameBand(2.53, zy(FR.ringA(2.53).pts), { depth: 0.05, thick: 0.03, skinGap: 0.004 }));
+    for (const zz of [-0.3, 0, 0.3]) {
+      const y0 = FR.bottomAt(2.585, zz) + 0.04, y1 = FR.topAt(2.585, Math.abs(zz)) - 0.04;
+      rb.push(FR.boxS(2.585, (y0 + y1) / 2, zz, 0.04, y1 - y0, 0.03));
+    }
+    for (const yy of [-0.2, 0.15]) {
+      let hw = 0;
+      for (let zz = 0; zz < FR.aW(2.585); zz += 0.01) if (FR.bottomAt(2.585, zz) < yy - 0.04 && FR.topAt(2.585, zz) > yy + 0.04) hw = zz;
+      rb.push(FR.boxS(2.585, yy, 0, 0.04, 0.03, 2 * hw));
+    }
+    P('Radar bulkhead', {
+      system: 'Structure', material: 'Machined aluminium bulkhead with stiffeners, radome attach ring', mass: 45,
+      explode: [2.3, -0.35, 0],
+      desc: 'Closes the front of the fuselage at station 2.55 m. Its face carries the mount for the 1,956-module APG-77 array (about 0.9 m across), its rim the attach ring and latches for the radome, which swings or comes off for radar maintenance.',
+    }, mesh(merge(rb), F.alu()));
   }
-  // mid fuselage: machined titanium bulkheads that carry the wing, bays and inlet ducts
+  // mid fuselage (Lockheed Martin Fort Worth; ≈ 30 % titanium, 30 % aluminium, 30 % composite): titanium
+  // wing-carry-through bulkheads where the titanium front and mid spars attach, aluminium frames between
   {
-    const g = [];
-    for (const s of [8.6, 9.6, 10.6, 11.6, 12.6]) {
+    const band = (s) => {
       const D = FR.bD(s);
       const sideBay = s > FR.SIDE_BAY.s0 && s < FR.SIDE_BAY.s1;
-      g.push(frameBand(s, zy(FR.ringB(s).pts), {
+      return frameBand(s, zy(FR.ringB(s).pts), {
         depth: 0.15, thick: 0.05,
         keep: (p) => !(p[1] < -D + 0.12 && Math.abs(p[0]) < FR.MAIN_BAY.z + 0.05) && !(sideBay && p[1] < -0.38 && p[1] > -0.86 && Math.abs(p[0]) > 1.25),
-      }));
-    }
+      });
+    };
     P('Mid-fuselage titanium bulkheads', {
-      system: 'Structure', material: 'Ti-6Al-4V bulkheads machined from large forgings', mass: 1150, explode: [0, 0.65, 0],
-      desc: 'Five heavy bulkheads (count simplified) carry wing bending loads across the fuselage around the inlet ducts and over the main weapons bay. Titanium alloys make up about 40 % of the F-22\'s structural weight (sources give 39–42 %), more than any earlier US fighter.',
-    }, mesh(merge(g), F.ti()));
+      system: 'Structure', material: 'Ti-6Al-4V bulkheads machined from large forgings', mass: 620, xrayWeight: 0.5,
+      explode: [0, 0.65, 0],
+      desc: 'Three heavy wing-carry-through bulkheads, where the titanium front and mid spars and the main-gear loads come in, carry wing bending across the fuselage around the inlet ducts and over the main weapons bay. Titanium is about 40 % of the F-22\'s structural weight (sources give 39–42 %), more than any earlier US fighter (assignment of bulkheads approximate).',
+    }, mesh(merge([8.6, 11.6, 12.6].map(band)), F.ti()));
+    P('Mid-fuselage aluminium frames', {
+      system: 'Structure', material: 'Machined aluminium frames', mass: 260, xrayWeight: 0.5,
+      explode: [0, 0.9, 0],
+      desc: 'Lighter frames between the titanium bulkheads, where the composite spars attach. The mid fuselage is built as three modules with about 5,000 structural parts and over 100,000 fasteners, and houses all or part of the fuel, hydraulic, electrical, environmental and APU systems.',
+    }, mesh(merge([9.6, 10.6].map(band)), F.alu()));
   }
   // engine-bay frames
   {
@@ -264,17 +297,20 @@ export function buildAirframe(ctx) {
     const g = [];
     const rings = [];
     for (const s of [12.8, 13.6, 14.6, 15.6, 16.6, 17.4]) rings.push(FR.superRing(X(s), side * 1.5, 0.05, 0.22, 0.5, 12, 6));
-    g.push(FR.gridSurface(rings, { closed: true, uv: 'n' }));
+    g.push(FR.gridSurface(rings, { closed: true }));
+    // machined forward, middle and end frames that the isogrid panels are welded to
+    const frames = [];
+    for (const s of [12.8, 15.1, 17.4]) frames.push(FR.gridSurface([FR.superRing(X(s - 0.03), side * 1.5, 0.05, 0.25, 0.53, 12, 6), FR.superRing(X(s + 0.03), side * 1.5, 0.05, 0.25, 0.53, 12, 6)], { closed: true, uv: 'n' }));
     // boom-end fairing behind the fuselage: tapers to the stabilator trailing edge
     const fr = [];
     const keys = [[17.35, 1.485, 0.0, 0.31, 0.62], [17.6, 1.49, 0.0, 0.29, 0.58], [18.0, 1.5, -0.03, 0.26, 0.44], [18.35, 1.51, -0.06, 0.2, 0.3], [18.62, 1.52, -0.08, 0.1, 0.12]];
     for (const [s, z, y, w, h] of keys) fr.push(FR.superRing(X(s), side * z, y, w, h, 16, 3.4));
     const fairing = FR.gridSurface(fr, { closed: true, uv: 'n' });
     P(side > 0 ? 'Aft boom (right)' : 'Aft boom (left)', {
-      system: 'Structure', material: 'Ti-6Al-4V, electron-beam welded (90+ pieces per ship set)', mass: 310,
+      system: 'Structure', material: 'Ti-6Al-4V isogrid panels electron-beam welded to machined frames (90+ pieces per ship set)', mass: 310,
       explode: [-1.9, 0.25, 1.15 * side],
-      desc: 'Box-section titanium booms outboard of each engine carry the vertical tail and stabilator. Boeing\'s aft fuselage joins over 90 titanium pieces with about 3,600 in (91 m) of full-penetration electron-beam welds per ship set instead of fasteners.',
-    }, [mesh(merge(g), F.ti()), mesh(fairing, F.skin())]);
+      desc: 'Box-section titanium booms outboard of each engine carry the vertical tail and stabilator; the aft fuselage is 55 % titanium because the booms run beside the hot nozzles. Aerojet robotically electron-beam welded integrally stiffened isogrid panels to machined forward, middle and end frames — about 3,600 in (91 m) of welds per ship set instead of fasteners.',
+    }, [mesh(merge(g), F.isogrid()), mesh(merge(frames), F.ti()), mesh(fairing, F.skin())]);
   }
 
   // ================================================================== wings
@@ -327,45 +363,78 @@ export function buildAirframe(ctx) {
       desc: 'Outboard trailing-edge surface for roll. The fly-by-wire system blends it with the flaperons, differential stabilators and, at low speed, the rudders.',
     }, { c0: 0.78, c1: 1, eta0: 0.53, eta1: 0.94, stations: 3 }, 0.78, down, 1) });
 
-    // wing box: six spars and ribs (count illustrative), torque box between the hinge lines
-    const spanEtas = [0, 0.12, 0.25, 0.4, 0.55, 0.7, 0.85, 0.97];
-    const secs = spanEtas.map((e) => {
-      const z = 1.45 + e * (FR.WING.semi - 1.45);
-      return FR.wingSection(z);
-    });
-    const box = [];
-    for (const f of [0.1, 0.23, 0.36, 0.49, 0.62, 0.75]) box.push(sparWeb(secs, f, f === 0.1 || f === 0.75 ? 0.022 : 0.014, 0.9, naca));
-    for (const sec of secs) box.push(ribPlate(sec, 0.1, 0.75, 0.014, 0.88, naca));
-    // root attach lugs on the side of the fuselage
-    for (const f of [0.1, 0.23, 0.36, 0.49, 0.62, 0.75]) {
-      const x = wRoot.le[0] - f * wRoot.chord;
-      box.push(new THREE.BoxGeometry(0.12, naca(f, wRoot.t) * wRoot.chord * 1.6, 0.22).translate(x, wRoot.le[1], 1.52));
+    // wing box (Boeing; the wing is almost 50 % titanium): titanium front, mid and rear spars machined
+    // from forgings, resin-transfer-moulded "sine-wave" composite intermediate spars, ribs, and root
+    // fittings that bolt the spars to the mid-fuselage bulkheads at the side of the body (z ≈ 1.88)
+    const zSOB = 1.88, zEnd = 1.45 + 0.97 * (FR.WING.semi - 1.45);
+    const TI_F = [0.10, 0.49, 0.75], RTM_F = [0.23, 0.36, 0.62];
+    const spanSecs = [zSOB, 2.5, 3.2, 3.9, 4.6, 5.3, 6.0, zEnd].map((z) => FR.wingSection(z));
+    const ti = [], rtm = [], ribs = [], fits = [];
+    for (const f of TI_F) {
+      ti.push(sparWeb(spanSecs, f, f === 0.49 ? 0.018 : 0.024, 0.9, naca));
+      ti.push(sparCaps(spanSecs, f, 0.075, 0.012, 0.9));
     }
-    const boxGeo = merge(box);
-    P(`Wing box (${R})`, {
-      system: 'Structure', material: 'Titanium and resin-transfer-moulded composite spars, composite ribs', mass: 900,
+    for (const f of RTM_F) {
+      // corrugated web: a sine wave in plan (≈ 0.16 m pitch, estimate) stiffens a thin composite web
+      const wave = [];
+      for (let z = zSOB; z <= zEnd + 1e-6; z += 0.02) {
+        const sec = FR.wingSection(z);
+        wave.push({ le: [sec.le[0] + 0.018 * Math.sin((2 * Math.PI * (z - zSOB)) / 0.16), sec.le[1], z], chord: sec.chord, t: sec.t });
+      }
+      rtm.push(sparWeb(wave, f, 0.01, 0.9, naca));
+      rtm.push(sparCaps(spanSecs, f, 0.06, 0.008, 0.9));
+    }
+    for (const z of [zSOB, 2.45, 3.05, 3.65, 4.25, 4.85, 5.45, 6.05, zEnd]) ribs.push(ribPlate(FR.wingSection(z), 0.1, 0.75, z === zSOB ? 0.02 : 0.012, 0.88, naca));
+    // root fittings: a lug on each spar end, bolted to the bulkhead it lines up with
+    const sob = FR.wingSection(zSOB);
+    for (const f of [...TI_F, ...RTM_F]) {
+      const x = sob.le[0] - f * sob.chord, hh = naca(f, sob.t) * sob.chord * 0.9;
+      fits.push(new THREE.BoxGeometry(0.16, hh * 1.7, 0.1).translate(x, sob.le[1], zSOB - 0.05));
+      for (const dy of [-hh * 0.55, hh * 0.55]) fits.push(new THREE.CylinderGeometry(0.03, 0.03, 0.14, 10).rotateX(Math.PI / 2).translate(x, sob.le[1] + dy, zSOB - 0.07));
+    }
+    const sideG = (g) => (side > 0 ? g : mirror(g));
+    P(`Wing titanium spars (${R})`, {
+      system: 'Structure', material: 'Ti-6Al-4V spars machined from forgings, with spar caps', mass: 330,
       explode: [0, -0.2, 2.2 * side], callout: side > 0, anchor: [X(10.44), -0.02, 3.4 * side],
-      desc: 'A multi-spar torque box that carries the wing\'s bending and twisting loads and doubles as an integral fuel tank. Boeing built the wings, using titanium spars and some of the first resin-transfer-moulded composite spars in production.',
-    }, mesh(side > 0 ? boxGeo : mirror(boxGeo), F.composite()));
+      desc: 'The front, mid and rear spars are machined titanium forgings. Boeing\'s wing is almost 50 % titanium, partly because an intermediate composite spar was changed to titanium wherever it was needed to tolerate battle damage (every third one, by Flight\'s account).',
+    }, mesh(sideG(merge(ti)), F.tiDull()));
+    P(`Wing RTM sine-wave spars (${R})`, {
+      system: 'Structure', material: 'Resin-transfer-moulded composite spars with corrugated (sine-wave) webs', mass: 120,
+      explode: [0, -0.5, 2.35 * side],
+      desc: 'Intermediate spars made by resin transfer moulding: dry fibre preforms are injected with resin in a closed mould, and the wavy web stays stiff without heavy stiffeners. Dow-UT delivered these RTM spars — 44 per ship set — among the first production RTM primary structure.',
+    }, mesh(sideG(merge(rtm)), F.composite()));
+    P(`Wing ribs (${R})`, {
+      system: 'Structure', material: 'Machined aluminium / titanium and composite ribs', mass: 230,
+      explode: [0, 0.15, 2.5 * side],
+      desc: 'Ribs across the spars hold the airfoil shape, carry the skin loads into the spars and divide the integral wing tank into bays (rib count approximate). The root rib closes the wing at the side of the body.',
+    }, mesh(sideG(merge(ribs)), F.alu()));
+    P(`Wing root attach fittings (${R})`, {
+      system: 'Structure', material: 'Titanium lugs and high-strength steel shear pins', mass: 110,
+      explode: [0, -0.15, 1.7 * side],
+      desc: 'Each spar ends in a lug at the side of the body, pinned to the mid-fuselage bulkhead it lines up with, so wing bending passes straight into the fuselage carry-through structure (lug detail approximate).',
+    }, mesh(sideG(merge(fits)), F.steel()));
 
     // wing control actuators: LEF power drive unit, torque tube and rotary actuators; trailing-edge actuators
     {
       const g = [];
       const lefA = mz(wingPoint(wRoot, wTip, 0.08, 0.1)), lefB = mz(wingPoint(wRoot, wTip, 0.93, 0.1));
       g.push(FR.pipe([[FR.SN - lefA.x, lefA.y, lefA.z], [FR.SN - lefB.x, lefB.y, lefB.z]], 0.014, 6, 4));
-      for (const e of [0.15, 0.45, 0.75]) {
-        const p = mz(wingPoint(wRoot, wTip, e, 0.12));
-        // sized to the local wing depth just behind the flap hinge
+      for (const e of [0.12, 0.3, 0.48, 0.66, 0.84]) {
+        const p = mz(wingPoint(wRoot, wTip, e, 0.1));
+        // geared rotary actuator on the torque tube, sized to the local wing depth behind the flap hinge,
+        // with its output arm forward to the flap
         const sec = FR.wingSection(Math.abs(p.z));
         const r = Math.min(0.05, naca(0.1, sec.t) * sec.chord * 0.5);
-        g.push(new THREE.CylinderGeometry(r, r, 0.22, 10).rotateX(Math.PI / 2).translate(p.x, p.y, p.z));
+        g.push(new THREE.CylinderGeometry(r, r, 0.2, 12).rotateX(Math.PI / 2).translate(p.x, p.y, p.z));
+        g.push(new THREE.CylinderGeometry(r * 1.15, r * 1.15, 0.05, 12).rotateX(Math.PI / 2).translate(p.x, p.y, p.z + 0.06));
+        g.push(new THREE.BoxGeometry(0.16, r * 0.6, 0.03).translate(p.x + 0.08, p.y, p.z - 0.06));
       }
       // power drive unit at the wing root, geared into the inboard end of the torque tube
       const pdu = mz(wingPoint(wRoot, wTip, 0.04, 0.1));
       g.push(new THREE.BoxGeometry(0.26, 0.09, 0.18).translate(pdu.x, pdu.y, pdu.z));
       P(`Leading-edge flap drive (${R})`, {
         system: 'Flight controls', material: 'Hydraulic power drive unit, titanium torque tube, rotary geared actuators', mass: 55, explode: [0.6, -0.6, 2.6 * side],
-        desc: 'A hydraulic power drive unit at the wing root turns a torque tube along the front spar; geared rotary actuators along it move the full-span leading-edge flap (actuator count illustrative).',
+        desc: 'A hydraulic power drive unit at the wing root turns a torque tube along the front spar, and geared rotary actuators along it move the full-span leading-edge flap. Curtiss-Wright developed these geared rotary actuators and has supplied them since the start of the programme (actuator count approximate; each is sized to the local wing depth).',
       }, mesh(merge(g), F.hyd()));
       const t = [];
       for (const [e, c, len] of [[0.16, 0.79, 0.55], [0.38, 0.79, 0.5], [0.66, 0.72, 0.42]]) {
@@ -388,12 +457,20 @@ export function buildAirframe(ctx) {
         const yb = p.y - naca(0.42, sec.t) * sec.chord * 0.9;
         g.push(new THREE.BoxGeometry(0.62, 0.05, 0.12).translate(p.x, yb + 0.035, p.z));
         for (const dx of [-0.24, 0.24]) g.push(new THREE.CylinderGeometry(0.025, 0.025, 0.05, 10).translate(p.x + dx, yb + 0.02, p.z));
-        if (wet) f.push(new THREE.CylinderGeometry(0.035, 0.035, 0.06, 10).translate(p.x - 0.05, yb + 0.03, p.z + 0.08 * side));
+        g.push(new THREE.BoxGeometry(0.08, 0.04, 0.06).translate(p.x - 0.27, yb + 0.03, p.z));                     // aft pivot fitting
+        if (wet) {
+          // fuel and air (tank pressurisation) couplings, each piped up into the wing tank above
+          f.push(new THREE.CylinderGeometry(0.035, 0.035, 0.06, 10).translate(p.x - 0.05, yb + 0.03, p.z + 0.08 * side));
+          f.push(new THREE.CylinderGeometry(0.022, 0.022, 0.05, 10).translate(p.x + 0.1, yb + 0.03, p.z + 0.08 * side));
+          f.push(FR.pipe([[FR.SN - (p.x - 0.05), yb + 0.06, p.z + 0.08 * side], [FR.SN - (p.x - 0.05), yb + 0.16, p.z + 0.1 * side], [FR.SN - (p.x + 0.1), yb + 0.2, p.z + 0.18 * side]], 0.014, 6, 6));
+          f.push(FR.pipe([[FR.SN - (p.x + 0.1), yb + 0.055, p.z + 0.08 * side], [FR.SN - (p.x + 0.12), yb + 0.18, p.z + 0.08 * side]], 0.01, 6, 4));
+          g.push(new THREE.CylinderGeometry(0.02, 0.02, 0.04, 10).translate(p.x + 0.18, yb + 0.03, p.z - 0.06 * side));   // electrical connector
+        }
       }
       P(`Wing store hardpoints (${R})`, {
         system: 'Structure', material: 'Titanium pylon fittings and sway-brace pads, flush under the lower skin', mass: 30, count: 2,
         explode: [0, -1.1, 2.9 * side],
-        desc: 'Two of the F-22\'s four underwing hardpoints, each rated for about 5,000 lb. They are normally bare and covered flush; the inboard one is plumbed for a 600 US gal (2,270 L) ferry tank, at the cost of stealth.',
+        desc: 'Two of the F-22\'s four underwing hardpoints, each rated for about 5,000 lb, with sway-brace pads and an aft pivot for the pylon. They are normally bare and covered flush; the inboard one also has fuel, air and electrical couplings for a 600 US gal (2,270 L) ferry tank on a BRU-47/A rack, at the cost of stealth.',
       }, [mesh(merge(g), F.tiDull()), mesh(merge(f), F.pipe())]);
     }
 

@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import { Assembly } from '../engine/assembly.js';
-import { decal, tailCode, stencilText } from '../engine/decals.js';
+import { decal, tailCode, stencilText, panelOutline } from '../engine/decals.js';
 import { decalTexture } from '../engine/surface.js';
 import { vaporConeMaterial } from '../engine/effects.js';
 import { recoveryTemperature } from '../physics/atmosphere.js';
@@ -19,6 +19,9 @@ import { buildAvionics } from './f22/avionics.js';
 import { buildWeapons } from './f22/weapons.js';
 import { buildGear } from './f22/gear.js';
 import { buildCockpit } from './f22/cockpit.js';
+import { buildAccess } from './f22/access.js';
+import { buildThermal } from './f22/thermal.js';
+import { buildWiring } from './f22/wiring.js';
 
 const { X, DEG } = FR;
 const clamp = FR.clamp;
@@ -63,6 +66,9 @@ export function buildFighter() {
   buildGear(ctx);
   buildSystems(ctx);
   buildAvionics(ctx);
+  buildThermal(ctx);
+  buildWiring(ctx);
+  buildAccess(ctx);
 
   // ------------------------------------------------------------------ markings (projected decals)
   attitude.updateMatrixWorld(true);
@@ -86,6 +92,12 @@ export function buildFighter() {
     add(`Caret inlet cowl (${R})`, usafInsignia(), { at: [X(7.75), -0.42, side * 1.72], dir: [0, -0.15, side], size: [0.9, 0.45, 0.25] });
     add(`Wing skin (${R})`, stencilText('NO STEP', 'rgba(30,34,38,0.85)', true), { at: [X(13.0), FR.wingY(3.2) + 0.12, side * 3.2], dir: [0, 1, 0], size: [0.6, 0.15, 0.3], angle: Math.PI / 2 });
   }
+  // small servicing panels too small to model as doors: single-point refuel and hydraulic / oil fill
+  // on the belly ahead of the engine bays, battery and oxygen-system service under the forward fuselage
+  for (const [s, z, w, l] of [[12.6, -0.45, 0.26, 0.2], [12.6, 0.45, 0.22, 0.18], [13.1, -1.15, 0.18, 0.18], [13.1, 1.15, 0.18, 0.18]]) {
+    add('Intake trunk & lower fuselage skin', panelOutline('f22.service'), { at: [X(s), -FR.bD(s) - 0.01, z], dir: [0, -1, 0], size: [l, w, 0.12] });
+  }
+  for (const side of [1, -1]) add('Forward fuselage skin', panelOutline('f22.service'), { at: [X(6.3), FR.bottomAt(6.3, 0.55) - 0.01, side * 0.55], dir: [0, -1, 0.25 * side], size: [0.3, 0.22, 0.15] });
   add('Wing skin (left)', usafInsignia(), { at: [X(11.6), FR.wingY(4.4) + 0.12, -4.4], dir: [0, 1, 0], size: [1.4, 0.7, 0.3], angle: -Math.PI / 2 });
   add('Forward fuselage skin', stencilText('U.S. AIR FORCE', 'rgba(36,40,46,0.85)'), { at: [X(5.0), FR.aYC(5.0) - 0.2, 0.86], dir: [0, -0.3, 1], size: [1.1, 0.22, 0.3] });
 
@@ -99,6 +111,22 @@ export function buildFighter() {
   vapor.renderOrder = 11;
   vapor.visible = false;
   attitude.add(vapor);
+
+  // X-ray legibility: dense stacked parts (blade rows, frame stacks, long harness and pipe runs, big
+  // tanks) glow additively in X-ray, so they are dimmed in proportion to how much they stack up
+  const XRAY = [
+    [/^Upper longerons & canopy rails$/, 0.45], [/^Engine-bay frames$/, 0.45], [/^Forward fuselage frames & bulkheads$/, 0.5], [/^Keel & weapons-bay longerons$/, 0.6],
+    [/^Wing (titanium spars|RTM sine-wave spars|ribs) /, 0.5], [/^(Fin box|Stabilator torque box & spindle) /, 0.55], [/^Side bay & gear-well liners$/, 0.5], [/^Main weapons bay$/, 0.6],
+    [/^Main wiring harnesses$/, 0.6], [/^Hydraulic lines /, 0.6], [/^Landing-gear & brake hydraulic lines$/, 0.65], [/^Fuel transfer lines$/, 0.7], [/^Refuelling manifold$/, 0.7],
+    [/^(Forward fuselage tank|Centre fuselage tank|Aft fuselage feed tank|Wing tank)/, 0.6], [/^Engine bleed-air ducts$/, 0.65], [/^Inert-gas generating system/, 0.7],
+    [/^F119 (shafts & bearings|annular combustor) /, 0.55], [/^Serpentine inlet duct /, 0.6], [/^Inlet throat & boundary-layer bleed /, 0.6], [/^AIM-120C AMRAAM/, 0.75],
+  ];
+  for (const p of A.parts) {
+    const i = p.userData.part;
+    if (i.xrayWeight < 1) continue;
+    const hit = XRAY.find(([re]) => re.test(i.name));
+    if (hit) i.xrayWeight = hit[1];
+  }
 
   A.finalize();
 
@@ -208,6 +236,11 @@ export function buildFighter() {
       const b = state.bay;
       const kd = smooth(0, 0.4, b), ke = smooth(0.45, 1, b);
       for (const d of anim.bay.doors) d.h.set(d.angle * kd);
+      // main bay bifold doors: the outer panel swings down to vertical while the inner panel, a beat
+      // later, folds up against its inside face, so the door never reaches up into the bay
+      const kq = clamp(b / 0.4, 0, 1);
+      for (const d of anim.bay.bifold) { d.outer.set((Math.PI / 2) * smooth(0, 0.6, kq)); d.inner.set(Math.PI * smooth(0.3, 1, kq)); }
+      for (const link of anim.bay.links) link(kd, ke);
       for (const e of anim.bay.ejectors) {
         e.holder.position.y = e.y0 - 0.23 * ke;
         for (const a of e.arms) {

@@ -217,12 +217,13 @@ export function flipFaces(g) {
   return g;
 }
 
-/** Merge geometries after making them all non-indexed (mixed sources). */
+/** Merge geometries: indexed as they are when all are indexed, otherwise all made non-indexed (mixed sources). */
 export function merge(list) {
   // empty pieces (a cut run with nothing in it) are skipped
   const live = list.filter((g) => g && g.attributes.position && g.attributes.position.count);
   if (!live.length) return new THREE.BufferGeometry();
-  const geos = live.map((g) => (g.index ? g.toNonIndexed() : g));
+  // flattening indexed tubes and lathes was a third of the build time, so it is done only when needed
+  const geos = live.every((g) => g.index) ? live : live.map((g) => (g.index ? g.toNonIndexed() : g));
   for (const g of geos) {
     if (!g.attributes.normal) g.computeVertexNormals();
     if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));

@@ -38,6 +38,23 @@ export function buildAvionics(ctx) {
       desc: `One of two Hughes common integrated processors (bay space for a third). Each runs the radar, electronic-warfare, CNI and fusion software on modules cooled by the PAO loop; sensor fusion merges every sensor's tracks into one picture before the pilot sees it.`,
     }, mesh(merge(g), F.box()));
   }
+  {
+    // liquid-cooled racks the boxes plug into: two shelves with PAO cold-plate rails, side frames and posts
+    const g = [], c = [];
+    g.push(box(3.5, -0.045, 0, 1.2, 0.02, 0.72));                                          // upper shelf (CIPs, INS, ALR-94)
+    g.push(box(3.22, -0.305, 0, 0.7, 0.02, 0.6));                                          // lower shelf (CNI)
+    for (const side of [1, -1]) {
+      g.push(box(3.55, 0.1, side * 0.36, 1.1, 0.28, 0.012));                                 // side frame
+      for (const s of [2.92, 3.62, 4.08]) g.push(box(s, -0.17, side * (s > 3.7 ? 0.36 : 0.3), 0.03, 0.27, 0.03));   // posts
+      for (const dz of [0.08, 0.32]) c.push(FR.cylX(3.5, -0.03, side * dz, 1.18, 0.012, 0.012, 6));   // cold-plate rails
+      c.push(FR.cylX(3.22, -0.29, side * 0.16, 0.68, 0.012, 0.012, 6));
+    }
+    P('Forward avionics racks', {
+      system: 'Avionics', material: 'Single-piece machined aluminium racks with liquid-cooled (PAO) cold-plate rails', mass: 45,
+      explode: [1.75, -0.35, 0],
+      desc: 'The forward avionics boxes plug into racks between the radar bulkhead and the cockpit; Flight called these single-piece machined racks the programme\'s most exacting machining job. Liquid coolant flows through the rails under each module, and there is room left for a third CIP.',
+    }, [mesh(merge(g), F.alu()), mesh(merge(c), F.pao())]);
+  }
   P('CNI suite (AN/ASQ-220)', {
     system: 'Avionics', material: 'Integrated comm / nav / identification modules', mass: 70,
     explode: [2.1, -0.75, 0],

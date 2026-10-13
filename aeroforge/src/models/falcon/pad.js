@@ -1,15 +1,20 @@
-// Launch Complex 39A as configured for Falcon Heavy: the raised hardstand cut by the Apollo-era
-// flame trench (490 ft long, 58 ft wide, 42 ft deep, inverted-V deflector), the fixed launch mount
-// built over it in 2015 with its hold-down clamps and tail service masts, SpaceX's
-// transporter-erector, the fixed service structure (12 levels at 20 ft spacing from 27 ft, 247 ft
-// tall) with the crew access arm as it stood for Falcon Heavy flights from 2019 to 2025 (removed in
-// February 2026), water deluge, and site scenery. Pad layout is compressed and simplified;
+// Launch Complex 39A as configured for Falcon Heavy: the raised hardstand bisected north–south by
+// the Apollo-era flame trench (490 ft long, 58 ft wide, 42 ft deep, inverted-V deflector), the fixed
+// launch mount built over it in 2015 with its hydraulic hold-down clamps and tail service masts,
+// SpaceX's transporter-erector (strongback, base frame and erector cylinders, umbilical and clamp
+// arms, lines, ground harness and air-conditioning duct) on rails that straddle the trench and run
+// down the old crawlerway ramp, the fixed service structure (12 levels at 20 ft spacing from 27 ft,
+// 247 ft tall) with its lightning mast and catenary wire and the crew access arm as it stood for
+// Falcon Heavy flights from 2019 to 2025 (removed in February 2026), water deluge and water tower,
+// the instrumentation bay under the hardstand and the propellant and gas farm with its trunk lines.
+// Frame: z runs north (+z) – south (−z) along the trench, the transporter-erector comes up from the
+// south, the side boosters stand east (+x) and west. Pad layout is compressed and simplified;
 // hardware positions on the mount are estimates.
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { beam, rod } from '../../engine/geometry.js';
-import { R, BOOSTER_X, PAD, STACK0, Y, polar } from './dims.js';
+import { R, BOOSTER_X, PAD, STACK0, T0_Y, polar } from './dims.js';
 import { merge, pipe, hoop, post, block, radialYaw } from './util.js';
 import { FM } from './materials.js';
 
@@ -17,7 +22,42 @@ const H = PAD.hardstand;
 const W = PAD.trenchHalfWidth;
 const DECK = H + PAD.mountDeck;
 // hardstand top half-extents, slope run and the chamfered concrete edge (compressed footprint)
-const TX = 22.5, TZ = 23, RUN = 7.5, LIP = 1.4, LIP_DROP = 0.9;
+const TX = 25, TZ = 23, RUN = 7.5, LIP = 1.4, LIP_DROP = 0.9;
+// transporter-erector tracks: one each side of the trench (centre ±RAIL_X), rail gauge (estimates)
+const RAIL_X = 10.0, GAUGE = 1.2;
+// what the stage frames the vehicle on: the hardstand and the towers, not the far-reaching ramp,
+// catenary wire and storage farm (see noFrame)
+const FRAME_BOX = new THREE.Box3(new THREE.Vector3(-TX - RUN, 0, -TZ - RUN - 4), new THREE.Vector3(TX + RUN, 88.4, TZ + RUN));
+
+/**
+ * Leave a far-reaching ground part out of the vehicle's framing. The stage fits and frames a vehicle
+ * on its meshes' bounding boxes, so a 250 m ramp or a sphere 160 m away would shrink the rocket to
+ * a speck. The box the stage sees is the mesh clipped to the pad footprint (empty if wholly
+ * outside it); ray casts get the real box back, so the part stays pickable.
+ */
+function noFrame(m) {
+  const g = m.geometry;
+  g.computeBoundingBox();
+  const real = g.boundingBox.clone();
+  const framed = real.clone().intersect(FRAME_BOX);
+  g.boundingBox = framed;
+  m.raycast = function raycast(rc, hits) {
+    g.boundingBox = real;
+    try { THREE.Mesh.prototype.raycast.call(this, rc, hits); } finally { g.boundingBox = framed; }
+  };
+  return m;
+}
+
+/** A strip of flat-shaded triangles between two polylines, faced away from ref; metric UVs. */
+function ribbon(a, b, ref) {
+  const pos = [], uv = [];
+  const put = (p) => { pos.push(...p); uv.push(p[0] + p[2] * 0.0, p[2] + p[1]); };
+  for (let i = 0; i < a.length - 1; i++) { put(a[i]); put(b[i]); put(a[i + 1]); put(a[i + 1]); put(b[i]); put(b[i + 1]); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  return faceAway(g, ref);
+}
 
 // Profile of the hardstand edge, [outward offset, height] from the top edge: a rounded concrete lip
 // (the first four points), then a grassed embankment that steepens near the top and flattens out
@@ -146,7 +186,7 @@ function truss(x0, z0, w, d, levels, { col = 0.5, hor = 0.35, diag = 0.25, mid =
  * Build the pad. bed: the hardstand and flame trench, shown in the launch-pad look in every render
  * mode so the vehicle always stands on it there. site: the towers, TE, deluge and scenery, shown
  * only in the launch-pad look's studio rendering. base: always shown (launch mount, clamps, tail
- * service masts). Returns { scenery, deckTop }.
+ * service masts). Returns { deckTop }.
  */
 export function buildPad(A, site, base, bed) {
   const G = (name, info, objs, grp = site) => {
@@ -202,20 +242,33 @@ export function buildPad(A, site, base, bed) {
   }, [mesh(deck, FM.padSteel()), mesh(merge(legs), FM.padSteel())], base);
 
   // hold-down clamps: around each core where the deck allows (simplified count)
-  const clamp = [];
+  const clamp = [], rel = [], relLine = [];
   const stations = [[0, 90], [0, 270], [BOOSTER_X, 0], [BOOSTER_X, 90], [BOOSTER_X, 270], [-BOOSTER_X, 180], [-BOOSTER_X, 90], [-BOOSTER_X, 270]];
   for (const [cx, a] of stations) {
     const [x, z] = polar(R + 0.34, a);
     const [hx, hz] = polar(R + 0.02, a);
     clamp.push(block(cx + x, DECK + 0.35, z, 0.5, 0.7, 0.42, radialYaw(a)));
     clamp.push(beam([cx + x, DECK + 0.62, z], [cx + hx, DECK + 0.3, hz], 0.18, 0.22));
+    // the release actuator: a hydraulic cylinder that pulls the jaw back at T-0, fed from a ring
+    // header round each exhaust opening
     const [px, pz] = polar(R + 0.7, a);
-    clamp.push(rod([cx + px, DECK + 0.05, pz], [cx + x, DECK + 0.5, z], 0.08, 8));
+    rel.push(rod([cx + px, DECK + 0.08, pz], [cx + x, DECK + 0.5, z], 0.075, 10), post(cx + px, pz, DECK, DECK + 0.16, 0.1, 10));
+    relLine.push(post(cx + px, pz, DECK - 1.8, DECK + 0.02, 0.022, 6));            // line down through the deck
   }
+  // headers under the deck, clear of the exhaust openings, and the hydraulic unit on the deck
+  const yH = DECK - 1.78, zH = R + 0.7;
+  for (const zz of [zH, -zH]) relLine.push(rod([-6.8, yH, zz], [6.8, yH, zz], 0.035, 6));
+  for (const xx of [6.8, -6.8]) relLine.push(rod([xx, yH, -zH], [xx, yH, zH], 0.035, 6));
+  const hpu = [block(-9.6, DECK + 0.55, 3.4, 1.4, 1.1, 1.0), post(-9.0, 3.4, DECK + 1.1, DECK + 1.5, 0.22, 12)];
+  relLine.push(post(-9.0, 3.0, yH, DECK + 0.1, 0.035, 6), rod([-9.0, yH, 3.0], [-6.8, yH, zH], 0.035, 6));
   G('Hold-down clamps', {
-    skin: true, count: stations.length, material: 'Hydraulically released steel clamps', mass: null,
-    desc: 'Clamp the cores to the mount while all 27 engines start and come up to full thrust; the computers check every engine before the clamps release. Eight shown; the exact clamp arrangement on the Falcon Heavy mount is simplified.',
+    skin: true, count: stations.length, material: 'Steel clamp bodies and jaws over the hold-down fittings', mass: null,
+    desc: 'Clamp the cores to the mount by their hold-down fittings while all 27 engines start and come up to full thrust; the flight computer checks ignition and full power during this hold-down before it lets go (Falcon User\'s Guide). Eight shown; the exact clamp arrangement on the Falcon Heavy mount is simplified.',
   }, mesh(merge(clamp), FM.aluDark()), base);
+  G('Hold-down hydraulic release', {
+    count: stations.length, material: 'Hydraulic release cylinders, under-deck headers and lines, hydraulic power unit', mass: null,
+    desc: 'If every engine is healthy, the hydraulic release system is triggered at T-0 (Falcon User\'s Guide): each clamp\'s cylinder pulls its jaw clear and the vehicle rises. Lines under the deck feed the cylinders from a hydraulic unit on it. Cylinder count, sizes and routing estimated.',
+  }, [mesh(merge(rel), FM.steelLine()), mesh(merge(relLine), FM.steelLine()), mesh(merge(hpu), FM.teWhite())], base);
 
   const tsm = [];
   for (const s of [1, -1]) {
@@ -230,43 +283,170 @@ export function buildPad(A, site, base, bed) {
     desc: 'Feed RP-1, LOX, helium and power into the base of each side booster until T-0, then retract and close a protective hood against the exhaust. The layout of the Falcon Heavy mount\'s side-booster umbilicals is not documented publicly; shown simplified.',
   }, mesh(merge(tsm), FM.teWhite()), base);
 
+  // pad EGSE room: like the shuttle-era Pad Terminal Connection Room, a reinforced concrete room on
+  // the west side of the trench under the hardstand fill (the hardstand ghosts in X-ray to show it)
+  const bayY = H - 6.1;                                   // under ≈ 20 ft of fill
+  const bay = [block(-14.0, bayY - 1.5, 0, 6.0, 3.0, 3.0)];
+  const bayKit = [];
+  for (const dz of [-0.9, 0, 0.9]) bayKit.push(block(-12.2, bayY - 1.6, dz, 0.6, 2.2, 0.7), block(-15.8, bayY - 1.6, dz, 0.6, 2.2, 0.7));   // equipment racks
+  bayKit.push(block(-11.6, bayY - 1.0, 1.0, 0.5, 0.6, 0.6));                               // junction box on the east wall
+  bayKit.push(pipe([[-11.6, bayY - 0.7, 1.0], [-11.6, H - 0.6, 0.8], [-11.2, H - 0.05, -0.6], [-11.0, H + 0.05, -1.5]], 0.06, { seg: 6, tubular: 12, tension: 0.05 }));   // conduit up to the pad surface
+  G('Pad instrumentation bay', {
+    material: 'Reinforced concrete room with equipment racks and a junction box', mass: null,
+    desc: 'Customer payload ground equipment sits in an instrument bay beneath the pad deck (Falcon User\'s Guide), linked through a junction box and a ground harness to the transporter-erector; at LC-39A the cable run from the racks to the spacecraft is 196 m (644 ft). Shown as a room under the hardstand fill west of the trench, where the shuttle-era Pad Terminal Connection Room was (NASA LC-39 fact sheet); size estimated.',
+  }, [mesh(merge(bay), FM.hardstand()), mesh(merge(bayKit), FM.padSteel())], bed);
+
   // ------------------------------------------------------------------ transporter-erector
+  // The TE rides rails up the old crawlerway ramp from SpaceX's hangar. Like the Apollo crawler it
+  // straddles the flame trench: its two tracks run on the hardstand either side of the trench, and
+  // girders bridge the trench under the strongback hinge and the erector cylinders.
   const zb = -4.5, zf = -6.9, top = STACK0 + 61;
   const levels = [];
   for (let y = DECK; y <= top + 0.01; y += 3.0) levels.push(y);
   const te = truss(-1.6, zf, 3.2, zb - zf, levels, { col: 0.42, hor: 0.26, diag: 0.2, mid: false });
-  te.push(block(0, DECK + 0.6, (zb + zf) / 2, 4.2, 1.2, 2.6));
-  for (const sx of [1, -1]) {
-    te.push(block(sx * 1.9, DECK + 0.7, zb + 0.1, 0.7, 1.4, 0.9));                        // erector hinge
-    te.push(rod([sx * 2.6, H + 0.2, -16], [sx * 1.7, STACK0 + 16, zf + 0.2], 0.34, 12));    // hydraulic erector pistons
-    te.push(rod([sx * 2.6, H + 0.2, -16], [sx * 2.4, H + 9, -13.2], 0.5, 12));
-    te.push(block(sx * 2.6, H + 0.5, -16, 1.6, 1.0, 1.6));
-  }
   G('Transporter-erector strongback', {
-    material: 'Steel truss strongback, hydraulic erector pistons', mass: null,
-    desc: 'SpaceX\'s transporter-erector carries the integrated vehicle horizontally from the hangar up the ramp, raises it on the mount and serves as its umbilical tower; it tilts back a few degrees just before launch.',
+    material: 'Steel lattice strongback', mass: null,
+    desc: 'The ≈ 212 ft spine of SpaceX\'s transporter-erector: it carries the integrated vehicle horizontally from the hangar, raises it onto the launch mount and then stands as its umbilical tower, carrying the arms, lines and ground harness. It is retracted a few degrees just before launch (Falcon User\'s Guide).',
   }, mesh(merge(te), FM.teWhite()));
 
-  const arms = [];
-  for (const [ys, wrap] of [[49.9, 1.2], [56.2, 1.0], [44.0, 0.8]]) {
+  const tb = [block(0, DECK + 0.6, (zb + zf) / 2, 4.2, 1.2, 2.6)];                  // base block under the strongback
+  for (const sx of [1, -1]) {
+    tb.push(block(sx * 1.9, DECK + 0.7, zb + 0.1, 0.7, 1.4, 0.9));                     // erector hinge
+    tb.push(block(sx * 1.9, DECK - 0.75, -4.56, 0.8, 1.3, 0.32));                      // hinge bracket on the mount's deck face
+    tb.push(block(sx * RAIL_X, H + 0.98, -12.5, 0.8, 0.9, 14.5));                      // side girder over the trucks
+    for (const z of [-6.4, -12.5, -18.6]) tb.push(block(sx * RAIL_X, H + 0.35, z, 1.9, 0.36, 1.6));   // rail trucks
+    tb.push(beam([sx * 2.0, DECK + 0.1, -6.6], [sx * (RAIL_X - 0.3), H + 1.3, -6.6], 0.5, 0.5));
+    tb.push(beam([sx * 2.0, DECK + 0.1, -5.0], [sx * (RAIL_X - 0.3), H + 1.3, -9.0], 0.4, 0.4));
+  }
+  for (const z of [-6.6, -16]) tb.push(beam([-RAIL_X, H + 1.0, z], [RAIL_X, H + 1.0, z], 0.9, 1.0));   // girders bridging the trench
+  G('TE base frame & erector hinges', {
+    material: 'Steel base frame on rail trucks, trench-spanning girders, strongback hinges', mass: null,
+    desc: 'The strongback pivots on hinges bolted to the edge of the launch mount. Its base frame stands on rail trucks either side of the flame trench, the way the Apollo crawler straddled it, with two girders bridging the trench under the hinge and the erector cylinders. Layout estimated.',
+  }, mesh(merge(tb), FM.teWhite()));
+
+  const cyl = [];
+  for (const sx of [1, -1]) {
+    const b0 = new THREE.Vector3(sx * 2.6, H + 2.0, -16), b1 = new THREE.Vector3(sx * 1.7, STACK0 + 16, zf + 0.2);
+    cyl.push(rod(b0.toArray(), b1.toArray(), 0.34, 12));                                                // ram
+    cyl.push(rod(b0.toArray(), b0.clone().lerp(b1, 0.45).toArray(), 0.5, 14));                           // barrel
+    cyl.push(block(sx * 2.6, H + 1.75, -16, 1.6, 0.5, 1.6));                                             // trunnion base on the girder
+    cyl.push(block(sx * 1.7, STACK0 + 16, zf + 0.15, 0.8, 0.9, 0.6));                                   // clevis on the strongback
+  }
+  G('TE erector cylinders', {
+    count: 2, material: 'Hydraulic erector cylinders, Ø ≈ 0.7 m barrels, trunnion bases', mass: null,
+    desc: 'Two long hydraulic cylinders rotate the strongback and the integrated vehicle from horizontal to vertical in minutes. The vehicle is normally erected only once per campaign; after a scrub it stays vertical on the pad (Falcon User\'s Guide).',
+  }, mesh(merge(cyl), FM.padSteel()));
+
+  // second-stage umbilical arm and the vehicle clamp arms
+  const armAt = (ys, wrap, list) => {
     const y = STACK0 + ys;
-    arms.push(beam([-0.9, y, zb], [-0.7, y, -R - 0.25], 0.32, 0.5), beam([0.9, y, zb], [0.7, y, -R - 0.25], 0.32, 0.5));
-    const arc = new THREE.TorusGeometry(R + 0.18, 0.1, 6, 24, wrap);
-    arc.rotateX(Math.PI / 2); arc.rotateY(Math.PI / 2 + wrap / 2);       // centred on −z, facing the strongback
-    arc.translate(0, y, 0);
-    arms.push(arc);
-    arms.push(block(0, y, -R - 0.12, 0.9, 0.7, 0.2));                                    // umbilical carrier plate
+    list.push(beam([-0.9, y, zb], [-0.7, y, -R - 0.25], 0.32, 0.5), beam([0.9, y, zb], [0.7, y, -R - 0.25], 0.32, 0.5));
+    const g = new THREE.TorusGeometry(R + 0.18, 0.1, 6, 24, wrap);
+    g.rotateX(Math.PI / 2); g.rotateY(Math.PI / 2 + wrap / 2);       // centred on −z, facing the strongback
+    g.translate(0, y, 0);
+    list.push(g);
+    return y;
+  };
+  const s2arm = [];
+  const yS2 = armAt(49.9, 1.2, s2arm);
+  s2arm.push(block(0, yS2, -R - 0.12, 0.9, 0.7, 0.2));                                   // carrier plate on the stage's T-0 disconnect
+  G('TE second-stage umbilical arm', {
+    material: 'Steel arm, quick-disconnect carrier plate', mass: null,
+    desc: 'Holds the ground half of the second stage\'s T-0 quick disconnect: RP-1 and LOX fill and drain, helium, nitrogen, power, data and the payload harness. The plate pulls away as the vehicle rises.',
+  }, mesh(merge(s2arm), FM.padSteel()));
+  const clampArms = [];
+  for (const [ys, wrap] of [[56.2, 1.0], [44.0, 0.8]]) {
+    const y = armAt(ys, wrap, clampArms);
+    clampArms.push(block(0, y, -R - 0.12, 0.7, 0.5, 0.16));                              // padded clamp shoe
   }
-  for (const [x, r] of [[-0.9, 0.1], [-0.6, 0.14], [0.6, 0.12], [0.9, 0.09]]) {
-    arms.push(pipe([[x, DECK + 0.4, zb + 0.05], [x, STACK0 + 30, zb + 0.15], [x, STACK0 + 49.4, zb + 0.15], [x * 0.8, STACK0 + 49.7, zb + 1.1]], r, { seg: 8, tubular: 60 }));
+  G('TE clamp arms', {
+    count: 2, material: 'Steel arms with padded clamp shoes', mass: null,
+    desc: 'Cradle the stack against the strongback while it is horizontal and during erection, at the interstage and the top of the second stage, and steady it against the wind on the pad.',
+  }, mesh(merge(clampArms), FM.padSteel()));
+
+  const lines = [];
+  for (const [x, r] of [[-0.48, 0.1], [-0.17, 0.14], [0.15, 0.12], [0.44, 0.09]]) {
+    lines.push(pipe([[x, DECK + 1.2, zb + 0.1], [x, STACK0 + 30, zb + 0.15], [x, yS2 - 0.7, zb + 0.15], [x * 0.8, yS2 - 0.5, zb + 1.1], [x * 0.42, yS2 - 0.22, -R - 0.27]], r, { seg: 8, tubular: 60 }));
   }
-  G('TE umbilical & clamp arms', {
-    material: 'Steel arms, quick-disconnect umbilical plates, propellant and gas lines', mass: null,
-    desc: 'Arms on the strongback steady the vehicle and connect the second-stage umbilicals — propellant, helium, nitrogen, power and data — which pull away at liftoff.',
-  }, mesh(merge(arms), FM.padSteel()));
+  G('TE propellant & gas lines', {
+    count: 4, material: 'Vacuum-jacketed LOX line, RP-1, helium and nitrogen lines', mass: null,
+    desc: 'Run up the strongback from the base to the second-stage arm: LOX, RP-1, helium and nitrogen for the second stage. They come from the propellant farm through the base frame; the first stage is fed at its base. Line sizes estimated.',
+  }, mesh(merge(lines), FM.water()));
+
+  // the centre core's base umbilical: a carrier from the TE base to its T-0 plate (the routing on
+  // the Falcon Heavy mount is not published)
+  const t0y = STACK0 + T0_Y;
+  const carrier = [block(0, t0y, -R - 0.2, 1.2, 0.8, 0.2)];
+  for (const sx of [1, -1]) carrier.push(beam([sx * 0.5, DECK + 0.45, -4.4], [sx * 0.45, t0y - 0.25, -R - 0.32], 0.2, 0.3));
+  const carrierLines = [];
+  for (const [x, r] of [[-0.42, 0.1], [-0.21, 0.08], [0, 0.04], [0.21, 0.05], [0.42, 0.03]]) {
+    carrierLines.push(pipe([[x, DECK + 0.25, -4.4], [x, DECK + 0.55, -3.2], [x, t0y - 0.1, -R - 0.32]], r, { seg: 6, tubular: 12 }));
+  }
+  G('TE centre-core base umbilical', {
+    count: 5, material: 'Carrier plate on a short arm; LOX, RP-1, helium, nitrogen and TEA-TEB lines, power and data', mass: null,
+    desc: 'The ground half of the centre core\'s T-0 plate. Spaceflight Now (2010) listed LOX, kerosene, helium, gaseous nitrogen and the TEA-TEB igniter fluid among the supplies at Falcon\'s first-stage T-0 connections; the carrier drops away at liftoff. Its routing on the Falcon Heavy mount is not published: estimated.',
+  }, [mesh(merge(carrier), FM.padSteel()), mesh(merge(carrierLines), FM.water())]);
+
+  // the ground harness: J-box on the base frame, up the strongback to the second-stage plate
+  const gh = [block(-1.4, DECK + 1.5, -6.4, 0.6, 0.6, 0.5),
+    pipe([[-11.0, H + 0.05, -1.5], [-11.0, H + 0.06, -4.8], [-10.4, H + 1.0, -5.9], [-9.6, H + 1.56, -6.3], [-6, H + 1.56, -6.3], [-1.6, H + 1.56, -6.3], [-1.45, DECK + 0.2, -6.3]], 0.05, { seg: 6, tubular: 40, tension: 0.05 }),
+    pipe([[-1.4, DECK + 1.5, -6.1], [-1.25, DECK + 1.9, -4.3], [-1.25, DECK + 3, zb + 0.45], [-1.25, yS2 - 1.0, zb + 0.45], [-1.15, yS2 - 0.55, zb + 0.9], [-0.42, yS2 - 0.15, -R - 0.27]], 0.05, { seg: 6, tubular: 50, tension: 0.05 })];
+  G('TE ground harness', {
+    material: 'Shielded cable bundles, connector box on the TE base', mass: null,
+    desc: 'The junction box in the instrumentation bay connects to the transporter-erector through a ground harness, and a harness runs the length of the TE to the second-stage T-0 quick disconnect, whose flight side feeds up to four payload harnesses (Falcon User\'s Guide). Routing estimated.',
+  }, mesh(merge(gh), FM.cable()));
+
+  // payload air conditioning: the pad plant's duct comes up the strongback to the fairing inlet
+  const [ix, iz] = polar(2.73, 280);
+  const yAc = STACK0 + 59.6;
+  const acx = 1.25, acz = -4.05;
+  const ac = [pipe([[ix, yAc, iz], [ix + 0.2, yAc, iz - 0.5], [acx - 0.15, yAc - 0.15, acz + 0.35], [acx, yAc - 0.6, acz], [acx, STACK0 + 30, acz], [acx, DECK + 2.2, acz], [acx, DECK + 1.45, -4.6], [acx, DECK + 1.3, -5.3]], 0.15, { seg: 12, tubular: 90, tension: 0.05 })];
+  ac.push(block(acx, DECK + 1.45, -5.6, 0.7, 0.5, 0.7));                                  // connection to the ground duct
+  const acd = G('TE payload air-conditioning duct', {
+    system: 'Environmental control', material: 'Flexible insulated air duct, Ø ≈ 0.3 m', mass: null,
+    desc: 'Once the vehicle is at the pad the payload air conditioning is reconnected through this duct, keeping the encapsulated spacecraft at 15.6–30 °C in Class 7 (10,000) clean air through liftoff (Falcon User\'s Guide). It is disconnected only briefly during rollout. Routing estimated.',
+  }, mesh(merge(ac), FM.blanket()));
+  acd.userData.part.temp = 293;
+
+  // rails: two tracks straddling the trench, on the hardstand and down the ramp
+  const rampL = H / Math.tan((2.9 * Math.PI) / 180);       // 2.9°: the steepest incline the vehicle sees
+  const zRamp0 = -TZ, zRamp1 = -TZ - rampL;
+  const rampY = (z) => (z >= zRamp0 ? H : Math.max(0, H - (zRamp0 - z) * Math.tan((2.9 * Math.PI) / 180)));
+  const rails = [], railBed = [];
+  for (const sx of [1, -1]) {
+    for (const dx of [-GAUGE / 2, GAUGE / 2]) {
+      const x = sx * RAIL_X + dx;
+      rails.push(block(x, H + 0.11, (-5 + zRamp0) / 2, 0.08, 0.14, -5 - zRamp0));
+      const g = new THREE.BoxGeometry(0.08, 0.14, rampL + 0.4);
+      g.rotateX(-Math.atan(H / rampL));
+      g.translate(x, H / 2 + 0.11, (zRamp0 + zRamp1) / 2);
+      rails.push(g);
+    }
+    for (let z = -5.6; z > zRamp0; z -= 1.2) railBed.push(block(sx * RAIL_X, H + 0.02, z, GAUGE + 0.6, 0.06, 0.3));   // ties on the pad
+  }
+  const ramp = [], rampSide = [];
+  for (const sx of [1, -1]) {
+    const top0 = [], top1 = [], side1 = [], wall0 = [];
+    const N = 24;
+    for (let i = 0; i <= N; i++) {
+      const z = zRamp0 - (rampL * i) / N, y = rampY(z) + 0.02;
+      top0.push([sx * (W + 0.25), y, z]); top1.push([sx * (RAIL_X + 3.2), y, z]);
+      side1.push([sx * (RAIL_X + 3.2 + 1.5 * y), 0.02, z]);
+      wall0.push([sx * (W + 0.25), 0.02, z]);
+    }
+    ramp.push(ribbon(top0, top1, new THREE.Vector3(sx * 11, -100, -140)));
+    rampSide.push(ribbon(top1, side1, new THREE.Vector3(sx * 6, -50, -140)));
+    ramp.push(ribbon(wall0, top0, new THREE.Vector3(sx * 40, 4, -140)));
+  }
+  const rp = G('TE rails & ramp', {
+    count: 2, material: 'Steel rails on concrete, the Apollo / Shuttle crawlerway ramp', mass: null,
+    desc: 'The transporter-erector rides rails up the old crawlerway ramp from SpaceX\'s hangar at the foot of the pad; the steepest incline the integrated vehicle sees on the way is 2.9° (Falcon User\'s Guide), so the ramp runs ≈ 250 m from the pad down to grade. The tracks straddle the flame trench as the crawler\'s did; rail spacing estimated.',
+  }, [mesh(merge(rails), FM.padSteel()), mesh(merge(railBed), FM.hardstand()), mesh(merge(ramp), FM.hardstand()), mesh(merge(rampSide), FM.embankment())]);
+  rp.traverse((o) => { if (o.isMesh) noFrame(o); });
+
 
   // ------------------------------------------------------------------ fixed service structure + crew access arm
-  const fx0 = -21.8, fz0 = -17.4, fw = 12.2;
+  const fx0 = -24.2, fz0 = -17.4, fw = 12.2;           // west of the TE's west track
   const fl = [H];
   for (let i = 0; i < 12; i++) fl.push(H + 8.23 + i * 6.096);
   const fss = truss(fx0, fz0, fw, fw, fl, { col: 0.62, hor: 0.42, diag: 0.3 });
@@ -306,34 +486,89 @@ export function buildPad(A, site, base, bed) {
     desc: 'At ignition water floods the mount, the trench and the deck from big rainbird nozzles. Turning to steam absorbs heat and damps the acoustic energy that would otherwise reflect back onto the vehicle. The water is stored in the pad\'s 290 ft water tower.',
   }, mesh(merge(wd), FM.water()));
 
-  // ------------------------------------------------------------------ scenery (launch-pad look only, not parts)
-  const scenery = new THREE.Group();
+  // ------------------------------------------------------------------ lightning protection, water tower, propellant farm
+  // These reach far beyond the hardstand, so they are left out of the vehicle's framing (noFrame).
   const fssTop = fl[fl.length - 1];
   const fx = fx0 + fw / 2, fz = fz0 + fw / 2;
   const mastGeo = merge([post(fx, fz, fssTop, fssTop + 6, 0.9, 12, 0.5), post(fx, fz, fssTop + 6, fssTop + 30.5, 0.5, 10, 0.18)]);
-  scenery.add(mesh(mastGeo, new THREE.MeshStandardMaterial({ color: 0xd9d4c6, roughness: 0.7, metalness: 0.05 }), { cast: false }));
   const wire = (a, b, sag) => {
     const pts = [];
     for (let i = 0; i <= 48; i++) { const t = i / 48; const p = new THREE.Vector3().lerpVectors(a, b, t); p.y -= sag * 4 * t * (1 - t); pts.push(p); }
     return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 64, 0.09, 4, false);
   };
   const tip = new THREE.Vector3(fx, fssTop + 30.5, fz);
-  scenery.add(mesh(merge([wire(tip, new THREE.Vector3(fx, 0, fz + 335), 22), wire(tip, new THREE.Vector3(fx, 0, fz - 335), 22)]), FM.black(), { cast: false }));
+  const anchors = [1, -1].map((s) => block(fx, 0.8, fz + s * 335, 3.0, 1.6, 3.0));
+  const lp = G('Lightning mast & catenary wire', {
+    material: 'Fibreglass mast on the tower roof, one-inch stainless-steel cable, concrete anchors', mass: null,
+    desc: 'The pad\'s overhead-wire lightning protection (Falcon User\'s Guide): an 80 ft fibreglass mast on the tower roof, 347 ft above the ground at its tip, carries a one-inch stainless-steel cable from an anchor south of the tower up over the mast and down to an anchor to the north (NASA LC-39 fact sheet). It gives a strike a preferred path, so lightning neither attaches to the vehicle and ground systems nor side-flashes to them.',
+  }, [mesh(mastGeo, new THREE.MeshStandardMaterial({ color: 0xd9d4c6, roughness: 0.7, metalness: 0.05 }), { cast: false }),
+    mesh(merge([wire(tip, new THREE.Vector3(fx, 1.6, fz + 335), 22), wire(tip, new THREE.Vector3(fx, 1.6, fz - 335), 22)]), FM.black(), { cast: false }),
+    mesh(merge(anchors), FM.hardstand(), { cast: false })]);
+  lp.traverse((o) => { if (o.isMesh) noFrame(o); });
+
   const white = new THREE.MeshStandardMaterial({ color: 0xe7e8e4, roughness: 0.55, metalness: 0.1 });
   const steel = new THREE.MeshStandardMaterial({ color: 0x8b9096, metalness: 0.7, roughness: 0.5 });
-  // water tower (≈ 290 ft) and propellant storage spheres
   const wt = [post(-110, -150, 70, 88, 9, 32), new THREE.ConeGeometry(9.4, 3.2, 32).translate(-110, 89.6, -150)];
   const legsW = [];
   for (let k = 0; k < 6; k++) { const [x, z] = polar(10, k * 60); const [x1, z1] = polar(7, k * 60); legsW.push(beam([-110 + x, 0, -150 + z], [-110 + x1, 70, -150 + z1], 0.9, 0.9)); }
-  scenery.add(mesh(merge(wt), white), mesh(merge(legsW), steel));
+  G('Water tower', {
+    material: 'Elevated steel water tank on a braced tower', mass: null,
+    desc: 'Holds 300,000 gallons on a 290 ft tower (NASA LC-39 fact sheet), enough head for the deluge to reach full flow within seconds of ignition. Position compressed.',
+  }, [mesh(merge(wt), white, { cast: false }), mesh(merge(legsW), steel, { cast: false })]).traverse((o) => { if (o.isMesh) noFrame(o); });
+
   // kept behind the tower, on the right of the default view, so they never sit under the hero text
-  for (const [x, z, r] of [[-30, -160, 9.3], [60, -150, 7.5], [120, -85, 4.2]]) {
-    scenery.add(mesh(new THREE.SphereGeometry(r, 40, 24).translate(x, r + 3, z), white));
-    const sl = [];
-    for (let k = 0; k < 8; k++) { const [a, b] = polar(r * 0.8, k * 45); sl.push(beam([x + a, 0, z + b], [x + a * 1.05, r + 3, z + b * 1.05], 0.5, 0.5)); }
-    scenery.add(mesh(merge(sl), steel));
+  const LOXS = [-30, -160, 9.33];
+  const sl = [];
+  for (let k = 0; k < 8; k++) { const [a, b] = polar(LOXS[2] * 0.8, k * 45); sl.push(beam([LOXS[0] + a, 0, LOXS[1] + b], [LOXS[0] + a * 1.05, LOXS[2] + 3, LOXS[1] + b * 1.05], 0.5, 0.5)); }
+  G('LOX storage sphere', {
+    material: 'Double-walled vacuum-insulated sphere on steel columns', mass: null,
+    desc: 'The Apollo-era liquid-oxygen sphere holds about 900,000 US gallons (≈ 3,400 m³, ≈ 18.7 m across). It works as a huge vacuum bottle, keeping the LOX below −183 °C, and pumps of 1,300 gal/min move it to the pad through vacuum-jacketed lines (NASA LC-39 fact sheet). It stands on the pad\'s north-west corner; the position here is compressed.',
+  }, [mesh(new THREE.SphereGeometry(LOXS[2], 40, 24).translate(LOXS[0], LOXS[2] + 3, LOXS[1]), white, { cast: false }), mesh(merge(sl), steel, { cast: false })]).traverse((o) => { if (o.isMesh) noFrame(o); });
+
+  const rpT = [], rpS = [];
+  for (const dx of [-6, 0, 6]) {
+    const g = new THREE.CapsuleGeometry(2.4, 13.2, 6, 24); g.rotateX(Math.PI / 2); g.translate(60 + dx, 3.4, -150); rpT.push(g);
+    for (const dz of [-5.5, 0, 5.5]) rpS.push(block(60 + dx, 0.6, -150 + dz, 3.6, 1.2, 0.8));
   }
-  scenery.traverse((o) => { if (o.isMesh) { o.userData.fx = true; o.userData.scenery = true; } });
-  site.add(scenery);
-  return { scenery, deckTop: DECK };
+  G('RP-1 storage tanks', {
+    material: 'Horizontal steel tanks on saddles', mass: null,
+    desc: 'Kerosene for both stages is stored in a tank farm on the pad perimeter and pumped to the vehicle through the transporter-erector. SpaceX\'s RP-1 storage at LC-39A is not described publicly: count, size and position estimated.',
+  }, [mesh(merge(rpT), white, { cast: false }), mesh(merge(rpS), FM.hardstand(), { cast: false })]).traverse((o) => { if (o.isMesh) noFrame(o); });
+
+  const gb = [], gf = [];
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) {
+    const g = new THREE.CylinderGeometry(0.6, 0.6, 12, 16); g.rotateX(Math.PI / 2); g.translate(116 + i * 1.5, 1.4 + j * 1.4, -85); gb.push(g);
+  }
+  for (const dz of [-5, 0, 5]) gf.push(block(118.25, 2.3, -85 + dz, 6.6, 4.6, 0.3));
+  G('Helium & nitrogen storage', {
+    material: 'High-pressure gas storage tubes in steel frames', mass: null,
+    desc: 'Helium for the tanks, COPVs and pneumatic systems and nitrogen for purges and the cold-gas thrusters are stored as high-pressure gas in banks of tubes and fed to the transporter-erector. Layout estimated.',
+  }, [mesh(merge(gb), steel, { cast: false }), mesh(merge(gf), FM.padSteel(), { cast: false })]).traverse((o) => { if (o.isMesh) noFrame(o); });
+
+  // trunk lines: from the farm onto the east ramp, up it beside the rails, along the pad and over a
+  // pipe bridge into the TE base (vacuum-jacketed LOX, RP-1, nitrogen, helium; routing estimated)
+  const onRamp = (x, z, r) => [x, rampY(z) + r + 0.15, z];
+  const trunk = [];
+  const run = (pts, r) => {
+    for (let i = 1; i < pts.length; i++) trunk.push(rod(pts[i - 1], pts[i], r, 10));
+    for (let i = 1; i < pts.length - 1; i++) trunk.push(new THREE.SphereGeometry(r * 1.02, 10, 6).translate(...pts[i]));
+  };
+  const toPad = (x, z0, r, yb) => {
+    const pts = [];
+    for (const z of [z0, -120, -80, -50, -23]) if (z >= z0) pts.push(onRamp(x, z, r));
+    pts.push([x, H + r + 0.15, -7.3], [x, yb, -7.3], [1.6, yb, -7.3]);
+    return pts;
+  };
+  const toe = (z) => RAIL_X + 3.2 + 1.5 * rampY(z);
+  run([[LOXS[0], 3.0, LOXS[1]], [LOXS[0], 0.55, LOXS[1]], [-20, 0.55, -152], [toe(-152), 0.55, -152], [RAIL_X + 3.25, rampY(-152) + 0.55, -152], ...toPad(11.45, -152, 0.25, 19.05)], 0.25);
+  run([[54, 1.2, -148], [toe(-148), 0.35, -148], [RAIL_X + 3.25, rampY(-148) + 0.35, -148], ...toPad(11.95, -148, 0.15, 19.55)], 0.15);
+  run([[116, 0.4, -86], [toe(-86), 0.25, -86], [RAIL_X + 3.25, rampY(-86) + 0.25, -86], ...toPad(12.25, -86, 0.06, 19.78)], 0.06);
+  run([[116, 0.4, -84], [toe(-84), 0.25, -84], [RAIL_X + 3.25, rampY(-84) + 0.25, -84], ...toPad(12.45, -84, 0.05, 19.93)], 0.05);
+  const tl = G('Propellant & gas trunk lines', {
+    count: 4, material: 'Vacuum-jacketed LOX line, RP-1 line, nitrogen and helium lines on sleepers', mass: null,
+    desc: 'Carry LOX, RP-1, nitrogen and helium from the farm up the ramp beside the rails and over a pipe bridge into the transporter-erector\'s base, which feeds the first stage at its base and the second stage up the strongback. Routing estimated.',
+  }, mesh(merge(trunk), FM.water()));
+  tl.traverse((o) => { if (o.isMesh) noFrame(o); });
+
+  return { deckTop: DECK };
 }

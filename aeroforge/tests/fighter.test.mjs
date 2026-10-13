@@ -4,7 +4,8 @@
 // 8,200 kg internal fuel, Mach 2.25 top speed, Mach 1.21 at sea level, Mach 1.76 supercruise,
 // 19,812 m ceiling, +9 / −3 g); Pratt & Whitney / Wikipedia F119-PW-100 (116 kN dry, 156 kN class
 // with afterburner, 38 in inlet / 48 in case diameter, ±20° pitch vectoring); canopy
-// 140 × 45 × 27 in, 360 lb.
+// 140 × 45 × 27 in, 360 lb; AIM-120C 3.65 m × 17.8 cm (USAF fact sheet), LAU-142/A AVEL 9 in stroke
+// (Hydraulics & Pneumatics, 1998); main bay split along the centre line (Wikipedia).
 //
 // The model's geometry is checked through its three.js-free layout module, the lab's flight model
 // through the three.js-free f22/performance.js, and the tour against the part names declared in
@@ -171,7 +172,7 @@ test('guided tour: real part names, every demo, cards that fit', () => {
   // template placeholders stand for a side (right / left), a numbered unit (CIP 1) or a system letter (A / B)
   const templates = args.flatMap((a) => [...a.matchAll(/`([^`]*)`/g)].map((m) => new RegExp(`^${m[1].split(/\$\{[^}]+\}/).map(esc).join('(?:right|left|Right|Left|\\d|A|B)')}$`)));
   assert.ok(literals.size + 2 * templates.length > 150, `found ${literals.size} literal and ${templates.length} templated part names`);
-  assert.ok(TOUR.length >= 8 && TOUR.length <= 12, `${TOUR.length} tour steps`);
+  assert.ok(TOUR.length >= 8 && TOUR.length <= 13, `${TOUR.length} tour steps`);
   const modes = new Set(['studio', 'xray', 'blueprint', 'systems', 'thermal', 'pressure']);
   const demos = new Set(['surfaces', 'tvc', 'bay', 'mach2']);
   const words = (t) => t.trim().split(/\s+/).length;
@@ -183,4 +184,54 @@ test('guided tour: real part names, every demo, cards that fit', () => {
     for (const name of step.focus || []) assert.ok(literals.has(name) || templates.some((re) => re.test(name)), `step ${i + 1}: no part named "${name}"`);
   }
   for (const d of ['tvc', 'surfaces', 'bay', 'mach2']) assert.ok(TOUR.some((s) => s.demo === d), `the tour runs the ${d} demo`);
+});
+
+test('main bay: six AIM-120C clear the centre web, the walls, the doors and each other', () => {
+  const { r: R, tip: T } = L.AMRAAM;
+  const W = L.MAIN_BAY.z - 0.004, web = L.DIVIDER.half;
+  const doorInner = -0.885 + L.MAIN_DOOR.thick;               // inside face of the closed doors (belly ≈ −0.885)
+  const fins = ([z, y, t]) => [0, 1, 2, 3].map((k) => { const a = t + (k * Math.PI) / 2; return [[z + R * Math.cos(a), y + R * Math.sin(a)], [z + T * Math.cos(a), y + T * Math.sin(a)]]; });
+  const segPt = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1]; const u = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy))); return Math.hypot(p[0] - a[0] - u * dx, p[1] - a[1] - u * dy); };
+  const segSeg = (a, b, c, d) => {
+    const o = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]));
+    if (o(a, b, c) !== o(a, b, d) && o(c, d, a) !== o(c, d, b)) return -1;
+    return Math.min(segPt(a, c, d), segPt(b, c, d), segPt(c, a, b), segPt(d, a, b));
+  };
+  const S = L.AMRAAM_SLOTS;
+  assert.equal(S.length, 3, 'three missiles each side of the web');
+  for (const m of S) {
+    for (const [, tip] of fins(m)) {
+      assert.ok(tip[0] > web, `fin clears the centre web (${tip[0].toFixed(3)} m)`);
+      assert.ok(tip[0] < W, `fin clears the bay wall (${tip[0].toFixed(3)} m)`);
+      assert.ok(tip[1] > doorInner, `fin clears the closed doors (${tip[1].toFixed(3)} m)`);
+      assert.ok(tip[1] < L.bayCeil(tip[0]), `fin clears the bay ceiling (${tip[1].toFixed(3)} m)`);
+      // after the 9 in AVEL stroke, anything below the belly must pass inboard of the folded-open doors
+      if (tip[1] - L.AVEL_STROKE < -0.885) assert.ok(tip[0] < L.OPEN_DOOR_Z, `ejected fin clears the open door (${tip[0].toFixed(3)} m)`);
+    }
+    assert.ok(m[0] - R > web && m[0] + R < W, 'body inside the bay half');
+  }
+  for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) {
+    const A = S[i], B = S[j];
+    assert.ok(Math.hypot(A[0] - B[0], A[1] - B[1]) > 2 * R, `bodies ${i}/${j} apart`);
+    for (const f of fins(A)) for (const g of fins(B)) assert.ok(segSeg(f[0], f[1], g[0], g[1]) > 0, `fins of missiles ${i} and ${j} do not cross`);
+    for (const f of fins(A)) assert.ok(segPt([B[0], B[1]], f[0], f[1]) > R, `fin of ${i} clears body ${j}`);
+    for (const f of fins(B)) assert.ok(segPt([A[0], A[1]], f[0], f[1]) > R, `fin of ${j} clears body ${i}`);
+  }
+  // two bifold panels per door, meeting the web's door land and the bay-edge hinge
+  close(L.MAIN_DOOR.zFold - L.MAIN_DOOR.zIn, L.MAIN_BAY.z - L.MAIN_DOOR.zFold, 0.02, 'equal bifold panels');
+  close(L.AVEL_STROKE, 0.2286, 1e-4, 'AVEL stroke 9 in');
+});
+
+test('saw-tooth door edges run parallel to the 42° wing leading edge', () => {
+  close(Math.atan(L.TOOTH_SLOPE) / DEG, 42, 1e-9, 'tooth angle');
+  const grid = L.toothedGrid((s, u) => [s, 0, u * 0.6], [10, 10.5, 11], { width: 0.6 });
+  for (const row of [grid[0], grid[grid.length - 1]]) {
+    for (let k = 0; k < row.length - 1; k++) {
+      const ds = row[k + 1][0] - row[k][0], dz = row[k + 1][2] - row[k][2];
+      close(Math.abs(ds / dz), L.TOOTH_SLOPE, 1e-9, 'each tooth edge at the leading-edge angle');
+    }
+  }
+  // teeth reach forward of the fore edge and aft of the aft edge; the middle row stays straight
+  assert.ok(Math.min(...grid[0].map((p) => p[0])) < 10 && Math.max(...grid[2].map((p) => p[0])) > 11);
+  assert.ok(grid[1].every((p) => p[0] === 10.5));
 });

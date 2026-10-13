@@ -76,11 +76,13 @@ export function buildPayload(P) {
   const CLK_X = [-0.22, -0.01, 0.2];
   const CS = [0.15, 0.15, 0.3];
   const clockAt = (x) => [x, IY - 0.02 - 0.075, CB.z];
+  /** Face of one of a clock package's two connectors (k 0: reference output, 1: power and telemetry), plus off. */
+  const clkConn = (x, k, off = 0) => [x + (k ? 1 : -1) * CS[0] / 4, IY - 0.02 - 0.075, CB.z - CS[2] / 2 - 0.024 - off];
   CLK_X.forEach((x, k) => {
     const c = clockAt(x);
     const pkg = unit(c, CS, G.silverBox(), { mount: '+y', conn: '-z', n: 2 });
     pkg.push(mesh(cylG([x, c[1] - 0.075 - 0.03, CB.z + 0.06], 0.045, 0.06, 'y', 20), G.alodine()));
-    reg(connPoint(c, CS, '-z', 0.04), 'npe', true);
+    reg(clkConn(x, 1, 0.028), 'npe', true);   // power and telemetry on the second connector
     P(`Rubidium atomic clock ${k + 1}`, {
       system: 'Payload', material: 'Rubidium lamp, absorption cell and quartz oscillator (Excelitas RAFS)', mass: 8, temp: 293, explode: [0, 1.1, 0],
       desc: k === 0
@@ -91,7 +93,7 @@ export function buildPayload(P) {
   const dx = 0.42, dc = clockAt(dx);
   const drafs = unit(dc, CS, G.alodine(), { mount: '+y', conn: '-z', n: 2 });
   drafs.push(mesh(merge([boxG([dx, dc[1] - 0.085, CB.z + 0.07], [0.1, 0.02, 0.08])]), G.blackBox()));
-  reg(connPoint(dc, CS, '-z', 0.04), 'npe', true);
+  reg(clkConn(dx, 1, 0.028), 'npe', true);
   P('Digital rubidium clock (SV10)', {
     system: 'Payload', material: 'Rubidium physics package with digital control electronics', mass: 8, temp: 293, explode: [0, 1.1, 0],
     desc: 'GPS III was designed with a fourth clock position for new or experimental frequency standards, such as a hydrogen maser. Lockheed says SV10, launched on 21 April 2026, carries a demonstration Digital Rubidium Atomic Frequency Standard; that it sits in this fourth slot is an inference, and on SV01–SV09 the slot is empty.',
@@ -100,9 +102,9 @@ export function buildPayload(P) {
   // ---- clock reference cables: each clock to the Mission Data Unit
   const ck = [], yc = IY - 0.12;
   [...CLK_X, dx].forEach((x, i) => {
-    const p = connPoint(clockAt(x), CS, '-z', 0.0);
+    const p = clkConn(x, 0), xc = p[0];
     const zr = -1.47 - i * 0.022;
-    ck.push(pipeG([p, [x, p[1], zr], [x, yc - i * 0.012, zr], [MDU.c[0] + 0.25, yc - i * 0.012, zr], [MDU.c[0] + 0.25, yc - i * 0.012, MDU.c[2] - 0.12 + i * 0.06], [MDU.c[0] + MDU.s[0] / 2 + 0.01, yc - i * 0.012, MDU.c[2] - 0.12 + i * 0.06]], 0.005));
+    ck.push(pipeG([p, [xc, p[1], zr], [xc, yc - i * 0.012, zr], [MDU.c[0] + 0.25, yc - i * 0.012, zr], [MDU.c[0] + 0.25, yc - i * 0.012, MDU.c[2] - 0.12 + i * 0.06], [MDU.c[0] + MDU.s[0] / 2 + 0.01, yc - i * 0.012, MDU.c[2] - 0.12 + i * 0.06]], 0.005));
   });
   P('Clock reference cables', {
     system: 'Payload', material: 'Semi-rigid coaxial cable', mass: 1.2, count: 4, temp: 293, explode: [0, 1.0, 0],
@@ -124,7 +126,8 @@ export function buildPayload(P) {
   [['L1 transmitter', 0], ['L5 transmitter', 1], ['L2 transmitter', 2]].forEach(([n, k]) => {
     const { c, s } = TX[n];
     const p = [c[0] - s[0] / 2 + 0.06, c[1] - s[1] / 2 - 0.012, c[2]], m = muxIn(k);
-    const yy = yr - k * 0.014, zr = muxBot - 0.07 - k * 0.022;
+    // L1's cable climbs in front of the L3 and L5 boxes, so L5's runs between L1's and its own box face
+    const yy = k === 1 ? yr + 0.018 : yr - k * 0.014, zr = muxBot - 0.07 - k * 0.022;
     rf.push(pipeG([p, [p[0], yy, p[2]], [p[0], yy, zr], [m[0], yy, zr], [m[0], m[1], zr], m], 0.007));
     ports.push(cylG([m[0], m[1], muxBot - 0.006], 0.013, 0.012, 'z', 10));
   });
@@ -132,12 +135,14 @@ export function buildPayload(P) {
   {
     const { c, s } = TX['L3 transmitter'];
     const p = [c[0] + s[0] / 2 - 0.06, c[1] - s[1] / 2 - 0.012, c[2]], f = npe(L3F.c, L3F.s);
-    rf.push(pipeG([p, [p[0], yr, p[2]], [p[0], yr, f[2] - 0.13], [f[0], yr, f[2] - 0.13], [f[0], f[1] - 0.09, f[2] - 0.13], [f[0], f[1] - 0.09, f[2] - 0.1]], 0.007));
+    const yf = yr + 0.03;   // across to the filter outboard of the transmitters' power drops
+    rf.push(pipeG([p, [p[0], yr, p[2]], [p[0], yr, f[2] - 0.13], [p[0], yf, f[2] - 0.13], [f[0], yf, f[2] - 0.13], [f[0], f[1] - 0.09, f[2] - 0.13], [f[0], f[1] - 0.09, f[2] - 0.1]], 0.007));
   }
   const zA = DECK + 0.035;
-  const mo = connPoint(muxC, MUX.s, '+z', 0.0), fo = connPoint(npe(L3F.c, L3F.s), L3F.s, '+z', 0.0);
+  // the multiplexer's output leaves its −X top connector (the middle one carries telemetry), clear of the UHF element above
+  const mo = [muxC[0] - MUX.s[0] / 3, muxC[1], muxC[2] + MUX.s[2] / 2], fo = connPoint(npe(L3F.c, L3F.s), L3F.s, '+z', 0.0);
   rf.push(pipeG([mo, [mo[0], mo[1], HZ - 0.01], [mo[0], mo[1], zA], [ARRAY_C[0] - 0.12, 0.3, zA], [ARRAY_C[0] - 0.05, 0.12, zA], [ARRAY_C[0], 0.05, DECK + 0.03]], 0.011));
-  rf.push(pipeG([fo, [fo[0], fo[1], HZ - 0.01], [fo[0], fo[1], zA], [ARRAY_C[0] + 0.12, 0.3, zA], [ARRAY_C[0] + 0.05, 0.12, zA], [ARRAY_C[0] + 0.03, 0.05, DECK + 0.03]], 0.009));
+  rf.push(pipeG([fo, [fo[0], fo[1], HZ - 0.01], [fo[0], fo[1], zA], [ARRAY_C[0] + 0.05, 0.3, zA], [ARRAY_C[0] + 0.05, 0.12, zA], [ARRAY_C[0] + 0.03, 0.05, DECK + 0.03]], 0.009));
   P('L-band RF cables', {
     system: 'Payload', material: 'Low-loss semi-rigid coaxial cable', mass: 5, temp: 295, explode: [0, 0.95, 0.4],
     desc: 'Coaxial lines from the L1, L2 and L5 transmitters to the multiplexer and from the L3 transmitter to its filter, then up through the Earth deck to the beam-forming network under the antenna panel. Every tenth of a decibel lost here is transmitter power wasted as heat (routing estimated).',
@@ -161,16 +166,20 @@ export function buildPayload(P) {
   const UDU = 'One of a redundant pair of S-band uplink/downlink units, the TT&C transponders: each demodulates and decrypts ground commands, returns telemetry and turns the ranging tones around so the ground can measure the satellite\'s distance, over SGLS with the Air Force Satellite Control Network or with Unified S-Band stations.';
   nce('Uplink/downlink unit (A)', 'uduA', UDU, 8);
   nce('Uplink/downlink unit (B)', 'uduB', 'The second S-band uplink/downlink unit; either one can reach the ground through the forward or the aft antenna.', 8);
-  // S-band RF cables: UDU A → forward mast (across under the Earth deck), UDU B → aft antenna
+  // S-band RF cables: UDU A → forward mast (through the top windows of the core walls, then up under the
+  // data trunk and the power bus to the mast), UDU B → aft antenna (along the panel between the power
+  // drops and the units, down the +X edge outboard of Battery 2, across the foot of the +X bay)
   const ua = bus(BUS.uduA.c, BUS.uduA.s), ub = bus(BUS.uduB.c, BUS.uduB.s);
   const [fx, fy] = DECK_AT.fwdMast, [ax, ay] = AFT_ANT;
   const fa = [ua[0] + 0.06, ua[1] + BUS.uduA.s[1] / 2 + 0.012, ua[2]], fb = [ub[0] + 0.06, ub[1] + BUS.uduB.s[1] / 2 + 0.012, ub[2]];
+  const ZBS = -HZ + 0.1;   // the aft run, above the thruster and oxidiser lines on the aft deck
+  const ZFS = 1.555;       // the forward run's last leg, under the top data trunk and the main power bus
   P('S-band RF cables', {
     system: 'Communications', material: 'Semi-rigid coaxial cable', mass: 2.5, temp: 290, explode: [0, -0.6, 0],
     desc: 'Coaxial lines from the two uplink/downlink units to the forward TT&C mast on the Earth deck and to the aft antenna at the far end, cross-strapped so either radio can reach the ground whichever way the satellite points (routing estimated).',
   }, mesh(merge([
-    pipeG([fa, [fa[0], -0.64, fa[2]], [fa[0], -0.64, HZ - 0.05], [fx, -0.64, HZ - 0.05], [fx, fy, HZ - 0.05], [fx, fy, DECK + 0.02]], 0.007),
-    pipeG([fb, [fb[0], -0.655, fb[2]], [1.16, -0.655, fb[2]], [1.16, -0.655, -HZ + 0.07], [1.16, ay, -HZ + 0.07], [ax, ay, -HZ + 0.07], [ax, ay, AFT - 0.01]], 0.007),
+    pipeG([fa, [fa[0], -0.64, fa[2]], [fa[0], 0.6, fa[2]], [fa[0], 0.6, ZFS], [fx, 0.6, ZFS], [fx, fy, ZFS], [fx, fy, DECK + 0.02]], 0.007),
+    pipeG([fb, [fb[0], -0.672, fb[2]], [1.19, -0.672, fb[2]], [1.19, -0.672, ZBS], [1.14, -0.672, ZBS], [1.14, ay, ZBS], [ax, ay, ZBS], [ax, ay, AFT - 0.01]], 0.007),
   ]), G.tubing()));
 
   // ================================================================== HOSTED PAYLOAD: Global Burst Detector (NDS)

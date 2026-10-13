@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { wingPanel, mirrorZ, loftRings, orientOutward, airfoilLoop } from '../../engine/geometry.js';
-import { MAT, DEG, V3, merge, box, cyl, tube, pchip, unitRod, aimRod, TAIL, pylonLean, strobeMat } from './common.js';
+import { MAT, DEG, V3, merge, box, cyl, tube, pipe, pchip, unitRod, aimRod, TAIL, pylonLean, strobeMat } from './common.js';
 
 /** Grid surface: fn(u, v) → Vector3 over u, v ∈ [0, 1]; skip(p) drops a quad. Normals computed. */
 function gridSurface(nu, nv, fn, skip = null) {
@@ -77,6 +77,8 @@ function trBladeGeometry() {
   return orientOutward(loftRings(rings, { capStart: true, capEnd: true }));
 }
 
+const WELL = 0.58;
+
 export function buildTail({ A, P, air, roofY }) {
   const paint = MAT.paint();
 
@@ -84,10 +86,12 @@ export function buildTail({ A, P, air, roofY }) {
   const shaftX = -0.03;
   // wide over the input and accessory modules, narrowing quickly aft so the engine inlets stay open
   const trans = fairing([[-0.9, 0.45, 2.67], [-0.45, 0.46, 2.73], [-0.15, 0.66, 2.77], [0.2, 0.8, 2.79], [0.7, 0.84, 2.78], [1.2, 0.8, 2.72], [1.7, 0.7, 2.62], [2.2, 0.57, 2.49], [2.6, 0.35, 2.31]], roofY, {
-    e: 3.0, nu: 64, nv: 40, skip: (c) => c.y > 2.6 && Math.hypot(c.x - shaftX, c.z) < 0.48,
+    e: 3.0, nu: 64, nv: 40, skip: (c) => c.y > 2.6 && Math.hypot(c.x - shaftX, c.z) < WELL,
   });
-  const well = cyl(0.48, 0.48, 0.22, [shaftX, 2.68, 0], 'y', 40, true);
-  const wellLip = new THREE.TorusGeometry(0.48, 0.018, 6, 40).rotateX(Math.PI / 2).translate(shaftX, 2.79, 0);
+  // the opening round the rotor shaft is wide enough for the swashplate and the tops of the three
+  // primary servos that stand on the deck ahead of the gearbox
+  const well = cyl(WELL, WELL, 0.17, [shaftX, 2.705, 0], 'y', 44, true);
+  const wellLip = new THREE.TorusGeometry(WELL, 0.018, 6, 44).rotateX(Math.PI / 2).translate(shaftX, 2.79, 0);
   P('Transmission fairing', {
     system: 'Skin & fairings', skin: true, material: 'Kevlar/graphite composite cowls on quick-release hinges', mass: 55, explode: [2.4, 1.0, 0],
     desc: 'Streamlines the forward upper deck, the flight-control closet, the main gearbox and its input and accessory modules. Its panels open as walkways for daily inspection of the rotor head.',
@@ -163,27 +167,51 @@ export function buildTail({ A, P, air, roofY }) {
     system: 'Flight controls', material: 'Dual electromechanical jackscrew actuators', mass: 12, count: 2, explode: [-3.0, -0.2, 0.4],
     desc: 'Two electromechanical actuators in series, each commanded by one of the two digital flight control computers — on the M those computers replaced the A/L\'s separate stabilator amplifiers. A fault in one is caught by the other and the pilot gets an aural warning.',
   }, [mesh(merge([tube([-9.0, 1.84, 0.07], [-9.32, 1.72, 0.09], 0.035, 10), tube([-9.0, 1.84, -0.07], [-9.32, 1.72, -0.09], 0.035, 10)]), MAT.hydraulic())]);
+  const hinge = [];
+  for (const sd of [1, -1]) {
+    hinge.push(cyl(0.012, 0.012, 0.62, [0.05, 0.075, 0.42 * sd], 'x', 8));
+    for (const x of [0.28, -0.18]) hinge.push(box(0.1, 0.05, 0.06, [x, 0.07, 0.42 * sd]));
+  }
+  P('Stabilator fold hinges', {
+    system: 'Flight controls', material: 'Steel hinge fittings and fold pins', mass: 3, count: 2, explode: [-3.2, -0.2, 0],
+    desc: 'A folding stabilator is one of the UH-60M\'s listed improvements: hinges near each root let the outer panels fold, so the aircraft goes into a transport aircraft with less disassembly. (Fold line and fittings approximate; not published.)',
+  }, [mesh(merge(hinge), MAT.steel())], sPivot);
 
   // ------------------------------------------------------------------ gearboxes and pylon shaft
   const igb = V3(...TAIL.igb), tgb = V3(...TAIL.tgb), hub = V3(...TAIL.hub);
   const n = V3(0, Math.sin(TAIL.cant), Math.cos(TAIL.cant));
   const pyDir = tgb.clone().sub(igb).normalize();
   P('Intermediate gearbox (42°)', {
-    system: 'Drive system', material: 'Aluminium case, spiral-bevel gears, splash lubricated', mass: 28, explode: [-2.6, 0.6, 0],
-    desc: 'At the base of the pylon a pair of bevel gears turns the drive up the fin through about 42°. Self-contained with its own oil and a chip detector.',
+    system: 'Drive system', material: 'Aluminium case, spiral-bevel gears, oil-lubricated', mass: 28, explode: [-2.6, 0.6, 0],
+    desc: 'At the base of the pylon a pair of bevel gears turns the drive up the fin through about 42° and reduces its speed. Self-contained with its own oil, it can run 30 minutes at cruise with all its oil lost.',
   }, [mesh(merge([new THREE.SphereGeometry(0.16, 18, 14).translate(igb.x, igb.y, igb.z), cyl(0.09, 0.09, 0.22, [igb.x + 0.16, igb.y, 0], 'x', 14), tube(igb, igb.clone().addScaledVector(pyDir, 0.24), 0.09, 14)]), MAT.casting())]);
-  P('Tail drive shaft, pylon section', {
-    system: 'Drive system', material: 'Aluminium-alloy tube, flexible couplings', mass: 8, explode: [-2.8, 0.6, 0],
-    desc: 'Climbs the inside of the pylon from the intermediate to the tail gearbox.',
+  P('Tail drive shaft section 6', {
+    system: 'Drive system', material: 'Dynamically balanced aluminium-alloy tube', mass: 6, explode: [-2.8, 0.6, 0],
+    desc: 'The sixth and last section climbs the inside of the pylon from the intermediate to the tail gearbox, with a disc coupling at each end.',
   }, [mesh(merge([tube(igb.clone().addScaledVector(pyDir, 0.2), tgb.clone().addScaledVector(pyDir, -0.2), 0.045, 12)]), MAT.steel())]);
   P('Tail rotor gearbox (90°)', {
-    system: 'Drive system', material: 'Aluminium case, bevel gears, pitch-change shaft through the output', mass: 38, explode: [-3.0, 0.9, -0.3],
-    desc: 'Turns the drive 90° into the tail-rotor shaft and reduces it to 1,190 rpm — 4.6 times main-rotor speed — with the tail rotor\'s pitch-change shaft passing through its hollow output.',
+    system: 'Drive system', material: 'Magnesium case, bevel gears, pitch-change shaft through the output', mass: 38, explode: [-3.0, 0.9, -0.3],
+    desc: 'Turns the drive 90° into the tail-rotor shaft and reduces it to 1,190 rpm — 4.6 times main-rotor speed — with the tail rotor\'s pitch-change shaft passing through its hollow output. Its housing is magnesium; it mounts the tail rotor and the tail-rotor servo, and like the 42° box it can run 30 minutes with no oil.',
   }, [mesh(merge([tube(tgb.clone().addScaledVector(n, -0.08), tgb.clone().addScaledVector(n, 0.2), 0.15, 18), tube(tgb, tgb.clone().addScaledVector(pyDir, -0.24), 0.1, 14)]), MAT.casting())]);
   P('Tail rotor servo', {
     system: 'Flight controls', material: 'Dual-stage hydraulic actuator', mass: 9, explode: [-3.0, 0.4, -0.5],
     desc: 'Driven by cables from the pedals, it moves the pitch-change shaft through the tail gearbox. Two stages: the first on the No. 1 hydraulic system, the second on the backup pump.',
   }, [mesh(merge([tube([-9.38, 2.95, pylonLean(2.95)], [-9.55, 3.28, pylonLean(3.28)], 0.04, 12), tube([-9.55, 3.28, pylonLean(3.28)], [-9.85, 3.4, pylonLean(3.4)], 0.012, 8)]), MAT.hydraulic())]);
+  // gearbox chip/temperature sensors, sight gauges and filler caps
+  const tc = tgb.clone().addScaledVector(n, 0.06), dn = V3(0, -Math.cos(TAIL.cant), Math.sin(TAIL.cant));
+  P('Tail gearbox chip/temperature sensors & sight gauges', {
+    system: 'Drive system', material: 'Fuzz burn-off chip detectors with bimetal temperature switches, oil sight gauges, filler caps', mass: 1, count: 4, explode: [-2.8, 1.25, 0.6],
+    desc: 'The 42° and 90° gearboxes carry identical chip/temperature sensors: a magnetic plug with fuzz burn-off lights CHIP INT XMSN or CHIP TAIL XMSN for a real chip, and a bimetal strip closes at 140 °C to light the oil-temperature caution. A sight gauge on each box shows its oil level on the walk-round.',
+  }, [mesh(merge([cyl(0.022, 0.022, 0.06, [igb.x, igb.y - 0.17, 0], 'y', 10), cyl(0.026, 0.026, 0.02, [igb.x + 0.05, igb.y, 0.155], 'z', 14), cyl(0.03, 0.03, 0.03, [igb.x - 0.02, igb.y + 0.16, 0], 'y', 12),
+    tube(tc.clone().addScaledVector(dn, 0.14), tc.clone().addScaledVector(dn, 0.2), 0.022, 10), cyl(0.026, 0.026, 0.02, [tc.x - 0.15, tc.y, tc.z], 'x', 14), tube(tc.clone().addScaledVector(dn, -0.14), tc.clone().addScaledVector(dn, -0.18), 0.03, 12)]), MAT.yellow())]);
+  // tail rotor quadrant: where the two control cables meet the tail-rotor servo's input
+  const qd = V3(-9.33, 2.86, pylonLean(2.86));
+  const sector = new THREE.CylinderGeometry(0.1, 0.1, 0.03, 16, 1, false, -0.6, 1.9).rotateX(Math.PI / 2).translate(qd.x, qd.y, qd.z);
+  P('Tail rotor quadrant', {
+    system: 'Flight controls', material: 'Aluminium cable quadrant on a pivot, tension spring, microswitches', mass: 2, explode: [-2.4, 0.2, -0.7],
+    desc: 'The two tail-rotor cables end on this quadrant, which turns the servo\'s input. Spring tension keeps it working normally if one cable is cut, and microswitches then light TAIL ROTOR QUADRANT; if control is lost altogether, the spring sets the blades to a pitch that roughly balances cruise power. (Location approximate.)',
+  }, [mesh(merge([sector, cyl(0.016, 0.016, 0.07, [qd.x, qd.y, qd.z], 'z', 10), box(0.04, 0.03, 0.03, [qd.x + 0.09, qd.y - 0.08, qd.z]), box(0.04, 0.03, 0.03, [qd.x - 0.02, qd.y - 0.11, qd.z])]), MAT.casting()),
+    mesh(merge([tube([qd.x + 0.06, qd.y + 0.06, qd.z], [qd.x + 0.22, qd.y + 0.12, qd.z], 0.009, 6), tube([qd.x + 0.05, qd.y - 0.02, qd.z + 0.02], [qd.x - 0.06, qd.y + 0.12, qd.z + 0.02], 0.007, 6)]), MAT.steel())]);
 
   // ------------------------------------------------------------------ tail rotor (non-rotating frame, spinning children)
   const trFrame = new THREE.Group();
@@ -200,6 +228,13 @@ export function buildTail({ A, P, air, roofY }) {
     build(s);
     return part;
   };
+  const qInv = trFrame.quaternion.clone().invert();
+  const toTr = (p) => V3(...p).sub(hub).applyQuaternion(qInv);
+  P('Tail rotor slip ring', {
+    system: 'Electrical', material: 'Slip-ring assembly on the tail-rotor shaft, feed cable up the pylon', mass: 3, explode: [-2.9, 1.7, -0.4],
+    desc: 'Carries de-ice power onto the turning tail-rotor shaft between the gearbox and the hub. The controller switches the tail-rotor power itself and sends it through here to all four blades at once, so unlike the main rotor the tail rotor needs no distributor. Its cable branches off the tail-cone harness and climbs the pylon.',
+  }, [mesh(merge([cyl(0.068, 0.068, 0.06, [0, -0.13, 0], 'y', 20), cyl(0.074, 0.074, 0.01, [0, -0.15, 0], 'y', 20)]), MAT.casting()),
+    mesh(pipe([toTr([-8.6, 2.0, -0.18]), toTr([-8.9, 2.4, pylonLean(2.4) - 0.04]), toTr([-9.45, 3.1, pylonLean(3.1) - 0.05]), toTr([-9.8, 3.4, -0.32]), toTr([-9.88, 3.5, -0.24]), V3(0.05, -0.13, 0.06)], 0.009, 5), MAT.wiring())], trFrame);
   const bladeG = trBladeGeometry();
   trPart('Tail rotor blades', {
     system: 'Rotor system', material: 'Graphite/glass skins over the crossbeam spars, nickel erosion strips', mass: 32, count: 4, explode: [-3.1, 1.1, 0],

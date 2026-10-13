@@ -11,7 +11,7 @@ import { mesh } from '../../engine/assembly.js';
 import { lathe } from '../../engine/geometry.js';
 import { G } from './materials.js';
 import { HX, HY, IY, IZ, DECK, AFT, boxG, cylG, merge, pipeG, plateG, helixG, rectHole, reg } from './kit.js';
-import { ARRAY_C, EC_INNER, EC_OUTER, UHF_INNER, UHF_OUTER, MEC, DECK_AT, JIB_POS, PANEL_OUTLINE, BUS, onBUS, AFT_ANT } from './layout.js';
+import { ARRAY_C, EC_INNER, EC_OUTER, UHF_INNER, UHF_OUTER, MEC, DECK_AT, JIB_POS, PANEL_OUTLINE, PANEL_HOLES, PANEL_POSTS, BUS, onBUS, AFT_ANT } from './layout.js';
 
 export const PANEL_Z = DECK + 0.085;      // top of the L-band antenna panel
 const PANEL_T = 0.03;
@@ -38,15 +38,14 @@ export function buildAntennas(P) {
   const A = DECK_AT;
   // ------------------------------------------------------------------ support frame, panel, feed networks
   const struts = [];
-  const strutAt = [[1.0, -0.78], [1.0, 0.78], [0.45, 0.0], [0.4, -0.78], [0.4, 0.78], [-0.2, -0.78], [-0.3, 0.78], [-0.75, 0.78], [-1.18, 0.75], [-1.18, -0.15], [-0.75, -0.38], [1.3, 0.05], [-0.15, 0.0]];
+  const strutAt = PANEL_POSTS;
   for (const [x, y] of strutAt) struts.push(cylG([x, y, (DECK + PANEL_Z - PANEL_T) / 2], 0.014, PANEL_Z - PANEL_T - DECK, 'z', 10), cylG([x, y, DECK + 0.004], 0.03, 0.008, 'z', 12));
   P('Antenna support frame', {
-    system: 'Structure', material: 'Carbon-fibre posts with titanium end fittings', mass: 9, count: 13, temp: 250, explode: [0, 0, 1.85],
-    desc: 'Stands the L-band antenna panel off the Earth deck so the beam-forming and crosslink feed networks fit underneath, and holds the array\'s pointing to the spacecraft axes. Geometry estimated.',
+    system: 'Structure', material: 'Carbon-fibre posts with titanium end fittings', mass: 9, count: strutAt.length, temp: 250, explode: [0, 0, 1.85],
+    desc: 'Stands the L-band antenna panel off the Earth deck so the beam-forming and crosslink feed networks fit underneath, and holds the array\'s pointing to the spacecraft axes. Two posts just inside the deck edge carry the +X tab, which overhangs the deck by about 17 cm. Geometry estimated.',
   }, mesh(merge(struts), G.cfrp(2)));
 
-  const holes = [rectHole(A.esa[0], A.esa[1], 0.3, 0.36), rectHole(A.lra[0], A.lra[1], 0.44, 0.44), rectHole(A.scot[0], A.scot[1], 0.3, 0.23), rectHole(A.hpeSensor[0], A.hpeSensor[1], 0.18, 0.18),
-    circle(A.fwdMast[0], A.fwdMast[1], 0.065), circle(A.hpeS[0], A.hpeS[1], 0.07)];
+  const holes = [...PANEL_HOLES.rects.map(([x, y, w, h]) => rectHole(x, y, w, h)), ...PANEL_HOLES.circles.map(([x, y, r]) => circle(x, y, r))];
   P('L-band antenna panel', {
     system: 'Payload', material: 'Black-finished aluminium honeycomb ground plane', mass: 38, temp: 245, explode: [0, 0, 2.05],
     desc: 'Ground plane of the navigation antennas, about 2.4 × 1.8 m and covering nearly the whole Earth deck, with a tab at each end. Its 12 Earth-coverage helices broadcast every civil and military signal to the whole visible Earth; the four M-code elements sit at the −X end. SV01\'s published calibration puts the L1 phase centre 1.232 m above the centre of mass, and IGS orbit fits agreed to 2 mm.',
@@ -61,7 +60,7 @@ export function buildAntennas(P) {
   const mc = [-1.0, 0.02];
   bfn.push(boxG([mc[0], mc[1], DECK + 0.03], [0.16, 0.16, 0.03]));
   for (const [x, y] of MEC) bfn.push(pipeG([[mc[0] + (x - mc[0]) * 0.4, mc[1] + (y - mc[1]) * 0.4, DECK + 0.045], [x, y, DECK + 0.045], [x, y, PANEL_Z - PANEL_T]], 0.007));
-  bfn.push(pipeG([[ARRAY_C[0] - 0.2, 0.02, DECK + 0.03], [mc[0] + 0.08, 0.02, DECK + 0.03]], 0.009));
+  bfn.push(pipeG([[ARRAY_C[0] - 0.2, 0.02, DECK + 0.034], [mc[0] + 0.08, 0.02, DECK + 0.034]], 0.009));
   P('Beam-forming network', {
     system: 'Payload', material: 'Coaxial power dividers and phase-trimmed cables', mass: 15, temp: 270, explode: [0, 0, 1.95],
     desc: 'Splits each signal twelve ways and sets the phase of the inner and outer elements, shaping the beam so a receiver at the Earth\'s edge, about 5,600 km farther away than one directly below (roughly 2 dB more path loss), still gets nearly the same signal strength. A branch feeds the four M-code elements.',
@@ -93,17 +92,19 @@ export function buildAntennas(P) {
   }, element(x, y, UHF));
   UHF_INNER.forEach(([x, y], k) => uhf(`UHF crosslink element, inner ${k + 1}`, x, y, true));
   UHF_OUTER.forEach(([x, y], k) => uhf(`UHF crosslink element, outer ${k + 1}`, x, y, false));
-  // UHF feed ring under the panel and a trunk down to the two crosslink transponders on the −Y panel
-  const uf = [], fr = [], RR = 0.63, zf = DECK + 0.028;
+  // UHF feed ring under the panel (on the lowest level, under the L-band and M-code feeds) and a trunk
+  // down to the two crosslink transponders on the −Y panel
+  const uf = [], fr = [], RR = 0.63, zf = DECK + 0.013;
   for (let k = 0; k <= 56; k++) { const a = (k / 56) * Math.PI * 2; fr.push([ARRAY_C[0] + Math.cos(a) * RR, ARRAY_C[1] + Math.sin(a) * RR, zf]); }
   uf.push(pipeG(fr, 0.008));
   for (const [x, y] of [...UHF_INNER, ...UHF_OUTER]) {
     const a = Math.atan2(y - ARRAY_C[1], x - ARRAY_C[0]);
     uf.push(pipeG([[ARRAY_C[0] + Math.cos(a) * RR, ARRAY_C[1] + Math.sin(a) * RR, zf], [x, y, zf], [x, y, PANEL_Z - PANEL_T]], 0.006));
   }
-  const ya = -0.62, xa = -0.84;
+  // along the deck beside the sunshade, through the deck, then outboard of the power bus and down the panel
+  const ya = -0.67, xa = -0.84;
   const ectsA = onBUS(BUS.ectsA.c, BUS.ectsA.s[1]), ectsB = onBUS(BUS.ectsB.c, BUS.ectsB.s[1]);
-  uf.push(pipeG([[ARRAY_C[0] - 0.22, -0.59, zf], [ARRAY_C[0] - 0.22, ya, zf], [xa, ya, zf], [xa, ya, 1.55], [xa, ya, ectsA[2] + 0.17], [ectsA[0] + 0.1, ectsA[1] + 0.02, ectsA[2] + 0.17], [ectsA[0] + 0.1, ectsA[1] + 0.02, ectsA[2] + 0.13]], 0.011));
+  uf.push(pipeG([[ARRAY_C[0] - 0.22, -0.59, zf], [xa, -0.59, zf], [xa, -0.59, IZ - 0.015], [xa, ya, IZ - 0.015], [xa, ya, ectsA[2] + 0.17], [ectsA[0] + 0.1, ectsA[1] + 0.02, ectsA[2] + 0.17], [ectsA[0] + 0.1, ectsA[1] + 0.02, ectsA[2] + 0.13]], 0.011));
   uf.push(pipeG([[xa, ya, ectsA[2] + 0.17], [xa, ya, ectsB[2] + 0.165], [ectsB[0] + 0.1, ectsB[1] + 0.06, ectsB[2] + 0.165], [ectsB[0] + 0.1, ectsB[1] + 0.06, ectsB[2] + 0.13]], 0.009));
   P('UHF feed network', {
     system: 'Communications', material: 'Coaxial cables, hybrid combiners', mass: 6, temp: 270, explode: [0, -0.4, 1.4],
@@ -135,7 +136,7 @@ export function buildAntennas(P) {
     return P(name, { system: 'Communications', material: 'Composite mast with a radiating element under a black radome', mass: 2.2, temp: 245, explode: ex, desc, ...extra }, [mesh(metal, G.satinTi()), mesh(tip, G.radomeBlack())]);
   };
   mast('Forward TT&C S-band antenna', A.fwdMast, 1.05, 'Lockheed\'s figure labels a "Fwd TT&C S-band Antenna" on a mast at this edge of the Earth deck (which of the two masts it is, is not certain). It carries commands, telemetry and ranging with the Air Force Satellite Control Network over SGLS, or with Unified S-Band stations; standing about 1 m clear of the elements gives it a clean pattern (height from the scale model).',
-    [0, 0.25, 2.1], { callout: true, anchor: [A.fwdMast[0], A.fwdMast[1], DECK + 1.0] });
+    [0, 0.25, 2.1], { callout: true, anchor: [A.fwdMast[0], A.fwdMast[1], DECK + 0.42] });   // at the mast's mid collar
   mast('Antenna mast (+X, −Y corner)', A.mast2, 0.9, 'A second mast, about 0.9 m tall in the scale model, that Lockheed\'s figure labels only "Antenna". The block diagram lists several hosted-payload antennas beside the TT&C ones; which this is, is not public.', [0.3, -0.3, 2.0]);
   const [axa, aya] = AFT_ANT;
   P('Aft TT&C S-band antenna', {
@@ -163,10 +164,13 @@ export function buildAntennas(P) {
     desc: 'The hosted-payload "S-band Antenna" that Lockheed\'s figure places near the hosted-payload sensor at the +X/+Y end of the deck, separate from the TT&C antennas. Its use is not described publicly (form and size estimated).',
   }, [mesh(merge([cylG([hx, hy, DECK + 0.05], 0.05, 0.1, 'z', 18)]), G.aluminium()), mesh(cylG([hx, hy, DECK + 0.17], 0.06, 0.14, 'z', 22, 0.02), G.radome())]);
   const [rx, ry] = A.hpeRx;
+  // its coaxial lead: down through the tab, inboard under the panel and down through the deck inside the box
+  const rxIn = [1.13, ry + 0.04, IZ - 0.02];
+  const lead = pipeG([[rx - 0.03, ry + 0.04, PANEL_Z - PANEL_T], [rx - 0.03, ry + 0.04, DECK + 0.025], [rxIn[0], rxIn[1], DECK + 0.025], rxIn], 0.006);
   P('HPE receive antenna', {
-    system: 'Payload', material: 'Cavity-backed element (generic)', mass: 1.0, temp: 245, explode: [0.45, 0, 2.0],
-    desc: 'The block diagram lists a hosted-payload receive antenna among the antenna elements. The burst detector records electromagnetic pulses in specific bands, which needs a receiving antenna; this generic unit on the panel\'s +X tab stands in for it (identification, form and position estimated).',
-  }, [mesh(boxG([rx, ry, PANEL_Z + 0.03], [0.13, 0.13, 0.06]), G.whitePaint()), mesh(new THREE.SphereGeometry(0.055, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2).translate(rx, ry, PANEL_Z + 0.06), G.radome())]);
+    system: 'Payload', material: 'Cavity-backed element (generic), coaxial lead', mass: 1.0, temp: 245, explode: [0.45, 0, 2.0],
+    desc: 'The block diagram lists a hosted-payload receive antenna among the antenna elements. The burst detector records electromagnetic pulses in specific bands, which needs a receiving antenna; this generic unit on the panel\'s +X tab stands in for it, its lead running under the panel and in through the deck (identification, form and position estimated).',
+  }, [mesh(boxG([rx, ry, PANEL_Z + 0.03], [0.13, 0.13, 0.06]), G.whitePaint()), mesh(new THREE.SphereGeometry(0.055, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2).translate(rx, ry, PANEL_Z + 0.06), G.radome()), mesh(lead, G.tubing())]);
 
   /** Rods stowed at d = 0 (inside their canisters), out at d = 1; they spring out once on station. */
   const setJIB = (d) => {
@@ -174,7 +178,7 @@ export function buildAntennas(P) {
     for (const r of rods) { r.scale.set(1, 1, Math.max(0.02, s)); r.visible = s > 0.03; }
   };
   reg([hx, hy, IZ - 0.02], 'deck');
-  reg([rx, ry, IZ - 0.02], 'deck');
+  reg(rxIn, 'deck');
   return { setJIB };
 }
 

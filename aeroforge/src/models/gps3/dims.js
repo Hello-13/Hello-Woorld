@@ -11,8 +11,9 @@
 // manufacturer's scale model, photographed face by face in IGS axes (Steigenberger et al. 2020,
 // Fig. 4), the ±Y radiator faces are the wider ones, and the IGS box-wing model gives an X face
 // (7.5 m²) almost twice the Z face (4.0 m²). So X (Sun axis) = 2.46 m, Y (array axis) = 1.78 m, and
-// the box is 3.40 m tall from the aft deck to the Earth deck; the launch adapter section below it
-// and the antennas above it bring the stowed height to about 4.2 m.
+// the box is 3.40 m tall from the aft deck to the Earth deck. With the launch adapter section below it
+// the model stands 3.9 m from the separation plane to the Earth deck, 4.5 m to the antenna element
+// tops and 5.0 m to the forward TT&C mast (the box-wing ±X face, 7.5 m², corresponds to about 4.2 m).
 
 export const BX = 2.46, BY = 1.78, BZ = 3.40;         // bus box (fact sheet; axes see above)
 export const HX = BX / 2, HY = BY / 2, HZ = BZ / 2;

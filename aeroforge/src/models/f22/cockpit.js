@@ -189,23 +189,101 @@ export function buildCockpit(ctx) {
     }, mesh(merge(pd), F.boxLight()));
   }
 
-  // ------------------------------------------------------------------ ACES II ejection seat
+  // ------------------------------------------------------------------ ACES II ejection seat, by component
   {
-    const S = SEAT_S, g = [], y = [];
-    const back = new THREE.BoxGeometry(0.12, 0.95, 0.5).rotateZ(0.3).translate(X(S + 0.24), 0.52, 0);
-    g.push(back);
-    g.push(box(S, 0.06, 0, 0.5, 0.16, 0.52));                                           // bucket / survival kit
-    g.push(new THREE.BoxGeometry(0.18, 0.2, 0.34).rotateZ(0.3).translate(X(S + 0.34), 0.94, 0));   // headrest / parachute
-    for (const side of [1, -1]) g.push(new THREE.BoxGeometry(0.08, 0.9, 0.05).rotateZ(0.3).translate(X(S + 0.32), 0.5, side * 0.27));  // rails
-    g.push(FR.cylX(S + 0.44, 0.18, 0, 0.28, 0.05, 0.05, 10));                          // catapult / rocket
-    y.push(FR.pipe([[S - 0.26, 0.12, -0.12], [S - 0.32, 0.22, 0], [S - 0.26, 0.12, 0.12]], 0.018, 6, 10));   // centre ejection handle
-    y.push(box(S - 0.22, 0.16, 0, 0.12, 0.03, 0.4));
-    const cush = [box(S + 0.02, 0.17, 0, 0.42, 0.06, 0.42), new THREE.BoxGeometry(0.06, 0.6, 0.4).rotateZ(0.3).translate(X(S + 0.16), 0.52, 0)];
+    const S = SEAT_S;
+    const tilt = 0.3;                                      // seat back leans 17° aft
+    const along = (d, y0 = 0.06) => [X(S + 0.24) - Math.sin(tilt) * d, y0 + Math.cos(tilt) * d];   // point d up the seat back
+    const g = [];
+    g.push(new THREE.BoxGeometry(0.1, 0.95, 0.46).rotateZ(tilt).translate(X(S + 0.24), 0.52, 0));                // back
+    for (const side of [1, -1]) g.push(box(S, 0.08, side * 0.245, 0.5, 0.2, 0.03));                                // seat-pan side frames
+    const cush = [box(S + 0.02, 0.17, 0, 0.42, 0.06, 0.42), new THREE.BoxGeometry(0.06, 0.6, 0.4).rotateZ(tilt).translate(X(S + 0.16), 0.52, 0)];
     P('ACES II ejection seat', {
-      system: 'Crew systems', material: 'Aluminium structure, rocket catapult, parachute', mass: 75,
+      system: 'Crew systems', material: 'Aluminium seat structure, cushions, harness', mass: 45,
       explode: [0, 2.0, 0], callout: true, anchor: [X(S + 0.32), 0.42, 0.28],
-      desc: 'A zero-zero seat: it can save the pilot even at zero height and zero airspeed. Pulling the centre handle between the knees fires a catapult and an under-seat rocket; the seat selects its parachute-deployment mode from airspeed and altitude.',
-    }, [mesh(merge(g), F.seat()), mesh(merge(y), F.yellow()), mesh(merge(cush), F.cushion())]);
+      desc: 'A third-generation zero-zero seat: it can save the pilot at zero height and zero airspeed. Pulling the centre handle between the pilot\'s legs starts the sequence — canopy jettison, catapult, rocket, then the parachute. The F-22 kept the existing ACES II after a new seat was dropped during development to save weight and cost.',
+    }, [mesh(merge(g), F.seat()), mesh(merge(cush), F.cushion())]);
+    const r = [];
+    for (const side of [1, -1]) r.push(new THREE.BoxGeometry(0.06, 1.0, 0.045).rotateZ(tilt).translate(X(S + 0.33), 0.5, side * 0.255));
+    P('Seat guide rails', {
+      system: 'Crew systems', material: 'Steel guide rails on the aft cockpit structure, roller slippers on the seat', mass: 12,
+      explode: [0, 2.0, 0.55],
+      desc: 'Two rails fixed to the cockpit structure guide the seat straight up and out during the catapult stroke, so it leaves along a set line clear of the canopy sill.',
+    }, mesh(merge(r), F.steel()));
+    const [hx, hy] = along(0.86);
+    const hb = [new THREE.BoxGeometry(0.2, 0.22, 0.36).rotateZ(tilt).translate(hx, hy, 0), new THREE.BoxGeometry(0.04, 0.16, 0.3).rotateZ(tilt).translate(hx - 0.1, hy, 0)];
+    P('Seat headbox (drogue & main parachute)', {
+      system: 'Crew systems', material: 'Headbox with drogue chute, main canopy and deployment mortar', mass: 14,
+      explode: [0, 2.45, 0],
+      desc: 'Behind the pilot\'s head: a drogue chute that steadies the seat at high speed, and the main parachute, deployed by a mortar once the seat has slowed. Which one opens when depends on the mode the sequencer picks.',
+    }, mesh(merge(hb), F.cushion()));
+    P('Seat survival kit', {
+      system: 'Crew systems', material: 'Rigid seat-pan container: survival radio, water, first aid, life raft', mass: 15,
+      explode: [0.3, 1.55, 0],
+      desc: 'The seat pan is a survival kit the pilot sits on; after ejection it hangs below on a lanyard and carries a radio, water, medical supplies and a life raft for a water landing.',
+    }, mesh(box(S, 0.07, 0, 0.44, 0.13, 0.44), F.yellow()));
+    const [cx, cy] = along(0.36);
+    const cat = [new THREE.CylinderGeometry(0.04, 0.045, 0.8, 14).rotateZ(tilt).translate(cx - 0.08, cy + 0.06, 0)];
+    cat.push(new THREE.CylinderGeometry(0.055, 0.055, 0.34, 16).rotateX(Math.PI / 2).translate(X(S + 0.3), 0.04, 0));   // under-seat rocket motor
+    cat.push(new THREE.CylinderGeometry(0.03, 0.02, 0.06, 12).rotateZ(Math.PI / 2 - 0.6).translate(X(S + 0.28), -0.0, 0));   // nozzle
+    P('Seat catapult & under-seat rocket', {
+      system: 'Crew systems', material: 'Telescoping ballistic catapult, solid-propellant rocket motor', mass: 14,
+      explode: [-0.35, 1.75, 0],
+      desc: 'A gas-driven catapult tube behind the seat back fires first and pushes the seat up its rails; as it leaves them, a rocket motor under the seat burns to carry the pilot high enough for the parachute to open, even from the runway.',
+    }, mesh(merge(cat), F.gun()));
+    const [qx, qy] = along(0.42);
+    P('Seat recovery sequencer', {
+      system: 'Crew systems', material: 'Redundant digital electronic sequencer with crash-data recorder', mass: 3,
+      explode: [0, 1.9, -0.7],
+      desc: 'A fully redundant digital sequencer senses airspeed and altitude, picks one of three recovery modes and fires each stage — drogue, main parachute, seat separation — at the right moment; it also keeps a crash-data record.',
+    }, mesh(new THREE.BoxGeometry(0.12, 0.12, 0.05).rotateZ(tilt).translate(qx + 0.02, qy, -0.245), F.box()));
+    const y = [FR.pipe([[S - 0.26, 0.12, -0.08], [S - 0.31, 0.21, 0], [S - 0.26, 0.12, 0.08]], 0.016, 6, 10), box(S - 0.22, 0.13, 0, 0.1, 0.03, 0.2)];
+    P('Ejection handle', {
+      system: 'Crew systems', material: 'Yellow-and-black loop handle on the seat-pan front', mass: 1,
+      explode: [0.75, 1.75, 0],
+      desc: 'The F-22 has a single ejection handle on the front of the seat between the pilot\'s legs; one pull starts the whole sequence, and the canopy is blown clear before the seat moves.',
+    }, mesh(merge(y), F.yellow()));
+  }
+
+  // ------------------------------------------------------------------ life support: BRAG valve, ABOS, oxygen line from the OBOGS
+  {
+    const S = SEAT_S;
+    const v = [box(S + 0.12, 0.25, -0.31, 0.15, 0.1, 0.08)];
+    const h = [FR.pipe([[S + 0.06, 0.26, -0.3], [S + 0.02, 0.45, -0.26], [S - 0.05, 0.7, -0.17], [S - 0.14, 0.88, -0.05]], 0.012, 6, 20)];   // to the mask
+    h.push(FR.pipe([[S + 0.06, 0.22, -0.3], [S - 0.05, 0.2, -0.22], [S - 0.08, 0.26, -0.14]], 0.014, 6, 10));                             // anti-g / vest
+    h.push(FR.pipe([[6.48, 0.1, -0.42], [6.2, 0.2, -0.4], [5.95, 0.25, -0.35], [5.89, 0.25, -0.32]], 0.01, 6, 12));                        // OBOGS → BRAG
+    P('BRAG valve & oxygen hoses', {
+      system: 'Crew systems', material: 'Breathing regulator / anti-g valve, mask hose, garment hoses', mass: 3,
+      explode: [0, 1.25, -0.95],
+      desc: 'The breathing regulator / anti-g (BRAG) valve meters oxygen and pressure to the pilot\'s mask, pressure vest and anti-g garments. In 2012 the US Air Force found a defective BRAG valve was over-inflating the vest at high g and restricting breathing; the valve and vest were changed.',
+    }, [mesh(merge(v), F.boxLight()), mesh(merge(h), F.black())]);
+    const ab = [new THREE.CylinderGeometry(0.05, 0.05, 0.28, 14).translate(X(6.35), 0.18, -0.4), new THREE.CylinderGeometry(0.02, 0.02, 0.05, 8).translate(X(6.35), 0.345, -0.4)];
+    const al = [FR.pipe([[6.35, 0.36, -0.4], [6.3, 0.38, -0.38], [6.15, 0.28, -0.37], [6.0, 0.25, -0.35]], 0.008, 5, 10)];
+    P('Automatic backup oxygen system (ABOS)', {
+      system: 'Crew systems', material: 'High-pressure oxygen bottle, automatic switching valve', mass: 4,
+      explode: [-0.2, 1.4, -1.05],
+      desc: 'Fitted from 2012 after a series of hypoxia incidents: if the OBOGS supply fails, it switches the pilot to bottled oxygen automatically, without the pilot having to find and pull a handle (position approximate).',
+    }, [mesh(merge(ab), F.oxygen()), mesh(merge(al), F.pipe())]);
+  }
+
+  // ------------------------------------------------------------------ gear handle, canopy and jettison controls
+  {
+    const gh = [onPanel(0.28, -0.29, 0.05, 0.08, 0.035, 0.03)];
+    gh.push(new THREE.CylinderGeometry(0.008, 0.008, 0.09, 6).rotateZ(Math.PI / 2 + PANEL_TILT).translate(X(PANEL_S) - 0.09, 0.29, -0.29));
+    gh.push(new THREE.CylinderGeometry(0.022, 0.022, 0.025, 14).rotateZ(Math.PI / 2 + PANEL_TILT).translate(X(PANEL_S) - 0.14, 0.3, -0.29));   // wheel-shaped knob
+    P('Landing-gear handle', {
+      system: 'Crew systems', material: 'Wheel-shaped knob on a lever, red warning light in the grip', mass: 1,
+      explode: [0.7, 1.05, -0.6],
+      desc: 'On the left of the main panel. Its wheel-shaped knob can be told apart by feel; weight-on-wheels interlocks stop it raising the gear while the jet is on the ground, and a light in the grip shows when the gear disagrees with the handle (position approximate).',
+    }, mesh(merge(gh), F.wheel()));
+    const cj = [box(5.92, 0.3, -0.4, 0.18, 0.02, 0.1)];
+    cj.push(box(4.98, 0.2, -0.42, 0.04, 0.05, 0.02));
+    cj.push(FR.pipe([[4.97, 0.2, -0.41], [4.92, 0.24, -0.4], [4.92, 0.29, -0.4], [4.97, 0.33, -0.41]], 0.008, 5, 8));
+    P('Canopy & emergency jettison controls', {
+      system: 'Crew systems', material: 'Canopy open / close switch, canopy jettison T-handle, stores-jettison button', mass: 1,
+      explode: [0.4, 1.45, -0.85],
+      desc: 'The canopy switch on the left console raises and lowers it for entry; the yellow canopy-jettison handle blows it off with the jettison motors for a ground egress, and an emergency button jettisons any external stores (positions approximate).',
+    }, [mesh(merge([cj[0]]), F.boxLight()), mesh(merge(cj.slice(1)), F.yellow())]);
   }
 
   // ------------------------------------------------------------------ pilot

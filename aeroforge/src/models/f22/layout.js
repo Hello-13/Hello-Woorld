@@ -350,6 +350,51 @@ export function stabSection(z) {
 // vertical tail: built in a local frame (chord toward −x, span along +z) then canted 28° outward
 export const FIN = { rootS: 13.45, rootZ: 1.42, rootY: 0.33, span: 3.12, rootC: 3.9, tipC: 1.45, sweep: 22.9 * DEG, cant: 28 * DEG };
 
+/** Slope of a saw-tooth edge: parallel to the 42° wing leading edge (ds/dz = tan 42°). */
+export const TOOTH_SLOPE = Math.tan(42 * DEG);
+
+/**
+ * Point grid for a flush door or panel whose fore and aft edges are saw-toothed, the way every F-22
+ * door edge is: each tooth edge runs parallel to the wing leading edge, so its radar reflection joins
+ * the few directions the planform already uses. `point(s, u)` is the outer-surface point at station s
+ * and lateral parameter u (0 … 1); `width` is the panel width (m). With `cut` false the teeth reach
+ * past s0 / s1 over the surrounding skin (the cut-out stays rectangular); with `cut` true they are
+ * notched into the panel instead (nozzle-flap trailing edges). Pitch ≈ 0.2 m (estimate).
+ */
+export function toothedGrid(point, stations, { width, pitch = 0.2, fore = true, aft = true, cut = false } = {}) {
+  const n = Math.max(1, Math.round(width / pitch));
+  const cols = 2 * n + 1;
+  const a = TOOTH_SLOPE * (width / (2 * n));
+  const s0 = stations[0], s1 = stations[stations.length - 1], last = stations.length - 1;
+  return stations.map((s, r) => [...Array(cols).keys()].map((k) => {
+    let ss = s;
+    if (k % 2 === 1) {
+      if (r === 0 && fore) ss = cut ? s0 + a : s0 - a;
+      if (r === last && aft) ss = cut ? s1 - a : s1 + a;
+    }
+    return point(ss, k / (cols - 1));
+  }));
+}
+
+// ------------------------------------------------------------------ main weapons bay layout
+/** Main-bay ceiling height at lateral position z (flat inboard, sloping down to the bay wall at 0.78). */
+export const bayCeil = (z) => (Math.abs(z) < 0.55 ? -0.24 : -0.24 - ((Math.abs(z) - 0.55) / 0.23) * 0.21);
+/**
+ * AIM-120C stations in the right half of the main bay: [z, y, fin angle in the z–y plane]. Solved
+ * numerically (simulated annealing) so the three missiles, their 44.7 cm wings and fins, the AVEL
+ * hangers and ejector arms clear each other, the centre-line web, the bay wall and the closed doors,
+ * and so each missile drops 23 cm clear of the open bifold doors: a zig-zag, inner and outer low,
+ * middle high. The real stagger is not published in this detail.
+ */
+export const AMRAAM_SLOTS = [[0.213, -0.654, 0.5506], [0.373, -0.452, 0.416], [0.551, -0.629, 0.3996]];
+export const AMRAAM = { r: 0.0889, tip: 0.2235, length: 3.65 };
+/** Bifold main-bay doors: inner edge, fold line and panel thickness (m); the centre divider web. */
+export const MAIN_DOOR = { zIn: 0.03, zFold: 0.405, thick: 0.035 };
+export const DIVIDER = { half: 0.015, cap: 0.03 };
+/** AVEL ejection stroke (9 in) and the inboard face of the open, folded doors below the belly. */
+export const AVEL_STROKE = 9 * 0.0254;
+export const OPEN_DOOR_Z = 0.715;
+
 // ------------------------------------------------------------------ lighting
 /**
  * Anti-collision strobe brightness (emissive intensity) at time t (s) since the strobes came on:

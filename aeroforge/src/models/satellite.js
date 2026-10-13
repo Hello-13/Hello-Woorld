@@ -79,7 +79,7 @@ export function buildSatellite({ compact = false } = {}) {
     specs: [
       ['Launch mass', `${fmt.n(GPS3.launchMass)} kg (8,115 lb, Space Force fact sheet); Lockheed's 2014 sheet gave 3,880 kg, and up to ≈ 4,400 kg is reported for individual launches`],
       ['On-orbit mass', `${fmt.n(GPS3.dryMass)} kg (4,764 lb, fact sheet), used here as the dry mass; listed parts sum to ≈ ${fmt.n(Math.round(listed / 10) * 10)} kg (brackets, fasteners and small items are not listed)`],
-      ['Size', `Bus ${W} × ${D} × ${H} m (97 × 70 × 134 in, fact sheet): 2.46 m along the Sun axis, 1.78 m along the array axis, as in the IGS box-wing model; ≈ 4.2 m tall stowed with the launch adapter and antennas`],
+      ['Size', `Bus ${W} × ${D} × ${H} m (97 × 70 × 134 in, fact sheet): 2.46 m along the Sun axis, 1.78 m along the array axis, as in the IGS box-wing model. Stowed, as modelled: ≈ 3.9 m from the separation plane to the Earth deck, ≈ 4.5 m to the tops of the antenna elements and ≈ 5.0 m to the forward TT&C mast, with the apogee-engine nozzle reaching ≈ 0.24 m below the separation plane (the IGS box-wing ±X face, 7.5 m², corresponds to about 4.2 m)`],
       ['Bus', 'Lockheed Martin A2100M'],
       ['Power', `${fmt.n(GPS3.powerEOL)} W at end of life`],
       ['Orbit', `${fmt.n(GPS3.altitude)} km circular, ${GPS3.inclination}° inclination`],

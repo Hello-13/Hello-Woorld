@@ -7,6 +7,9 @@ import {
   FALCON_HEAVY, MU_EARTH, R_EARTH, ORBIT_TOLERANCE, FAIRING_HEATING_LIMIT,
 } from '../src/physics/launch.js';
 import { isa } from '../src/physics/atmosphere.js';
+import { readFileSync } from 'node:fs';
+import { R as CORE_R, BOOSTER_X, Y as ST } from '../src/models/falcon/dims.js';
+import TOUR from '../src/learn/tours/rocket.js';
 
 const close = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ''} expected ${b} ± ${tol}, got ${a}`);
 const P_SL = 101325;
@@ -156,4 +159,52 @@ test('an overloaded Falcon Heavy fails to reach orbit, and says why', () => {
   assert.equal(result.success, false);
   assert.equal(result.cause, 'heavy');
   assert.match(result.label, /too heavy/);
+});
+
+test('station plan matches the published Falcon Heavy dimensions', () => {
+  close(2 * BOOSTER_X + 2 * CORE_R, 12.2, 0.01, 'overall width m');
+  close(ST.fairingTop, 70, 0.01, 'overall height m');
+  // Espace & Exploration no. 51: interstage 4.5 m; first-stage core 42.6 m (the plan's 43.1 m
+  // keeps the separation plane where the 70 m overall height puts it)
+  close(ST.interTop - ST.s1Top, 4.5, 0.01, 'interstage length m');
+  close(ST.s1Top, 42.6, 0.6, 'first-stage length m');
+  // the Merlin Vacuum's extension hangs inside the interstage
+  assert.ok(ST.mvacExit >= ST.s1Top - 0.01 && ST.mvacExit < ST.interTop - 2.7, `MVac exit at ${ST.mvacExit} m`);
+  // the side boosters' forward section sits above the centre core's LOX-tank forward skirt
+  assert.ok(ST.adapterTop > ST.s1Top && ST.noseTip > ST.adapterTop, 'booster forward section and nose');
+  close(ST.fairingTop - ST.fairingBase, 13.15, 0.06, 'fairing height m (13.1–13.2 m published)');
+});
+
+test('guided tour: every focused part exists in the model source', () => {
+  const read = (f) => readFileSync(new URL(`../src/models/${f}`, import.meta.url), 'utf8');
+  const core = read('falcon/core.js');
+  const rest = ['falcon/upper.js', 'falcon/pad.js', 'rocket.js'].map(read).join('\n');
+  // first argument of every part call: P / O / E (core), P / S / V (upper), G (pad)
+  const names = (src) => {
+    const args = [...src.matchAll(/\b(?:P|O|E|S|V|G)\(((?:[^{$]|\$(?!\{)|\$\{[^}]*\})*?),\s*\{/g)].map((m) => m[1]);
+    const lit = new Set(args.flatMap((a) => [...a.matchAll(/^\s*'((?:[^'\\]|\\.)+)'\s*$/g)].map((m) => m[1].replace(/\\'/g, "'"))));
+    // names passed through a loop variable: for (const [name, …] of [['forward attach fitting', …], …])
+    for (const m of src.matchAll(/\[\s*'((?:[^'\\]|\\.)+)',\s*[\w.]+,\s*[\d.]+\s*\]/g)) lit.add(m[1]);
+    const esc = (t) => t.replace(/[.*+?^()|[\]\\]/g, '\\$&');
+    const tpl = args.flatMap((a) => [...a.matchAll(/^\s*`([^`]*)`\s*$/g)].map((m) => new RegExp(`^${m[1].split(/\$\{[^}]+\}/).map(esc).join('(?:A|B)')}$`)));
+    return (n) => lit.has(n) || tpl.some((re) => re.test(n));
+  };
+  const inCore = names(core), inRest = names(rest);
+  const known = (n) => {
+    const m = n.match(/^(Centre core|Side booster A|Side booster B) (.+)$/);
+    return m ? inCore(m[2]) : inRest(n);
+  };
+  assert.ok(TOUR.length >= 10 && TOUR.length <= 16, `${TOUR.length} tour steps`);
+  const modes = new Set(['studio', 'xray', 'blueprint', 'systems', 'thermal', 'pressure']);
+  const words = (t) => t.trim().split(/\s+/).length;
+  for (const [i, step] of TOUR.entries()) {
+    assert.ok(step.title && step.body && step.key, `step ${i + 1} has a title, body and key idea`);
+    if (step.mode) assert.ok(modes.has(step.mode), `step ${i + 1}: mode ${step.mode}`);
+    assert.ok(words(step.body) <= 90 && words(step.key) <= 45, `step ${i + 1} text fits the card (${words(step.body)} + ${words(step.key)} words)`);
+    for (const name of step.focus || []) assert.ok(known(name), `step ${i + 1}: no part named "${name}"`);
+  }
+  // the landing-leg step plays the leg deployment
+  assert.ok(TOUR.some((s) => s.demo === 'deploy' && (s.focus || []).some((n) => /landing legs/.test(n))), 'the tour deploys the landing legs');
+  // a deliberately wrong name is caught
+  assert.equal(known('Centre core LOX downcomer'), false);
 });

@@ -2,6 +2,7 @@
 
 import * as THREE from 'three';
 import { M, SKIN } from '../../engine/materials.js';
+import { decalTexture } from '../../engine/surface.js';
 
 const cache = new Map();
 const once = (k, make) => { if (!cache.has(k)) cache.set(k, make()); return cache.get(k); };
@@ -77,4 +78,49 @@ export const F = {
   probe: () => std('f22.probe', { color: 0x9aa0a6, roughness: 0.3, metalness: 0.95 }),
   nozzle: () => std('f22.nozzle', { color: 0x4b4744, roughness: 0.5, metalness: 0.7 }),
   nozzleIn: () => std('f22.nozzleIn', { color: 0x3a302c, roughness: 0.5, metalness: 0.85, side: THREE.DoubleSide }),
+  // flush doors and panels sit a couple of millimetres proud of the skin they cover: a small polygon
+  // offset keeps their saw-tooth edges from flickering against it
+  door: () => once('f22.door', () => { const m = F.skin().clone(); m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; return m; }),
+  doorWing: () => once('f22.doorWing', () => { const m = F.wing().clone(); m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; return m; }),
+  // isogrid: integrally machined triangular stiffening on the aft-boom panels (≈ 0.1 m pockets, estimate)
+  isogrid: () => once('f22.isogrid', () => {
+    const tex = decalTexture('f22.isogrid', 256, 222, (c, w, h) => {
+      c.fillStyle = '#8f969c'; c.fillRect(0, 0, w, h);
+      c.strokeStyle = '#c3c9ce'; c.lineWidth = 9; c.lineCap = 'square';
+      const a = w / 2, hh = h / 2;
+      // horizontal ribs every half tile, and 60° diagonals through the tile corners: a seamless repeat
+      c.beginPath();
+      for (const y of [0, hh, h]) { c.moveTo(0, y); c.lineTo(w, y); }
+      for (let k = -3; k <= 3; k++) {
+        const x0 = k * a;
+        c.moveTo(x0, h); c.lineTo(x0 + a, 0);
+        c.moveTo(x0, 0); c.lineTo(x0 + a, h);
+      }
+      c.stroke();
+    });
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(5, 5.77);
+    return new THREE.MeshStandardMaterial({ color: 0xc8ced3, map: tex, bumpMap: tex, bumpScale: 1.5, roughness: 0.45, metalness: 0.85, side: THREE.DoubleSide });
+  }),
+  // inlet bleed: perforated compression-surface panels (dot pattern, ≈ 1.5 cm pitch on a 1 m tile)
+  perforated: () => once('f22.perforated', () => {
+    const tex = decalTexture('f22.perf', 256, 256, (c, w, h) => {
+      c.fillStyle = '#4a5056'; c.fillRect(0, 0, w, h);
+      c.fillStyle = '#121416';
+      for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) { c.beginPath(); c.arc((i + 0.5 + (j % 2) * 0.5) * 16, (j + 0.5) * 16, 4, 0, Math.PI * 2); c.fill(); }
+    });
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(4, 4);
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map: tex, roughness: 0.75, metalness: 0.3, side: THREE.DoubleSide });
+  }),
+  // wiring: braided harness jackets, colour-coded on the engines
+  harness: () => std('f22.harness', { color: 0x30322f, roughness: 0.85, metalness: 0.05 }),
+  fbw: () => std('f22.fbw', { color: 0x4a3f6b, roughness: 0.8, metalness: 0.05 }),
+  fibre: () => std('f22.fibre', { color: 0xc8742c, roughness: 0.7, metalness: 0.05 }),
+  wireBlue: () => std('f22.wireBlue', { color: 0x2f5fa8, roughness: 0.75, metalness: 0.05 }),
+  wireGreen: () => std('f22.wireGreen', { color: 0x3f8a46, roughness: 0.75, metalness: 0.05 }),
+  wireOrange: () => std('f22.wireOrange', { color: 0xd0702a, roughness: 0.75, metalness: 0.05 }),
+  wireWhite: () => std('f22.wireWhite', { color: 0xd9dcd6, roughness: 0.75, metalness: 0.05 }),
+  oxygen: () => std('f22.oxygen', { color: 0x2f6b3a, roughness: 0.45, metalness: 0.3 }),
+  pao: () => std('f22.pao', { color: 0x2a5a78, roughness: 0.4, metalness: 0.7 }),
 };

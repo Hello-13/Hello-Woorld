@@ -83,7 +83,7 @@ export default [
     title: 'Oil and fuel: one loop cools the other',
     body: 'Trace the lubrication loop: tank, anti-leak valve, the lubrication unit\'s pressure element, filter, then the bearing sumps; scavenge elements suck the oil back through a filter and the debris monitor, which counts metal particles from wearing bearings. The hot oil then gives its heat to the fuel in the main heat exchanger on its way to the pump\'s high-pressure stage, the HMU and the burners — and to the servo lines that move every actuator.',
     key: 'Heat into the fuel: Q = ṁ_fuel·c_p,fuel·ΔT ≈ 4.6 kg/s × 2 kJ/(kg·K) × 15 K ≈ 140 kW at take-off (illustrative).',
-    focus: OIL_FUEL, mode: 'systems', view: { dir: [-0.3, -0.55, 1], fill: 0.8 },
+    focus: OIL_FUEL, view: { dir: [0.8, -0.35, 1], fill: 0.72 },
   },
   {
     title: 'Follow the flow',

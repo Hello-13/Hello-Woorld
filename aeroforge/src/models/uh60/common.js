@@ -39,27 +39,47 @@ export function pchip(keys, x) {
   return (2 * t3 - 3 * t2 + 1) * y0 + (t3 - 2 * t2 + t) * m0 + (-2 * t3 + 3 * t2) * y1 + (t3 - t2) * m1;
 }
 
-/** Merge any mix of geometries into one indexed geometry with position/normal/uv. */
+/**
+ * Merge any mix of geometries into one indexed geometry with position/normal/uv. Copies straight
+ * into preallocated typed arrays (three's generic mergeGeometries builds its index as a JS array,
+ * which dominated the build time of this model).
+ */
 export function merge(list) {
   const out = [];
-  for (const src of list.flat()) {
-    if (!src) continue;
-    let g = src;
-    for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+  let nv = 0, ni = 0;
+  for (const g of list.flat()) {
+    if (!g) continue;
     if (!g.attributes.normal) g.computeVertexNormals();
-    if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
-    if (!g.index) {
-      const idx = new Array(g.attributes.position.count);
-      for (let i = 0; i < idx.length; i++) idx[i] = i;
-      g.setIndex(idx);
-    }
     out.push(g);
+    nv += g.attributes.position.count;
+    ni += g.index ? g.index.count : g.attributes.position.count;
   }
-  if (out.length === 1) return out[0];
-  const m = mergeGeometries(out, false);
-  if (!m) throw new Error('UH-60: geometry merge failed (attribute mismatch)');
+  if (out.length === 1 && out[0].index && out[0].attributes.uv && Object.keys(out[0].attributes).length === 3) return out[0];
+  const pos = new Float32Array(nv * 3), nrm = new Float32Array(nv * 3), uv = new Float32Array(nv * 2);
+  const idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+  let v = 0, i = 0;
+  const copy = (dst, attr, size, at) => {
+    const a = attr.array;
+    if (!attr.isInterleavedBufferAttribute && attr.itemSize === size && a.length === attr.count * size) dst.set(a, at * size);
+    else for (let k = 0; k < attr.count; k++) for (let c = 0; c < size; c++) dst[(at + k) * size + c] = attr.getComponent(k, c);
+  };
+  for (const g of out) {
+    const p = g.attributes.position, n = p.count;
+    copy(pos, p, 3, v);
+    copy(nrm, g.attributes.normal, 3, v);
+    if (g.attributes.uv) copy(uv, g.attributes.uv, 2, v);
+    if (g.index) { const a = g.index.array; for (let k = 0; k < g.index.count; k++) idx[i + k] = a[k] + v; i += g.index.count; }
+    else { for (let k = 0; k < n; k++) idx[i + k] = v + k; i += n; }
+    v += n;
+  }
+  const m = new THREE.BufferGeometry();
+  m.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  m.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  m.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  m.setIndex(new THREE.BufferAttribute(idx, 1));
   return m;
 }
+export { mergeGeometries };
 
 /** Place a geometry: rotate (Euler, radians) then translate. Returns the geometry. */
 export function place(g, [x, y, z] = [0, 0, 0], [rx, ry, rz] = [0, 0, 0], order = 'XYZ') {
@@ -131,6 +151,52 @@ export function aimRod(m, a, b, r) {
   m.position.copy(a);
   m.quaternion.setFromUnitVectors(_up, _d.multiplyScalar(1 / Math.max(len, 1e-6)));
   m.scale.set(r, len, r);
+}
+/**
+ * Aim an object built along +y with its far end at y = L0 (a linkage with eyes, barrels or
+ * reservoirs): it sits at a, points at b and stretches along its axis only to fit the distance.
+ * `roll` (optional) is a world-frame vector the object's +x should face, e.g. to keep a damper's
+ * side reservoir on top.
+ */
+const _x = V3(), _q = new THREE.Quaternion();
+export function aimFixed(o, a, b, L0, roll = null) {
+  _d.subVectors(b, a);
+  const len = _d.length();
+  _d.multiplyScalar(1 / Math.max(len, 1e-6));
+  o.position.copy(a);
+  o.quaternion.setFromUnitVectors(_up, _d);
+  if (roll) {
+    // turn about the axis so that local +x lies as close as possible to `roll`
+    _x.set(1, 0, 0).applyQuaternion(o.quaternion);
+    const want = roll.clone().addScaledVector(_d, -roll.dot(_d));
+    if (want.lengthSq() > 1e-10) {
+      want.normalize();
+      const ang = Math.atan2(_x.clone().cross(want).dot(_d), _x.dot(want));
+      _q.setFromAxisAngle(_d, ang);
+      o.quaternion.premultiply(_q);
+    }
+  }
+  o.scale.set(1, len / L0, 1);
+}
+/**
+ * Two-link scissor (anti-drive link) from p0 to p1 with link lengths l1, l2, its knee pushed
+ * toward `bend` (a direction). Aims the two unitRod meshes and places the knee pin; all points in
+ * the meshes' parent frame. Returns the knee position.
+ */
+const _k = V3(), _m = V3(), _n = V3();
+export function scissor(m1, m2, pin, p0, p1, l1, l2, bend, r = 0.018) {
+  _d.subVectors(p1, p0);
+  const d = Math.min(_d.length(), l1 + l2 - 1e-4);
+  _d.normalize();
+  const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d);
+  const h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+  _n.copy(bend).addScaledVector(_d, -bend.dot(_d)).normalize();
+  _m.copy(p0).addScaledVector(_d, a);
+  _k.copy(_m).addScaledVector(_n, h);
+  aimRod(m1, p0, _k, r);
+  aimRod(m2, _k, p1, r);
+  if (pin) pin.position.copy(_k);
+  return _k;
 }
 
 // ------------------------------------------------------------------------------- materials

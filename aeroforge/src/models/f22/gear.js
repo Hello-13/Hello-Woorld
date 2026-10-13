@@ -9,9 +9,9 @@ import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { F } from './materials.js';
 import * as FR from './frame.js';
-import { merge, slab, hinge } from './util.js';
+import { merge, slab, hinge, toothedGrid } from './util.js';
 
-const { X } = FR;
+const { X, lerp } = FR;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const UP = V(0, 1, 0);
 
@@ -110,17 +110,40 @@ export function buildGear(ctx) {
     sg.push(new THREE.BoxGeometry(0.08, 0.24, Wn + 0.14).translate(ax.x, ax.y + 0.12, ax.z));
     const pA = pivotAt(T);
     pA.add(mesh(merge(sg), F.gear()), mesh(merge(ch), F.chrome()));
-    const light = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 14).rotateZ(Math.PI / 2).translate(...at(0.66).add(V(0.12, 0, 0)).toArray()), F.lens());
-    const lamp = new THREE.Mesh(new THREE.CircleGeometry(0.04, 14).rotateY(Math.PI / 2).translate(...at(0.66).add(V(0.15, 0, 0)).toArray()), new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xfff2d8, emissiveIntensity: 0 }));
-    lamp.userData.fx = true;
-    pA.add(light, lamp);
-    anim.taxiLight = lamp.material;
     P('Nose gear shock strut', {
       system: 'Landing gear', material: '300M steel / titanium oleo-pneumatic strut, chromed piston', mass: 85,
       explode: [0.4, -0.85, 0],
-      desc: 'A single-wheel oleo-pneumatic strut: nitrogen and hydraulic oil inside it absorb the landing and taxi loads. It carries the taxi / landing light and retracts aft into a well under the cockpit floor (geometry approximate).',
+      desc: 'A single-wheel oleo-pneumatic strut: nitrogen and hydraulic oil inside it absorb the landing and taxi loads. It retracts aft into a well under the cockpit floor (geometry approximate).',
     }, pA);
     pv.push(pA);
+    // taxi / landing light on a bracket at the front of the strut
+    {
+      const pL = pivotAt(T);
+      const c = at(0.66);
+      const body = merge([new THREE.CylinderGeometry(0.055, 0.05, 0.07, 16).rotateZ(Math.PI / 2).translate(c.x + 0.12, c.y, c.z), new THREE.BoxGeometry(0.1, 0.03, 0.04).translate(c.x + 0.06, c.y, c.z)]);
+      const lamp = new THREE.Mesh(new THREE.CircleGeometry(0.045, 16).rotateY(Math.PI / 2).translate(c.x + 0.156, c.y, c.z), new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xfff2d8, emissiveIntensity: 0 }));
+      lamp.userData.fx = true;
+      pL.add(mesh(body, F.lens()), lamp);
+      anim.taxiLight = lamp.material;
+      P('Taxi / landing light', {
+        system: 'Electrical', material: 'Sealed lamp on the nose strut, 28 V DC', mass: 2,
+        explode: [1.1, -0.75, 0.3],
+        desc: 'The jet\'s one forward-facing white light, on the nose leg so it stows inside the well with the gear. Like the other lights it runs from the 28 V DC buses fed by the 270 → 28 V converter-regulators; it comes on only with the gear down.',
+      }, pL);
+      pv.push(pL);
+    }
+    // weight-on-wheels switch on the torque-link apex
+    {
+      const pW = pivotAt(T);
+      const c = at(0.86).add(V(0.12, 0, 0.05));
+      pW.add(mesh(merge([new THREE.BoxGeometry(0.06, 0.05, 0.045).translate(c.x, c.y, c.z), new THREE.CylinderGeometry(0.006, 0.006, 0.3, 5).translate(c.x - 0.02, c.y + 0.16, c.z)]), F.yellow()));
+      P('Nose gear weight-on-wheels switch', {
+        system: 'Landing gear', material: 'Proximity sensor on the oleo torque links, redundant channels', mass: 1,
+        explode: [1.0, -1.3, 0.45],
+        desc: 'Senses when the oleo compresses under load. Weight-on-wheels interlocks stop the gear retracting on the ground; in a 2018 mishap the jet sensed weight off wheels at 135 KCAS after rotating early, and the gear came up before it could fly.',
+      }, pW);
+      pv.push(pW);
+    }
 
     const pS = pivotAt(T);
     pS.add(mesh(merge([new THREE.BoxGeometry(0.2, 0.12, 0.22).translate(...at(0.5).toArray()), rodV(at(0.42).add(V(-0.12, 0, 0.1)), at(0.52).add(V(-0.02, 0, 0.13)), 0.025)]), F.hyd()));
@@ -232,6 +255,17 @@ export function buildGear(ctx) {
     const pT = pivotAt(T);
     pT.add(mesh(merge([rodV(at(0.66).add(V(0.12, 0, 0)), at(0.8).add(V(0.22, 0, 0)), 0.026), rodV(at(0.8).add(V(0.22, 0, 0)), at(0.92).add(V(0.08, 0, 0)), 0.026),
       new THREE.CylinderGeometry(0.03, 0.03, 0.14, 8).rotateX(Math.PI / 2).translate(...at(0.8).add(V(0.22, 0, 0)).toArray())]), F.steel()));
+    {
+      const pW = pivotAt(T);
+      const c = at(0.8).add(V(0.24, 0, side * 0.05));
+      pW.add(mesh(merge([new THREE.BoxGeometry(0.06, 0.05, 0.05).translate(c.x, c.y, c.z), new THREE.CylinderGeometry(0.006, 0.006, 0.36, 5).translate(c.x - 0.03, c.y + 0.2, c.z)]), F.yellow()));
+      P(`Main gear weight-on-wheels switch (${R})`, {
+        system: 'Landing gear', material: 'Proximity sensor at the torque links, redundant channels', mass: 1,
+        explode: [0.75, -1.5, 0.75 * side],
+        desc: 'Tells the flight controls, gear handle interlock and brakes whether the leg is carrying weight. The gear-retraction interlock relies on it, so a false weight-off-wheels signal at low speed can raise the gear too soon.',
+      }, pW);
+      pv.push(pW);
+    }
     P(`Main gear torque links (${R})`, {
       system: 'Landing gear', material: 'Forged steel scissor links', mass: 8,
       explode: [0.55, -1.2, 0.5 * side],
@@ -294,11 +328,10 @@ export function buildGear(ctx) {
 
     // main gear door, hinged at its inboard edge, with its actuator
     const st = ctx.sB.filter((s) => s >= FR.MAIN_WELL.s0 - 1e-6 && s <= FR.MAIN_WELL.s1 + 1e-6);
-    const zs = [FR.MAIN_WELL.z0 + 0.004, 1.06, 1.26, FR.MAIN_WELL.z1 - 0.004];
-    const grid = st.map((s) => zs.map((z) => [X(s), -FR.bD(s) - 0.002, side * Math.min(z, FR.bWb(s) - 0.054)]));
+    const grid = toothedGrid((s, u) => [X(s), -FR.bD(s) - 0.002, side * Math.min(lerp(FR.MAIN_WELL.z0 + 0.004, FR.MAIN_WELL.z1 - 0.004, u), FR.bWb(s) - 0.054)], st, { width: 0.6 });
     const door = slab(grid, () => [0, 0.03, 0], V(0, -1, 0));
     const hp0 = V(X(FR.MAIN_WELL.s0), -FR.bD(FR.MAIN_WELL.s0), side * FR.MAIN_WELL.z0);
-    const h = hinge(mesh(door, F.skin()), hp0, V(X(FR.MAIN_WELL.s1), -FR.bD(FR.MAIN_WELL.s1), side * FR.MAIN_WELL.z0), V(X(12), -0.9, side * 1.3), V(0, -1, 0));
+    const h = hinge(mesh(door, F.door()), hp0, V(X(FR.MAIN_WELL.s1), -FR.bD(FR.MAIN_WELL.s1), side * FR.MAIN_WELL.z0), V(X(12), -0.9, side * 1.3), V(0, -1, 0));
     P(`Main gear door (${R})`, {
       system: 'Skin & fairings', skin: true, material: 'Composite door with saw-tooth edges', mass: 28,
       explode: [0, -1.65, 1.15 * side],
@@ -338,19 +371,43 @@ export function buildGear(ctx) {
     const { s0, s1, z } = FR.NOSE_WELL;
     const st = ctx.sA.filter((s) => s >= s0 - 1e-6 && s <= s1 + 1e-6);
     const pivots = [];
+    const hs = [];
     for (const side of [1, -1]) {
-      const zs = [0.006, z * 0.5, z - 0.004].map((v) => v * side);
-      const grid = st.map((s) => zs.map((zz) => [X(s), FR.bottomAt(s, zz) - 0.002, zz]));
+      const grid = toothedGrid((s, u) => { const zz = side * lerp(0.006, z - 0.004, u); return [X(s), FR.bottomAt(s, zz) - 0.002, zz]; }, st, { width: 0.24 });
       const door = slab(grid, () => [0, 0.03, 0], V(0, -1, 0));
-      const h = hinge(mesh(door, F.skin()), V(X(s0), FR.bottomAt(s0, z), side * z), V(X(s1), FR.bottomAt(s1, z), side * z), V(X(4.8), -0.7, side * 0.05), V(0, -1, 0));
+      const h = hinge(mesh(door, F.door()), V(X(s0), FR.bottomAt(s0, z), side * z), V(X(s1), FR.bottomAt(s1, z), side * z), V(X(4.8), -0.7, side * 0.05), V(0, -1, 0));
       pivots.push(h.pivot);
+      hs.push({ h, side });
       anim.gearDoors.push({ h, angle: 1.55 });
     }
     P('Nose gear doors', {
-      system: 'Skin & fairings', skin: true, material: 'Composite doors with serrated edges', mass: 18,
+      system: 'Skin & fairings', skin: true, material: 'Composite doors with saw-tooth fore and aft edges', mass: 18,
       explode: [0.4, -1.4, 0],
-      desc: 'Two doors hinged at their outer edges close the nose-gear well under the cockpit; a mechanical linkage opens them with the leg.',
+      desc: 'Two 1.8 m doors hinged at their outer edges close the nose-gear well under the cockpit; a mechanical linkage opens them with the leg, and their fore and aft edges are saw-toothed like every other door.',
     }, pivots);
+    // door linkage: a bellcrank on the well roof, driven by the leg near its trunnion, with a rod to a horn
+    // on each door's hinge line
+    const crank = V(X(4.2), -0.1, 0);
+    const rods = [], horns = [];
+    for (const { h, side } of hs) {
+      const horn = V(X(4.2), FR.bottomAt(4.2, z) + 0.06, side * (z - 0.05));
+      const rod = mesh(new THREE.CylinderGeometry(0.0075, 0.0075, 1, 6), F.steel());
+      rods.push(rod);
+      horns.push({ h, horn, rod, p0: V(X(s0), FR.bottomAt(s0, z), side * z) });
+    }
+    const crankG = mesh(merge([new THREE.BoxGeometry(0.08, 0.04, 0.12).translate(crank.x, crank.y, crank.z), new THREE.CylinderGeometry(0.0075, 0.0075, 0.22, 6).translate(crank.x + 0.06, crank.y - 0.11, 0)]), F.steel());
+    P('Nose gear door linkage', {
+      system: 'Landing gear', material: 'Steel push rods and bellcrank', mass: 3,
+      explode: [0.6, -0.95, 0.5],
+      desc: 'Mechanical rods from a bellcrank on the well roof, worked by the leg as it swings, open and close both nose-gear doors in step with the gear, so no separate door actuators are needed (linkage geometry approximate).',
+    }, [crankG, ...rods]);
+    const hp = new THREE.Vector3();
+    anim.gearLinks.push(() => {
+      for (const k of horns) {
+        hp.subVectors(k.horn, k.p0).applyQuaternion(k.h.pivot.quaternion).add(k.p0);
+        place(k.rod, crank, hp);
+      }
+    });
   }
 
   // ------------------------------------------------------------------ arresting hook and its door
@@ -364,11 +421,11 @@ export function buildGear(ctx) {
       explode: [-0.6, -1.0, 0],
       desc: 'An emergency tail hook stowed between the engines. A hydraulic damper holds it up and, when released, drops it to catch a runway cable if brakes or steering fail.',
     }, [mesh(merge(g), F.steel()), mesh(merge(a), F.hyd())]);
-    const door = slab([15.65, 16.0, 16.35, 16.7, 17.05].map((s) => [-0.1, 0.1].map((z) => [X(s), -FR.bD(s) - 0.002, z])), () => [0, 0.02, 0], V(0, -1, 0));
+    const door = slab(toothedGrid((s, u) => [X(s), -FR.bD(s) - 0.002, lerp(-0.1, 0.1, u)], [15.65, 16.0, 16.35, 16.7, 17.05], { width: 0.2 }), () => [0, 0.02, 0], V(0, -1, 0));
     P('Arresting hook door', {
-      system: 'Skin & fairings', skin: true, material: 'Composite door', mass: 5,
+      system: 'Skin & fairings', skin: true, material: 'Composite door, saw-tooth ends', mass: 5,
       explode: [-0.6, -1.5, 0],
       desc: 'A narrow flush door between the engine bays covers the hook so it adds nothing to the radar signature.',
-    }, mesh(door, F.skin()));
+    }, mesh(door, F.door()));
   }
 }

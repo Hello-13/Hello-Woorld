@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { G } from './materials.js';
 import { HX, HY, HZ, IY, SADA_C, boxG, cylG, merge, unit, pipeG, connPoint, reg } from './kit.js';
-import { onBUS } from './layout.js';
+import { onBUS, BATT, battConn } from './layout.js';
 
 import { SADA_L, YOKE_L, PANEL_L, PANEL_W, PANEL_T, GAP, ARRAY_SPAN, ARRAY_AREA } from './dims.js';
 
@@ -44,8 +44,6 @@ export function buildPower(P, body) {
       desc: s < 0
         ? 'The "SADA" (solar array drive assembly) that Lockheed\'s figure labels on the bus panel, seated about 0.35 m below mid-height on the face as the scale model shows. It turns its wing once per 718-minute orbit, about 0.5° a minute, so the cells face the Sun while the body points at the Earth; slip rings carry the array current across the rotating joint.'
         : 'One of the two solar array drive assemblies: a stepper motor turns the +Y wing once per 718-minute orbit, about 0.5° a minute, in step with its twin, so the cells face the Sun while the body points at the Earth. Slip rings inside carry the wing\'s share of the 4,480 W end-of-life power across the rotating joint to the power regulation unit.',
-      // the drive's callout, on the +Y one (the one the default framings see), at the rim of the motor housing
-      callout: s > 0, anchor: [0, 0.12, 0.11],
     }, [mesh(sada, G.gunmetal()), mesh(merge(bolts), G.satinTi())], mount);
 
     const drive = new THREE.Group();
@@ -62,11 +60,15 @@ export function buildPower(P, body) {
     ]);
     P(`Array yoke (${tag})`, {
       system: 'Power', material: 'Carbon-fibre tubes, titanium hinge fittings', mass: 10, temp: 300, explode: [0, 2.05, 0],
-      desc: 'A triangular frame that holds the inboard panel about 1.3 m clear of the bus, so the wing\'s shadow and the radiator\'s view of space don\'t interfere. It folds flat against the face for launch; its length is estimated so the folded wing just covers the 2.46 m face, which gives a span of about 14.6 m against the 15 m published.',
+      desc: 'A triangular frame that holds the inboard panel about 1.3 m clear of the bus, so the wing\'s shadow and the radiator\'s view of space don\'t interfere. The solar array drive at its root turns it, and the whole wing with it, once per orbit. It folds flat against the face for launch; its length is estimated so the folded wing just covers the 2.46 m face, which gives a span of about 14.6 m against the 15 m published.',
+      // the wing mechanism's callout, on the +Y yoke's arm: the drives sit too close to the bus for every look to see one
+      callout: s > 0, anchor: [0, 0.03 + 0.8 * (YOKE_L - 0.03), 0.8 * ARM_Z],
     }, mesh(yoke, G.cfrp(2)), yokePivot);
     const ah = [];
-    for (const sz of [1, -1]) ah.push(pipeG([[0.03, 0.06, 0], [0.03, YOKE_L * 0.5, sz * ARM_Z * 0.5], [0.03, YOKE_L - 0.05, sz * (ARM_Z - 0.05)], [0.03, YOKE_L + 0.01, sz * (ARM_Z - 0.12)],
-      [-PANEL_T / 2 - 0.007, YOKE_L + GAP + 0.012, sz * (ARM_Z - 0.12)]], 0.0075, 6));   // service loop across the root hinge line
+    // service loop across the root hinge line: round the panel's root edge, in the hinge gap, to its back
+    const yLoop = YOKE_L + GAP - 0.0095;
+    for (const sz of [1, -1]) ah.push(pipeG([[0.03, 0.06, 0], [0.03, YOKE_L * 0.5, sz * ARM_Z * 0.5], [0.03, YOKE_L - 0.05, sz * (ARM_Z - 0.05)], [0.03, yLoop, sz * (ARM_Z - 0.12)],
+      [-PANEL_T / 2 - 0.007, yLoop, sz * (ARM_Z - 0.12)], [-PANEL_T / 2 - 0.007, YOKE_L + GAP + 0.012, sz * (ARM_Z - 0.12)]], 0.0075, 6));
     ah.push(pipeG([[0.03, 0.06, 0], [0.05, 0.02, 0.04], [0.05, -0.02, 0.02]], 0.011, 6));
     P(`Array harness (${tag})`, {
       system: 'Electrical', material: 'Copper power and sense wires in a beta-cloth sleeve', mass: 4, temp: 300, explode: [0, 2.1, 0],
@@ -143,7 +145,7 @@ export function buildPower(P, body) {
     reg(connPoint(c, sz, opts.conn, 0.04), 'bus', power);
     return P(name, info, unit(c, sz, mat, opts));
   };
-  const BAT = { s: [1.0, 0.25, 0.3], z: -1.05 };
+  const BAT = BATT;
   const battery = (name, x, desc) => {
     const y0 = -IY, z = BAT.z, d = BAT.s[1];
     const base = [boxG([x, y0 + 0.006, z], [BAT.s[0] + 0.03, 0.012, BAT.s[2] + 0.03]), boxG([x - BAT.s[0] / 2 + 0.01, y0 + d / 2, z], [0.02, d, BAT.s[2]]), boxG([x + BAT.s[0] / 2 - 0.01, y0 + d / 2, z], [0.02, d, BAT.s[2]]),
@@ -154,12 +156,16 @@ export function buildPower(P, body) {
       cells.push(cylG([cx, y0 + 0.12, z + dz], 0.044, 0.12, 'y', 16));
       cells.push(new THREE.SphereGeometry(0.044, 16, 6, 0, Math.PI * 2, 0, Math.PI / 2).translate(cx, y0 + 0.18, z + dz));
     }
-    reg([x + 0.3, y0 + d + 0.04, z + 0.12], 'bus', true);
+    // connector bracket on the pack's +Z side, outboard of the cells: power (feeder) and telemetry connectors
+    const cn = battConn(x), zb = z + BAT.s[2] / 2;
+    base.push(boxG([x, y0 + 0.11, zb + 0.013], [0.2, 0.2, 0.026]));
+    const plugs = [cylG([cn.power[0], cn.power[1], zb + 0.038], 0.02, 0.024, 'z', 12), cylG([cn.data[0], cn.data[1], zb + 0.038], 0.016, 0.024, 'z', 12)];
+    reg(cn.data, 'bus');   // telemetry to the data harness; the power feeder is drawn in harness.js
     return P(name, {
       system: 'Power', material: 'Nickel–hydrogen pressure-vessel cells in aluminium sleeves', mass: 75, count: 20, temp: 278, explode: [0, -1.25, -0.15], desc,
-    }, [mesh(merge(base), G.blackBox()), mesh(merge(cells), G.silverBox())]);
+    }, [mesh(merge(base), G.blackBox()), mesh(merge(cells), G.silverBox()), mesh(merge(plugs), G.connector())]);
   };
-  battery('Battery 1', -0.4, 'One of the two nickel–hydrogen batteries, drawn in Lockheed\'s figure as a long pack of pressure-vessel cells in two rows (here 2 × 10 cells, about 1.0 × 0.25 × 0.3 m; count estimated). Twice a year, when the Sun lies near the orbit plane, the satellite crosses the Earth\'s shadow on every orbit for up to about 56 minutes, and the batteries run the whole spacecraft. The design paper lists lithium-ion as a later weight-saving insertion.');
+  battery('Battery 1', -0.4, 'One of the two nickel–hydrogen batteries, drawn in Lockheed\'s figure as a long pack of pressure-vessel cells in two rows (here 2 × 10 cells, about 1.0 × 0.25 × 0.3 m; count estimated). Twice a year, when the Sun lies near the orbit plane, the satellite crosses the Earth\'s shadow on every orbit for up to about 56 minutes, and the batteries run the whole spacecraft. A bracket on the pack\'s +Z side, outboard of the cells, carries its power connector (the feeder from the power regulation unit) and a telemetry connector (bracket estimated). The design paper lists lithium-ion as a later weight-saving insertion.');
   battery('Battery 2', 0.66, 'The second NiH₂ battery. Cells are kept cool, about 0–10 °C, on the radiator panel, because battery life falls quickly when they run warm (cell count estimated).');
   box('Power regulation unit (SPRU)', {
     system: 'Power', material: 'Aluminium chassis, shunt regulators and battery charge electronics', mass: 44, temp: 305, explode: [0, -1.15, 0.05],

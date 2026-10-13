@@ -15,7 +15,7 @@ import { M } from '../../engine/materials.js';
 import { naca00, mirrorZ } from '../../engine/geometry.js';
 import { F } from './materials.js';
 import * as FR from './frame.js';
-import { merge, slab, hinge, mirror } from './util.js';
+import { merge, slab, hinge, mirror, toothedGrid, rectTube } from './util.js';
 
 const { X, mono, lerp, smooth } = FR;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -138,7 +138,7 @@ export function buildSystems(ctx) {
   tanks.push(P('Centre fuselage tank (F-2)', {
     system: 'Fuel', material: 'Integral tank wrapped over the inlet ducts and weapons bay', mass: kg[1],
     explode: [0, 2.15, 0], callout: false,
-    desc: `The largest tank, saddled over both inlet ducts and the main weapons bay. Modelled capacity ≈ ${kg[1].toLocaleString('en-US')} kg (${L(kg[1]).toLocaleString('en-US')} L, estimate). Fuel is also the jet's main heat sink: avionics heat is dumped into it.`,
+    desc: `The largest tank, saddled over both inlet ducts and the main weapons bay. Modelled capacity ≈ ${kg[1].toLocaleString('en-US')} kg (${L(kg[1]).toLocaleString('en-US')} L, estimate). Fuel is also the jet's main heat sink: avionics heat is dumped into it. Public sources list eight internal tanks; the model groups them into five (cell layout approximate).`,
   }, mesh(t2.geo, fuelMat)));
   tanks.push(P('Aft fuselage feed tank (F-3)', {
     system: 'Fuel', material: 'Integral tank with boost pumps', mass: kg[2],
@@ -181,7 +181,7 @@ export function buildSystems(ctx) {
     // transfer lines: wings and F-2 → feed tank
     const g = [];
     for (const side of [1, -1]) {
-      g.push(FR.pipe([[11.4, -0.05, side * 2.2], [11.6, -0.12, side * 1.7], [11.9, -0.16, side * 0.7], [12.6, -0.3, side * 0.3]], 0.03, 6));
+      g.push(FR.pipe([[11.3, -0.05, side * 2.2], [11.32, -0.1, side * 1.85], [11.36, -0.3, side * 1.6], [11.45, -0.42, side * 1.2], [12.0, -0.43, side * 0.72], [12.6, -0.3, side * 0.3]], 0.03, 6));
       g.push(FR.pipe([[8.4, 0.1, side * 0.3], [10.5, -0.1, side * 0.25], [11.5, -0.12, side * 0.32], [12.6, -0.25, side * 0.22]], 0.025, 6));
     }
     g.push(FR.pipe([[7.5, -0.4, 0.12], [8.2, -0.25, 0.2], [8.6, -0.1, 0.25]], 0.025, 6));
@@ -213,18 +213,28 @@ export function buildSystems(ctx) {
       explode: [0.2, 2.7, 0],
       desc: 'A USAF flying-boom receptacle centred on the spine behind the canopy, in its own well in the top of tank F-1. A tanker\'s boom plugs in here; at full rate it can refill the internal tanks in a few minutes.',
     }, mesh(merge(g), F.yellow()));
-    const grid = [];
-    for (const s of [s0, (s0 + s1) / 2, s1]) grid.push([-0.15, -0.05, 0.05, 0.15].map((z) => [X(s), FR.topAt(s, z) + 0.003, z]));
-    const dm = F.skin().clone();
-    dm.polygonOffset = true; dm.polygonOffsetFactor = -2; dm.polygonOffsetUnits = -2;
+    const grid = toothedGrid((s, u) => { const z = lerp(-0.15, 0.15, u); return [X(s), FR.topAt(s, Math.abs(z)) + 0.003, z]; }, [s0, (s0 + s1) / 2, s1], { width: 0.3 });
     const door = slab(grid, () => [0, -0.02, 0], V(0, 1, 0));
-    const h = hinge(mesh(door, dm), V(X(s1), FR.topAt(s1, 0.15), -0.15), V(X(s1), FR.topAt(s1, 0.15), 0.15), V(X(s0), 0.7, 0), V(0, -1, 0));
+    const h = hinge(mesh(door, F.door()), V(X(s1), FR.topAt(s1, 0.15), -0.15), V(X(s1), FR.topAt(s1, 0.15), 0.15), V(X(s0), 0.7, 0), V(0, -1, 0));
     P('Air-refuelling door', {
-      system: 'Skin & fairings', skin: true, material: 'Composite door', mass: 6,
+      system: 'Skin & fairings', skin: true, material: 'Composite door, saw-tooth edges', mass: 6,
       explode: [0.2, 3.2, 0],
-      desc: 'Rotates down into the spine to expose the receptacle and its lights, and closes flush afterwards.',
+      desc: 'Rotates down into the spine to expose the receptacle and its lights, and closes flush afterwards; its fore and aft edges are saw-toothed like every other door.',
     }, h.pivot);
     anim.arDoor = h;
+    // slipway floodlights in the walls of the receptacle well, lighting it for the boom operator at night
+    const lens = [], lit = [];
+    for (const zz of [-0.135, 0.135]) for (const sl of [7.85, 8.15]) {
+      const y = FR.topAt(sl, 0) - 0.1;
+      lens.push(new THREE.CylinderGeometry(0.03, 0.03, 0.02, 12).rotateX(Math.PI / 2).translate(X(sl), y, zz));
+      lit.push(new THREE.CircleGeometry(0.024, 12).rotateY(zz > 0 ? Math.PI : 0).translate(X(sl), y, zz - Math.sign(zz) * 0.011));
+    }
+    const arLamp = new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0xfff4dc, emissiveIntensity: 0.25, roughness: 0.4 });
+    P('Air-refuelling lights', {
+      system: 'Electrical', material: 'Slipway floodlights, 28 V DC', mass: 1, count: 4,
+      explode: [0.2, 2.95, 0.4],
+      desc: 'Floodlights set into the receptacle well light the slipway so the tanker\'s boom operator can see to plug in at night (count and positions approximate).',
+    }, [mesh(merge(lens), F.lens()), mesh(merge(lit), arLamp, { cast: false })]);
     // refuel manifold: receptacle → F-1 → gallery along the spine → F-2, F-3 and both wings
     const m = [];
     m.push(FR.pipe([[8.28, FR.topAt(8.28, 0) - 0.2, 0], [8.4, 0.2, 0.08], [9.0, 0.32, 0.18], [11.0, 0.32, 0.2], [12.6, 0.28, 0.2]], 0.03, 6));
@@ -233,8 +243,18 @@ export function buildSystems(ctx) {
     P('Refuelling manifold', {
       system: 'Fuel', material: 'Aluminium manifold with level-control shut-off valves', mass: 22,
       explode: [0.1, 2.35, 0],
-      desc: 'Distributes fuel from the receptacle (or a ground pressure-refuelling point) to every tank; float-operated shut-off valves close each tank as it fills.',
+      desc: 'Distributes fuel from the receptacle (or the ground pressure-refuelling point) to every tank; float-operated shut-off valves close each tank as it fills.',
     }, mesh(merge(m), F.pipe()));
+    // single-point pressure-refuelling adapter in the right main-gear well, piped up into F-3
+    const ga = [];
+    ga.push(new THREE.CylinderGeometry(0.05, 0.055, 0.1, 16).rotateX(Math.PI / 2 - 0.4).translate(X(12.7), -0.62, 1.415));
+    ga.push(new THREE.BoxGeometry(0.14, 0.12, 0.04).translate(X(12.7), -0.62, 1.445));
+    ga.push(FR.pipe([[12.7, -0.6, 1.44], [12.68, -0.45, 1.47], [12.45, -0.2, 1.45], [12.4, 0.15, 1.38], [12.44, 0.42, 1.12]], 0.022, 6, 14));
+    P('Ground refuelling adapter', {
+      system: 'Fuel', material: 'Single-point pressure-refuelling coupling with shut-off valve', mass: 5,
+      explode: [0.3, -1.25, 1.5],
+      desc: 'A ground crew refuels every tank through this one coupling in a gear well, under pressure from a truck or hydrant, with the same level-control valves that stop each tank filling (position approximate).',
+    }, mesh(merge(ga), F.yellow()));
   }
   {
     // quantity probes: vertical capacitance probes through each tank
@@ -285,9 +305,9 @@ export function buildSystems(ctx) {
     for (const dy of [0.0, 0.14]) g.push(FR.cylX(14.22, -0.47 + dy, side * 1.38, 0.32, 0.06, 0.055, 14));
     g.push(box(14.05, -0.4, side * 1.38, 0.06, 0.3, 0.16));
     P(`Hydraulic pumps (${R} AMAD)`, {
-      system: 'Hydraulics', material: 'Variable-displacement piston pumps', mass: 32, count: 2,
+      system: 'Hydraulics', material: 'Eaton PV3-115 variable-displacement piston pumps', mass: 32, count: 2,
       explode: [-0.1, -1.0, 1.0 * side],
-      desc: `Two engine-driven pumps on the ${R} accessory drive pressurise ${side > 0 ? 'system A' : 'system B'} at 4,000 psi (27.6 MPa) — higher than the usual 3,000 psi, so actuators and lines can be smaller and lighter.`,
+      desc: `Engine-driven pumps on the ${R} accessory drive pressurise ${side > 0 ? 'system A' : 'system B'} at 4,000 psi (27.6 MPa) — higher than the usual 3,000 psi, so actuators and lines can be smaller and lighter. Eaton\'s PV3-115 was qualified for this duty with an 8,000-hour design life; the number of pumps per AMAD is not published (two are drawn).`,
     }, mesh(merge(g), F.hyd()));
     const S = side > 0 ? 'A' : 'B';
     P(`Hydraulic reservoir (system ${S})`, {
@@ -312,7 +332,7 @@ export function buildSystems(ctx) {
     // pump → reservoir / manifold, then aft to the stabilator, rudder and nozzle area, outboard to the wing
     g.push(FR.pipe([[14.2, -0.42, z * 1.38], [13.6, -0.5, z * 1.0], [13.2, -0.6, z * 0.6]], 0.016, 5));
     g.push(FR.pipe([[14.2, -0.42, z * 1.38], [15.5, -0.35, z * 1.4], [16.2, -0.26, z * 1.38]], 0.016, 5));
-    g.push(FR.pipe([[14.6, -0.35, z * 1.4], [14.6, 0.15, z * 1.42], [14.9, 0.3, z * 1.42], [16.4, 0.36, z * 1.45]], 0.014, 5));
+    g.push(FR.pipe([[14.6, -0.35, z * 1.4], [14.6, 0.15, z * 1.42], [14.9, 0.3, z * 1.42], [15.9, 0.36, z * 1.44]], 0.014, 5));
     g.push(FR.pipe([[13.2, -0.55, z * 1.0], [13.4, -0.15, z * 1.6], [13.6, -0.1, z * 2.6], [13.9, -0.15, z * 4.2]], 0.014, 5));
     // forward along the bay edge to the leading-edge flap drive, bay doors and nose
     g.push(FR.pipe([[13.2, -0.6, z * 0.6], [12.6, -0.7, z * 0.84], [10.5, -0.74, z * 0.84], [8.5, -0.7, z * 0.84], [8.0, -0.5, z * 1.2], [8.6, -0.1, z * 1.75]], 0.016, 5, 40));
@@ -339,6 +359,30 @@ export function buildSystems(ctx) {
     }, mesh(merge(g), F.hyd()));
   }
 
+  {
+    // weapons branches off each system's bay-edge gallery: door drive, the three AVELs (their pneumatic
+    // ejectors are boosted by aircraft hydraulics), the side-bay trapeze and door, and the gun drive
+    const g = [];
+    for (const side of [1, -1]) {
+      const z = side;
+      g.push(FR.pipe([[9.5, -0.74, z * 0.84], [9.6, -0.77, z * 0.79], [9.65, -0.75, z * 0.76]], 0.008, 5));            // door drive PDU
+      // up outside the bay wall, along the sloping ceiling under the duct, into each AVEL hanger
+      g.push(FR.pipe([[10.9, -0.74, z * 0.84], [10.95, -0.5, z * 0.82], [11.0, -0.36, z * 0.72], [11.05, -0.3, z * 0.6], [11.05, -0.27, z * 0.4], [11.05, -0.265, z * 0.2]], 0.007, 5, 24));
+      for (const zz of [0.213, 0.373, 0.551]) g.push(FR.pipe([[11.05, -0.27, z * zz], [11.05, -0.24 - (zz > 0.55 ? 0.01 : 0) - 0.04, z * zz]], 0.006, 5, 2));
+      // out under the duct to the side bay: trapeze actuator and door actuator
+      g.push(FR.pipe([[10.4, -0.74, z * 0.84], [10.5, -0.42, z * 0.92], [10.58, -0.39, z * 1.1]], 0.008, 5));
+      g.push(FR.pipe([[10.58, -0.39, z * 1.1], [10.3, -0.38, z * 1.3], [10.06, -0.38, z * 1.48]], 0.007, 5));
+    }
+    // gun drive, from system A's gallery up the outboard side of the right duct
+    g.push(FR.pipe([[10.2, -0.74, 0.84], [10.3, -0.42, 0.95], [10.4, -0.38, 1.42], [10.48, -0.18, 1.55], [10.52, 0.02, 1.58]], 0.008, 5, 24));
+    g.push(FR.pipe([[10.25, -0.74, 0.86], [10.35, -0.43, 0.97], [10.45, -0.4, 1.45], [10.55, -0.2, 1.57], [10.62, 0.0, 1.6]], 0.008, 5, 24));
+    P('Weapons hydraulic branch lines', {
+      system: 'Hydraulics', material: 'Titanium tubing (4,000 psi), swivel joints at the moving launchers', mass: 9, xrayWeight: 0.7,
+      explode: [0.2, -1.75, 0.35],
+      desc: 'Branches off the bay-edge galleries feed the main-bay door drives, the three AVELs on each side, the side-bay trapeze and door actuators, and the M61A2 gun drive. The 4,000 psi system runs the rudders, landing gear, nose-wheel steering, flight controls and the weapons alike.',
+    }, mesh(merge(g), F.hyd()));
+  }
+
   // ================================================================== electrical
   for (const side of [1, -1]) {
     const R = side > 0 ? 'right' : 'left';
@@ -348,18 +392,62 @@ export function buildSystems(ctx) {
       desc: 'Driven by the accessory drive, it supplies the 270 V DC primary bus. A high-voltage DC system saves copper weight; development-era figures give about 157 kW of primary and auxiliary electrical power in total.',
     }, mesh(merge([FR.cylX(13.36, -0.42, side * 1.38, 0.26, 0.1, 0.1, 18), box(13.2, -0.42, side * 1.38, 0.06, 0.16, 0.16)]), F.yellow()));
   }
-  // APU embedded in the left wing root, between two wing spars, exhausting through the upper skin
-  P('Auxiliary power unit (APU)', {
-    system: 'Electrical', material: 'Small gas turbine, 335 kW (450 hp) class', mass: 75,
-    explode: [0.2, 0.9, -1.3],
-    desc: 'Part of the auxiliary power generation system (AlliedSignal, now Honeywell), embedded in the left wing root: it starts the engines without ground carts and can restart them in flight. Inlet and exhaust door positions are approximate.',
-  }, mesh(merge([FR.cylX(11.95, -0.08, -1.8, 0.56, 0.1, 0.09, 18), box(11.62, -0.08, -1.8, 0.1, 0.2, 0.2),
-    FR.pipe([[12.2, -0.08, -1.8], [12.3, -0.06, -1.82], [12.36, 0.0, -1.84]], 0.045, 8, 6)]), F.boxLight()));
-  P('Stored-energy system', {
-    system: 'Electrical', material: 'High-pressure gas bottle and turbine', mass: 30,
-    explode: [0.5, -1.85, 0.2],
-    desc: 'An emergency power source that comes on line within 5 s at any altitude, airspeed or attitude to keep the flight controls, hydraulics and essential electrics alive if both engines fail (about 75 kW).',
-  }, mesh(merge([new THREE.CapsuleGeometry(0.1, 0.3, 4, 12).rotateZ(Math.PI / 2).translate(X(12.95), -0.73, 0.18)]), F.orange()));
+  // auxiliary power generation system (AlliedSignal, now Honeywell; ≈ 120 kg in all): the G250 APU in the
+  // left wing root between two wing spars, its inlet and exhaust behind flush doors, and the stored-energy
+  // system whose air bottles start it
+  {
+    const ax = 11.97, ay = -0.06, az = -1.72;
+    const g = [FR.cylX(ax - 0.12, ay, az, 0.42, 0.13, 0.15, 20), FR.cylX(ax + 0.2, ay, az, 0.22, 0.15, 0.12, 20)];   // compressor / combustor / turbine
+    g.push(FR.boxS(ax - 0.28, ay - 0.02, az + 0.06, 0.12, 0.2, 0.18));                                                   // gearbox and starter-generator pad
+    g.push(FR.cylX(ax - 0.33, ay + 0.1, az + 0.09, 0.14, 0.05, 0.05, 12));
+    P('Auxiliary power unit (APU)', {
+      system: 'Electrical', material: 'Honeywell (AlliedSignal) G250 gas turbine, 335 kW (450 hp)', mass: 70,
+      explode: [0.2, 0.9, -1.3],
+      desc: 'A 335 kW (450 hp) gas turbine in the left wing root that gives the F-22 autonomous ground starts and can restart the engines at subsonic speed up to 41,000 ft; the whole power system weighs about 120 kg. The F-22 uses an APU plus a stored-energy system, not an F-35-style integrated power package (envelope ≈ 0.7 × 0.3 m, estimate).',
+    }, mesh(merge(g), F.boxLight()));
+    // inlet from a flush door in the trunk wall under the chine; exhaust up to a door in the upper skin
+    const wIn = (f) => { const [zz, y] = FR.wallB(11.55, f); return [11.55, y, -zz]; };
+    const d = [rectTube([[11.5, wIn(0.2)[1], -1.77], [11.62, -0.12, -1.74], [11.72, ay - 0.04, -1.7]], 0.1, 0.14, { n: 6 })];
+    d.push(FR.pipe([[12.32, ay, az], [12.42, ay + 0.06, az], [12.5, FR.topAt(12.5, 1.72) - 0.04, az]], 0.065, 12, 8));
+    P('APU inlet & exhaust ducts', {
+      system: 'Electrical', material: 'Titanium exhaust duct, composite inlet duct', mass: 8,
+      explode: [0.2, 1.3, -1.75],
+      desc: 'A 450 hp turbine needs its own air: an inlet duct from a flush door in the side of the fuselage just below the chine, and a short titanium exhaust duct up through the upper skin (positions approximate).',
+    }, mesh(merge(d), F.tiDull()));
+    const dIn = slab(toothedGrid((sv, u) => { const [zz, y] = FR.wallB(sv, lerp(0.1, 0.32, u)); return [X(sv), y, -(zz + 0.003)]; }, [11.42, 11.52, 11.62], { width: 0.2 }), () => [0, 0.01, 0.02], V(0, -0.3, -1));
+    const dEx = slab(toothedGrid((sv, u) => { const zz = -lerp(1.6, 1.84, u); return [X(sv), FR.topAt(sv, Math.abs(zz)) + 0.003, zz]; }, [12.4, 12.5, 12.6], { width: 0.24 }), () => [0, -0.015, 0], V(0, 1, 0));
+    P('APU inlet & exhaust doors', {
+      system: 'Skin & fairings', skin: true, material: 'Composite flush doors, saw-tooth edges', mass: 3, count: 2,
+      explode: [0.2, 1.75, -2.05],
+      desc: 'Flush doors keep both APU openings closed, and stealthy, except while the APU runs (positions approximate).',
+    }, mesh(merge([dIn, dEx]), F.door()));
+    // stored-energy system: two high-pressure air bottles aft of the APU, valve and lines to its starter
+    const b = [];
+    for (const [y, z] of [[-0.32, -1.6], [-0.1, -1.55]]) b.push(new THREE.CapsuleGeometry(0.095, 0.31, 4, 14).rotateZ(Math.PI / 2).translate(X(12.65), y, z));
+    b.push(FR.boxS(12.36, -0.2, -1.6, 0.08, 0.1, 0.1));                                                                    // start / control valve
+    const l = [FR.pipe([[12.42, -0.32, -1.6], [12.37, -0.25, -1.6]], 0.015, 6, 3), FR.pipe([[12.42, -0.1, -1.55], [12.37, -0.16, -1.6]], 0.015, 6, 3)];
+    l.push(FR.pipe([[12.32, -0.2, -1.6], [12.25, -0.17, -1.62], [12.2, -0.15, -1.64]], 0.015, 6, 4));
+    P('Stored-energy system (SES)', {
+      system: 'Electrical', material: 'High-pressure air bottles, start / control valve and lines to the APU', mass: 30,
+      explode: [-0.3, -0.6, -1.95],
+      desc: 'Stored high-pressure air starts the APU, which must be running before either engine can be started. In flight the 75 kW stored-energy system has to come on line within 5 s at any altitude, airspeed and attitude to keep the flight controls, hydraulics and computers alive if both engines fail.',
+    }, [mesh(merge(b), F.orange()), mesh(merge(l), F.pipe())]);
+    const c = [FR.boxS(13.08, -0.25, -1.62, 0.25, 0.18, 0.18), FR.cylX(13.25, -0.25, -1.62, 0.1, 0.06, 0.06, 12)];
+    c.push(FR.pipe([[12.95, -0.25, -1.62], [12.88, -0.3, -1.6], [12.83, -0.32, -1.6]], 0.012, 6, 4));
+    P('SES air re-charge compressor', {
+      system: 'Electrical', material: 'Electrically driven high-pressure air compressor', mass: 12,
+      explode: [-0.5, -0.9, -1.7],
+      desc: 'Refills the stored-energy air bottles on board, part of the plan to make the F-22 independent of ground carts for starting and servicing.',
+    }, mesh(merge(c), F.boxLight()));
+    // start path from the APU to both AMADs (drawn as ducting; the actual drive arrangement is not published)
+    const sp = [FR.pipe([[12.3, ay - 0.08, az + 0.1], [12.6, -0.45, -1.55], [13.2, -0.62, -1.4], [13.52, -0.5, -1.38]], 0.035, 8, 16)];
+    sp.push(FR.pipe([[13.2, -0.66, -1.4], [13.3, -0.74, -0.8], [13.3, -0.75, 0.0], [13.3, -0.74, 0.8], [13.4, -0.6, 1.38], [13.52, -0.5, 1.38]], 0.035, 8, 24));
+    P('APU start path to AMADs', {
+      system: 'Electrical', material: 'Start ducting (arrangement not published; route approximate)', mass: 10,
+      explode: [-0.2, -1.45, 0],
+      desc: 'The APU\'s output reaches each airframe-mounted accessory drive to spin that engine up for a start, on the ground or in flight up to 41,000 ft. Whether the F-22 does this through a shaft or with starter air is not published, so this run only shows the connection.',
+    }, mesh(merge(sp), F.tiDull()));
+  }
   P('Batteries', {
     system: 'Electrical', material: 'Main and APU-start batteries', mass: 40, count: 2,
     explode: [0.4, -0.9, -0.6],
@@ -398,12 +486,31 @@ export function buildSystems(ctx) {
   {
     // engine bleed air forward along the weapons-bay edges to the ECS bay under the cockpit
     const g = [];
-    for (const side of [1, -1]) g.push(FR.pipe([[14.55, -0.6, side * 0.42], [14.0, -0.62, side * 0.5], [13.3, -0.6, side * 0.66], [12.6, -0.55, side * 0.82], [8.6, -0.52, side * 0.82], [7.6, -0.56, side * 0.5], [6.6, -0.48, side * 0.3]], 0.03, 8, 60));
+    const vb = [];
+    for (const side of [1, -1]) {
+      const ez = FR.ENG_Z * side, ey = FR.ENG_Y;
+      g.push(FR.pipe([[14.55, -0.6, side * 0.42], [14.0, -0.62, side * 0.5], [13.3, -0.6, side * 0.66], [12.6, -0.55, side * 0.82], [8.6, -0.52, side * 0.82], [7.6, -0.56, side * 0.5], [6.6, -0.48, side * 0.3]], 0.03, 8, 60));
+      // bleed port: from the HP compressor case (r ≈ 0.3) out through the bypass duct to the valve
+      const dir = new THREE.Vector2(side * 0.42 - ez, -0.6 - ey).normalize();
+      g.push(FR.pipe([[14.5, ey + dir.y * 0.3, ez + dir.x * 0.3], [14.52, ey + dir.y * 0.48, ez + dir.x * 0.48], [14.55, -0.6, side * 0.42]], 0.028, 8, 6));
+      // shut-off valve at the engine, pressure-regulating valve just forward of it
+      vb.push(new THREE.CylinderGeometry(0.05, 0.05, 0.15, 14).rotateZ(Math.PI / 2).translate(X(14.42), -0.61, side * 0.45));
+      vb.push(FR.boxS(14.42, -0.54, side * 0.45, 0.07, 0.06, 0.06));
+      vb.push(new THREE.CylinderGeometry(0.045, 0.045, 0.13, 14).rotateZ(Math.PI / 2).translate(X(13.95), -0.62, side * 0.51));
+      vb.push(FR.boxS(13.95, -0.55, side * 0.51, 0.06, 0.06, 0.06));
+    }
+    // conditioned air to the OBOGS concentrator and inert-gas generator, tapped after the air-cycle machine
+    g.push(FR.pipe([[6.62, -0.42, 0.06], [6.66, -0.25, -0.2], [6.64, -0.05, -0.38], [6.6, 0.02, -0.42]], 0.016, 6, 10));
     P('Engine bleed-air ducts', {
-      system: 'Environmental control', material: 'Insulated titanium ducting with shut-off and pressure-regulating valves', mass: 30,
+      system: 'Environmental control', material: 'Insulated titanium ducting', mass: 30,
       explode: [0.2, -1.05, 0],
-      desc: 'Hot, high-pressure air tapped from each engine\'s compressor runs forward to the environmental control system and the inert-gas generator; valves at each engine shut it off in a fire (routing approximate).',
+      desc: 'Hot, high-pressure air tapped through a port in each engine\'s HP compressor case runs forward to the air-cycle pack for cockpit pressurisation and cooling, the OBOGS and the inert-gas generator (routing approximate).',
     }, mesh(merge(g), F.tiDull()));
+    P('Bleed-air shut-off & regulating valves', {
+      system: 'Environmental control', material: 'Electrically controlled, pneumatically actuated butterfly valves', mass: 12, count: 4,
+      explode: [-0.2, -1.5, 0],
+      desc: 'At each engine a shut-off valve can isolate the bleed in a fire or a duct leak, and a pressure-regulating valve just forward of it drops the pressure to what the ECS can use (valve positions approximate).',
+    }, mesh(merge(vb), F.steel()));
     P('ECS heat exchangers', {
       system: 'Environmental control', material: 'Aluminium plate-fin cores, fuel- and ram-air cooled', mass: 45, count: 2,
       explode: [0.4, -1.3, -0.4],
@@ -417,35 +524,28 @@ export function buildSystems(ctx) {
     const d = [];
     for (const side of [1, -1]) d.push(FR.pipe([[6.3, -0.4, side * 0.08], [6.4, -0.15, side * 0.3], [6.2, 0.05, side * 0.44], [5.4, 0.05, side * 0.44]], 0.035, 8));
     d.push(FR.pipe([[6.25, -0.45, 0], [5.0, -0.12, 0.3], [4.0, -0.1, 0.3], [3.3, -0.05, 0.36]], 0.03, 8));
+    {
+      const v = [new THREE.CylinderGeometry(0.075, 0.075, 0.06, 18).rotateZ(Math.PI / 2).translate(X(6.94), 0.1, 0.3)];
+      v.push(new THREE.CylinderGeometry(0.05, 0.05, 0.08, 14).rotateZ(Math.PI / 2).translate(X(6.94), 0.1, -0.3));
+      v.push(FR.boxS(6.95, 0.0, -0.3, 0.05, 0.08, 0.07));
+      // canopy-seal air: from the regulator up the bulkhead to the sill
+      const l = [FR.pipe([[6.94, 0.06, -0.3], [6.85, 0.3, -0.38], [6.7, FR.upperA(6.7, FR.sillW(6.7)) - 0.04, -(FR.sillW(6.7) - 0.03)]], 0.008, 5, 8)];
+      P('Cockpit pressure regulator & outflow valve', {
+        system: 'Environmental control', material: 'Pressure-regulating outflow valve, safety valve, canopy-seal pressure regulator', mass: 6,
+        explode: [-0.6, 1.0, 0],
+        desc: 'Conditioned air flows into the cockpit and out through this outflow valve on the aft pressure bulkhead, which opens and closes to hold the cabin-pressure schedule; a regulator beside it feeds air to inflate the canopy seal against the sill (positions approximate).',
+      }, [mesh(merge(v), F.boxLight()), mesh(merge(l), F.pipe())]);
+    }
     P('Cockpit & avionics air ducts', {
       system: 'Environmental control', material: 'Composite and aluminium ducting', mass: 15,
       explode: [0.5, -0.4, 0.2],
       desc: 'Carry conditioned air to the cockpit outlets, the canopy demist and the forward avionics bay, and keep the cockpit pressurised.',
     }, mesh(merge(d), F.duct()));
   }
-  P('Fuel–PAO heat exchangers', {
-    system: 'Environmental control', material: 'Aluminium plate-fin cores', mass: 45, count: 2,
-    explode: [0.4, -1.35, 0.4],
-    desc: 'Heat from the avionics is carried by liquid coolant and dumped into the fuel, which then burns in the engines. Thermal management is a big limit on a stealthy jet that cannot have many external cooling scoops.',
-  }, mesh(merge([box(7.35, -0.62, 0.35, 0.34, 0.2, 0.3), box(7.35, -0.62, -0.35, 0.34, 0.2, 0.3)]), F.copper()));
-  P('PAO liquid-cooling loop', {
-    system: 'Environmental control', material: 'Polyalphaolefin coolant in aluminium lines', mass: 55,
-    explode: [0.8, -0.25, 0],
-    desc: 'A liquid loop of PAO coolant runs through cold plates under the radar\'s transmit/receive modules and the integrated processors, then back to the fuel–PAO heat exchangers.',
-  }, mesh(merge([
-    FR.pipe([[2.62, 0.0, 0.36], [3.0, -0.12, 0.38], [4.5, -0.28, 0.42], [6.0, -0.45, 0.42], [7.2, -0.6, 0.38]], 0.02, 6),
-    FR.pipe([[2.62, 0.0, -0.36], [3.0, -0.12, -0.38], [4.5, -0.28, -0.42], [6.0, -0.45, -0.42], [7.2, -0.6, -0.38]], 0.02, 6),
-    FR.pipe([[3.05, 0.3, 0.2], [3.3, 0.36, 0.0], [3.05, 0.3, -0.2]], 0.016, 6),
-  ]), F.ductDark()));
-  P('PAO pump & reservoir', {
-    system: 'Environmental control', material: 'Electric coolant pump, pressurised reservoir', mass: 18,
-    explode: [0.6, -1.65, 0.6],
-    desc: 'Circulates the PAO coolant round the loop; the reservoir takes up its expansion as it heats.',
-  }, mesh(merge([FR.cylX(6.95, -0.6, -0.35, 0.22, 0.07, 0.07, 14), new THREE.SphereGeometry(0.08, 14, 10).translate(X(6.95), -0.6, 0.35)]), F.boxLight()));
   P('OBOGS oxygen concentrator', {
     system: 'Environmental control', material: 'Molecular-sieve oxygen concentrator', mass: 18,
     explode: [0.2, 1.05, -0.6],
-    desc: 'The on-board oxygen generation system strips nitrogen from engine bleed air to give the pilot breathing oxygen without liquid-oxygen servicing.',
+    desc: 'The on-board oxygen generation system passes conditioned engine bleed air through molecular-sieve beds that hold back nitrogen, giving the pilot breathing oxygen without liquid-oxygen servicing. Its product gas goes to the BRAG valve on the seat.',
   }, mesh(box(6.6, 0.12, -0.42, 0.24, 0.22, 0.16), F.boxLight()));
   {
     // fire protection: extinguisher bottles ahead of the engine bays, with spray lines into each bay
@@ -456,10 +556,25 @@ export function buildSystems(ctx) {
       l.push(FR.pipe([[13.45, 0.36, side * 0.18], [13.7, 0.5, side * 0.35], [14.5, 0.55, side * 0.42], [16.0, 0.5, side * 0.42]], 0.01, 5));
       l.push(FR.pipe([[14.0, 0.53, side * 0.4], [14.2, 0.45, side * 1.2], [14.4, 0.2, side * 1.36]], 0.008, 5));
     }
+    const dl = [];
+    for (const side of [1, -1]) {
+      const ez = FR.ENG_Z * side;
+      const yT = (s, z) => Math.min(0.5, FR.topAt(s, Math.abs(z)) - 0.07), yB = (s) => Math.max(-0.6, -FR.bD(s) + 0.07);
+      for (const dz of [0.6, -0.6]) {
+        dl.push(FR.pipe([13.45, 14.6, 15.8, 17.05].map((s) => [s, yT(s, ez + dz), ez + dz]), 0.006, 5, 16));
+        dl.push(FR.pipe([13.45, 14.6, 15.8, 17.05].map((s) => [s, yB(s), ez + dz]), 0.006, 5, 16));
+      }
+      for (const s of [13.45, 17.05]) dl.push(FR.pipe([[s, yT(s, ez - 0.6), ez - 0.6], [s, yT(s, ez), ez], [s, yT(s, ez + 0.6), ez + 0.6]], 0.006, 5, 10), FR.pipe([[s, yB(s), ez - 0.6], [s, yB(s), ez], [s, yB(s), ez + 0.6]], 0.006, 5, 10));
+    }
+    P('Engine-bay fire detector loops', {
+      system: 'Environmental control', material: 'Continuous-element fire / overheat sensing loops on clips', mass: 4, xrayWeight: 0.7,
+      explode: [-0.5, 2.05, 0],
+      desc: 'Sensing elements run along the top and bottom of each engine bay: their resistance changes with temperature, so a fire or a hot-air leak anywhere along them raises a warning in the cockpit. Kidde-Graviner, a fire-protection specialist, is on the F-22 supplier list (routing approximate).',
+    }, mesh(merge(dl), F.wireOrange()));
     P('Engine-bay fire extinguishers', {
-      system: 'Environmental control', material: 'Pressurised extinguishing-agent bottles, spray tubes, fire / overheat detector loops', mass: 22, count: 2,
+      system: 'Environmental control', material: 'Pressurised extinguishing-agent bottles and spray tubes', mass: 22, count: 2,
       explode: [-0.3, 1.55, 0],
-      desc: 'Detector loops in each engine bay warn of fire or overheat; the pilot can then shut off fuel and fire one or both bottles, which flood the bay through spray tubes (agent and positions approximate).',
+      desc: 'When the detector loops warn of a fire, the pilot shuts off that engine\'s fuel and fires one or both bottles, which flood the bay through spray tubes (agent and positions approximate).',
     }, [mesh(merge(g), F.red()), mesh(merge(l), F.pipe())]);
     const d = [];
     for (const side of [1, -1]) for (const s of [9.2, 10.4]) d.push(new THREE.CapsuleGeometry(0.035, 0.1, 4, 8).rotateZ(Math.PI / 2).translate(X(s), FR.topAt(s, 1.5) - 0.1, side * 1.5));

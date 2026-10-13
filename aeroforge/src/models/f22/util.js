@@ -144,31 +144,50 @@ export function slab(grid, off, outward = null) {
   return g;
 }
 
-/** Slope of a saw-tooth edge: parallel to the 42° wing leading edge (ds/dz = tan 42°). */
-export const TOOTH_SLOPE = Math.tan((42 * Math.PI) / 180);
-
 /**
- * Point grid for a flush door or panel whose fore and aft edges are saw-toothed, the way every F-22
- * door edge is: each tooth edge runs parallel to the wing leading edge, so its radar reflection joins
- * the few directions the planform already uses. `point(s, u)` is the outer-surface point at station s
- * and lateral parameter u (0 … 1); `width` is the panel width (m). With `cut` false the teeth reach
- * past s0 / s1 over the surrounding skin (the cut-out stays rectangular); with `cut` true they are
- * notched into the panel instead (nozzle-flap trailing edges). Pitch ≈ 0.2 m (estimate).
+ * Rectangular duct or chute swept along station-space points [[s, y, z], …]: `w` across (horizontal),
+ * `h` deep (vertical), corners kept sharp. `up` fixes the roll of the section along the path.
  */
-export function toothedGrid(point, stations, { width, pitch = 0.2, fore = true, aft = true, cut = false } = {}) {
-  const n = Math.max(1, Math.round(width / pitch));
-  const cols = 2 * n + 1;
-  const a = TOOTH_SLOPE * (width / (2 * n));
-  const s0 = stations[0], s1 = stations[stations.length - 1], last = stations.length - 1;
-  return stations.map((s, r) => [...Array(cols).keys()].map((k) => {
-    let ss = s;
-    if (k % 2 === 1) {
-      if (r === 0 && fore) ss = cut ? s0 + a : s0 - a;
-      if (r === last && aft) ss = cut ? s1 - a : s1 + a;
+export function rectTube(points, w, h, { n = 12, up = [0, 1, 0], caps = true } = {}) {
+  const curve = new THREE.CatmullRomCurve3(points.map(([s, y, z]) => new THREE.Vector3(X(s), y, z)), false, 'catmullrom', 0.2);
+  const U = new THREE.Vector3(...up).normalize();
+  const rings = [];
+  const T = new THREE.Vector3(), S = new THREE.Vector3(), N = new THREE.Vector3();
+  for (let k = 0; k <= n; k++) {
+    const u = k / n;
+    const p = curve.getPointAt(u);
+    curve.getTangentAt(u, T);
+    S.crossVectors(T, U);
+    if (S.lengthSq() < 1e-8) S.set(0, 0, 1);
+    S.normalize();
+    N.crossVectors(S, T).normalize();
+    const c = (a, b) => [p.x + S.x * a + N.x * b, p.y + S.y * a + N.y * b, p.z + S.z * a + N.z * b];
+    const A = c(w / 2, h / 2), B = c(-w / 2, h / 2), C = c(-w / 2, -h / 2), D = c(w / 2, -h / 2);
+    rings.push([A, B, B, C, C, D, D, A]);
+  }
+  const pos = [], idx = [];
+  for (const r of rings) for (const q of r) pos.push(...q);
+  const m = 8;
+  for (let i = 0; i < rings.length - 1; i++) {
+    for (let j = 0; j < m; j += 2) {
+      const a = i * m + j, b = a + 1, c = a + m, d = c + 1;
+      idx.push(a, c, b, b, c, d);
     }
-    return point(ss, k / (cols - 1));
-  }));
+  }
+  if (caps) {
+    idx.push(0, 2, 4, 0, 4, 6);                                     // start cap faces back along the path
+    const o = (rings.length - 1) * m;
+    idx.push(o, o + 4, o + 2, o, o + 6, o + 4);                     // end cap faces forward
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  const flat = g.toNonIndexed();
+  flat.computeVertexNormals();
+  return flat;
 }
+
+export { TOOTH_SLOPE, toothedGrid } from './layout.js';
 
 /**
  * Hinged pivot for a door or surface: rotates `objects` about p0→p1. `test` is a point on the

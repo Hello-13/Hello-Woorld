@@ -9,7 +9,7 @@ import { M } from '../../engine/materials.js';
 import { plumeMaterial, plumeMesh } from '../../engine/effects.js';
 import { F } from './materials.js';
 import * as FR from './frame.js';
-import { merge, slab, bladeRow, latheX } from './util.js';
+import { merge, slab, bladeRow, latheX, hinge, toothedGrid, rectTube } from './util.js';
 
 const { X, lerp, mono } = FR;
 
@@ -49,6 +49,10 @@ function ductRings() {
   return { lip, inner, rings, st: [null, ...st] };
 }
 
+const ductColsP = [1, 2, 3, 4, 5].map((c) => FR.DUCT.map((r) => [r[0], r[c]]));
+/** Inlet duct centre and size at station s (right side). */
+function ductAtLocal(s) { const [zc, yc, w, h] = ductColsP.map((k) => mono(k, s)); return { zc, yc, w, h }; }
+
 export function buildPropulsion(ctx) {
   const { P, anim } = ctx;
   const D = ductRings();
@@ -75,25 +79,82 @@ export function buildPropulsion(ctx) {
     // ---------------------------------------------------------------- inlet duct, bleed and S-duct
     const fwd = sideRings(D.rings.slice(0, iSplit + 1));
     const aft = sideRings(D.rings.slice(iSplit));
-    const bleed = [];
-    // porous bleed panel on the inboard duct wall and the plenum behind it
-    for (let k = 0; k < 6; k++) {
-      const s = 7.75 + k * 0.14;
-      bleed.push(new THREE.BoxGeometry(0.1, 0.36, 0.03).translate(X(s), -0.32 + k * 0.035, side * (FR.aW(s) + 0.035)));
+    // perforated bleed regions on the upper and inboard walls of the compression surfaces, from the lip
+    // to s 8.0, standing 4 mm off the duct wall toward its centre line
+    const perf = [];
+    {
+      const ringsP = sideRings(D.rings.slice(0, D.st.findIndex((x) => x != null && x >= 8.0) + 1));
+      const inset = (r) => {
+        let cz = 0, cy = 0; for (const p of r) { cz += p[2]; cy += p[1]; } cz /= r.length; cy /= r.length;
+        return r.map((p) => { const dz = cz - p[2], dy = cy - p[1], L = Math.hypot(dz, dy) || 1; return [p[0], p[1] + (dy / L) * 0.004, p[2] + (dz / L) * 0.004]; });
+      };
+      const sub = (j0, j1) => ringsP.map((r) => inset(r).slice(j0, j1 + 1));
+      const n = ringsP[0].length;
+      perf.push(FR.gridSurface(sub(0, 4)), FR.gridSurface(sub(n - 6, n - 1)));
     }
-    bleed.push(new THREE.BoxGeometry(0.9, 0.42, 0.1).translate(X(8.15), -0.18, side * 0.94));
-    // bypass ducting to the upper-surface spill doors
-    bleed.push(FR.pipe([[8.3, -0.05, side * 1.0], [8.8, 0.25, side * 1.02], [9.3, 0.5, side * 1.05]], 0.07, 8));
+    const bl = [];
+    // bleed plenum behind the inboard wall, and the exit duct up to the grille on the upper surface
+    bl.push(new THREE.BoxGeometry(0.75, 0.4, 0.09).translate(X(8.0), -0.18, side * 0.945));
+    bl.push(FR.pipe([[8.3, 0.0, side * 0.965], [8.4, 0.25, side * 1.0], [8.47, FR.topAt(8.47, 1.08) - 0.04, side * 1.08]], 0.045, 8, 10));
     P(`Inlet throat & boundary-layer bleed (${R})`, {
-      system: 'Propulsion', material: 'Composite duct, porous titanium bleed panel', mass: 120,
+      system: 'Propulsion', material: 'Composite duct, perforated titanium bleed panels', mass: 110,
       explode: [0.55, -0.35, 1.25 * side],
-      desc: 'Low-energy boundary-layer air is sucked off through a porous panel in the inlet wall and dumped overboard, and excess inlet air spills through bypass doors on the upper fuselage, so the engine always sees uniform flow (layout simplified).',
-    }, [mesh(FR.gridSurface(fwd, { closed: true, uv: 'n' }), F.duct()), mesh(merge(bleed), F.ductDark())]);
+      desc: 'From the lip back to the throat the upper and inboard compression surfaces are perforated: slow, low-energy boundary-layer air is sucked off through thousands of small holes so the engine sees uniform flow. It is fixed bleed — there are no moving ramps in a caret inlet.',
+    }, [mesh(FR.gridSurface(fwd, { closed: true, uv: 'n' }), F.duct()), mesh(merge(perf), F.perforated())]);
+    P(`Inlet bleed plenum & exit duct (${R})`, {
+      system: 'Propulsion', material: 'Composite plenum and duct', mass: 14,
+      explode: [0.9, 0.35, 1.5 * side],
+      desc: 'The bleed air collects in a plenum behind the perforated wall and is ducted up to a fixed grille on the upper surface just aft of the inlet, where it is dumped overboard (routing approximate).',
+    }, mesh(merge(bl), F.ductDark()));
+    {
+      // fixed exit grille: a frame with slats across it, flush in the upper skin
+      const s0 = 8.42, s1 = 8.95;
+      const pt = (s, u) => { const z = side * lerp(1.0, 1.32, u); return [X(s), FR.topAt(s, Math.abs(z)) + 0.003, z]; };
+      const frame = slab(toothedGrid(pt, [s0, (s0 + s1) / 2, s1], { width: 0.32 }), () => [0, -0.015, 0], new THREE.Vector3(0, 1, 0));
+      const slats = [];
+      for (let k = 1; k < 9; k++) {
+        const s = lerp(s0 + 0.04, s1 - 0.04, k / 9);
+        const za = 1.03, zb = 1.29;
+        const ya = FR.topAt(s, za) + 0.006, yb = FR.topAt(s, zb) + 0.006;
+        const len = Math.hypot(zb - za, yb - ya);
+        slats.push(new THREE.BoxGeometry(0.012, 0.02, len).rotateX(Math.atan2(yb - ya, zb - za) * side).translate(X(s), (ya + yb) / 2, side * (za + zb) / 2));
+      }
+      P(`Upper bleed exit grille (${R})`, {
+        system: 'Skin & fairings', skin: true, material: 'Composite grille frame with angled slats, saw-tooth edges', mass: 4,
+        explode: [0.3, 1.6, 1.5 * side],
+        desc: 'Fixed grilles on the upper surface just aft of each inlet dump the inlet bleed and the diverter air that has passed through the fuel cooler. A retired P&W field-service representative recalls that roughly the first two dozen F-22s also had doors over these grilles, deleted after flight test showed they were not needed (position approximate).',
+      }, [mesh(frame, F.door()), mesh(merge(slats), F.ductDark())]);
+    }
     P(`Serpentine inlet duct (${R})`, {
       system: 'Propulsion', material: 'Composite duct with radar-absorbent lining', mass: 160,
       explode: [0, -0.15, 1.0 * side], callout: side > 0, anchor: [X(10.6), 0.38, 1.15 * side],
       desc: 'The duct curves up and inward for about 7 m from the inlet to the engine, so no line of sight reaches the spinning fan — normally the brightest radar reflector on a jet — and its absorbent lining soaks up energy that bounces in.',
     }, mesh(FR.gridSurface(aft, { closed: true, uv: 'n' }), F.duct()));
+    {
+      // bypass (spill) door on the upper aft fuselage over the end of the duct, with the short duct to it
+      const s0 = 12.45, s1 = 13.15, za = 1.18, zb = 1.46;
+      const pt = (s, u) => { const z = side * lerp(za, zb, u); return [X(s), FR.topAt(s, Math.abs(z)) + 0.003, z]; };
+      const door = slab(toothedGrid(pt, [s0, 12.8, s1], { width: zb - za }), () => [0, -0.02, 0], new THREE.Vector3(0, 1, 0));
+      const hd = hinge(mesh(door, F.door()), new THREE.Vector3(X(s1), FR.topAt(s1, za), side * za), new THREE.Vector3(X(s1), FR.topAt(s1, zb), side * zb), new THREE.Vector3(X(s0), 0.6, side * 1.3), new THREE.Vector3(0, 1, 0));
+      anim.bypass = anim.bypass || [];
+      anim.bypass.push(hd);
+      P(`Inlet bypass door (${R})`, {
+        system: 'Skin & fairings', skin: true, material: 'Composite door with saw-tooth edges, hydraulically actuated', mass: 9,
+        explode: [-0.2, 1.75, 1.2 * side],
+        desc: 'When the engine needs less air than the fixed caret inlet captures, this door opens to spill the surplus from the aft end of the duct overboard, keeping the inlet shock system stable instead of letting it buzz. It matters at the Mach 1.5-plus the F-22 cruises at on dry power (position approximate).',
+      }, hd.pivot);
+      const sm = (s0 + s1) / 2;
+      const { zc, yc, w, h } = ductAtLocal(sm);
+      // taps the duct's upper outboard shoulder, outboard of the F-3 saddle tank
+      void w; void zc;
+      const zB = side * 1.24, yB = yc + 0.25 * (h / 0.94);
+      const by = [rectTube([[sm, yB, zB], [sm, (yB + FR.topAt(sm, 1.28)) / 2, side * 1.26], [sm, FR.topAt(sm, 1.3) - 0.03, side * 1.3]], 0.14, 0.6, { n: 6, up: [1, 0, 0] })];
+      P(`Inlet bypass duct (${R})`, {
+        system: 'Propulsion', material: 'Composite plenum off the top of the S-duct', mass: 10,
+        explode: [-0.2, 1.25, 1.35 * side],
+        desc: 'A short plenum taps the top of the serpentine duct just ahead of the fan face and leads up to the bypass door, so spilled air never reaches the engine (position approximate).',
+      }, mesh(merge(by), F.duct()));
+    }
 
     // ---------------------------------------------------------------- F119 fan
     const E = FR.F119;
@@ -103,17 +164,35 @@ export function buildPropulsion(ctx) {
       g.push(latheX([[0.001, 13.12], [0.09, 13.2], [0.15, 13.32], [0.18, 13.45], [0.2, 13.6], [0.21, 14.05]], yc, zc, 28));
       const rot = [[13.5, 20, 0.18, 0.47, 0.16], [13.72, 26, 0.2, 0.44, 0.13], [13.92, 32, 0.22, 0.42, 0.11]];
       for (const [s, n, h, t, ch] of rot) g.push(bladeRow({ x: X(s), y: yc, z: zc, count: n, rHub: h, rTip: t, chord: ch, twist: 0.75, thick: 0.014 }));
-      // variable inlet guide vanes, then a stator row behind each rotor
-      g.push(bladeRow({ x: X(13.4), y: yc, z: zc, count: 22, rHub: 0.15, rTip: 0.48, chord: 0.06, twist: -0.2, thick: 0.012 }));
+      // a stator row behind each rotor
       for (const [s, n, h, t] of [[13.61, 36, 0.2, 0.47], [13.82, 40, 0.21, 0.44], [14.02, 44, 0.22, 0.42]]) g.push(bladeRow({ x: X(s), y: yc, z: zc, count: n, rHub: h, rTip: t, chord: 0.07, twist: -0.35, thick: 0.01 }));
       const blades = merge(g);
       const cas = FR.cylX(13.74, yc, zc, 0.76, 0.49, 0.48, 40, true);       // fan-case liner over the blade tips
       const fan = P(`F119 fan (${R})`, {
         system: 'Propulsion', material: 'Hollow wide-chord titanium blades linear-friction-welded to their discs (blisks), Alloy C stators', mass: 480,
         explode: [1.3, 0.55, 0.45 * side], callout: side > 0, anchor: [X(13.62), 0.38, zc],
-        desc: 'Three shroudless fan stages built as integrally bladed rotors (blisks), driven by the single-stage LP turbine; the inlet guide vanes are variable for stall margin. The fan face is 38 in (0.97 m) across, and with a bypass ratio of 0.30 about 23 % of the air flows around the core (blade counts illustrative; the whole F119 weighs about 2,270 kg).',
+        desc: 'Three shroudless fan stages driven by the single-stage LP turbine, each a blisk: hollow wide-chord titanium blades linear-friction-welded to their disc, with Alloy C stator rows between. The fan face is 38 in (0.97 m) across, and with a bypass ratio of 0.30 about 23 % of the air flows around the core (blade counts illustrative; the whole F119 weighs about 2,270 kg).',
       }, [mesh(blades, F.blade()), mesh(cas, F.tiDull())]);
       fan.userData.part.thermalRole = 'fan';
+      fan.userData.part.xrayWeight = 0.45;
+      // variable inlet guide vanes: one row ahead of the first rotor, each vane on a spindle through the
+      // case, all turned together by a unison ring and its actuator
+      const igv = [bladeRow({ x: X(13.4), y: yc, z: zc, count: 22, rHub: 0.15, rTip: 0.48, chord: 0.06, twist: -0.2, thick: 0.012 })];
+      const ring = [tor(0.505, 0.012, 13.4, 44)];
+      for (let k = 0; k < 22; k++) {
+        const a = (k / 22) * Math.PI * 2;
+        ring.push(new THREE.CylinderGeometry(0.006, 0.006, 0.03, 5).translate(0, 0.49, 0).rotateX(a).translate(X(13.4), yc, zc));
+      }
+      // actuator under the case driving the ring through a bellcrank
+      ring.push(FR.cylX(13.6, yc - 0.53, zc + side * 0.12, 0.26, 0.022, 0.022, 10));
+      ring.push(FR.pipe([[13.46, yc - 0.53, zc + side * 0.12], [13.41, yc - 0.505, zc + side * 0.1]], 0.008, 5, 2));
+      const ig = P(`F119 variable inlet guide vanes (${R})`, {
+        system: 'Propulsion', material: 'Burn-resistant titanium (Alloy C) vanes on spindles, unison ring and actuator', mass: 30,
+        explode: [1.75, 0.3, 0.45 * side],
+        desc: 'The first row of vanes is variable: a unison ring round the case, moved by a FADEC-controlled actuator, turns all 22 vanes together to set the angle at which air meets the first fan rotor, which widens the stall and surge margin (vane count illustrative).',
+      }, [mesh(igv[0], F.blade()), mesh(merge(ring), F.steel())]);
+      ig.userData.part.thermalRole = 'fan';
+      ig.userData.part.xrayWeight = 0.5;
     }
     // ---------------------------------------------------------------- outer case and bypass duct
     {
@@ -135,6 +214,7 @@ export function buildPropulsion(ctx) {
         desc: 'The outer case is 48 in (1.22 m) across. Between it and the core cowl runs the bypass duct, which carries cool fan air past the hot core to the augmentor and nozzle. The case splits along its length, so modules can be changed without pulling the whole engine apart (drawn faint in X-ray so the core shows).',
       }, [mesh(merge(c), F.tiDull()), mesh(core, F.hot()), mesh(merge(st), F.tiDull())]);
       cs.userData.part.thermalRole = 'fan';
+      cs.userData.part.xrayWeight = 0.5;
     }
     // ---------------------------------------------------------------- HP compressor
     {
@@ -153,6 +233,7 @@ export function buildPropulsion(ctx) {
         desc: 'Six stages (the F100 needed ten) raise the core pressure so that the whole engine reaches an overall pressure ratio of about 26:1. Its stators are a burn-resistant titanium alloy, because a titanium fire in a compressor can otherwise sustain itself.',
       }, [mesh(merge(g), F.blade()), mesh(cas, F.tiDull())]);
       hpc.userData.part.thermalRole = 'compressor';
+      hpc.userData.part.xrayWeight = 0.35;
     }
     // ---------------------------------------------------------------- shafts and bearings
     {
@@ -196,6 +277,7 @@ export function buildPropulsion(ctx) {
         desc: 'One stage of single-crystal blades drives the six-stage compressor. The gas reaching it is around 1,900 K (about 3,000 °F), hotter than the alloy can survive, so compressor air is blown through each hollow blade and out of tiny holes as a protective film.',
       }, mesh(merge(g), F.bladeHot()));
       hpt.userData.part.thermalRole = 'turbine';
+      hpt.userData.part.xrayWeight = 0.4;
       const l = [bladeRow({ x: X(15.42), y: yc, z: zc, count: 40, rHub: 0.225, rTip: 0.355, chord: 0.05, twist: -0.6, thick: 0.012 })];
       l.push(bladeRow({ x: X(15.51), y: yc, z: zc, count: 60, rHub: 0.23, rTip: 0.365, chord: 0.045, twist: -0.85, thick: 0.01 }));
       l.push(FR.cylX(15.52, yc, zc, 0.06, 0.22, 0.22, 28));
@@ -205,6 +287,7 @@ export function buildPropulsion(ctx) {
         desc: 'A single LP stage turns the three-stage fan through the LP shaft. The two spools spin in opposite directions, which cancels much of their gyroscopic moment when the jet manoeuvres hard (the vanes between the turbines were kept).',
       }, mesh(merge(l), F.bladeHot()));
       lpt.userData.part.thermalRole = 'turbine';
+      lpt.userData.part.xrayWeight = 0.4;
     }
     // ---------------------------------------------------------------- augmentor
     {
@@ -226,6 +309,7 @@ export function buildPropulsion(ctx) {
         desc: 'The three-zone afterburner lifts thrust from about 116 kN dry to the 156 kN class. Instead of spray bars and V-gutters, fuel is injected from thick curved vanes coated with radar-absorbent ceramic, which also hold the flame and block any view of the turbine (vane count illustrative); a perforated liner keeps bypass air between flame and casing.',
       }, [mesh(merge(g), F.hot()), mesh(liner, F.liner()), mesh(outer, F.hot())]);
       aug.userData.part.thermalRole = 'augmentor';
+      aug.userData.part.xrayWeight = 0.45;
       const glow = mesh(new THREE.CircleGeometry(0.5, 32).rotateY(-Math.PI / 2).translate(X(17.2), yc, zc), anim.turbine, { cast: false });
       glow.userData.fx = true;
       aug.add(glow);
@@ -248,19 +332,20 @@ export function buildPropulsion(ctx) {
         }
         walls.push(slab(grid, () => [0, 0, dz > 0 ? -0.04 : 0.04], new THREE.Vector3(0, 0, Math.sign(dz))));
       }
-      // moving flaps: convergent + divergent about the throat, external flaps about their front edges
+      // fixed convergent flaps set the throat; the divergent (vectoring) flaps swing about the throat;
+      // the external flaps hinge at their front edges and follow. Trailing edges are saw-toothed.
       const fw = NW - 0.04;
-      const flapGeo = (sgn) => merge([
-        slab([[[sx(17.72), sgn * 0.32 + yc, zc - fw], [sx(17.72), sgn * 0.32 + yc, zc + fw]], [[sx(17.96), sgn * 0.21 + yc, zc - fw], [sx(17.96), sgn * 0.21 + yc, zc + fw]]], () => [0, sgn * 0.035, 0]),
-        slab([[[sx(17.96), sgn * 0.21 + yc, zc - fw], [sx(17.96), sgn * 0.21 + yc, zc + fw]], [[sx(18.52), sgn * 0.25 + yc, zc - fw], [sx(18.52), sgn * 0.25 + yc, zc + fw]]], () => [0, sgn * 0.035, 0]),
-      ]);
+      const flapPts = (sgn, s0, s1, y0, y1, cut) => toothedGrid((s, u) => [sx(s), yc + sgn * lerp(y0, y1, (s - s0) / (s1 - s0)), zc + lerp(-fw, fw, u)],
+        cut ? [s0, lerp(s0, s1, 0.33), lerp(s0, s1, 0.66), s1] : [s0, s1], { width: 2 * fw, fore: false, aft: cut, cut: true });
+      const conv = (sgn) => slab(flapPts(sgn, 17.72, 17.96, 0.32, 0.21, false), () => [0, sgn * 0.035, 0]);
+      const div = (sgn) => slab(flapPts(sgn, 17.96, 18.52, 0.21, 0.25, true), () => [0, sgn * 0.035, 0]);
       const throat = new THREE.Vector3(sx(17.96), yc, zc);
       const pivot = new THREE.Group();
       pivot.position.copy(throat);
       const inner = new THREE.Group();
       inner.position.copy(throat).multiplyScalar(-1);
       pivot.add(inner);
-      inner.add(mesh(merge([flapGeo(1), flapGeo(-1)]), F.nozzleIn()));
+      inner.add(mesh(merge([div(1), div(-1)]), F.nozzleIn()));
       // plume (effect)
       const pm = plumeMaterial({ core: 0xfff3d6, outer: 0xff6a20, diamonds: 1.2 });
       const plume = plumeMesh(0.3, 0.12, 6.5, pm);
@@ -281,50 +366,85 @@ export function buildPropulsion(ctx) {
         g.position.copy(front).multiplyScalar(-1);
         p.add(g);
         const top0 = sgn > 0 ? 0.555 : -0.6, top1 = sgn > 0 ? 0.27 : -0.29;
-        const grid = [];
-        for (let k = 0; k <= 4; k++) {
-          const t = k / 4, s = lerp(17.55, 18.52, t);
-          const y = lerp(top0, top1, t) + sgn * 0.03 * Math.sin(Math.PI * t);
-          grid.push([[sx(s), y, zc - NW - 0.03], [sx(s), y, zc + NW + 0.03]]);
-        }
+        const grid = toothedGrid((s, u) => {
+          const t = (s - 17.55) / 0.97;
+          return [sx(s), lerp(top0, top1, t) + sgn * 0.03 * Math.sin(Math.PI * Math.min(1, t)), zc + lerp(-NW - 0.03, NW + 0.03, u)];
+        }, [0, 1, 2, 3, 4].map((k) => lerp(17.55, 18.52, k / 4)), { width: 2 * NW + 0.06, fore: false, cut: true });
         g.add(mesh(slab(grid, () => [0, -sgn * 0.04, 0], new THREE.Vector3(0, sgn, 0)), F.wing()));
         return p;
       };
       const extU = ext(1), extL = ext(-1);
       anim.tvc.push({ pivot, extU, extL });
-      const nz = P(`2-D vectoring nozzle (${R})`, {
-        system: 'Propulsion', material: 'Burn-resistant titanium (Alloy C) and nickel flaps, ceramic-coated hot sections', mass: 500,
-        explode: [-2.6, 0.3, 0.85 * side], callout: side > 0, anchor: [X(18.3), 0.5, zc],
-        desc: 'A two-dimensional convergent–divergent nozzle: upper and lower flaps set the throat and exit areas and swing the exhaust ±20° in pitch, giving pitch control even when the tail has too little airflow to bite. Its flat sides and serrated edges also shield the hot turbine from view.',
-      }, [mesh(trans, F.nozzleIn()), mesh(merge(walls), F.nozzle()), pivot, extU, extL]);
-      nz.userData.part.thermalRole = 'nozzle';
-      // nozzle actuators: two above and two below, between the convergent flaps and the external flaps
-      const acts = [];
+      const tp = P(`Nozzle transition duct & sidewalls (${R})`, {
+        system: 'Propulsion', material: 'Burn-resistant titanium (Alloy C) and nickel alloy, ceramic-coated hot walls', mass: 170,
+        explode: [-2.2, 0.75, 0.85 * side],
+        desc: 'The fixed part of the 2-D nozzle: a transition duct that turns the round augmentor exit into a rectangle, and flat sidewalls 1.0 m apart that carry the flap hinges. The flat sides and the rectangular exit also shield the hot turbine from view.',
+      }, [mesh(trans, F.nozzleIn()), mesh(merge(walls), F.nozzle())]);
+      tp.userData.part.thermalRole = 'nozzle';
+      const cv = P(`Nozzle convergent flaps (${R})`, {
+        system: 'Propulsion', material: 'Cooled nickel-alloy flaps', mass: 70,
+        explode: [-2.45, -0.75, 0.85 * side],
+        desc: 'Upper and lower convergent flaps squeeze the flow down to the throat, the narrowest point, where it reaches the speed of sound. The throat area is fully variable: it opens up for afterburner, when the hotter, larger-volume gas needs more room.',
+      }, mesh(merge([conv(1), conv(-1)]), F.nozzleIn()));
+      cv.userData.part.thermalRole = 'nozzle';
+      const dv = P(`Nozzle divergent (vectoring) flaps (${R})`, {
+        system: 'Propulsion', material: 'Burn-resistant titanium (Alloy C) and nickel flaps, saw-tooth trailing edges', mass: 150,
+        explode: [-3.1, 0.3, 0.85 * side], callout: side > 0, anchor: [X(18.3), 0.25, zc],
+        desc: 'Two wedge-shaped divergent flaps let the supersonic jet expand after the throat, and swing it ±20° in pitch to give pitch control even when the tail has too little airflow to bite. They also flatten the plume so it mixes and cools faster, cutting the infrared signature.',
+      }, pivot);
+      dv.userData.part.thermalRole = 'nozzle';
+      const ex = P(`Nozzle external flaps (${R})`, {
+        system: 'Propulsion', material: 'Composite / titanium outer flaps, saw-tooth trailing edges', mass: 60,
+        explode: [-2.8, 0.95, 1.05 * side],
+        desc: 'The outer fairing flaps above and below hinge at their front edges and follow the divergent flaps, keeping the outer mould line smooth; their serrated trailing edges match the planform angles.',
+      }, [extU, extL]);
+      ex.userData.part.thermalRole = 'nozzle';
+      // nozzle actuators: two above and two below, between the convergent flaps and the external flaps,
+      // each with a supply and return line from the engine
+      const acts = [], lines = [];
       for (const dz of [-0.28, 0.28]) {
         for (const y of [0.4, -0.42]) {
           acts.push(new THREE.CylinderGeometry(0.03, 0.026, 0.27, 10).rotateZ(Math.PI / 2).translate(sx(17.815), yc + y, zc + dz));
           acts.push(new THREE.CylinderGeometry(0.014, 0.014, 0.16, 8).rotateZ(Math.PI / 2).translate(sx(18.0), yc + y * 0.93, zc + dz));
+          const r0 = Math.sign(y) * 0.585;
+          lines.push(FR.pipe([[15.0, yc + r0 * 0.98, zc + dz * 0.6], [16.4, yc + r0 * 0.97, zc + dz * 0.8], [17.3, yc + Math.sign(y) * 0.6, zc + dz], [17.68, yc + y + Math.sign(y) * 0.02, zc + dz]], 0.008, 5, 16));
         }
       }
       P(`Nozzle actuators (${R})`, {
-        system: 'Propulsion', material: 'Fuel-draulic linear actuators (engine fuel as the working fluid)', mass: 50, count: 4,
+        system: 'Propulsion', material: 'Linear actuators with supply and return lines along the augmentor case (working fluid not published)', mass: 50, count: 4,
         explode: [-2.2, -0.45, 1.25 * side],
-        desc: 'Four linear actuators move the convergent and divergent flaps together to set throat and exit area, and differentially to vector the jet. On many augmented engines these run on high-pressure engine fuel rather than hydraulic fluid (working fluid and count approximate for the F119).',
-      }, mesh(merge(acts), F.hyd()));
+        desc: 'Four linear actuators move the flaps together to set throat and exit areas, and differentially to vector the jet, on FADEC command. Lines along the augmentor case bring their working fluid from the engine; whether the F119 uses fuel or hydraulic fluid for this is not published, so treat the plumbing as approximate.',
+      }, [mesh(merge(acts), F.hyd()), mesh(merge(lines), F.pipe())]);
     }
     // ---------------------------------------------------------------- gearbox, AMAD, engine fuel, lube, ignition, mounts
     {
       const gy = yc - 0.69;
       const g = [];
-      g.push(new THREE.BoxGeometry(0.55, 0.12, 0.34).translate(X(13.85), gy, zc));
-      g.push(FR.cylX(13.85, gy + 0.07, zc, 0.5, 0.05, 0.05, 10));                          // tower-shaft housing
-      g.push(FR.pipe([[13.7, gy, zc + side * 0.12], [13.7, -0.55, side * 1.1], [13.7, -0.42, side * 1.3]], 0.03, 6));
-      g.push(new THREE.BoxGeometry(0.5, 0.2, 0.24).translate(X(13.75), -0.42, side * 1.38));
-      P(`Accessory gearbox & AMAD (${R})`, {
-        system: 'Propulsion', material: 'Aluminium / magnesium gear cases, steel gears', mass: 95,
+      g.push(new THREE.BoxGeometry(0.5, 0.12, 0.34).translate(X(13.85), gy, zc));
+      g.push(FR.cylX(13.85, gy + 0.07, zc, 0.46, 0.05, 0.05, 10));                         // tower-shaft housing
+      for (const [s, dz] of [[13.7, 0.12], [14.0, -0.1]]) g.push(FR.cylX(s, gy - 0.07, zc + side * dz, 0.08, 0.045, 0.045, 12));   // drive pads
+      P(`F119 accessory gearbox (${R})`, {
+        system: 'Propulsion', material: 'Aluminium / magnesium gear case, steel gears, mounted under the fan case', mass: 55,
         explode: [0.2, -0.95, 0.55 * side],
-        desc: 'A gearbox under the fan case takes power off the HP spool through a tower shaft and drives the engine\'s own pumps; a shaft to the airframe-mounted accessory drive (AMAD) turns this side\'s generator and hydraulic pumps.',
+        desc: 'The engine-mounted gearbox takes power off the HP spool through a radial tower shaft and drives the engine\'s own fuel and lube pumps; a power take-off pad on its outboard side drives the shaft to the airframe gearbox.',
       }, mesh(merge(g), F.boxLight()));
+      // power take-off shaft up and outboard to the AMAD, with flexible couplings at both ends
+      const pA = new THREE.Vector3(X(13.72), gy + 0.03, zc + side * 0.17), pB = new THREE.Vector3(X(13.74), -0.44, side * 1.255);
+      const sh = [FR.pipe([[13.72, pA.y, pA.z], [13.73, (pA.y + pB.y) / 2, (pA.z + pB.z) / 2], [13.74, pB.y, pB.z]], 0.03, 10, 4)];
+      for (const p of [pA, pB]) sh.push(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 14).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), pB.clone().sub(pA).normalize())).translate(p.x, p.y, p.z));
+      P(`Power take-off shaft (${R})`, {
+        system: 'Propulsion', material: 'Steel shaft with flexible diaphragm couplings', mass: 6,
+        explode: [0.45, -1.35, 0.95 * side],
+        desc: 'A short, fast-turning shaft carries engine power out of the engine to the airframe-mounted accessory drive; its flexible couplings let the engine grow and move on its mounts without loading the gearboxes. During a start, power flows the other way along it to spin the engine up.',
+      }, mesh(merge(sh), F.steel()));
+      const am = [new THREE.BoxGeometry(0.5, 0.2, 0.24).translate(X(13.75), -0.42, side * 1.38)];
+      am.push(new THREE.BoxGeometry(0.06, 0.24, 0.2).translate(X(13.5), -0.42, side * 1.38), new THREE.BoxGeometry(0.06, 0.24, 0.2).translate(X(14.01), -0.42, side * 1.38));   // mounting faces
+      am.push(FR.cylX(13.75, -0.3, side * 1.38, 0.12, 0.035, 0.035, 10));                   // oil filler / breather
+      P(`Airframe-mounted accessory drive (${R})`, {
+        system: 'Propulsion', material: 'AMAD: aluminium gear case, steel gears, own lube system', mass: 45,
+        explode: [0.3, -0.55, 1.55 * side],
+        desc: 'The AMAD is the airframe gearbox: it turns this side\'s 270 V DC generator (bolted to its forward face) and the engine-driven hydraulic pumps (aft face), and spins the engine for a start. If one fails, that side loses hydraulic and electrical power; every F-22 AMAD is validated on a single depot test stand at Hill AFB.',
+      }, mesh(merge(am), F.boxLight()));
 
       const f = [];
       f.push(new THREE.BoxGeometry(0.18, 0.14, 0.16).translate(X(13.48), gy - 0.01, zc + side * 0.1));       // main fuel pump
@@ -384,6 +504,26 @@ export function buildPropulsion(ctx) {
       const fy = yc - 0.33, fz = zc + side * 0.55;
       const fd = [new THREE.BoxGeometry(0.4, 0.2, 0.08).rotateX(th).translate(X(14.75), fy, fz)];
       fd.push(FR.pipe([[14.55, fy + 0.05, fz], [14.2, fy + 0.1, zc + side * 0.6], [13.9, fy + 0.15, zc + side * 0.6]], 0.012, 5));
+      // colour-coded harnesses along the case from the FADEC, and the engine's own sensors
+      {
+        const hz = zc + side * 0.6, hz2 = zc + side * 0.56;
+        const blue = [FR.pipe([[14.55, fy + 0.02, fz], [14.3, yc - 0.42, hz], [13.9, yc - 0.42, hz], [13.45, yc - 0.4, hz]], 0.011, 6, 16)];
+        const orange = [FR.pipe([[14.95, fy, fz], [15.2, yc - 0.38, hz2], [15.6, yc - 0.36, zc + side * 0.53]], 0.011, 6, 12)];
+        const green = [FR.pipe([[14.6, fy - 0.05, fz], [14.3, yc - 0.55, zc + side * 0.42], [13.85, gy + 0.08, zc + side * 0.2]], 0.01, 6, 12)];
+        const sens = [];
+        // fan-inlet temperature / pressure probes (T2 / P2) through the case at the fan face
+        for (const a of [0.6, 2.4]) sens.push(new THREE.CylinderGeometry(0.008, 0.008, 0.1, 6).translate(0, 0.45, 0).rotateX(a * side).translate(X(13.36), yc, zc));
+        // N1 / N2 speed pickups on the gearbox
+        for (const dz of [-0.2, 0.2]) sens.push(new THREE.CylinderGeometry(0.014, 0.014, 0.06, 8).rotateX(Math.PI / 2).translate(X(13.75), gy, zc + dz));
+        // turbine-exhaust thermocouples: a ring of probes and their harness at the LP turbine exit
+        sens.push(tor(0.555, 0.008, 15.6, 40));
+        for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; sens.push(new THREE.CylinderGeometry(0.006, 0.006, 0.2, 5).translate(0, 0.46, 0).rotateX(a).translate(X(15.6), yc, zc)); }
+        P(`F119 harnesses & sensors (${R})`, {
+          system: 'Propulsion', material: 'Colour-coded shielded harnesses, thermocouples, pressure and speed sensors', mass: 14, xrayWeight: 0.6,
+          explode: [0.5, -0.25, 1.35 * side],
+          desc: 'Harnesses from the FADEC to the fan-inlet temperature and pressure probes, the N1 / N2 speed pickups on the gearbox, the ring of turbine-exhaust thermocouples, igniters and actuators. They are colour-coded, part of a design that lets the F119 be serviced with just five hand tools.',
+        }, [mesh(merge(blue), F.wireBlue()), mesh(merge(orange), F.wireOrange()), mesh(merge(green), F.wireGreen()), mesh(merge(sens), F.probe())]);
+      }
       P(`FADEC engine control (${R})`, {
         system: 'Propulsion', material: 'Dual-redundant digital engine controller (Hamilton Standard), fuel cooled', mass: 18,
         explode: [0.0, 0.5, 1.15 * side],

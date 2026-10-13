@@ -35,9 +35,21 @@ export const DECK_AT = {
 export const JIB_POS = [[-1.07, 0.8], [-0.42, 0.8], [0.22, 0.81], [0.72, 0.8], [0.2, -0.8], [-1.1, -0.31], [-1.13, 0.48], [-0.16, -0.6]];
 
 // L-band antenna panel outline (x, y): nearly the whole deck, chamfered, with a tab at the +X end, the
-// M-code group at the −X end and a notch for the sunshade
-export const PANEL_OUTLINE = [[1.08, -0.86], [-0.3, -0.86], [-0.3, -0.53], [-0.84, -0.42], [-1.06, -0.42], [-1.25, -0.22], [-1.25, 0.8], [-1.19, 0.86],
-  [1.1, 0.86], [1.1, 0.56], [1.21, 0.56], [1.4, 0.22], [1.4, -0.12], [1.21, -0.52], [1.08, -0.52]];
+// M-code group at the −X end, a notch for the sunshade and the second mast, and corner cut-outs where
+// the laser retroreflector and the hosted-payload sensor stand on the deck (those two estimated)
+export const PANEL_OUTLINE = [[0.62, -0.86], [-0.3, -0.86], [-0.3, -0.53], [-0.84, -0.42], [-1.06, -0.42], [-1.25, -0.22], [-1.25, 0.8], [-1.19, 0.86],
+  [0.93, 0.86], [0.93, 0.62], [1.1, 0.62], [1.1, 0.56], [1.21, 0.56], [1.4, 0.22], [1.4, -0.12], [1.21, -0.52], [1.08, -0.52], [1.08, -0.44], [0.62, -0.44]];
+
+// cut-outs for the deck-mounted units that come up through the panel: rectangles [x, y, w, h] and
+// circles [x, y, r]; each lies wholly inside the outline (the retroreflector and the hosted-payload
+// sensor stand in corner cut-outs of the outline instead)
+export const PANEL_HOLES = {
+  rects: [[...DECK_AT.esa, 0.3, 0.36], [...DECK_AT.scot, 0.3, 0.23]],
+  circles: [[...DECK_AT.fwdMast, 0.042], [...DECK_AT.hpeS, 0.07]],
+};
+// posts on the deck that carry the panel (x, y); the two at x 1.17 carry the +X tab, which overhangs the deck edge
+export const PANEL_POSTS = [[1.02, -0.4], [0.8, 0.78], [0.45, 0.0], [0.4, -0.78], [0.4, 0.78], [-0.2, -0.78], [-0.34, 0.8], [-0.92, 0.78], [-1.18, 0.75], [-1.18, -0.15],
+  [-0.75, -0.38], [1.17, 0.2], [1.17, -0.3], [-0.15, 0.0]];
 
 // Bus/NCE/HPE panel (−Y), unit centres (x, z) and sizes [x, depth y, z]
 export const BUS = {
@@ -51,4 +63,14 @@ export const BUS = {
 export const onNPE = ([x, z], d) => [x, IY - d / 2, z];
 export const onBUS = ([x, z], d) => [x, -(IY - d / 2), z];
 export const AFT_ANT = [1.0, 0.72];   // aft TT&C S-band antenna, an aft corner (Fig. 4)
+
+// The two NiH₂ batteries low on the −Y panel: centres x, centre z, size [x, depth y, z]. Each pack has a
+// connector bracket on its +Z side, outboard of the cells: a power connector for the feeder from the
+// power regulation unit and a telemetry connector (cell voltages, pressures, temperatures) for the
+// data harness. Bracket and connector positions are estimates.
+export const BATT = { xs: [-0.4, 0.66], z: -1.05, s: [1.0, 0.25, 0.3] };
+export const battConn = (x) => {
+  const z = BATT.z + BATT.s[2] / 2 + 0.05;   // connector faces, 5 cm proud of the pack's +Z side
+  return { power: [x - 0.05, -IY + 0.165, z], data: [x + 0.05, -IY + 0.075, z] };
+};
 export { HX };

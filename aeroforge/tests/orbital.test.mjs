@@ -119,6 +119,31 @@ test('GPS III Earth deck layout: 4 + 8 rings, M-code tab, sunshade corner, no cl
     const [[x1, y1], r1] = items[i], [[x2, y2], r2] = items[j];
     assert.ok(Math.hypot(x1 - x2, y1 - y2) >= r1 + r2 + 0.01, `deck items at (${x1}, ${y1}) and (${x2}, ${y2}) clash`);
   }
+  // L-band antenna panel: every cut-out lies wholly inside the outline (a hole crossing the edge
+  // extrudes filled, with side walls outside the panel), and the units in the corner cut-outs clear it
+  const O = L.PANEL_OUTLINE;
+  const inPoly = ([x, y]) => { let c = false; for (let i = 0, j = O.length - 1; i < O.length; j = i++) { const [xi, yi] = O[i], [xj, yj] = O[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c; } return c; };
+  const edgeDist = ([x, y]) => Math.min(...O.map(([x1, y1], i) => { const [x2, y2] = O[(i + 1) % O.length]; const dx = x2 - x1, dy = y2 - y1; const t = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy))); return Math.hypot(x - x1 - t * dx, y - y1 - t * dy); }));
+  const ringPts = (x, y, r) => Array.from({ length: 32 }, (_, k) => [x + r * Math.cos((k / 32) * 2 * Math.PI), y + r * Math.sin((k / 32) * 2 * Math.PI)]);
+  const rectPts = (x, y, w, h) => Array.from({ length: 33 }, (_, k) => k / 32).flatMap((t) => [[x - w / 2 + t * w, y - h / 2], [x - w / 2 + t * w, y + h / 2], [x - w / 2, y - h / 2 + t * h], [x + w / 2, y - h / 2 + t * h]]);
+  const holePts = [...L.PANEL_HOLES.rects.map((h) => rectPts(...h)), ...L.PANEL_HOLES.circles.map((c) => ringPts(...c))];
+  for (const pts of holePts) for (const p of pts) assert.ok(inPoly(p) && edgeDist(p) >= 0.005, `panel cut-out point (${p.map((v) => v.toFixed(3))}) inside the outline`);
+  for (const [k, half] of [['lra', 0.203], ['hpeSensor', 0.075]]) {
+    const [x, y] = L.DECK_AT[k];
+    for (const p of rectPts(x, y, 2 * half, 2 * half)) assert.ok(!inPoly(p), `${k} stands in a corner cut-out, clear of the panel`);
+  }
+  // the panel's posts stand on the deck, under solid panel (not in a cut-out)
+  for (const [x, y] of L.PANEL_POSTS) {
+    assert.ok(Math.abs(x) + 0.03 <= D.HX && Math.abs(y) + 0.03 <= D.HY, `post foot at (${x}, ${y}) on the deck`);
+    assert.ok(inPoly([x, y]) && edgeDist([x, y]) >= 0.014, `post at (${x}, ${y}) under the panel`);
+    for (const [hx, hy, w, h] of L.PANEL_HOLES.rects) assert.ok(Math.abs(x - hx) > w / 2 + 0.014 || Math.abs(y - hy) > h / 2 + 0.014, `post at (${x}, ${y}) clear of a cut-out`);
+    for (const [hx, hy, r] of L.PANEL_HOLES.circles) assert.ok(Math.hypot(x - hx, y - hy) > r + 0.014, `post at (${x}, ${y}) clear of a cut-out`);
+  }
+  // batteries: the connector bracket is outboard of the cells, on the pack's +Z side
+  for (const x of L.BATT.xs) {
+    const c = L.battConn(x);
+    for (const q of [c.power, c.data]) { assert.ok(q[2] >= L.BATT.z + L.BATT.s[2] / 2, 'battery connector outboard of the cells'); assert.ok(Math.abs(q[0] - x) < L.BATT.s[0] / 2 && q[1] > -D.IY && q[1] < -D.IY + L.BATT.s[1], 'battery connector on its pack'); }
+  }
 });
 
 test('GPS III display poses and guided tour', () => {

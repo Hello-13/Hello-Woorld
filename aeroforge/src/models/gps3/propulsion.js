@@ -45,7 +45,6 @@ export function buildPropulsion(P) {
   const lae = P('Liquid apogee engine', {
     system: 'Propulsion', material: 'Niobium-alloy chamber and radiation-cooled nozzle', mass: 4.5, temp: 270, explode: [0, 0, -2.3],
     desc: `The 100-lbf-class bipropellant engine (hydrazine burned with nitrogen tetroxide) that lifts GPS III from its transfer orbit to 20,180 km in a series of apogee burns. The A2100's apogee engine is the LEROS 1c (${GPS3.laeThrust} N, Isp ${GPS3.laeIsp} s, niobium-alloy chamber); that GPS III flies the same engine is likely but unconfirmed, so its figures are used here. The nozzle reaches about 0.2 m below the separation ring.`,
-    callout: true, anchor: [0.135, 0, LAE_TOP - 0.74],
   }, [mesh(bell, G.nozzle()), mesh(head, G.gunmetal())]);
   lae.userData.part.thermalRole = 'engine';
   const mnt = [cylG([0, 0, LAE_TOP + 0.005], 0.1, 0.02, 'z', 28)];
@@ -152,9 +151,10 @@ export function buildPropulsion(P) {
     system: 'Fuel', material: 'Titanium tubing', mass: 3, temp: 290, explode: [0, 0, -0.55],
     desc: 'Nitrogen tetroxide leaves the bottom of each flanking tank, runs inboard along the aft deck to a tee in the core foot, passes its latch valve and drops to the engine\'s bipropellant valve. The thrusters never use it (routing estimated).',
   }, mesh(merge([
-    pipeG([[OX.x, 0, oxBot - 0.025], [OX.x, 0, zo], [0.4, -0.15, zo], [0, -0.15, zo]], r),
-    pipeG([[-OX.x, 0, oxBot - 0.025], [-OX.x, 0, zo], [-0.4, -0.15, zo], [0, -0.15, zo]], r),
-    pipeG([[0, -0.15, zo], [-0.085, -0.15, zo], [-0.085, -0.05, -1.69], [-0.085, 0, LAE_TOP - 0.006]], r),
+    // the two tank lines meet head-on at a tee above the engine; the latch valve is on the drop below it
+    pipeG([[OX.x, 0, oxBot - 0.025], [OX.x, 0, zo], [0.4, -0.15, zo], [-0.085, -0.15, zo]], r),
+    pipeG([[-OX.x, 0, oxBot - 0.025], [-OX.x, 0, zo], [-0.4, -0.15, zo], [-0.085, -0.15, zo]], r),
+    pipeG([[-0.085, -0.15, zo], [-0.085, -0.15, -1.665], [-0.085, -0.05, -1.69], [-0.085, 0, LAE_TOP - 0.006]], r),
   ]), G.tubing()));
   const loop = [[0.62, 0.62], [-0.62, 0.62], [-0.62, -0.62], [0.62, -0.62], [0.62, 0.62]].map(([x, y]) => [x, y, zm]);
   const man = [pipeG(loop, r)];
@@ -169,7 +169,7 @@ export function buildPropulsion(P) {
   P('Latch valves & filter', {
     system: 'Fuel', material: 'Latching solenoid valves, etched-disc filter', mass: 2.4, count: 4, temp: 290, explode: [0.4, 0, -0.5],
     desc: 'A filter catches particles before they reach a valve seat; latching valves, which hold open or closed with no power, let the ground isolate the engine fuel branch, the thruster branch or the oxidiser line (count estimated).',
-  }, mesh(merge([cylG([0.1, 0.15, -1.22], 0.025, 0.08, 'z', 14), cylG([0.1, 0.15, -1.45], 0.022, 0.05, 'z', 12), cylG([0.3, 0.15, -1.45], 0.022, 0.05, 'z', 12), cylG([-0.04, -0.15, zo], 0.022, 0.05, 'x', 12),
+  }, mesh(merge([cylG([0.1, 0.15, -1.22], 0.025, 0.08, 'z', 14), cylG([0.1, 0.15, -1.45], 0.022, 0.05, 'z', 12), cylG([0.3, 0.15, -1.45], 0.022, 0.05, 'z', 12), cylG([-0.085, -0.15, -1.638], 0.022, 0.04, 'z', 12),
     boxG([0.1, 0.15, -1.45], [0.03, 0.06, 0.03]), boxG([0.3, 0.15, -1.45], [0.03, 0.06, 0.03])]), G.silverBox()));
   reg([0.2, 0.15, -1.45], 'core');
   const FV = -1.02;
@@ -184,7 +184,7 @@ export function buildPropulsion(P) {
     desc: 'Run from the three service valves into the bus: the fuel line joins the hydrazine feed, the oxidiser line the NTO tee, and the helium line climbs the −X bay, clear of the oxidiser tank, to the −X helium tank; the +X tank fills through the manifold (routing estimated).',
   }, mesh(merge([
     pipeG([[FV, 0.15, AFT], [FV, 0.15, zo + 0.02], [0.1, 0.15, zo + 0.02]], r),
-    pipeG([[FV, -0.15, AFT], [FV, -0.15, zo - 0.012], [-0.4, -0.15, zo - 0.012]], r),
+    pipeG([[FV, -0.15, AFT], [FV, -0.15, zo - 0.012], [-0.45, -0.15, zo - 0.012], [-0.4, -0.15, zo]], r),
     pipeG([[FV, 0, AFT], [FV, 0, zo + 0.04], [FV, 0.36, zo + 0.04], [FV, 0.36, 0.4], [-HE.x, 0.1, heBot - 0.06], [-HE.x, 0, heBot - 0.02]], r),
   ]), G.tubing()));
 
@@ -212,6 +212,8 @@ export function buildPropulsion(P) {
     const t = P(`Thruster cluster (${tag})`, {
       system: 'Propulsion', material: 'Catalytic hydrazine thrusters on a titanium valve block', mass: 2.6, count: 3, temp: 270, explode: [sx * 0.7, sy * 0.3, -1.85],
       desc: `Three of the ${GPS3.thrusterSmall} N ("0.2-lbf") hydrazine thrusters, Isp ≈ ${GPS3.rcsIsp} s: hydrazine decomposes over an iridium catalyst into hot gas, with no oxidiser. They control attitude, unload the reaction wheels and make the periodic station-keeping moves (count and layout estimated).`,
+      // propulsion's callout: this pod stands outboard of the box, where every look can see it (the apogee engine sits inside the adapter)
+      callout: sx > 0 && sy > 0, anchor: [c[0] + sx * 0.05, c[1], c[2] + 0.04],
     }, [mesh(merge(pod), G.satinTi()), mesh(merge(small), G.nozzle())]);
     t.userData.part.thermalRole = 'thruster';
     const big = P(`22 N thruster (${tag})`, {
