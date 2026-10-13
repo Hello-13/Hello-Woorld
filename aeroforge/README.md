@@ -48,10 +48,14 @@ All five designs are fictional and modelled from public engineering principles.
   based sky, AgX tone mapping, multisampled HDR post-processing with ground-truth ambient occlusion,
   bloom on emissives only, and procedural PBR surfaces (panel lines, rivets, weathering, carbon
   weave, multi-layer insulation, concrete) with decals and stencils, and a final grade (gentle
-  S-curve, split toning, lens fall-off). Graphics presets (Ultra, High, Balanced, Performance)
-  scale resolution, MSAA, ambient occlusion, mirror reflections and shadow resolution; Ultra is
-  the default on desktops with 8+ cores, and the preset steps down automatically if the frame
-  rate drops.
+  S-curve, split toning, lens fall-off).
+- **4K rendering** — Ultra and High draw at the screen's native resolution (3840 × 2160 on a 4K
+  display); the **4K** preset supersamples a 3840 × 2160 frame onto smaller screens for extra-clean
+  edges. At Ultra and 4K the aircraft and rocket skins and all stencils are painted at twice the
+  texture resolution. The nav shows the frame size being drawn. Presets (4K, Ultra, High,
+  Balanced, Performance) also scale MSAA, ambient occlusion, mirror reflections and shadow maps;
+  Ultra is the default on desktops with 8+ cores, automatic mode steps up to 4K when the GPU has
+  headroom, and steps down if the frame rate drops.
 - **Environments** — showroom, hangar, open sky above a cloud deck, a dawn launch pad with
   floodlights, and low Earth orbit. During a launch the sky darkens with altitude, the stars come
   out and the curved Earth (NASA Blue Marble by day, city lights by night, clouds and an

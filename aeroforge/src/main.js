@@ -12,6 +12,7 @@ import { INFERNO_CSS } from './engine/effects.js';
 import { LOOKS } from './engine/environment.js';
 import { TourPlayer } from './learn/tour.js';
 import { QUALITY } from './engine/stage.js';
+import { setTextureDetail } from './engine/surface.js';
 import { EventLog } from './ui/log.js';
 import { el, fmt } from './ui/dom.js';
 import { buildFighter } from './models/fighter.js';
@@ -75,6 +76,8 @@ async function start() {
   // console handle for tinkering: __aeroforge.stage, .modes, .FLEET, .app
   window.__aeroforge = { stage, modes, FLEET, get app() { return app; } };
   const log = new EventLog($('log'));
+  // Ultra and 4K paint the large skins and stencils at twice the resolution for 4K close-ups
+  setTextureDetail(stage.quality === '4k' || stage.quality === 'ultra' ? 2 : 1);
 
   for (const f of FLEET) {
     bootLine(`Building ${f.id === 'turbofan' ? 'turbofan rotor stages' : f.id} geometry`);
@@ -181,9 +184,11 @@ async function start() {
   for (const [k, q] of Object.entries(QUALITY)) qualitySel.append(el('option', { value: k, text: q.label }));
   qualitySel.value = stage.quality;
   qualitySel.addEventListener('change', () => { stage.setQuality(qualitySel.value); log.push('VIEW', `Render quality: ${QUALITY[qualitySel.value].label}`); });
-  stage.onQualityChange = (k, manual) => {
+  stage.onQualityChange = (k, manual, up) => {
     qualitySel.value = k;
-    if (!manual) log.push('VIEW', `Render quality lowered to ${QUALITY[k].label} to keep the frame rate up`, 'warn');
+    if (manual) return;
+    if (up) log.push('VIEW', `Graphics raised to ${QUALITY[k].label}: this GPU has headroom, so frames are now supersampled`, 'ok');
+    else log.push('VIEW', `Graphics lowered to ${QUALITY[k].label} to keep the frame rate up`, 'warn');
   };
 
   // ------------------------------------------------------------------ tools
@@ -515,6 +520,8 @@ async function start() {
       clockAcc = 0;
       $('utc').textContent = new Date().toISOString().slice(11, 19);
       $('fps').textContent = Math.round(stage.fps);
+      const { width, height } = stage.renderSize;
+      $('res').textContent = `${width} × ${height}`;
     }
   });
 

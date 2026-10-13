@@ -13,15 +13,19 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { Environment } from './environment.js';
 
+// dpr: render at the screen's native pixel density up to this cap; minPixels: never draw fewer
+// pixels than this (the 4K preset supersamples a 3840 × 2160 frame onto smaller screens);
 // showroom.reflect: mirror-floor resolution (fraction of the canvas, 0 = off);
 // showroom.contact: contact-shadow map size; contactEvery: refresh every n frames
+export const UHD = 3840 * 2160;
 export const QUALITY = {
-  ultra: { label: 'Ultra', dpr: 2, msaa: 4, ao: 1, shadow: 4096, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
-  high: { label: 'High', dpr: 1.5, msaa: 4, ao: 0.5, shadow: 2048, showroom: { reflect: 0.38, contact: 512, contactEvery: 1 } },
-  balanced: { label: 'Balanced', dpr: 1.25, msaa: 4, ao: 0, shadow: 2048, showroom: { reflect: 0, contact: 512, contactEvery: 2 } },
+  '4k': { label: '4K', dpr: 4, minPixels: UHD, msaa: 2, ao: 1, shadow: 4096, showroom: { reflect: 0.5, contact: 2048, contactEvery: 1 } },
+  ultra: { label: 'Ultra', dpr: 3, msaa: 4, ao: 1, shadow: 4096, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
+  high: { label: 'High', dpr: 2, msaa: 4, ao: 0.5, shadow: 2048, showroom: { reflect: 0.38, contact: 512, contactEvery: 1 } },
+  balanced: { label: 'Balanced', dpr: 1.5, msaa: 4, ao: 0, shadow: 2048, showroom: { reflect: 0, contact: 512, contactEvery: 2 } },
   performance: { label: 'Performance', dpr: 1, msaa: 0, ao: 0, shadow: 1024, showroom: { reflect: 0, contact: 256, contactEvery: 3 } },
 };
-const ORDER = ['ultra', 'high', 'balanced', 'performance'];
+const ORDER = ['4k', 'ultra', 'high', 'balanced', 'performance'];
 
 /** World-space bounds of the solid (non-effect, visible) meshes under an object. */
 export function solidBounds(root) {
@@ -96,7 +100,7 @@ const GradeShader = {
       c.rgb += vec3(0.5, 0.18, -0.4) * smoothstep(0.55, 1.0, l) * split;
       float v = smoothstep(0.95, 0.25, length(d * vec2(1.15, 1.0)));
       c.rgb *= mix(1.0 - vignette, 1.0, v);
-      c.rgb += (hash(vUv * 1024.0 + fract(time) * 37.0) - 0.5) * grain;
+      c.rgb += (hash(mod(gl_FragCoord.xy, 1024.0) + fract(time) * 37.0) - 0.5) * grain;   // per pixel at any resolution
       gl_FragColor = c;
     }`,
 };
@@ -167,9 +171,25 @@ export class Stage {
   get hangar() { return this.env.ground; }
   setHangarVisible(v) { this.env.ground.visible = v; }
 
+  /** Pixel ratio for a preset: native density (capped), raised to reach minPixels if it has one. */
+  pixelRatioFor(q) {
+    let r = Math.min(window.devicePixelRatio || 1, q.dpr);
+    if (q.minPixels) {
+      const w = Math.max(1, this.container.clientWidth), h = Math.max(1, this.container.clientHeight);
+      r = Math.min(q.dpr, Math.max(r, Math.sqrt(q.minPixels / (w * h))));
+    }
+    return r;
+  }
+
+  /** Size of the frame actually being drawn, in device pixels. */
+  get renderSize() {
+    const c = this.renderer.domElement;
+    return { width: c.width, height: c.height };
+  }
+
   buildComposer() {
     const q = QUALITY[this.quality];
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.dpr));
+    this.renderer.setPixelRatio(this.pixelRatioFor(q));
     const key = this.lights.key;
     if (key.shadow.mapSize.x !== q.shadow) {
       key.shadow.mapSize.set(q.shadow, q.shadow);
@@ -212,13 +232,14 @@ export class Stage {
 
   setQuality(name, { manual = true } = {}) {
     if (!QUALITY[name] || name === this.quality) return;
+    const up = ORDER.indexOf(name) < ORDER.indexOf(this.quality);
     this.quality = name;
     if (manual) {
       this.autoQuality = false;
       try { localStorage.setItem('aeroforge.quality', name); } catch { /* storage blocked */ }
     }
     this.buildComposer();
-    this.onQualityChange?.(name, manual);
+    this.onQualityChange?.(name, manual, up);
   }
 
   setOutlined(objects) {
@@ -229,6 +250,12 @@ export class Stage {
   resize() {
     const w = Math.max(1, this.container.clientWidth);
     const h = Math.max(1, this.container.clientHeight);
+    // the 4K preset's supersampling factor depends on the window size
+    const r = this.pixelRatioFor(QUALITY[this.quality]);
+    if (Math.abs(r - this.renderer.getPixelRatio()) > 1e-3) {
+      this.renderer.setPixelRatio(r);
+      this.composer.setPixelRatio(r);
+    }
     this.renderer.setSize(w, h, false);
     this.composer.setSize(w, h);
     this.labels.setSize(w, h);
@@ -287,13 +314,21 @@ export class Stage {
     if (this._fpsAcc > 0.5) {
       this.fps = this._fpsN / this._fpsAcc;
       this._fpsAcc = 0; this._fpsN = 0;
-      // adaptive quality: step down after ~3 s below 26 fps
+      // adaptive quality: step down after ~3 s below 26 fps; step Ultra up to 4K supersampling
+      // after ~4 s above 50 fps, unless the screen is already 4K or a step down has happened
       if (this.autoQuality && document.visibilityState === 'visible' && this.time > this._grace) {
         this._slow = this.fps < 26 ? this._slow + 1 : 0;
+        this._fast = this.fps > 50 ? (this._fast || 0) + 1 : 0;
         if (this._slow >= 6) {
           const i = ORDER.indexOf(this.quality);
           if (i < ORDER.length - 1) this.setQuality(ORDER[i + 1], { manual: false });
           this._slow = 0;
+          this._noUpgrade = true;
+        } else if (this._fast >= 8 && !this._noUpgrade && this.quality === 'ultra') {
+          const { width, height } = this.renderSize;
+          if (width * height < UHD * 0.95) this.setQuality('4k', { manual: false });
+          else this._noUpgrade = true;
+          this._fast = 0;
         }
       }
     }

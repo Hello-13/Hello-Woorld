@@ -41,6 +41,11 @@ export function fbm(size, { seed = 1, octaves = 5, base = 4, gain = 0.5 } = {}) 
   return out;
 }
 
+// Resolution multiplier for the large procedural skins and the decals: 2 at Ultra / 4K so panel
+// lines, fasteners and stencils stay sharp in close-ups on 4K screens.
+let DETAIL = 1;
+export function setTextureDetail(k) { DETAIL = k; }
+
 function canvas(w, h = w) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
@@ -98,17 +103,24 @@ function tex(c, { srgb = false, repeat = [1, 1], aniso = 8 } = {}) {
   return t;
 }
 
-/** Build a { map, roughnessMap, normalMap } set from albedo/height/roughness painters. */
-function mapSet(key, size, { albedo, height, rough, normalStrength = 2, repeat = [1, 1] }) {
+/** Build a { map, roughnessMap, normalMap } set from albedo/height/roughness painters.
+ *  hires: paint albedo and height at the DETAIL multiple (painters keep logical coordinates). */
+function mapSet(key, size, { albedo, height, rough, normalStrength = 2, repeat = [1, 1], hires = false }) {
   return once(key, () => {
-    const a = canvas(size), hgt = canvas(size), rg = canvas(size);
-    albedo?.(a.getContext('2d'), size);
-    height(hgt.getContext('2d'), size);
-    rough(rg.getContext('2d'), size);
+    const k = hires ? DETAIL : 1;
+    const paint = (fn, scale) => {
+      const c = canvas(size * scale);
+      const ctx = c.getContext('2d');
+      ctx.scale(scale, scale);
+      fn?.(ctx, size);
+      return c;
+    };
+    const a = paint(albedo, k), hgt = paint(height, k), rg = paint(rough, 1);
     const set = {
       map: albedo ? tex(a, { srgb: true, repeat }) : null,
       roughnessMap: tex(rg, { repeat }),
-      normalMap: tex(heightToNormal(hgt, normalStrength), { repeat }),
+      // the Sobel gradient is per pixel, so a finer canvas needs a proportionally stronger filter
+      normalMap: tex(heightToNormal(hgt, normalStrength * k), { repeat }),
     };
     return set;
   });
@@ -123,6 +135,7 @@ const grime = (size, seed, lo, hi) => fieldToCanvas(fbm(size, { seed, octaves: 6
  */
 export function aircraftSkin({ seed = 7, tile = 512, sawtooth = true, rivets = true } = {}) {
   return mapSet(`skin.${seed}.${sawtooth}.${rivets}`, tile, {
+    hires: true,
     albedo(ctx, s) {
       ctx.drawImage(grime(s, seed, 0.86, 1.0), 0, 0);
       const r = rng(seed + 3);
@@ -185,6 +198,7 @@ export function aircraftSkin({ seed = 7, tile = 512, sawtooth = true, rivets = t
 /** Rocket tank skin: circumferential friction-stir welds, faint isogrid ribs, satin paint. */
 export function tankSkin({ seed = 21, tile = 512 } = {}) {
   return mapSet(`tank.${seed}`, tile, {
+    hires: true,
     height(ctx, s) {
       ctx.drawImage(grime(s, seed, 0.47, 0.53), 0, 0);
       ctx.strokeStyle = 'rgba(255,255,255,0.55)';
@@ -376,8 +390,10 @@ export function floorMarkings(size = 2048, worldSize = 80) {
 /** Text / insignia decal on a transparent canvas. */
 export function decalTexture(key, w, h, draw) {
   return once(`decal.${key}`, () => {
-    const c = canvas(w, h);
-    draw(c.getContext('2d'), w, h);
+    const c = canvas(w * DETAIL, h * DETAIL);
+    const ctx = c.getContext('2d');
+    ctx.scale(DETAIL, DETAIL);
+    draw(ctx, w, h);
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 8;

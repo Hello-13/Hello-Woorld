@@ -113,7 +113,7 @@ export class LineChart {
 
   draw() {
     const c = this.canvas;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
     const { w, h, l, r, t, b } = this.layout();
     if (w < 10 || h < 10) return;
     if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }

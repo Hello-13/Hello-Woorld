@@ -79,8 +79,9 @@ button, input, output, select { font: inherit; color: inherit; }
   background: rgba(8, 12, 18, 0.6); color: var(--text); border: 1px solid var(--line); border-radius: 2px;
   font: 500 12px/1 var(--font-data); letter-spacing: 0.04em; padding: 6px 8px; cursor: pointer;
 }
-.nav-fps { font: 11px/1 var(--font-data); color: var(--muted); letter-spacing: 0.06em; min-width: 6ch; }
+.nav-fps { font: 11px/1 var(--font-data); color: var(--muted); letter-spacing: 0.06em; white-space: nowrap; }
 .nav-fps b { color: var(--soft); font-weight: 500; font-variant-numeric: tabular-nums; }
+.nav-sep { margin: 0 8px; color: var(--line-strong); }
 
 /* ------------------------------------------------------------------ stage */
 .stage { position: fixed; inset: 0; z-index: 0; background: var(--ground); overflow: hidden; }
