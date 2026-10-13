@@ -140,7 +140,7 @@ export function buildPad(A, site, base, bed) {
     faceAway(defl, new THREE.Vector3(0, -5, 0));
   }
   G('Flame trench & deflector', {
-    material: 'Refractory-brick lining, steel deflector faced with high-temperature concrete',
+    skin: true, material: 'Refractory-brick lining, steel deflector faced with high-temperature concrete',
     desc: 'The Apollo-era trench is 490 ft long, 58 ft wide and 42 ft deep. An inverted-V deflector under the vehicle splits the 27-engine exhaust and turns it along the trench toward both ends.',
   }, [mesh(merge(lining), FM.refractory()), mesh(floor, FM.refractory()), mesh(defl, FM.deflector())], bed);
 

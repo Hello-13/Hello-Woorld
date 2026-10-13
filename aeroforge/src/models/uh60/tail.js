@@ -196,7 +196,7 @@ export function buildTail({ A, P, air, roofY }) {
   const bladeG = trBladeGeometry();
   trPart('Tail rotor blades', {
     system: 'Rotor system', material: 'Graphite/glass skins over the crossbeam spars, nickel erosion strips', mass: 32, count: 4, explode: [-3.1, 1.1, 0],
-    desc: 'Four blades, 3.35 m across, turning at 1,190 rpm. Thrust to starboard balances the main rotor\'s torque; because the shaft is canted 20° up, about a third of that thrust\'s sine — roughly 3 % of the weight — also lifts the tail.',
+    desc: 'Four blades, 3.35 m across, turning at 1,190 rpm. Thrust to starboard balances the main rotor\'s torque; because the shaft is canted 20° up, sin 20° ≈ a third of that thrust (about 2.5 kN in a heavy hover, roughly 3 % of the weight) also lifts the tail.',
     callout: true, anchor: [0, 0.25, 0],
   }, (s) => {
     for (let i = 0; i < 4; i++) {
