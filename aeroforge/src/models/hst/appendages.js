@@ -116,7 +116,7 @@ export function buildAppendages(P, body) {
     const foldHinge = [rod([-SA.width / 2 + 0.1, 0.04, s * (half + 0.02)], [SA.width / 2 - 0.1, 0.04, s * (half + 0.02)], 0.03, 10)];
     const wp = P(`Solar array wing (${side})`, {
       system: 'Power', material: 'Aluminium-lithium X2096 panel support structure under MLI; hinges under silver-Teflon tape', mass: 290, massSource: 'NASA SM4 Media Guide (640 lb per wing)', temp: 330,
-      explode: [0, 0, s * 1.6],
+      explode: [0, 0, s * 1.6], xrayWeight: 0.5,
       desc: 'The third set of arrays (SA3), fitted in 2002: 7.1 × 2.6 m, rigid instead of the roll-up blankets that flexed and jittered the telescope as they crossed between sunlight and shadow. Twelve flexures, three per panel, let the frame swing between −70 °C and +86 °C every orbit without "snapping". ≈ 5.3 kW for both wings (5,270 W predicted at 6 years). Fold scheme in the deploy demo simplified.',
       callout: s > 0, anchor: [0.3, 0.4, s * 5.0],
     }, [mesh(merge([...frame(0.04), ...yoke]), HM.al()), mesh(merge(foldHinge), HM.ti())], track);
@@ -124,7 +124,7 @@ export function buildAppendages(P, body) {
     wp.add(inner);
     wp.userData.part.thermalRole = 'array';
     const panelInfo = (which) => ({
-      system: 'Power', material: 'Two Iridium-design panels, each 1,000 gallium-arsenide-on-germanium cells on a Kapton face sheet over aluminium honeycomb; white Tedlar backs', count: 2, temp: 330, explode: [0, 0.5, 0],
+      system: 'Power', material: 'Two Iridium-design panels, each 1,000 gallium-arsenide-on-germanium cells on a Kapton face sheet over aluminium honeycomb; white Tedlar backs', count: 2, temp: 330, explode: [0, 0.5, 0], xrayWeight: 0.5,
       desc: `The ${which} pair of the wing's four panels, about 4.6 m² each. The white Tedlar backs radiate heat to space; the cells face the Sun. Part of the wing; mass included.`,
     });
     // one mesh per panel: the box keeps its face groups, so the cells show on the front only

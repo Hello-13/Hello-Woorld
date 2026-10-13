@@ -593,7 +593,7 @@ export function buildSSM(P) {
     desc: 'Behind them, at the forward end of the aft shroud on the shadow side, sit the three rate sensor units and the fixed-head star trackers. In 2009 spacewalkers retracted the star-tracker door seals, opened these doors and swapped all three gyro units. Leaf sizes estimated.',
   });
   doorPair('Radial bay doors (FGS)', [0, 90, 270].flatMap((c) => [[c - 14, c - 0.6, c - 14], [c + 0.6, c + 14, c + 14]]), 1.85, 3.38, {
-    material: 'Three pairs of hinged honeycomb door leaves, hinged at their outer edges and latched where they meet', mass: 45, count: 6, explode: [0, 0, 0],
+    material: 'Three pairs of hinged honeycomb door leaves, hinged at their outer edges and latched where they meet', mass: 45, count: 6, explode: [-1.6, -4.0, 0],
     desc: 'A pair of doors over each Fine Guidance Sensor bay near the joint with the equipment section (FGS-2 on +V3, FGS-1 and FGS-3 on the ±V2 sides). In 2009 the crew opened the +V3 FGS-2 doors and carried eight Aft Shroud Latch Repair kits in case a door latch ran stiff. The radial camera has no door: its own radiator forms that part of the skin.',
   });
 

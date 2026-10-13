@@ -104,3 +104,34 @@ test('thermosphere and drag decay behave physically', () => {
   assert.ok(busy.reentry && (!quiet.reentry || busy.reentry < quiet.reentry), 'solar maximum brings re-entry sooner');
   for (let i = 1; i < busy.points.length; i++) assert.ok(busy.points[i].y <= busy.points[i - 1].y + 1e-9, 'altitude never rises');
 });
+
+// ---- model checks that need no three.js: the tour against the part names in the model source
+import { readFileSync, readdirSync } from 'node:fs';
+import TOUR from '../src/learn/tours/hubble.js';
+
+test('guided tour: every focus name is a Hubble part, valid modes and demos', () => {
+  const dir = new URL('../src/models/hst/', import.meta.url);
+  const src = [readFileSync(new URL('../src/models/hubble.js', import.meta.url), 'utf8'),
+    ...readdirSync(dir).filter((f) => f.endsWith('.js')).map((f) => readFileSync(new URL(f, dir), 'utf8'))].join('\n');
+  // part names are string literals (P('Name', …) or name: '…') or templates such as `Bay ${k} door (${…})`
+  const literals = new Set([...src.matchAll(/'((?:[^'\\\n]|\\.)+)'/g)].map((m) => m[1].replace(/\\'/g, "'")));
+  const esc = (t) => t.replace(/[.*+?^()|[\]\\]/g, '\\$&');
+  const templates = [...src.matchAll(/`([^`]*)`/g)].map((m) => m[1]).filter((t) => t.includes('${'))
+    .map((t) => t.split(/\$\{[^}]+\}/))
+    .filter((bits) => bits.join('').replace(/[\s()]/g, '').length >= 3)          // skip `${a} ${b}`-style joins
+    .map((bits) => new RegExp(`^${bits.map(esc).join('[^]+?')}$`));
+  const modes = new Set(['studio', 'xray', 'blueprint', 'systems', 'thermal', 'pressure']);
+  const demos = new Set(['bay', 'deploy']);
+  assert.ok(TOUR.length >= 8 && TOUR.length <= 14, `${TOUR.length} tour steps`);
+  const missing = [];
+  for (const [i, step] of TOUR.entries()) {
+    assert.ok(step.title && step.body && step.key, `step ${i + 1} has a title, body and key idea`);
+    if (step.mode) assert.ok(modes.has(step.mode), `step ${i + 1}: mode ${step.mode}`);
+    if (step.demo) assert.ok(demos.has(step.demo), `step ${i + 1}: demo ${step.demo}`);
+    for (const name of step.focus || []) if (!literals.has(name) && !templates.some((re) => re.test(name))) missing.push(`step ${i + 1}: ${name}`);
+  }
+  assert.deepEqual(missing, [], 'tour focus names that match no part');
+  for (const d of demos) assert.ok(TOUR.some((s) => s.demo === d), `the tour runs the ${d} demo`);
+  // the 2002 aft-shroud cooling system was never flown (not in the SM3B or SM4 manifests)
+  assert.ok(!literals.has('Aft shroud cooling system'), 'no ASCS part');
+});

@@ -344,7 +344,7 @@ export function buildOTA(P) {
   latchPart('Axial instrument A-latches', la, 4, 'At the forward end of each axial bay, beside the instrument\'s aperture: a ball fitting on the instrument is clamped in a titanium spherical seat by moving jaws, fixing all three axes. It takes 38 ft-lb in 12–16 turns. Positions approximate.', [-1.4, 0, 0]);
   latchPart('Axial instrument B-latches', lb, 4, 'At the aft end, driven from the ±V2 side through the shroud doors: a plunger pushed into a ball joint drives the instrument onto its A and C fittings and goes over centre in 10–12 turns. In 2009 COS carried a B-latch alignment aid. Positions approximate.', [-3.0, 0, 0]);
   latchPart('Axial instrument C-latches', lc, 4, 'A self-aligning stabiliser ball at the aft end of each axial instrument that engages by itself as the B latch drives the instrument home. Positions approximate.', [-3.0, 0, 0]);
-  latchPart('Radial instrument A-latches', lr, 4, 'Each radial instrument (WFC3 and the three Fine Guidance Sensors) has one A latch: a bolt at its outboard end pulls it inboard onto preload springs, 32–35 ft-lb in 20–22 turns, under the bay door. Positions approximate.', [0, 0, 0]);
+  latchPart('Radial instrument A-latches', lr, 4, 'Each radial instrument (WFC3 and the three Fine Guidance Sensors) has one A latch: a bolt at its outboard end pulls it inboard onto preload springs, 32–35 ft-lb in 20–22 turns, under the bay door. Positions approximate.', [-2.4, 0, 0]);
 
   // the FPS science-instrument connector panels where the harness ends meet each instrument's cables
   const cp = [];

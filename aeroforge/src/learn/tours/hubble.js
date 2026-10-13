@@ -33,7 +33,7 @@ export default [
     title: 'Two hyperbolic mirrors',
     body: 'Both mirrors are hyperboloids, a Ritchey–Chrétien design free of spherical aberration and coma. The primary is ULE glass, two faceplates fused to an egg-crate core: 828 kg, not 3.6 t. Heaters and 24 actuators sit behind it; the truss holds the secondary 4.906 m away to 2.5 µm.',
     key: 'Design conics: K₁ = −1.0023 (primary), K₂ = −1.4960 (secondary).',
-    focus: ['Primary mirror', 'Primary mirror egg-crate core', 'Primary mirror rear faceplate', 'Primary mirror mounts & actuators', 'Primary mirror heaters', 'Reaction plate', 'Secondary mirror', 'Secondary mirror assembly', 'Metering truss', 'OTA kinematic mounts'],
+    focus: ['Primary mirror', 'Primary mirror egg-crate core', 'Primary mirror rear faceplate', 'Primary mirror mounts & actuators', 'Primary mirror heaters', 'Reaction plate', 'Secondary mirror', 'Secondary mirror assembly', 'Metering truss', 'OTA kinematic mounts', 'Primary mirror actuator pads', 'Secondary mirror actuators', 'Secondary mirror cell, flexures & clamp', 'Main ring', 'Actuator control electronics'],
     mode: 'systems', explode: 0.55, view: { dir: [0.95, 0.55, 0.8], fill: 1.3, lift: -0.3 },
   },
   {
@@ -53,7 +53,7 @@ export default [
     title: 'Swapping an instrument',
     body: 'An axial instrument slides in on guide rails until its latches take over: the A latch by the aperture fixes all three axes, the B latch at the aft end drives it home and a C ball steadies it. Then a ground strap and four connectors put it on the SI C&DH bus.',
     key: 'A latch: 38 ft-lb in 12–16 turns. Most bolts take one 7/16-inch socket.',
-    focus: ['Cosmic Origins Spectrograph', 'COS connectors & ground strap', 'COS remote interface unit', 'Advanced Camera for Surveys', 'ACS connectors & ground strap', 'ACS remote interface unit', 'FPS guide rails', 'Axial instrument A-latches', 'Axial instrument B-latches', 'Axial instrument C-latches', 'Radial instrument A-latches', 'SI connector panels', 'Focal plane structure', 'FPS flexures', 'FPS crew handles'],
+    focus: ['Cosmic Origins Spectrograph', 'COS connectors & ground strap', 'COS remote interface unit', 'Advanced Camera for Surveys', 'ACS connectors & ground strap', 'ACS remote interface unit', 'FPS guide rails', 'Axial instrument A-latches', 'Axial instrument B-latches', 'Axial instrument C-latches', 'Radial instrument A-latches', 'SI connector panels', 'SI C&DH harness', 'WFC3 blind-mate connector & ground strap', 'Focal plane structure', 'FPS flexures', 'FPS crew handles'],
     mode: 'systems', view: { dir: [-1, 0.42, 0.9], fill: 1.0, lift: -0.25 },
   },
   {
@@ -67,7 +67,7 @@ export default [
     title: 'Pointing to 0.007″',
     body: 'Six gyroscopes in three rate sensor units feel every motion. Three star trackers fix the attitude to an arc-minute, enough to put guide stars in the Fine Guidance Sensors, which lock on two of them 40 times a second. If the computer falls silent, bay 8\'s safe-mode electronics turn the arrays to the Sun.',
     key: 'Held to 0.007″ for 24 hours: about the width of a human hair seen from 1.6 km.',
-    focus: ['Rate sensor unit 1', 'Rate sensor unit 2', 'Rate sensor unit 3', 'Gyro electronics control units', 'Fixed-head star trackers', 'Fine Guidance Sensor 1', 'Fine Guidance Sensor 2', 'Fine Guidance Sensor 3', 'FGS 1 star selectors & interferometers', 'FGS 2 star selectors & interferometers', 'FGS 3 star selectors & interferometers', 'Fine guidance electronics', 'Pointing/safemode electronics assembly', 'Retrieval mode gyro assembly', 'Coarse sun sensors (aft)'],
+    focus: ['Rate sensor unit 1', 'Rate sensor unit 2', 'Rate sensor unit 3', 'Gyro electronics control units', 'Fixed-head star trackers', 'Fine Guidance Sensor 1', 'Fine Guidance Sensor 2', 'Fine Guidance Sensor 3', 'FGS 1 star selectors & interferometers', 'FGS 2 star selectors & interferometers', 'FGS 3 star selectors & interferometers', 'Fine guidance electronics', 'Pointing/safemode electronics assembly', 'Retrieval mode gyro assembly', 'Coarse sun sensors (aft)', 'Gyro harness (RSU → ECU)', 'FPS −V3 equipment shelves'],
     // steeply from above the +V2 side: the camera cannot go below the horizon, and from up here the
     // −V3 gyros and trackers show through the ghosted skins with their labels apart
     mode: 'systems', explode: 0.35, view: { dir: [-0.3, 1.3, -1], fill: 1.6, lift: -0.85 },
@@ -76,7 +76,7 @@ export default [
     title: 'Power',
     body: 'Two rigid SA3 wings of gallium-arsenide cells give about 5.3 kW. Each turns on its drive; the current crosses a coupler and a diode box to the power control unit in bay 4, and six NiH₂ batteries carry Hubble through 36 min of shadow. Watch the masts deploy as in 1990.',
     key: 'The batteries cycle every orbit, about 5,500 times a year.',
-    focus: [...['+V2', '−V2'].flatMap((s) => [`Solar array wing (${s})`, `SA3 solar panels, inner pair (${s})`, `SA3 solar panels, outer pair (${s})`, `Solar array mast (${s})`, `Solar array coupler (${s})`, `Solar array damper (${s})`, `Solar array drive mechanism (${s})`, `Solar array drive adapter (${s})`]), 'Solar array drive cable sets', 'Diode box assemblies (DBA-2)', 'Solar array power harness', 'Battery module 1 (bay 2)', 'Battery module 2 (bay 3)', 'Battery isolation switches & connectors', 'Charge current controllers', 'Power control unit', 'Power distribution units', 'Solar array drive electronics', 'High-gain antenna mast (+V3)', 'High-gain antenna mast (−V3)'],
+    focus: [...['+V2', '−V2'].flatMap((s) => [`Solar array wing (${s})`, `SA3 solar panels, inner pair (${s})`, `SA3 solar panels, outer pair (${s})`, `Solar array mast (${s})`, `Solar array coupler (${s})`, `Solar array damper (${s})`, `Solar array drive mechanism (${s})`, `Solar array drive adapter (${s})`]), 'Solar array drive cable sets', 'Diode box assemblies (DBA-2)', 'Solar array power harness', 'Battery module 1 (bay 2)', 'Battery module 2 (bay 3)', 'Battery isolation switches & connectors', 'Charge current controllers', 'Power control unit', 'Power distribution units', 'Main power bus harness', 'Solar array drive electronics', 'High-gain antenna mast (+V3)', 'High-gain antenna mast (−V3)'],
     demo: 'deploy', view: { dir: [0.5, 0.8, 0.75], fill: 0.72 },
   },
   {
@@ -97,14 +97,14 @@ export default [
     title: 'Keeping the optics stable',
     body: 'In sunlight the blankets bake; in shadow they fall far below freezing, about 15 times a day. Insulation wraps the spacecraft, bay doors and white panels act as radiators, and heaters hold the mirrors near 21 °C. Here the Sun-facing +V3 half of each shell reads hot, the shadow half cold.',
     key: 'A radiator sheds P = ε σ A T⁴: in vacuum, radiation is the only way to dump heat.',
-    focus: ['Light shield', 'Forward shell', 'Aft shroud', ...BAY_DOORS, ...NOBLS, 'OTA equipment section doors', 'WFC3 radiator', 'NCS radiator', '+V2 aft shroud doors (STIS, NICMOS)', '−V2 aft shroud doors (COS, ACS)', '−V3 aft shroud doors (gyros, star trackers)', 'Radial bay doors (FGS)', 'Aperture door'],
+    focus: ['Light shield', 'Forward shell', 'Aft shroud', ...BAY_DOORS, ...NOBLS, 'OTA equipment section doors', 'WFC3 radiator', 'NCS radiator', 'MLI repair patches', '+V2 aft shroud doors (STIS, NICMOS)', '−V2 aft shroud doors (COS, ACS)', '−V3 aft shroud doors (gyros, star trackers)', 'Radial bay doors (FGS)', 'Aperture door'],
     mode: 'thermal', view: { dir: [-0.55, 0.12, 1], fill: 1.0 },
   },
   {
     title: 'Built to be serviced',
     body: 'Hubble is the only telescope built for astronauts to repair. Five Shuttle crews, 1993–2009, grappled it, stood it on berthing pins and worked along 69 m of handrails, opening J-hook doors. The last crew left a soft-capture ring so a future craft can dock to boost or de-orbit it.',
     key: '31 foot-restraint sockets; ten bay doors plus nine on the OTA equipment section.',
-    focus: ['EVA handrails (aft shroud)', 'EVA handrails (equipment section)', 'EVA handrails (forward shell)', 'EVA handrails (light shield)', 'Foot-restraint sockets', 'Scuff plates', 'Grapple fixtures', 'Soft capture mechanism', 'SCM LIDS interface ring', 'SCM EVA drive & clamp linkage', 'Relative-navigation targets', 'Berthing pins', 'Berthing target', 'Umbilical tower (J101)', '+V2 aft shroud doors (STIS, NICMOS)', '−V2 aft shroud doors (COS, ACS)', '−V3 aft shroud doors (gyros, star trackers)', 'Radial bay doors (FGS)', 'OTA equipment section doors', ...BAY_DOORS],
+    focus: ['EVA handrails (aft shroud)', 'EVA handrails (equipment section)', 'EVA handrails (forward shell)', 'EVA handrails (light shield)', 'Foot-restraint sockets', 'Scuff plates', 'Grapple fixtures', 'Soft capture mechanism', 'SCM LIDS interface ring', 'SCM EVA drive & clamp linkage', 'Relative-navigation targets', 'Berthing pins', 'Berthing target', 'Umbilical tower (J101)', 'Star-tracker door light seals', 'Aperture door hinge & drive', '+V2 aft shroud doors (STIS, NICMOS)', '−V2 aft shroud doors (COS, ACS)', '−V3 aft shroud doors (gyros, star trackers)', 'Radial bay doors (FGS)', 'OTA equipment section doors', ...BAY_DOORS],
     view: { dir: [-0.9, 0.45, 0.75], fill: 1.0 },
   },
 ];
