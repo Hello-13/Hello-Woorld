@@ -308,7 +308,7 @@ export function buildUAV() {
     P(`Wing fuel tank (${sn})`, {
       system: 'Fuel', material: 'Sealed integral bay / bladder (est.)', mass: 20, explode: [0, -0.35, 1.9 * side],
       desc: 'Fuel in the wing box between the spars, from the root to about 8.4 m out: ≈ 750 L per wing in this model (the real split is not published). Wing fuel sits where the lift is, so it relieves wing bending and barely moves the centre of gravity as it burns.',
-      callout: side > 0, anchor: wpt(6.6, 0.42, 1, -0.04).map((v, i) => (i === 2 ? v * side : v)),
+      callout: side > 0, anchor: wpt(8.0, 0.42, 1, -0.04).map((v, i) => (i === 2 ? v * side : v)),
     }, L(f(tankG), m.fuel));
 
     // trailing-edge surfaces
@@ -371,7 +371,7 @@ export function buildUAV() {
     storeParts.gbu.push(P(`GBU-12 Paveway II (${sn})`, {
       system: 'Weapons', material: 'Mk 82 steel bomb body, laser guidance kit', mass: 230, massSource: 'Published GBU-12 figure (≈ 230 kg)', explode: [0, -1.1, 2.1 * side],
       desc: 'A 500 lb-class Mk 82 bomb with a laser seeker and steering canards on the nose and folding wings at the tail: 3.27 m long, 0.27 m across. It steers toward laser energy reflected from a marked spot.',
-      callout: side > 0, anchor: [gx + 0.75, gy - 0.12, gb.z * side],   // forward, on the guidance kit: clear of the Hellfire label
+      callout: side > 0, anchor: [gx - 1.4, gy + 0.12, gb.z * side],
     }, [L(place(g.body), m.olive), L(place(g.guidance), m.seeker), L(place(g.dome), m.glass), L(place(g.band), m.yellow)]));
 
     // two Hellfires on a two-rail launcher, middle station
@@ -388,7 +388,7 @@ export function buildUAV() {
     storeParts.hellfire.push(P(`AGM-114 Hellfire pair (${sn})`, {
       system: 'Weapons', material: 'Steel/aluminium airframe, semi-active laser seeker', mass: 98, massSource: 'Published AGM-114 figure (45–49 kg each)', count: 2, explode: [0, -1.2, 2.0 * side],
       desc: 'Two laser-guided Hellfire missiles, each 1.63 m long and 0.18 m in diameter. The seeker under the nose dome homes on a laser spot with a matching pulse code.',
-      callout: side > 0, anchor: [lx - 0.6, hy - 0.1, (md.z + 0.12) * side],
+      callout: side < 0, anchor: [lx - 0.6, hy - 0.1, (md.z + 0.12) * side],   // the port pair: its label falls clear of the nose sensors'
     }, [L(pair(hf.body), m.olive), L(pair(hf.dome), m.glass), L(pair(hf.band), m.yellow), L(pair(hf.motor), m.brown)]));
   }
   // wing root fairings (both sides)
@@ -439,7 +439,7 @@ export function buildUAV() {
     P(`Ruddervator (${sn})`, {
       system: 'Flight controls', material: 'Composite (est.)', mass: 7, explode: [-0.6, -0.35, 0.85 * side],
       desc: 'Moving together, the two ruddervators pitch the aircraft like an elevator; moving oppositely they yaw it like a rudder. The flight computers mix the two commands.',
-      callout: side > 0, anchor: [vtPoint(0.6, 0.85, 1).x, 0, VT_L * 0.6 * side],
+      callout: side > 0, anchor: [vtPoint(0.92, 0.85, 1).x, 0, VT_L * 0.92 * side],
     }, rH.pivot, frame);
     surf.rv.push({ h: rH, side });
     const vs = [sparGeo(0.05, VT_L - 0.05, 0.25, { width: 0.025, steps: 4, root: vtRoot, tip: vtTip, twist: 0 }), sparGeo(0.05, VT_L - 0.08, 0.66, { width: 0.02, steps: 4, root: vtRoot, tip: vtTip, twist: 0 })];
@@ -753,7 +753,7 @@ export function buildUAV() {
   P('AN/APY-8 Lynx SAR antenna', {
     system: 'Sensors', material: 'Gimballed Ku-band antenna', mass: 30, explode: [2.2, -0.5, 0],
     desc: 'General Atomics’ Lynx synthetic-aperture radar (developed with Sandia National Laboratories) images the ground through cloud, smoke and darkness, down to about 10 cm resolution in spotlight mode, and tracks moving vehicles.',
-    callout: true, anchor: [X(0.48) + 0.1, 1.05, 0.25],
+    callout: true, anchor: [X(0.48) + 0.13, 1.34, 0.2],
   }, lynx);
   P('Lynx radar electronics', {
     system: 'Sensors', material: 'Radar electronics unit', mass: 22, explode: [0.9, -0.15, 0.6],
@@ -793,7 +793,7 @@ export function buildUAV() {
   P('Ku-band SATCOM antenna', {
     system: 'Communications', material: 'Steerable reflector on a two-axis pedestal', mass: 30, explode: [1.45, 2.05, 0],
     desc: 'Tracks a geostationary satellite to carry control and sensor video beyond line of sight. The round trip via a satellite 35,786 km up adds about half a second of delay, so crews in the US can fly aircraft overseas, but not land them.',
-    callout: true, anchor: [X(1.15), 1.75, 0.3],
+    callout: true, anchor: [X(1.15) + 0.25, 1.95, 0],
   }, dishG);
   P('Ku-band SATCOM modem', {
     system: 'Avionics', material: 'Modem and RF unit', mass: 8, explode: [1.0, 1.0, -0.4],

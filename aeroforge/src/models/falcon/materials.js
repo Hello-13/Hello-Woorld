@@ -12,6 +12,18 @@ import { rng } from '../../engine/materials.js';
 const cache = new Map();
 const once = (k, make) => { if (!cache.has(k)) cache.set(k, make()); return cache.get(k); };
 
+// White exterior finishes. The launch-pad look adds three floodlights to the dawn sky and sun, which
+// lift the lower white skins past the renderer's bloom threshold (HDR luminance ≈ 2.1 measured on
+// the side boosters, threshold 1.9), so the vehicle seemed to glow. While the floods are on, these
+// finishes are toned to 78 % so the vehicle reads as painted white (peaks ≈ 1.6); elsewhere they
+// are at full albedo.
+const painted = new Set();
+const paint = (m) => { painted.add(m); m.userData.albedo = m.color.clone(); return m; };
+/** Scale every white exterior finish (1 = full albedo). */
+export function setPaintTone(k) {
+  for (const m of painted) m.color.copy(m.userData.albedo).multiplyScalar(k);
+}
+
 function canvasTex(w, h, draw, { srgb = true } = {}) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
@@ -88,10 +100,10 @@ export function tankMaterial(paintMap, lengthM) {
   const sk = tankSkin();
   const normalMap = sk.normalMap.clone(); normalMap.repeat.set(10, lengthM / 3.4); normalMap.wrapT = THREE.RepeatWrapping; normalMap.needsUpdate = true;
   const roughnessMap = sk.roughnessMap.clone(); roughnessMap.repeat.set(4, lengthM / 6); roughnessMap.wrapT = THREE.RepeatWrapping; roughnessMap.needsUpdate = true;
-  return new THREE.MeshStandardMaterial({
+  return paint(new THREE.MeshStandardMaterial({
     color: 0xffffff, map: paintMap, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.5, 0.5),
     roughness: 0.82, metalness: 0.02,
-  });
+  }));
 }
 
 function carbonSet(rx, ry) {
@@ -117,11 +129,11 @@ export const FM = {
     return new THREE.MeshPhysicalMaterial({ color: 0x9a9da2, map: c.map, normalMap: c.normalMap, roughness: 0.55, metalness: 0.2, clearcoat: 0.4, clearcoatRoughness: 0.4 });
   }),
   titanium: () => once('ti', () => new THREE.MeshStandardMaterial({ color: 0x8b8580, roughness: 0.5, metalness: 0.95 })),
-  whiteComposite: () => once('whiteComp', () => new THREE.MeshStandardMaterial({ color: 0xd6d8da, roughness: 0.62, metalness: 0.02 })),
-  fairing: () => once('fairing', () => new THREE.MeshStandardMaterial({ color: 0xd8dadb, roughness: 0.6, metalness: 0.02, side: THREE.DoubleSide })),
+  whiteComposite: () => once('whiteComp', () => paint(new THREE.MeshStandardMaterial({ color: 0xd6d8da, roughness: 0.62, metalness: 0.02 }))),
+  fairing: () => once('fairing', () => paint(new THREE.MeshStandardMaterial({ color: 0xd8dadb, roughness: 0.6, metalness: 0.02, side: THREE.DoubleSide }))),
   heatShield: () => once('heatShield', () => new THREE.MeshStandardMaterial({ color: 0x2a2826, roughness: 0.9, metalness: 0.05 })),
   boot: () => once('boot', () => new THREE.MeshStandardMaterial({ color: 0xb9b6b0, roughness: 0.95, metalness: 0.0, side: THREE.DoubleSide })),
-  raceway: () => once('raceway', () => new THREE.MeshStandardMaterial({ color: 0xd6d9db, roughness: 0.65, metalness: 0.05 })),
+  raceway: () => once('raceway', () => paint(new THREE.MeshStandardMaterial({ color: 0xd6d9db, roughness: 0.65, metalness: 0.05 }))),
   alu: () => once('alu', () => new THREE.MeshStandardMaterial({ color: 0xb8bec4, roughness: 0.42, metalness: 0.9 })),
   aluDark: () => once('aluDark', () => new THREE.MeshStandardMaterial({ color: 0x80878e, roughness: 0.5, metalness: 0.85 })),
   domeAlu: () => once('domeAlu', () => new THREE.MeshStandardMaterial({ color: 0xaab1b7, roughness: 0.45, metalness: 0.85, side: THREE.DoubleSide })),
@@ -142,7 +154,7 @@ export const FM = {
   // ground support
   padSteel: () => once('padSteel', () => new THREE.MeshStandardMaterial({ color: 0x6c7176, roughness: 0.6, metalness: 0.55 })),
   fssSteel: () => once('fssSteel', () => new THREE.MeshStandardMaterial({ color: 0x8a8d8f, roughness: 0.6, metalness: 0.45 })),
-  teWhite: () => once('teWhite', () => new THREE.MeshStandardMaterial({ color: 0xd4d6d7, roughness: 0.55, metalness: 0.3 })),
+  teWhite: () => once('teWhite', () => new THREE.MeshStandardMaterial({ color: 0xc4c6c7, roughness: 0.6, metalness: 0.3 })),
   refractory: () => once('refractory', () => new THREE.MeshStandardMaterial({ color: 0x5a554f, roughness: 0.95, metalness: 0.02 })),
   deflector: () => once('deflector', () => new THREE.MeshStandardMaterial({ color: 0x8f8a83, roughness: 0.9, metalness: 0.1 })),
   water: () => once('waterPipe', () => new THREE.MeshStandardMaterial({ color: 0xb7b9b2, roughness: 0.5, metalness: 0.6 })),

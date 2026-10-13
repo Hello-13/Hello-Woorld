@@ -44,9 +44,9 @@ export default [
   },
   {
     title: 'Engines that eat sand and hide their heat',
-    body: 'Thermal view. Swirl vanes in each T700\'s inlet particle separator fling sand outward into a scroll that is blown overboard, so the compressor breathes clean air in desert landings. Behind the engines the IR suppressors mix cool air into the hot exhaust and turn it outboard and upward: notice the suppressor ducts glow far less than the engine cores.',
+    body: 'Thermal view. Swirl vanes in each T700\'s inlet particle separator fling sand outward into a scroll that is blown overboard, so the compressor breathes clean air in desert landings. Behind the engines the IR suppressors mix cool air into the hot exhaust and turn it outboard and upward: with the cowlings ghosted, notice the suppressor ducts glow far less than the engine cores inside.',
     key: 'T700-GE-701D: 1,994 shp for 10 min, 1,716 shp continuous, 207 kg — about 9.6 shp per kilogram.',
-    focus: ['T700-GE-701D engine (right)', 'T700-GE-701D engine (left)', 'Inlet particle separator (right)', 'Inlet particle separator (left)', 'Exhaust IR suppressor (right)', 'Exhaust IR suppressor (left)', 'Engine cowling (right)', 'Engine cowling (left)', 'Auxiliary power unit'],
+    focus: ['T700-GE-701D engine (right)', 'T700-GE-701D engine (left)', 'Inlet particle separator (right)', 'Inlet particle separator (left)', 'Exhaust IR suppressor (right)', 'Exhaust IR suppressor (left)', 'Auxiliary power unit'],
     mode: 'thermal', view: { dir: [-0.6, 0.8, 1], fill: 1.15 },
   },
   {
@@ -60,7 +60,7 @@ export default [
     body: 'The Black Hawk was the first helicopter designed from the outset to crash-survival standards. In a hard impact the oleos\' crash stage and the drag beams absorb energy first, then the crushable belly; the cabin roof beams hold the gearbox up, and the pilots\' armoured seats and the hanging troop seats stroke downward to limit spinal loads. The two fuel cells survive a 20 m drop test, and breakaway valves seal every line that tears loose.',
     key: 'Design goal: a livable space and no post-crash fire in a vertical impact of about 11.6 m/s (38 ft/s).',
     focus: ['Main gear oleo (right)', 'Main gear oleo (left)', 'Main gear drag beam (right)', 'Main gear drag beam (left)', 'Keel beams & crushable belly', 'Cabin frames & roof beams', 'Armoured crashworthy pilot seats', 'Troop seats', 'Crew chief & gunner seats', 'Fuel cell (right)', 'Fuel cell (left)', 'Fuel lines & breakaway valves'],
-    mode: 'systems', view: { dir: [0.8, 0.5, -1.2], fill: 1.0 },
+    mode: 'systems', view: { dir: [0.8, 0.5, -1.2], fill: 1.2 },
   },
   {
     title: 'The glass cockpit',
