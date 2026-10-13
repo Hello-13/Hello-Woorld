@@ -57,14 +57,6 @@ export function exitArea(stage) {
   return (stage.thrustVac - stage.thrustSL) / P_SL;
 }
 
-/** Side-booster throttle at time t (s): 1, except for the throttle bucket through max-Q. */
-export function boosterThrottle(vehicle, t) {
-  const b = vehicle.boosterBucket;
-  if (!b) return 1;
-  const k = Math.min(1, Math.max(0, Math.min((t - b.start) / b.ramp, (b.end - t) / b.ramp)));
-  return 1 - (1 - b.level) * k;
-}
-
 /** Liftoff mass (kg) of a vehicle with a given payload. */
 export function liftoffMass(vehicle = FALCON_HEAVY, payload = 0) {
   const B = vehicle.booster, C = vehicle.core, U = vehicle.upper;
@@ -100,9 +92,7 @@ export function deltaVBudget(vehicle = FALCON_HEAVY, payload = 0) {
   const B = vehicle.booster, C = vehicle.core, U = vehicle.upper;
   const mdot = (s) => (s.thrustVac / (G0 * s.ispVac)) * s.engines;
   const ispSL = (s) => (s.ispVac * (s.thrustVac - P_SL * exitArea(s))) / s.thrustVac;
-  // each booster burns its own load; the throttle bucket stretches the burn by its deficit
-  const bk = vehicle.boosterBucket;
-  const tBoost = B.prop / mdot(B) + (bk ? (1 - bk.level) * (bk.end - bk.start - bk.ramp) : 0);
+  const tBoost = B.prop / mdot(B);                       // each booster burns its own load
   const kT = vehicle.coreThrottleTime, kD = vehicle.coreThrottleDown;
   const coreInBoost = Math.min(C.prop, mdot(C) * (Math.min(kT, tBoost) + Math.max(0, tBoost - kT) * kD));
   const m0 = liftoffMass(vehicle, payload);
@@ -249,7 +239,7 @@ export function simulateAscent({
     let thrust = 0, mdotB = 0, mdotC = 0, mdotU = 0;
     const coreThrottle = (boostersAttached && t > vehicle.coreThrottleTime) ? vehicle.coreThrottleDown : 1;
     if (phase === 'BOOST') {
-      const b = engineThrust(B, atm.p, boosterThrottle(vehicle, t));
+      const b = engineThrust(B, atm.p, 1);
       const c = engineThrust(C, atm.p, coreThrottle);
       thrust = b.thrust * B.count + c.thrust;
       mdotB = b.mdot * B.count; mdotC = c.mdot;

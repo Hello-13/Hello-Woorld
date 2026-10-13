@@ -13,7 +13,11 @@ const AVIONICS = [
   'ARC-210 V/UHF radios', 'Ku-band SATCOM modem', 'Main batteries', 'MTS-B electronics unit', 'Lynx radar electronics', 'Avionics cooling fan', 'Avionics cooling ducts',
   'Avionics bay harness', 'Avionics floor',
 ];
-const FUEL = ['Fuselage fuel tank', 'Collector tank', 'Boost pumps', 'Wing feed lines', 'Fuselage tank feed line', 'Engine feed line', 'Fuel shut-off valve', 'Transfer & crossfeed valves', 'Fuel sump drains', 'Fuel control unit', 'Fuel manifold & nozzles'];
+const FUEL = [
+  'Wing fuel tank (starboard)', 'Wing fuel tank (port)', 'Fuselage fuel tank', 'Fuel quantity probes', 'Gravity refuel ports', 'Fuel vents',
+  'Wing feed lines', 'Fuselage tank feed line', 'Transfer & crossfeed valves', 'Collector tank', 'Boost pumps', 'Engine feed line',
+  'Fuel shut-off valve', 'Fuel sump drains', 'Fuel control unit', 'Fuel manifold & nozzles',
+];
 const STORES = [
   'Inboard pylon (starboard)', 'Middle pylon (starboard)', 'Outboard pylon (starboard)', 'Inboard pylon (port)', 'Middle pylon (port)', 'Outboard pylon (port)', 'Centreline station',
   'GBU-12 Paveway II (starboard)', 'GBU-12 Paveway II (port)', 'M310 launcher (starboard)', 'M310 launcher (port)', 'AGM-114 Hellfire pair (starboard)', 'AGM-114 Hellfire pair (port)',
@@ -86,7 +90,7 @@ export default [
     title: 'Fuel and time on station',
     body: 'About 1,800 kg of JP-8 fills the wing bays and a fuselage tank at the centre of gravity. Follow it: each tank feeds a small collector through motorised valves, two boost pumps send it aft through the firewall shut-off valve to the engine-driven fuel control, and a metered line takes it to the combustor nozzles. That fuel is what buys the 27 hours; open the Mission endurance lab to see what transit and stores cost.',
     key: 'Breguet endurance E = (η / c) · (L/D) · (1/V) · ln(W₀ / W₁).',
-    mode: 'systems', focus: FUEL, view: { dir: [-0.75, 1, 0.3], fill: 0.95 },
+    mode: 'systems', focus: FUEL, view: { dir: [-1, 0.95, -0.75], fill: 0.72 },
   },
   {
     title: 'Seven stations',

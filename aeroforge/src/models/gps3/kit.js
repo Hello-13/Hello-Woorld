@@ -1,28 +1,34 @@
 // Shared dimensions and small geometry helpers for the GPS III model.
 //
 // Axes (metres): the GPS spacecraft body frame used by the IGS. +Z points at the Earth (nadir, the
-// L-band antenna side), +Y runs along the solar-array axis (the two radiator faces), +X completes
-// the right-handed set and faces the Sun's hemisphere under yaw steering. Origin at the centre of
-// the bus box.
+// L-band antenna side), +Y runs along the solar-array axis (the two radiator / equipment panels),
+// +X completes the right-handed set and faces the Sun's hemisphere under yaw steering. Origin at
+// the centre of the bus box. Lockheed Martin's own axes are turned 180° about Z from these, so a
+// unit Lockheed places on its "−Y" panel is on +Y here, and its "−X" side is +X here.
 //
-// Size: the U.S. Space Force fact sheet gives 97 in wide × 70 in deep × 134 in high
-// (2.46 × 1.78 × 3.40 m). The 97-in width is taken along the array axis (Y), as in the IGS
-// box-wing model, whose X face (≈ 7.5 m²) is about twice the Z face (≈ 4.0 m²). The 134-in height
-// is read as the stowed height from the separation plane to the antenna tops (an assumption), which
-// leaves a 2.80 m box.
+// Size: the U.S. Space Force fact sheet gives 97 × 70 × 134 in (2.46 × 1.78 × 3.40 m). In the
+// manufacturer's scale model, photographed face by face in IGS axes (Steigenberger et al. 2020,
+// Fig. 4), the ±Y radiator faces are the wider ones, and the IGS box-wing model gives an X face
+// (7.5 m²) almost twice the Z face (4.0 m²). So X (Sun axis) = 2.46 m, Y (array axis) = 1.78 m, and
+// the box is 3.40 m tall from the aft deck to the Earth deck; the launch adapter section below it
+// and the antennas above it bring the stowed height to about 4.2 m.
 
 import * as THREE from 'three';
 import { mergeGeometries } from '../../engine/geometry.js';
 import { mesh } from '../../engine/assembly.js';
 import { G } from './materials.js';
 
-export const BX = 1.78, BY = 2.46, BZ = 2.80;         // bus box (fact-sheet footprint; height see above)
+export const BX = 2.46, BY = 1.78, BZ = 3.40;         // bus box (fact sheet; axes see above)
 export const HX = BX / 2, HY = BY / 2, HZ = BZ / 2;
 export const T = 0.025;                               // honeycomb panel thickness
-export const RC = 0.62;                               // central cylinder radius (estimate)
+export const CORE = 0.50;                             // half-width of the core box section (estimate: about 1.0 × 1.0 m)
+export const BAY = 0.50;                              // the ±X tank bays run |y| < 0.5 between the shear webs
 export const IX = HX - T, IY = HY - T, IZ = HZ - T;   // inner faces of the closure panels
 export const DECK = HZ + 0.012;                       // top of the Earth-deck blanket
 export const AFT = -HZ - 0.013;                       // outer face of the aft-deck blanket
+export const ADAPTER = { r: 0.85, z0: -HZ, z1: -2.12 };   // launch adapter section (scale model: ≈ 1.7 m across, 0.5 m tall)
+export const SEP_Z = -2.12;                           // top of the separation ring; the separation plane is its base
+export const SADA_C = [0.1, -0.37];                   // solar-array drive axis (x, z) on both ±Y faces (scale model)
 
 /** Non-indexed copy so geometries of any kind can be merged. */
 export const flat = (g) => (g.index ? g.toNonIndexed() : g);
@@ -36,6 +42,14 @@ export function boxG(c, s) {
 /** Cylinder geometry along an axis ('x' | 'y' | 'z') centred at c. r is the −axis end radius, r2 the +axis end. */
 export function cylG(c, r, h, axis = 'z', seg = 24, r2 = r, open = false) {
   const g = new THREE.CylinderGeometry(r2, r, h, seg, 1, open);   // Three's cylinder runs along +Y, top radius first
+  if (axis === 'x') g.rotateZ(-Math.PI / 2);
+  else if (axis === 'z') g.rotateX(Math.PI / 2);
+  return g.translate(c[0], c[1], c[2]);
+}
+
+/** Capsule (cylinder with hemispherical ends) along an axis, centred at c, radius r, overall length L. */
+export function capsuleG(c, r, L, axis = 'z', radial = 48, cap = 14) {
+  const g = new THREE.CapsuleGeometry(r, Math.max(0.001, L - 2 * r), cap, radial);
   if (axis === 'x') g.rotateZ(-Math.PI / 2);
   else if (axis === 'z') g.rotateX(Math.PI / 2);
   return g.translate(c[0], c[1], c[2]);
@@ -74,6 +88,13 @@ export function plateG(points, thick, z0, holes = []) {
   return new THREE.ExtrudeGeometry(s, { depth: thick, bevelEnabled: false, curveSegments: 40 }).translate(0, 0, z0);
 }
 
+/** Rectangular hole path (for plateG / panel cut-outs), centre (cx, cy), size w × h. */
+export function rectHole(cx, cy, w, h) {
+  const p = new THREE.Path();
+  p.moveTo(cx - w / 2, cy - h / 2); p.lineTo(cx - w / 2, cy + h / 2); p.lineTo(cx + w / 2, cy + h / 2); p.lineTo(cx + w / 2, cy - h / 2); p.closePath();
+  return p;
+}
+
 /** Regular octagon (flat sides on the axes) of across-flats size d, as x, y points. */
 export function octagon(cx, cy, d) {
   const R = d / 2 / Math.cos(Math.PI / 8);
@@ -92,6 +113,11 @@ export function helixG(x, y, r, z0, z1, turns, wire = 0.0032, phase = 0, r1 = r)
     pts.push(new THREE.Vector3(x + Math.cos(a) * rr, y + Math.sin(a) * rr, z0 + (z1 - z0) * t));
   }
   return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n, wire, 5, false);
+}
+
+/** Bolt heads (small hex-ish cylinders) at points, axis along `axis`. */
+export function boltsG(points, axis = 'y', r = 0.008, h = 0.006) {
+  return merge(points.map((p) => cylG(p, r, h, axis, 6)));
 }
 
 const AX = { x: 0, y: 1, z: 2 };
@@ -142,3 +168,11 @@ export function connPoint(c, s, conn, off = 0.03) {
   p[a] += (conn[0] === '+' ? 1 : -1) * (s[a] / 2 + off);
   return p;
 }
+
+/**
+ * Harness landing points, collected from every module and drawn last (harness.js).
+ * side: 'npe' (+Y panel), 'bus' (−Y panel), 'deck' (Earth deck units), 'aft' (aft-end units);
+ * power: true when the unit also gets a drop from the power harness (the larger loads).
+ */
+export const NET = { nodes: [] };
+export const reg = (p, side, power = false) => { NET.nodes.push({ p, side, power }); return p; };

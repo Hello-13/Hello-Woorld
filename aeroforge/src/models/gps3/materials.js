@@ -1,7 +1,8 @@
-// GPS III surface materials: black-Kapton and gold-Kapton blankets, quartz OSR radiators,
-// triple-junction cells, painted antenna parts and the finishes of avionics boxes.
-// Exterior colours follow the general look of published GPS III imagery (dark blankets, silver
-// radiators, white L-band elements); exact finishes per panel are not published.
+// GPS III surface materials: black and silver multi-layer insulation, quartz OSR radiators,
+// triple-junction cells, the black antenna panel with black Earth-coverage and white crosslink
+// radomes, and the finishes of avionics boxes. Exterior finishes follow the pre-launch images of
+// SV02 and the manufacturer's scale model (Steigenberger et al. 2020, §4 and Fig. 4): silver MLI on
+// the Sun-facing +X face and the +Z antenna face, black MLI on −X and most of −Z.
 
 import * as THREE from 'three';
 import { M, SKIN } from '../../engine/materials.js';
@@ -61,8 +62,21 @@ export const G = {
       normalScale: new THREE.Vector2(0.22, 0.22), roughness: 0.5, metalness: 0.3,
     });
   }),
-  /** Gold (aluminised Kapton, amber side out) blanket for the propulsion end. */
+  /** Silver multi-layer insulation (aluminised outer layer): the Sun-facing +X face and, in a
+   *  radio-transparent version, the +Z antenna face. */
+  silverMLI: (r = 1.2) => once(`silverMLI${r}`, () => {
+    const s = mliSurface({ seed: 23 });
+    return new THREE.MeshStandardMaterial({
+      color: 0xc9ced3, normalMap: tile(s.normalMap, r), roughnessMap: tile(s.roughnessMap, r),
+      normalScale: new THREE.Vector2(0.3, 0.3), roughness: 0.3, metalness: 0.85,
+    });
+  }),
+  /** Gold (aluminised Kapton, amber side out) wrap of the oxidiser tanks in the scale model. */
   goldMLI: () => SKIN.mli(),
+  /** Black paint / black Kapton: the antenna panel and the radiator strip along the −X edge. */
+  blackPaint: () => once('blackPaint', () => new THREE.MeshStandardMaterial({ color: 0x17181b, roughness: 0.62, metalness: 0.1 })),
+  /** Black tapered Earth-coverage radomes. */
+  radomeBlack: () => once('radomeBlack', () => new THREE.MeshStandardMaterial({ color: 0x1b1c20, roughness: 0.45, metalness: 0.05 })),
   /** Optical solar reflector radiator: quartz mirrors on aluminium honeycomb. */
   osr: (rx, ry) => once(`osr${rx}.${ry}`, () => new THREE.MeshPhysicalMaterial({
     color: 0xffffff, map: tile(osrTexture(), rx, ry), metalness: 0.85, roughness: 0.14,

@@ -171,7 +171,7 @@ export function buildInstruments(P, root) {
   const rad = P('WFC3 radiator', {
     system: 'Thermal control', skin: true, material: 'White-painted aluminium radiator with embedded heat pipes, 0.8 × 2.2 m', temp: 235, mass: 45, explode: [0, -2.6, 0],
     desc: 'The camera\'s outer face, 0.8 m wide and 2.2 m long, is a curved radiator that forms part of the aft shroud skin. It carries away the heat pumped out by the detectors\' thermoelectric coolers; WFC3 is behind it.',
-    callout: true, anchor: [2.6, -2.14, 0.15],
+    callout: true, anchor: [1.35, -2.09, -0.37],   // aft corner, so the label clears the Systems legend
   }, [mesh(radPanel, HM.radiator()), mesh(merge(radFins), HM.al())]);
   rad.userData.part.thermalRole = 'radiator';
 
@@ -211,9 +211,11 @@ export function buildInstruments(P, root) {
     return P(`Rate sensor unit ${n}`, {
       system: 'Attitude control', material: 'Two gas-bearing rate-integrating gyroscopes in an enclosure, on a mounting plate', mass: 24, count: 2, temp: 296,
       explode: az(rsuPhi, 1.2, -0.6), desc: `Each unit carries two gyros, six in all, measuring rotation rate about their sensitive axes; electronics control units in bay 10 process their output. The gyros' flex leads corroded over time; all three units were replaced in 2009. Since 2024 Hubble points with a single gyro to conserve the rest. Position on the −V3 side approximate.`,
+      callout: n === 2, anchor: az(rsuPhi, 1.9, x),
     }, [mesh(box, HM.iridite()), mesh(merge([...gyros, plate]), HM.box())]);
   };
-  rsu(1, 2.55); rsu(2, 2.9); rsu(3, 3.25);
+  rsu(1, 2.55); rsu(3, 3.25);
+  rsu(2, 2.9).userData.part.tourLabel = true;      // the middle unit names the gyros during the tour
 
   const fh = [], shades = [];
   for (const a of [198.5, 206, 213.5].map(deg)) {
@@ -223,10 +225,12 @@ export function buildInstruments(P, root) {
     g.translate(3.0, RAD.big - 0.02, 0).rotateX(a);
     shades.push(g);
   }
-  P('Fixed-head star trackers', {
+  const fhst = P('Fixed-head star trackers', {
     system: 'Attitude control', material: 'Image-dissector star sensors with sunshades', mass: 54, count: 3, temp: 285, explode: az(deg(206), 1.6, 0.4),
+    callout: true, anchor: az(deg(206), 1.98, 3.0),
     desc: 'Three trackers behind the focal plane structure, next to the gyros, look out through light-sealed openings in the −V3 doors and map bright stars to fix Hubble\'s attitude to about an arc-minute — coarse enough to put the guide stars inside the Fine Guidance Sensors\' view. Positions approximate.',
   }, [mesh(merge(fh), HM.box()), mesh(merge(shades), HM.black())]);
+  fhst.userData.part.tourLabel = true;
 
   const ncsPhi = deg(240);
   const ncs = [rbox(ncsPhi, 0.6, 0.32, 0.46, 2.95, 1.62)];

@@ -367,7 +367,7 @@ export function buildSSM(P) {
   }
   // bays 6 and 9: reaction wheels, No. 1 / No. 3 forward
   out.wheels = [];
-  const wheel = (k, n, x, tilt) => {
+  const wheel = (k, n, x, tilt, label = false) => {
     const g = new THREE.Group();
     const housing = mesh(new THREE.CylinderGeometry(0.295, 0.295, 0.2, 40), HM.box());
     const flangeM = mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.03, 40).translate(0, -0.1, 0), HM.al());
@@ -385,9 +385,11 @@ export function buildSSM(P) {
       system: 'Attitude control', material: 'Flywheel on ball bearings up to 3,000 rpm, brushless DC motor', mass: 45, massSource: 'NASA SM3A Media Guide (about 100 lb)', temp: 300,
       desc: `Bay ${k}, ${n % 2 ? 'forward' : 'aft'} position. Spinning a 59 cm flywheel faster or slower turns the telescope the other way — no propellant, no thruster vibration. Four wheels with skewed axes, any three enough; they slew Hubble about 90° in 15 minutes, as slow as a minute hand.`,
     }, g);
+    // internal: one wheel names the set while a tour step focuses it
+    if (label) Object.assign(p.userData.part, { callout: true, anchor: c.clone().addScaledVector(axis, 0.14), tourLabel: true });
     return p;
   };
-  wheel(6, 1, X_EQ1 - 0.42, -0.35); wheel(6, 2, X_EQ0 + 0.42, 0.35);
+  wheel(6, 1, X_EQ1 - 0.42, -0.35, true); wheel(6, 2, X_EQ0 + 0.42, 0.35);
   wheel(9, 3, X_EQ1 - 0.42, -0.35); wheel(9, 4, X_EQ0 + 0.42, 0.35);
   // bay 7: mechanism control
   B(7, 'Mechanism control unit', {

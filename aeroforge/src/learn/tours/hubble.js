@@ -1,8 +1,9 @@
 // Guided tour: Hubble Space Telescope. See ../tours.js for the step format.
 // Step bodies stay under about 265 characters and key ideas under about 85 (two lines) so the
 // card's Back / Next row fits at 1280 × 800; the detail lives in the part cards. Systems-view steps
-// frame their subject loosely (fill ≥ 1.2) and a little high (negative lift) so it stays clear of the
-// Systems legend at the lower right.
+// frame their subject loosely (fill ≥ 1.2) and a little high (negative lift) so the focused parts and
+// their labels stay left of and above the Systems legend at the lower right (checked by projecting
+// each step's focus bounds and callout anchors at 1280 × 800 with the tour card open).
 
 const BAY_DOORS = [
   'Bay 1 door (data management)', 'Bay 2 door (battery module 1)', 'Bay 3 door (battery module 2)', 'Bay 4 door (power control)',
@@ -53,14 +54,16 @@ export default [
     body: 'Hubble carries no thrusters and no propellant. Four reaction wheels in bays 6 and 9 turn it: spin a wheel faster one way and the telescope turns the other, 90° in about 15 minutes. Disturbance torques build up wheel speed; four magnetic torquer bars push on Earth\'s field to bleed it off.',
     key: 'Any three of the four skewed wheels can point the telescope; the fourth is a spare.',
     focus: ['Reaction wheel assembly 1', 'Reaction wheel assembly 2', 'Reaction wheel assembly 3', 'Reaction wheel assembly 4', 'Magnetic torquer bar 1', 'Magnetic torquer bar 2', 'Magnetic torquer bar 3', 'Magnetic torquer bar 4', 'Flight computer (80486)'],
-    mode: 'systems', explode: 0.3, view: { dir: [0.45, 0.75, 0.9], fill: 1.3, lift: -0.25 },
+    mode: 'systems', explode: 0.3, view: { dir: [0.2, 0.8, 1], fill: 1.45, lift: -0.3 },
   },
   {
     title: 'Pointing to 0.007″',
     body: 'Six gyroscopes in three rate sensor units feel every motion. Three star trackers fix the attitude to an arc-minute, enough to put guide stars in the Fine Guidance Sensors, which lock on two of them 40 times a second. If the computer falls silent, bay 8\'s safe-mode electronics turn the arrays to the Sun.',
     key: 'Held to 0.007″ for 24 hours: about the width of a human hair seen from 1.6 km.',
     focus: ['Rate sensor unit 1', 'Rate sensor unit 2', 'Rate sensor unit 3', 'Gyro electronics control units', 'Fixed-head star trackers', 'Fine Guidance Sensor 1', 'Fine Guidance Sensor 2', 'Fine Guidance Sensor 3', 'FGS 1 star selectors & interferometers', 'FGS 2 star selectors & interferometers', 'FGS 3 star selectors & interferometers', 'Fine guidance electronics', 'Pointing/safemode electronics assembly', 'Retrieval mode gyro assembly', 'Coarse sun sensors (aft)'],
-    mode: 'systems', explode: 0.35, view: { dir: [-0.6, -0.35, 1], fill: 1.3, lift: -0.3 },
+    // steeply from above the +V2 side: the camera cannot go below the horizon, and from up here the
+    // −V3 gyros and trackers show through the ghosted skins with their labels apart
+    mode: 'systems', explode: 0.35, view: { dir: [-0.3, 1.3, -1], fill: 1.6, lift: -0.85 },
   },
   {
     title: 'Power',
@@ -74,7 +77,7 @@ export default [
     body: 'Hubble never talks straight to the ground. Two steerable high-gain antennas aim at NASA\'s geostationary Tracking and Data Relay Satellites, which relay to White Sands. Two low-gain antennas, one at each end, hear commands in almost any attitude; recorders hold data between contacts.',
     key: 'The relay is 36,000 km away; Hubble is only about 500 km up.',
     focus: ['High-gain antenna (+V3)', 'High-gain antenna (−V3)', 'High-gain antenna mast (+V3)', 'High-gain antenna mast (−V3)', 'HGA gimbal (+V3)', 'HGA gimbal (−V3)', 'Low-gain antenna (forward)', 'Low-gain antenna (aft)', 'RF cables & waveguide', 'S-band single-access transmitters', 'Multiple-access transponders', 'Solid-state recorder 1 (bay 5)', 'Solid-state recorder 3 (bay 5)', 'Engineering/science tape recorder (bay 8)', 'Science instrument command & data handling unit', 'Data management unit', ...DIUS],
-    mode: 'systems', view: { dir: [0.3, 0.6, 1], fill: 1.2 },
+    mode: 'systems', view: { dir: [0.3, 0.6, 1], fill: 1.3, lift: -0.15 },
   },
   {
     title: 'The equipment ring',

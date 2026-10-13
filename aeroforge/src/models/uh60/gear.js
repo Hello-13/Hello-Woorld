@@ -131,23 +131,32 @@ export function buildGear({ A, P }) {
       callout: side > 0, anchor: [-2.9, 0.9, 0.6],
     }, [mesh(g, MAT.fuelCell()), mesh(merge(fittings), MAT.casting())]);
   }
+  // Each feed line stays inside a skin all the way: up through the transition section, through the
+  // roof into the aft deck fairing, across into the engine bay where the fairing meets the cowl,
+  // through the selector valve on the deck under the engine, round the underside of the engine
+  // and up to the engine-driven boost pump.
   const lines = [];
   for (const s of [1, -1]) {
-    // engine feed: up the transition section, through the roof under the nacelle, forward to the engine-driven boost pump
-    lines.push(pipe([[-2.2, 1.5, 0.55 * s], [-2.05, 1.9, 0.62 * s], [-1.85, 2.12, 0.7 * s], [-1.6, 2.3, 0.74 * s], [-1.2, 2.45, 0.82 * s], [-0.95, 2.58, 0.9 * s], [-0.87, 2.68, 0.93 * s]], 0.016));
-    lines.push(pipe([[-2.5, 1.5, 0.3 * s], [-2.3, 1.9, 0.15 * s], [-2.0, 2.3, -0.1 * s], [-2.0, 2.35, -0.19 * s]], 0.012));
+    lines.push(pipe([[-2.2, 1.5, 0.55 * s], [-2.1, 1.85, 0.47 * s], [-1.95, 2.1, 0.36 * s], [-1.8, 2.3, 0.3 * s], [-1.68, 2.41, 0.36 * s], [-1.66, 2.43, 0.44 * s], [-1.64, 2.36, 0.56 * s], [-1.6, 2.32, 0.6 * s]], 0.016));
+    lines.push(pipe([[-1.5, 2.32, 0.6 * s], [-1.42, 2.3, 0.66 * s], [-1.3, 2.26, 0.8 * s], [-1.1, 2.28, 0.98 * s], [-0.95, 2.5, 1.02 * s], [-0.88, 2.62, 0.97 * s], [-0.87, 2.68, 0.93 * s]], 0.016));
   }
   lines.push(tube([-2.4, 1.0, 0.06], [-2.4, 1.0, -0.06], 0.03, 10));
   const valves = [];
-  for (const s of [1, -1]) valves.push(cyl(0.035, 0.035, 0.06, [-2.2, 1.55, 0.55 * s], 'y', 12), cyl(0.03, 0.03, 0.05, [-1.86, 2.11, 0.7 * s], 'y', 10));
+  for (const s of [1, -1]) valves.push(cyl(0.035, 0.035, 0.06, [-2.2, 1.55, 0.55 * s], 'y', 12), cyl(0.03, 0.03, 0.05, [-1.89, 2.18, 0.34 * s], 'y', 10));
   P('Fuel lines & breakaway valves', {
     system: 'Fuel', material: 'Self-sealing hoses, frangible breakaway valves', mass: 20, explode: [-0.6, -0.6, 0],
-    desc: 'Each cell feeds its own engine, which draws the fuel by suction, so a cut line sucks air instead of spraying fuel. Breakaway valves at every structural joint seal both ends if a line is torn out in a crash — the main reason post-crash fires are rare in H-60s.',
+    desc: 'Each cell feeds its own engine, which draws the fuel by suction, so a cut line sucks air instead of spraying fuel. Breakaway valves at every structural joint (here at the cell outlets and where the lines pass through the roof) seal both ends if a line is torn out in a crash — the main reason post-crash fires are rare in H-60s.',
   }, [mesh(merge(lines), MAT.hydraulic()), mesh(merge(valves), MAT.red())]);
+  const selG = [];
+  for (const s of [1, -1]) {
+    selG.push(cyl(0.04, 0.04, 0.09, [-1.55, 2.32, 0.6 * s], 'x', 12), box(0.05, 0.03, 0.06, [-1.55, 2.27, 0.6 * s]));
+    // crossfeed: from the valve's inboard side through the firewall into the aft deck fairing
+    selG.push(pipe([[-1.55, 2.33, 0.555 * s], [-1.56, 2.42, 0.45 * s], [-1.56, 2.36, 0.3 * s], [-1.56, 2.3, 0.12 * s], [-1.56, 2.3, 0]], 0.012));
+  }
   P('Fuel selector valves', {
     system: 'Fuel', material: 'Cable-operated two-way valves, crossfeed line', mass: 4, count: 2, explode: [-0.8, 0.9, 0],
-    desc: 'One per engine on the aft deck, worked by the fuel selector levers overhead: each engine can draw directly from its own cell or crossfeed from the other one.',
-  }, [mesh(merge([cyl(0.04, 0.04, 0.09, [-1.5, 2.36, 0.77], 'x', 12), cyl(0.04, 0.04, 0.09, [-1.5, 2.36, -0.77], 'x', 12), pipe([[-1.55, 2.33, 0.74], [-1.82, 2.12, 0.66], [-1.9, 2.12, 0.0], [-1.82, 2.12, -0.66], [-1.55, 2.33, -0.74]], 0.012)]), MAT.red())]);
+    desc: 'One per engine, in the feed line on the deck beneath the engine (location approximate), worked by the fuel selector levers overhead: each engine can draw directly from its own cell or crossfeed from the other one through the line that crosses under the aft deck fairing.',
+  }, [mesh(merge(selG), MAT.red())]);
   P('Fuel prime/boost pump', {
     system: 'Fuel', material: 'Electric pump in the left cell (location approximate)', mass: 4, explode: [-0.6, -0.3, -1.1],
     desc: 'An electric pump primes the engine fuel lines before a start and feeds the APU, which draws from the left cell; in flight the engines\' own pumps do the work.',
@@ -161,7 +170,7 @@ export function buildGear({ A, P }) {
   const drains = [];
   for (const s of [1, -1]) {
     drains.push(cyl(0.025, 0.025, 0.06, [-2.15, 0.52, 0.45 * s], 'y', 10));
-    drains.push(pipe([[-2.0, 1.52, 0.7 * s], [-1.95, 1.9, 0.8 * s], [-1.9, 2.15, 0.85 * s]], 0.01));
+    drains.push(pipe([[-2.0, 1.52, 0.7 * s], [-1.95, 1.9, 0.8 * s], [-1.92, 2.07, 0.79 * s]], 0.01));
   }
   P('Fuel sump drains & vents', {
     system: 'Fuel', material: 'Drain valves at the low points, vent lines with rollover valves', mass: 2, count: 4, explode: [-0.4, -1.1, 0.8],

@@ -111,8 +111,10 @@ export function mountHubbleLab(root, ctx) {
   const tgt = segmented({ label: 'Target', value: p.target, options: Object.entries(TARGETS).map(([k, t]) => [k, t.label]), onChange: (x) => { p.target = x; mark(); } });
   const roT = readouts([
     { key: 'dist', label: 'Distance' }, { key: 'feat', label: 'Smallest feature Hubble resolves' },
-    { key: 'ground', label: 'Through 0.8″ ground seeing' }, { key: 'across', label: 'Resolution elements across it' },
+    { key: 'ground', label: 'Through ground seeing' }, { key: 'across', label: 'Resolution elements across it' },
   ]);
+  // the seeing row names the value it uses: the seeing slider, scaled to the chosen wavelength
+  const groundLabel = roT.el.querySelectorAll('.ro-label')[2];
   const tgtNote = el('p', { class: 'lab-note' });
 
   // ------------------------------------------------------------------ orbit
@@ -205,10 +207,16 @@ export function mountHubbleLab(root, ctx) {
     const rad = diffractionLimit(lam * 1e-9, 2.4);
     roT.set('dist', length(T.d));
     roT.set('feat', length(linearResolution(T.d, rad)));
-    roT.set('ground', length(T.d * (see / 206264.8)));
+    if (lam < 300) {
+      groundLabel.textContent = `From the ground at ${fmt.n(lam)} nm`;
+      roT.set('ground', 'absorbed by the air', 'crit');
+    } else {
+      groundLabel.textContent = `Through ${see.toFixed(2)}″ ground seeing at ${fmt.n(lam)} nm`;
+      roT.set('ground', length(T.d * (see / 206264.8)));
+    }
     const n = T.size / toArcsec(rad);
     roT.set('across', n >= 1 ? fmt.n(n, 0) : `${n.toFixed(2)} (unresolved)`);
-    tgtNote.textContent = `For ${T.what}, ${arcsec(T.size)} across, at ${fmt.n(lam)} nm.`;
+    tgtNote.textContent = `For ${T.what}, ${arcsec(T.size)} across, at ${fmt.n(lam)} nm. The ground figure uses the seeing slider above (${p.seeing.toFixed(2)}″ at 500 nm), scaled to this wavelength as λ^−1/5.`;
 
     // ---------------- orbit
     const o = orbitAt(p.h);

@@ -101,3 +101,17 @@ test('stores fits use the published store and M310 launcher masses', () => {
   assert.equal(LOADOUTS.strike.mass, 2 * 230 + 4 * 49 + 2 * 43);
   assert.ok(LOADOUTS.strike.mass < MQ9.maxExternal);
 });
+
+test('the fuel step shows the whole fuel system, wing tanks included', () => {
+  const fuel = new Set();
+  for (const m of modelSrc.matchAll(/P\((['`])([^'`]+)\1,\s*\{\s*system: 'Fuel'/g)) {
+    const n = m[2];
+    if (!n.includes('${')) fuel.add(n);
+    else for (const side of ['starboard', 'port']) fuel.add(n.replace(/\$\{(sn|SN\([^)]*\))\}/g, side));
+  }
+  assert.ok(fuel.has('Wing fuel tank (starboard)') && fuel.has('Wing fuel tank (port)') && fuel.size >= 12, `fuel parts: ${[...fuel].join(', ')}`);
+  const step = TOUR.find((s) => /fuel/i.test(s.title));
+  assert.ok(step, 'a fuel step exists');
+  const missing = [...fuel].filter((n) => !step.focus.includes(n));
+  assert.deepEqual(missing, [], 'fuel parts left out of the fuel step');
+});

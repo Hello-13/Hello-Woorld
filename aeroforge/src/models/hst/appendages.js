@@ -167,10 +167,12 @@ export function buildAppendages(P) {
     const bar = [rod(az(p, RAD.shell + 0.15, MT0), az(p, RAD.shell + 0.15, MT1), 0.045, 16)];
     for (const x of [MT0 + 0.1, MT1 - 0.1]) bar.push(new THREE.BoxGeometry(0.14, 0.16, 0.16).translate(0, RAD.shell + 0.08, 0).rotateX(p).translate(x, 0, 0));
     for (const x of [MT0, MT1]) bar.push(new THREE.CylinderGeometry(0.06, 0.06, 0.05, 16).rotateZ(Math.PI / 2).translate(x, 0, 0).translate(0, ...az(p, RAD.shell + 0.15).slice(1)));
-    P(`Magnetic torquer bar ${n}`, {
+    const mtb = P(`Magnetic torquer bar ${n}`, {
       system: 'Attitude control', material: 'Ferromagnetic-core electromagnet with redundant windings, 2.5 m long', mass: 45, massSource: 'NASA SM3A Media Guide (100 lb)', temp: 255,
       explode: az(p, 0.9, 0.3), desc: 'One of four bars on the forward shell. Driven against the Earth\'s magnetic field, it bleeds off the momentum the reaction wheels build up from gravity-gradient and aerodynamic torques, and can hold attitude in a contingency. Hubble carries no thrusters at all.',
+      callout: n === 1, anchor: az(p, RAD.shell + 0.2, MT0 + 0.9),
     }, mesh(merge(bar), HM.mtb()));
+    if (n === 1) mtb.userData.part.tourLabel = true;   // labelled only while the tour focuses the torquers
   }
 
   // ------------------------------------------------------------------ magnetometers and coarse sun sensors

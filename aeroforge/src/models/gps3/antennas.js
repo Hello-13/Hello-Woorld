@@ -1,150 +1,181 @@
-// GPS III antenna farm on the Earth deck. Layout after the GPS III nadir antenna deck shown as prior
-// art in Lockheed Martin patent US 10,749,252 (Fig. 1): an Earth-coverage (EC) L-band array of 12
-// tapered helices interleaved with 12 UHF crosslink elements, a 4-element military Earth-coverage
-// (MEC) group at one end of the same panel, and the laser retroreflector at the other end. Element
-// sizes and heights, and the exact positions, are estimates scaled from that drawing.
-// Also here: the deployable JIB monopoles and the two S-band TT&C antennas.
+// GPS III antenna subsystem element on the Earth deck (Marquis & Shaw 2011, Figs. 3 and 4; layout
+// from the manufacturer's scale model, Steigenberger et al. 2020, Fig. 4, see layout.js): the black
+// L-band panel with 12 tapered Earth-coverage helices and 4 military Earth-coverage (M-code)
+// elements, 12 white UHF crosslink elements interleaved with them, the beam-forming and crosslink
+// feed networks, the forward TT&C S-band mast and a second mast, the aft TT&C antenna, eight
+// deployable JIB monopoles, the stowed antenna on the +X face and the hosted-payload antennas.
+// Element sizes and heights are estimates scaled from the photographs.
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { lathe } from '../../engine/geometry.js';
 import { G } from './materials.js';
-import { HX, HY, HZ, IY, IZ, DECK, AFT, boxG, cylG, merge, pipeG, plateG, helixG } from './kit.js';
+import { HX, HY, IY, IZ, DECK, AFT, boxG, cylG, merge, pipeG, plateG, helixG, rectHole, reg } from './kit.js';
+import { ARRAY_C, EC_INNER, EC_OUTER, UHF_INNER, UHF_OUTER, MEC, DECK_AT, JIB_POS, PANEL_OUTLINE, BUS, onBUS, AFT_ANT } from './layout.js';
 
 export const PANEL_Z = DECK + 0.085;      // top of the L-band antenna panel
 const PANEL_T = 0.03;
-
-// panel outline: a chamfered octagon over the array with a tongue toward −Y for the MEC group
-const OUTLINE = [[0.8, -0.5], [0.8, 0.5], [0.5, 0.8], [-0.5, 0.8], [-0.8, 0.5], [-0.8, -0.5], [-0.5, -0.8], [-0.26, -0.8],
-  [-0.26, -1.12], [-0.18, -1.2], [0.18, -1.2], [0.26, -1.12], [0.26, -0.8], [0.5, -0.8]];
-
-const D = Math.PI / 180;
-const ring = (n, r, a0) => Array.from({ length: n }, (_, k) => { const a = (a0 + (k * 360) / n) * D; return [Math.cos(a) * r, Math.sin(a) * r]; });
-export const EC_INNER = ring(4, 0.13, 22.5), EC_OUTER = ring(8, 0.46, 0);
-export const UHF_INNER = ring(4, 0.29, 67.5), UHF_OUTER = ring(8, 0.70, 22.5);
-export const MEC = [[-0.075, -0.925], [0.075, -0.925], [-0.075, -1.075], [0.075, -1.075]];
-export const LRA_C = [0, 1.02];
-export const JIB_POS = [[-0.36, 1.16], [0.36, 1.16], [-0.82, 1.16], [0.82, 1.16], [-0.36, -1.16], [0.36, -1.16], [-0.82, -1.16], [0.82, -1.16]];
 const JIB_L = 0.5;
 
-/** Radome: a cylinder with a shallow dome, height h, standing on z0. */
-function radomeG(x, y, r, h, z0, seg = 28) {
-  const prof = [[r, 0], [r, h - 0.03], [r * 0.72, h - 0.008], [0.0001, h]];
+/** Radome: a cylinder or frustum with a shallow dome, base radius r, top radius rt, height h, standing on z0. */
+function radomeG(x, y, r, h, z0, rt = r, seg = 28) {
+  const prof = [[r, 0], [rt, h - 0.02], [rt * 0.7, h - 0.004], [0.0001, h]];
   return lathe(prof, seg).rotateX(Math.PI / 2).translate(x, y, z0);
 }
+const circle = (x, y, r) => { const p = new THREE.Path(); p.absarc(x, y, r, 0, Math.PI * 2, true); return p; };
 
-/** A helical element on the panel: base cup, mast, radome and tapered conductor. */
-function helixElement(x, y, h, rr, turns, { quad = false } = {}) {
+/** A helical element on the panel: base cup, mast, radome and conductor. */
+function element(x, y, { h, r, rt = r, turns, quad = false, mat }) {
   const z0 = PANEL_Z;
-  const metal = merge([cylG([x, y, z0 + 0.015], rr + 0.008, 0.03, 'z', 24), cylG([x, y, z0 + 0.03 + (h - 0.07) / 2], 0.009, h - 0.07, 'z', 8)]);
+  const metal = merge([cylG([x, y, z0 + 0.015], r + 0.008, 0.03, 'z', 24), cylG([x, y, z0 + 0.03 + (h - 0.07) / 2], 0.009, h - 0.07, 'z', 8)]);
   const wire = quad
-    ? merge([0, 1, 2, 3].map((k) => helixG(x, y, rr - 0.02, z0 + 0.05, z0 + h - 0.02, turns, 0.004, (k * Math.PI) / 2)))
-    : helixG(x, y, rr - 0.018, z0 + 0.04, z0 + h - 0.02, turns, 0.0032, 0, rr - 0.03);
-  return [mesh(metal, G.aluminium()), mesh(radomeG(x, y, rr, h, z0 + 0.03), G.radome()), mesh(wire, G.helixWire())];
+    ? merge([0, 1, 2, 3].map((k) => helixG(x, y, Math.min(r, rt) - 0.015, z0 + 0.05, z0 + h - 0.02, turns, 0.004, (k * Math.PI) / 2)))
+    : helixG(x, y, r - 0.018, z0 + 0.04, z0 + h - 0.03, turns, 0.0032, 0, rt - 0.012);
+  return [mesh(metal, G.aluminium()), mesh(radomeG(x, y, r, h, z0 + 0.03, rt), mat), mesh(wire, G.helixWire())];
 }
 
 export function buildAntennas(P) {
+  const A = DECK_AT;
   // ------------------------------------------------------------------ support frame, panel, feed networks
   const struts = [];
-  const strutAt = [[0.72, -0.42], [0.72, 0.42], [0.42, 0.72], [-0.42, 0.72], [-0.72, 0.42], [-0.72, -0.42], [-0.42, -0.72], [0.42, -0.72], [-0.18, -1.12], [0.18, -1.12]];
+  const strutAt = [[1.0, -0.78], [1.0, 0.78], [0.45, 0.0], [0.4, -0.78], [0.4, 0.78], [-0.2, -0.78], [-0.3, 0.78], [-0.75, 0.78], [-1.18, 0.75], [-1.18, -0.15], [-0.75, -0.38], [1.3, 0.05], [-0.15, 0.0]];
   for (const [x, y] of strutAt) struts.push(cylG([x, y, (DECK + PANEL_Z - PANEL_T) / 2], 0.014, PANEL_Z - PANEL_T - DECK, 'z', 10), cylG([x, y, DECK + 0.004], 0.03, 0.008, 'z', 12));
   P('Antenna support frame', {
-    system: 'Structure', material: 'Carbon-fibre struts with titanium end fittings', mass: 10, temp: 250, explode: [0, 0, 1.85],
-    desc: 'Stands the L-band antenna panel off the Earth deck so its feed networks fit underneath, and holds the array\'s pointing to the spacecraft axes. Geometry estimated.',
+    system: 'Structure', material: 'Carbon-fibre posts with titanium end fittings', mass: 9, count: 13, temp: 250, explode: [0, 0, 1.85],
+    desc: 'Stands the L-band antenna panel off the Earth deck so the beam-forming and crosslink feed networks fit underneath, and holds the array\'s pointing to the spacecraft axes. Geometry estimated.',
   }, mesh(merge(struts), G.cfrp(2)));
 
+  const holes = [rectHole(A.esa[0], A.esa[1], 0.3, 0.36), rectHole(A.lra[0], A.lra[1], 0.44, 0.44), rectHole(A.scot[0], A.scot[1], 0.3, 0.23), rectHole(A.hpeSensor[0], A.hpeSensor[1], 0.18, 0.18),
+    circle(A.fwdMast[0], A.fwdMast[1], 0.065), circle(A.hpeS[0], A.hpeS[1], 0.07)];
   P('L-band antenna panel', {
-    system: 'Payload', material: 'White-painted aluminium honeycomb ground plane', mass: 40, temp: 245, explode: [0, 0, 2.05],
-    desc: 'Ground plane of the navigation antennas. Its 12 Earth-coverage helices broadcast every civil and military signal to the whole visible Earth; four military Earth-coverage (M-code) elements sit at one end. Lockheed\'s patent drawing of the GPS III nadir deck shows this arrangement; panel size and element positions here are scaled from it (estimate).',
-    // label anchored on the panel's −X corner: in both the orbit-look and Showroom framings this keeps it
-    // more than a label height above or below the laser-retroreflector label at the +Y end of the deck
-    callout: true, anchor: [-0.78, -0.48, PANEL_Z],
-  }, mesh(plateG(OUTLINE, PANEL_T, PANEL_Z - PANEL_T), G.whitePaint()));
+    system: 'Payload', material: 'Black-finished aluminium honeycomb ground plane', mass: 38, temp: 245, explode: [0, 0, 2.05],
+    desc: 'Ground plane of the navigation antennas, about 2.4 × 1.8 m and covering nearly the whole Earth deck, with a tab at each end. Its 12 Earth-coverage helices broadcast every civil and military signal to the whole visible Earth; the four M-code elements sit at the −X end. SV01\'s published calibration puts the L1 phase centre 1.232 m above the centre of mass, and IGS orbit fits agreed to 2 mm.',
+    callout: true, anchor: [-1.2, 0.5, PANEL_Z],
+  }, mesh(plateG(PANEL_OUTLINE, PANEL_T, PANEL_Z - PANEL_T, holes), G.blackPaint()));
 
-  const bfn = [cylG([0, 0, DECK + 0.03], 0.24, 0.03, 'z', 40)];
+  const bfn = [cylG([ARRAY_C[0], ARRAY_C[1], DECK + 0.03], 0.2, 0.03, 'z', 40)];
   for (const [x, y] of [...EC_INNER, ...EC_OUTER]) {
-    const a = Math.atan2(y, x), r0 = 0.22;
-    bfn.push(pipeG([[Math.cos(a) * r0, Math.sin(a) * r0, DECK + 0.04], [x, y, DECK + 0.04], [x, y, PANEL_Z - PANEL_T]], 0.007));
+    const a = Math.atan2(y - ARRAY_C[1], x - ARRAY_C[0]), r0 = 0.18;
+    bfn.push(pipeG([[ARRAY_C[0] + Math.cos(a) * r0, ARRAY_C[1] + Math.sin(a) * r0, DECK + 0.042], [x, y, DECK + 0.042], [x, y, PANEL_Z - PANEL_T]], 0.007));
   }
-  bfn.push(boxG([0, -1.0, DECK + 0.03], [0.2, 0.2, 0.03]));
-  for (const [x, y] of MEC) bfn.push(pipeG([[x * 0.5, -1.0, DECK + 0.04], [x, y, DECK + 0.04], [x, y, PANEL_Z - PANEL_T]], 0.007));
-  bfn.push(pipeG([[0, -0.22, DECK + 0.03], [0, -0.92, DECK + 0.03]], 0.009));
+  const mc = [-1.0, 0.02];
+  bfn.push(boxG([mc[0], mc[1], DECK + 0.03], [0.16, 0.16, 0.03]));
+  for (const [x, y] of MEC) bfn.push(pipeG([[mc[0] + (x - mc[0]) * 0.4, mc[1] + (y - mc[1]) * 0.4, DECK + 0.045], [x, y, DECK + 0.045], [x, y, PANEL_Z - PANEL_T]], 0.007));
+  bfn.push(pipeG([[ARRAY_C[0] - 0.2, 0.02, DECK + 0.03], [mc[0] + 0.08, 0.02, DECK + 0.03]], 0.009));
   P('Beam-forming network', {
-    system: 'Payload', material: 'Coaxial power dividers and phase-trimmed cables', mass: 16, temp: 270, explode: [0, 0, 1.95],
-    desc: 'Splits each signal twelve ways and sets the phase of the inner and outer elements, shaping the beam so a receiver at the Earth\'s edge, about 5,600 km farther away than one directly below (roughly 2 dB more path loss), still gets nearly the same signal strength. A second divider feeds the four M-code elements.',
+    system: 'Payload', material: 'Coaxial power dividers and phase-trimmed cables', mass: 15, temp: 270, explode: [0, 0, 1.95],
+    desc: 'Splits each signal twelve ways and sets the phase of the inner and outer elements, shaping the beam so a receiver at the Earth\'s edge, about 5,600 km farther away than one directly below (roughly 2 dB more path loss), still gets nearly the same signal strength. A branch feeds the four M-code elements.',
   }, mesh(merge(bfn), G.connector()));
 
-  // ------------------------------------------------------------------ Earth-coverage helices
+  // ------------------------------------------------------------------ Earth-coverage and M-code helices (black, tapered)
+  const EC = { h: 0.35, r: 0.06, rt: 0.034, turns: 6, mat: G.radomeBlack() };
   EC_INNER.forEach(([x, y], k) => P(`L-band helix, inner ${k + 1}`, {
-    system: 'Payload', material: 'Tapered copper helix on a dielectric support inside a fibreglass radome', mass: 1.8, temp: 240, explode: [x * 0.4, y * 0.4, 2.35],
-    desc: 'One of the four central Earth-coverage elements. An axial-mode helix about one wavelength round (19 cm at L1) radiates right-hand circularly polarised waves; each element carries L1, L2 and L5 at once, at more than 300 W of continuous RF per antenna (patent figure). Element dimensions estimated.',
-  }, helixElement(x, y, 0.3, 0.06, 6)));
+    system: 'Payload', material: 'Tapered copper helix on a dielectric support inside a black tapered radome', mass: 1.8, temp: 240, explode: [(x - ARRAY_C[0]) * 0.4, y * 0.4, 2.35],
+    desc: 'One of the four central Earth-coverage elements, about 0.17 m from the array centre. An axial-mode helix about one wavelength round (19 cm at L1) radiates right-hand circularly polarised waves; each element carries L1, L2 and L5 at once, at more than 300 W of continuous RF per antenna (patent figure). Element dimensions estimated.',
+  }, element(x, y, EC)));
   EC_OUTER.forEach(([x, y], k) => P(`L-band helix, outer ${k + 1}`, {
-    system: 'Payload', material: 'Tapered copper helix on a dielectric support inside a fibreglass radome', mass: 1.8, temp: 240, explode: [x * 0.4, y * 0.4, 2.3],
-    desc: 'One of eight ring elements of the Earth-coverage array. Fed with a phase offset from the central four, the ring pushes power out toward the limb so the beam covers the whole Earth disc, 13.9° either side of nadir. Its phase centre moves slightly with frequency, one reason later designs study other element types (element dimensions estimated).',
-  }, helixElement(x, y, 0.3, 0.06, 6)));
+    system: 'Payload', material: 'Tapered copper helix on a dielectric support inside a black tapered radome', mass: 1.8, temp: 240, explode: [(x - ARRAY_C[0]) * 0.4, y * 0.4, 2.3],
+    desc: 'One of eight ring elements of the Earth-coverage array, about 0.53 m from its centre. Fed with a phase offset from the central four, the ring pushes power out toward the limb so the beam covers the whole Earth disc, 13.9° either side of nadir (element dimensions estimated).',
+  }, element(x, y, EC)));
+  const MECE = { h: 0.3, r: 0.058, rt: 0.034, turns: 5.5, mat: G.radomeBlack() };
   MEC.forEach(([x, y], k) => P(`M-code helix ${k + 1}`, {
-    system: 'Payload', material: 'Tapered copper helix in a fibreglass radome', mass: 1.6, temp: 240, explode: [x * 0.6, -0.25, 2.3],
-    desc: 'One of four military Earth-coverage (MEC) elements at the end of the antenna panel, listed by Lockheed among the GPS III antenna assemblies. They add M-code power for military users: GPS III delivers M-code at least −153 dBW at the ground, 5 dB more than Block IIR and IIF (element size estimated).',
-  }, helixElement(x, y, 0.28, 0.058, 5.5)));
+    system: 'Payload', material: 'Tapered copper helix in a black radome', mass: 1.6, temp: 240, explode: [-0.35, (y - 0.02) * 0.8, 2.3],
+    desc: 'One of four military Earth-coverage (MEC) elements in the group at the −X end of the antenna panel. They add M-code power for military users: GPS III delivers M-code at no less than −153 dBW at 5° elevation, against −158 dBW for Block IIR and IIF (element size estimated).',
+  }, element(x, y, MECE)));
 
-  // ------------------------------------------------------------------ UHF crosslink elements, interleaved with the EC array
+  // ------------------------------------------------------------------ UHF crosslink elements (white cylinders), interleaved
+  const UHF = { h: 0.45, r: 0.08, turns: 0.75, quad: true, mat: G.radome() };
   const uhf = (name, x, y, inner) => P(name, {
-    system: 'Communications', material: 'Quadrifilar helix in a fibreglass radome', mass: 2.4, temp: 245, explode: [x * 0.55, y * 0.55, 2.2],
+    system: 'Communications', material: 'Quadrifilar helix in a white fibreglass radome', mass: 2.4, temp: 245, explode: [(x - ARRAY_C[0]) * 0.55, y * 0.55, 2.2],
     desc: inner
-      ? 'One of the UHF crosslink elements interleaved with the L-band helices, as the GPS III patent drawing shows: satellites exchange data and measure the distances between each other over these links. The form of each element (here a quadrifilar helix) and its size are estimates.'
-      : 'Outer-ring UHF crosslink element. Placing the crosslink elements among high-power L-band helices raises the risk of passive intermodulation, one reason Lockheed and Northrop Grumman have patented alternative layouts (element form and size estimated).',
-  }, helixElement(x, y, 0.4, 0.078, 0.75, { quad: true }));
+      ? 'One of the four inner UHF crosslink elements (about 0.36 m from the array centre), interleaved with the L-band helices as the GPS III patent drawing shows: satellites exchange data and measure the distances between each other over these links. The form of each element (here a quadrifilar helix) is an estimate.'
+      : 'One of eight outer-ring UHF crosslink elements; the ring is about 1.66 m across, almost the full 1.78 m deck depth. Placing crosslink elements among high-power L-band helices raises the risk of passive intermodulation, one reason Lockheed and Northrop Grumman have patented other layouts (element form estimated).',
+  }, element(x, y, UHF));
   UHF_INNER.forEach(([x, y], k) => uhf(`UHF crosslink element, inner ${k + 1}`, x, y, true));
   UHF_OUTER.forEach(([x, y], k) => uhf(`UHF crosslink element, outer ${k + 1}`, x, y, false));
-  // UHF feed ring under the panel and a trunk down to the crosslink transponder on the +Y radiator
-  const uf = [];
-  const fr = [];
-  for (let k = 0; k <= 48; k++) { const a = (k / 48) * Math.PI * 2; fr.push([Math.cos(a) * 0.58, Math.sin(a) * 0.58, DECK + 0.025]); }
+  // UHF feed ring under the panel and a trunk down to the two crosslink transponders on the −Y panel
+  const uf = [], fr = [], RR = 0.63, zf = DECK + 0.028;
+  for (let k = 0; k <= 56; k++) { const a = (k / 56) * Math.PI * 2; fr.push([ARRAY_C[0] + Math.cos(a) * RR, ARRAY_C[1] + Math.sin(a) * RR, zf]); }
   uf.push(pipeG(fr, 0.008));
   for (const [x, y] of [...UHF_INNER, ...UHF_OUTER]) {
-    const a = Math.atan2(y, x);
-    uf.push(pipeG([[Math.cos(a) * 0.58, Math.sin(a) * 0.58, DECK + 0.025], [x, y, DECK + 0.025], [x, y, PANEL_Z - PANEL_T]], 0.006));
+    const a = Math.atan2(y - ARRAY_C[1], x - ARRAY_C[0]);
+    uf.push(pipeG([[ARRAY_C[0] + Math.cos(a) * RR, ARRAY_C[1] + Math.sin(a) * RR, zf], [x, y, zf], [x, y, PANEL_Z - PANEL_T]], 0.006));
   }
-  uf.push(pipeG([[-0.12, 0.567, DECK + 0.025], [-0.12, 0.7, DECK + 0.025], [-0.12, 0.7, IZ - 0.04], [-0.12, IY - 0.12, IZ - 0.06], [-0.12, IY - 0.12, 0.27], [-0.3, IY - 0.1, 0.27], [-0.42, IY - 0.09, 0.25]], 0.01));
+  const ya = -0.62, xa = -0.84;
+  const ectsA = onBUS(BUS.ectsA.c, BUS.ectsA.s[1]), ectsB = onBUS(BUS.ectsB.c, BUS.ectsB.s[1]);
+  uf.push(pipeG([[ARRAY_C[0] - 0.22, -0.59, zf], [ARRAY_C[0] - 0.22, ya, zf], [xa, ya, zf], [xa, ya, 1.55], [xa, ya, ectsA[2] + 0.17], [ectsA[0] + 0.1, ectsA[1] + 0.02, ectsA[2] + 0.17], [ectsA[0] + 0.1, ectsA[1] + 0.02, ectsA[2] + 0.13]], 0.011));
+  uf.push(pipeG([[xa, ya, ectsA[2] + 0.17], [xa, ya, ectsB[2] + 0.165], [ectsB[0] + 0.1, ectsB[1] + 0.06, ectsB[2] + 0.165], [ectsB[0] + 0.1, ectsB[1] + 0.06, ectsB[2] + 0.13]], 0.009));
   P('UHF feed network', {
-    system: 'Communications', material: 'Coaxial cables, hybrid combiners', mass: 6, temp: 270, explode: [0, 0, 1.9],
-    desc: 'Combines the twelve UHF elements and carries the crosslink signal through the Earth deck to the crosslink transponder on the payload radiator (routing estimated).',
+    system: 'Communications', material: 'Coaxial cables, hybrid combiners', mass: 6, temp: 270, explode: [0, -0.4, 1.4],
+    desc: 'Combines the twelve UHF elements and carries the crosslink signal through the Earth deck to the redundant pair of crosslink transponders (ECTS) on the bus panel (routing estimated).',
   }, mesh(merge(uf), G.connector()));
 
   // ------------------------------------------------------------------ deployable JIB monopoles
   const rods = [];
   JIB_POS.forEach(([x, y], k) => {
-    const can = merge([boxG([x, y, DECK + 0.033], [0.1, 0.1, 0.065]), cylG([x, y, DECK + 0.07], 0.022, 0.012, 'z', 14)]);
+    const can = merge([boxG([x, y, PANEL_Z + 0.033], [0.1, 0.1, 0.065]), cylG([x, y, PANEL_Z + 0.07], 0.022, 0.012, 'z', 14)]);
     const pivot = new THREE.Group();
-    pivot.position.set(x, y, DECK + 0.075);
+    pivot.position.set(x, y, PANEL_Z + 0.075);
     const rod = mesh(merge([cylG([0, 0, JIB_L / 2], 0.0065, JIB_L, 'z', 8), cylG([0, 0, JIB_L], 0.01, 0.012, 'z', 8)]), G.stem());
     pivot.add(rod);
     rods.push(pivot);
     P(`JIB antenna ${k + 1}`, {
-      system: 'Communications', material: 'Stored-energy STEM monopole in an aluminium canister', mass: 0.7, temp: 250, explode: [Math.sign(x) * 0.15, Math.sign(y) * 0.15, 1.95],
+      system: 'Communications', material: 'Stored-energy STEM monopole in an aluminium canister', mass: 0.7, temp: 250, explode: [Math.sign(x) * 0.15, Math.sign(y) * 0.15, 2.0],
       desc: k === 0
-        ? 'One of eight "Jack-in-the-Box" deployable monopoles (Northrop Grumman Astro Aerospace). Stowed in a canister about 10 × 10 × 6 cm, each springs out in about 200 ms once the satellite is on station, and together they form an RF antenna array. Their function, length and positions are not public; 0.5 m rods are shown.'
+        ? 'One of eight "Jack-in-the-Box" deployable monopoles (Northrop Grumman Astro Aerospace). Stowed in a canister about 10 × 10 × 6 cm, each springs out in about 200 ms once the satellite is on station, and together they form an RF antenna array whose user is not public. Their length and positions are not public either; 0.5 m rods are shown.'
         : 'Deployable JIB monopole antenna, one of eight that together form an RF array. Northrop Grumman has delivered more than 1,000 JIB assemblies for GPS IIR, IIF and III (rod length and position estimated).',
     }, [mesh(can, G.alodine()), pivot]);
   });
 
-  // ------------------------------------------------------------------ S-band telemetry, tracking and command antennas
-  const sAnt = (name, x, y, z0, dir, ex, desc) => {
-    const s = Math.sign(dir);
-    const metal = merge([cylG([x, y, z0 + s * 0.025], 0.05, 0.05, 'z', 20), cylG([x, y, z0 + s * 0.06], 0.012, 0.03, 'z', 8)]);
-    const cone = cylG([x, y, z0 + s * 0.13], s > 0 ? 0.075 : 0.02, 0.12, 'z', 24, s > 0 ? 0.02 : 0.075);
-    return P(name, { system: 'Communications', material: 'Conical-spiral element in a radome', mass: 1.5, temp: 240, explode: ex, desc }, [mesh(metal, G.aluminium()), mesh(cone, G.radome())]);
+  // ------------------------------------------------------------------ TT&C S-band antennas and the second mast
+  const mast = (name, [x, y], H, desc, ex, extra = {}) => {
+    const metal = merge([cylG([x, y, DECK + 0.01], 0.06, 0.02, 'z', 18), cylG([x, y, DECK + 0.05], 0.035, 0.06, 'z', 14), cylG([x, y, DECK + (H * 0.78) / 2], 0.022, H * 0.78, 'z', 12),
+      cylG([x, y, DECK + H * 0.4], 0.03, 0.025, 'z', 12)]);
+    const tip = merge([cylG([x, y, DECK + H * 0.78 + (H * 0.22) / 2], 0.036, H * 0.22, 'z', 16), cylG([x, y, DECK + H + 0.008], 0.024, 0.016, 'z', 12)]);
+    return P(name, { system: 'Communications', material: 'Composite mast with a radiating element under a black radome', mass: 2.2, temp: 245, explode: ex, desc, ...extra }, [mesh(metal, G.satinTi()), mesh(tip, G.radomeBlack())]);
   };
-  sAnt('S-band antenna (Earth side)', -0.62, -1.02, DECK, 1, [-0.2, -0.2, 1.9], 'Telemetry, tracking and command antenna facing the Earth. Ground antennas of the Space Force control segment send commands and navigation uploads on S-band (Space-Ground Link System, uplink ≈ 1,783.74 MHz). Position estimated.');
-  sAnt('S-band antenna (aft)', 0.72, 0.0, AFT, -1, [0.3, 0, -1.9], 'The second TT&C antenna, on the anti-Earth side, so the satellite can be commanded in any attitude, which is essential while it reorients for apogee burns (downlink ≈ 2,227.5 MHz). Position estimated.');
+  mast('Forward TT&C S-band antenna', A.fwdMast, 1.05, 'Lockheed\'s figure labels a "Fwd TT&C S-band Antenna" on a mast at this edge of the Earth deck (which of the two masts it is, is not certain). It carries commands, telemetry and ranging with the Air Force Satellite Control Network over SGLS, or with Unified S-Band stations; standing about 1 m clear of the elements gives it a clean pattern (height from the scale model).',
+    [0, 0.25, 2.1], { callout: true, anchor: [A.fwdMast[0], A.fwdMast[1], DECK + 1.0] });
+  mast('Antenna mast (+X, −Y corner)', A.mast2, 0.9, 'A second mast, about 0.9 m tall in the scale model, that Lockheed\'s figure labels only "Antenna". The block diagram lists several hosted-payload antennas beside the TT&C ones; which this is, is not public.', [0.3, -0.3, 2.0]);
+  const [axa, aya] = AFT_ANT;
+  P('Aft TT&C S-band antenna', {
+    system: 'Communications', material: 'Conical-spiral element in a radome', mass: 1.5, temp: 230, explode: [0.4, 0.3, -1.95],
+    desc: 'The second TT&C antenna, at an aft corner of the core base (Fig. 4), facing away from the Earth. With the forward antenna it lets the ground command the satellite in any attitude, essential while it reorients for the apogee burns (downlink ≈ 2,227.5 MHz).',
+  }, [mesh(merge([cylG([axa, aya, AFT - 0.02], 0.06, 0.04, 'z', 20), cylG([axa, aya, AFT - 0.055], 0.012, 0.03, 'z', 8)]), G.aluminium()), mesh(cylG([axa, aya, AFT - 0.135], 0.02, 0.13, 'z', 24, 0.075), G.radome())]);
+
+  // ------------------------------------------------------------------ stowed antenna on the +X face
+  const sx0 = HX + 0.075, sy0 = 0.22, z0 = -1.05, z1 = 0.95;
+  const sm = [cylG([sx0, sy0, (z0 + z1) / 2], 0.025, z1 - z0, 'z', 14)];
+  for (const z of [-0.55, -0.05, 0.45]) sm.push(cylG([sx0, sy0, z], 0.045, 0.12, 'z', 14));
+  sm.push(cylG([sx0, sy0, z1 + 0.05], 0.035, 0.1, 'z', 14));
+  const brk = [];
+  for (const z of [-0.85, 0.0, 0.8]) brk.push(pipeG([[sx0, sy0, z], [HX + 0.03, 0.5, z], [HX + 0.014, 0.58, z]], 0.012, 8), boxG([HX + 0.017, 0.6, z], [0.01, 0.07, 0.07]));
+  brk.push(boxG([sx0, sy0, z0 - 0.04], [0.07, 0.07, 0.08]), cylG([sx0, sy0 + 0.05, z0 - 0.04], 0.018, 0.04, 'y', 10));
+  P('Stowed antenna (+X)', {
+    system: 'Communications', material: 'Composite mast with element fittings; titanium launch-lock brackets', mass: 6, temp: 380, explode: [1.0, 0.1, 0],
+    desc: 'A mast about 2 m long folded along the Sun-side face for launch, with element fittings along it. Lockheed\'s expanded view calls it the "Stowed Antenna (−X)" in its own axes, which is +X in the IGS axes used here (the scale model shows its stand-off fittings on this face). Its function and how it deploys are not given in the source, so it is shown stowed (length and position estimated).',
+  }, [mesh(merge(sm), G.radome()), mesh(merge(brk), G.satinTi())]);
+
+  // ------------------------------------------------------------------ hosted-payload antennas
+  const [hx, hy] = A.hpeS;
+  P('HPE S-band antenna', {
+    system: 'Payload', material: 'Conical-spiral element in a radome (generic)', mass: 1.2, temp: 245, explode: [0.25, 0.2, 2.0],
+    desc: 'The hosted-payload "S-band Antenna" that Lockheed\'s figure places near the hosted-payload sensor at the +X/+Y end of the deck, separate from the TT&C antennas. Its use is not described publicly (form and size estimated).',
+  }, [mesh(merge([cylG([hx, hy, DECK + 0.05], 0.05, 0.1, 'z', 18)]), G.aluminium()), mesh(cylG([hx, hy, DECK + 0.17], 0.06, 0.14, 'z', 22, 0.02), G.radome())]);
+  const [rx, ry] = A.hpeRx;
+  P('HPE receive antenna', {
+    system: 'Payload', material: 'Cavity-backed element (generic)', mass: 1.0, temp: 245, explode: [0.45, 0, 2.0],
+    desc: 'The block diagram lists a hosted-payload receive antenna among the antenna elements. The burst detector records electromagnetic pulses in specific bands, which needs a receiving antenna; this generic unit on the panel\'s +X tab stands in for it (identification, form and position estimated).',
+  }, [mesh(boxG([rx, ry, PANEL_Z + 0.03], [0.13, 0.13, 0.06]), G.whitePaint()), mesh(new THREE.SphereGeometry(0.055, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2).translate(rx, ry, PANEL_Z + 0.06), G.radome())]);
 
   /** Rods stowed at d = 0 (inside their canisters), out at d = 1; they spring out once on station. */
   const setJIB = (d) => {
     const s = THREE.MathUtils.smoothstep(d, 0.55, 0.95);
     for (const r of rods) { r.scale.set(1, 1, Math.max(0.02, s)); r.visible = s > 0.03; }
   };
+  reg([hx, hy, IZ - 0.02], 'deck');
+  reg([rx, ry, IZ - 0.02], 'deck');
   return { setJIB };
 }
 
-export { HX, HY, HZ };
+export { HX, HY, IY, IZ };

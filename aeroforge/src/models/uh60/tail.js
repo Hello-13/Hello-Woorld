@@ -83,7 +83,7 @@ export function buildTail({ A, P, air, roofY }) {
   // ------------------------------------------------------------------ upper fairings
   const shaftX = -0.03;
   // wide over the input and accessory modules, narrowing quickly aft so the engine inlets stay open
-  const trans = fairing([[-0.9, 0.38, 2.66], [-0.45, 0.45, 2.73], [-0.15, 0.66, 2.77], [0.2, 0.8, 2.79], [0.7, 0.84, 2.78], [1.2, 0.8, 2.72], [1.7, 0.7, 2.62], [2.2, 0.57, 2.49], [2.6, 0.35, 2.31]], roofY, {
+  const trans = fairing([[-0.9, 0.45, 2.67], [-0.45, 0.46, 2.73], [-0.15, 0.66, 2.77], [0.2, 0.8, 2.79], [0.7, 0.84, 2.78], [1.2, 0.8, 2.72], [1.7, 0.7, 2.62], [2.2, 0.57, 2.49], [2.6, 0.35, 2.31]], roofY, {
     e: 3.0, nu: 64, nv: 40, skip: (c) => c.y > 2.6 && Math.hypot(c.x - shaftX, c.z) < 0.48,
   });
   const well = cyl(0.48, 0.48, 0.22, [shaftX, 2.68, 0], 'y', 40, true);
@@ -92,7 +92,9 @@ export function buildTail({ A, P, air, roofY }) {
     system: 'Skin & fairings', skin: true, material: 'Kevlar/graphite composite cowls on quick-release hinges', mass: 55, explode: [2.4, 1.0, 0],
     desc: 'Streamlines the forward upper deck, the flight-control closet, the main gearbox and its input and accessory modules. Its panels open as walkways for daily inspection of the rotor head.',
   }, [mesh(merge([trans, well, wellLip]), paint), mesh(well.clone(), MAT.interior())]);
-  const aftF = fairing([[-3.6, 0.16, roofY(-3.6) + 0.12], [-3.0, 0.28, 2.45], [-2.4, 0.35, 2.6], [-1.5, 0.37, 2.66], [-0.9, 0.38, 2.67]], roofY, { nu: 30, nv: 28 });
+  // between the nacelles its flanks run into the cowls' inboard sides, closing the deck (no open
+  // slot between the engines and the fairing, and the fuel lines pass from one to the other inside)
+  const aftF = fairing([[-3.6, 0.16, roofY(-3.6) + 0.12], [-3.0, 0.28, 2.45], [-2.4, 0.35, 2.6], [-1.9, 0.43, 2.645], [-1.65, 0.47, 2.66], [-1.4, 0.47, 2.665], [-0.9, 0.45, 2.67]], roofY, { nu: 36, nv: 28 });
   const grille = [];
   for (let k = 0; k < 7; k++) grille.push(box(0.025, 0.012, 0.42, [-1.48 + k * 0.05, 2.668, 0]));
   P('Aft deck fairing', {

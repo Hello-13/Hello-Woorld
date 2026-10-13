@@ -170,8 +170,8 @@ export const FM = {
   padSteel: () => once('padSteel', () => new THREE.MeshStandardMaterial({ color: 0x6c7176, roughness: 0.6, metalness: 0.55 })),
   fssSteel: () => once('fssSteel', () => new THREE.MeshStandardMaterial({ color: 0x8a8d8f, roughness: 0.6, metalness: 0.45 })),
   teWhite: () => once('teWhite', () => new THREE.MeshStandardMaterial({ color: 0xc4c6c7, roughness: 0.6, metalness: 0.3 })),
-  refractory: () => once('refractory', () => new THREE.MeshStandardMaterial({ color: 0x47443f, roughness: 0.95, metalness: 0.02 })),   // soot-darkened refractory brick
-  deflector: () => once('deflector', () => new THREE.MeshStandardMaterial({ color: 0x84837f, roughness: 0.9, metalness: 0.1 })),
+  refractory: () => once('refractory', () => new THREE.MeshStandardMaterial({ color: 0x34322e, roughness: 0.95, metalness: 0.02 })),   // soot-darkened refractory brick
+  deflector: () => once('deflector', () => new THREE.MeshStandardMaterial({ color: 0x5c5955, roughness: 0.9, metalness: 0.1 })),   // scorched steel and refractory concrete
   water: () => once('waterPipe', () => new THREE.MeshStandardMaterial({ color: 0xb7b9b2, roughness: 0.5, metalness: 0.6 })),
   hardstand: () => once('hardstand', () => {
     const c = concrete({ seed: 11 });           // same tile as the pad floor (cached)
