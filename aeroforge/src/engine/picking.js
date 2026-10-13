@@ -31,6 +31,10 @@ export class Picker {
     el.addEventListener('pointerleave', () => { this.pending = null; this.setHover(null); });
     stage.onFrame(() => {
       if (!this.pending) return;
+      // dense models hold hundreds of thousands of triangles: hover-test at most ~20 times a second
+      const now = performance.now();
+      if (now - (this.lastPick || 0) < 50) return;
+      this.lastPick = now;
       const e = this.pending;
       this.pending = null;
       if (e.pointerType === 'touch' || !this.enabled()) return;
