@@ -184,8 +184,8 @@ export function ringA(s) {
 }
 
 const B_UP = [0, 0.08, 0.16, 0.24, 0.32, 0.40, 0.48, 0.55, 0.62, 0.69, 0.75, 0.81, 0.86, 0.905, 0.94, 0.97, 1];
-export const SIDE_BAY = { s0: 7.95, s1: 11.15, y0: -0.42, y1: -0.82 };
-export const MAIN_BAY = { s0: 8.25, s1: 12.2, z: 0.78 };
+export const SIDE_BAY = { s0: 8.5, s1: 11.6, y0: -0.42, y1: -0.82 };
+export const MAIN_BAY = { s0: 8.45, s1: 12.35, z: 0.78 };
 export const MAIN_WELL = { s0: 11.2, s1: 12.95, z0: 0.86, z1: 1.46 };
 /** Wall fractions (chine → lower corner) with exact side-bay edges. */
 export function wallFractions(s) {

@@ -1,6 +1,14 @@
-// Planar (2-D) ascent simulation of the HELIOS-H heavy-lift launcher over a rotating,
-// spherical Earth with ISA drag. Stage 1 flies a pitch-kick + gravity turn; the upper stage
-// runs a closed-loop altitude/vertical-rate guidance law until orbital insertion.
+// Planar (2-D) ascent simulation of the SpaceX Falcon Heavy from LC-39A over a rotating,
+// spherical Earth with ISA drag. All 27 Merlin 1D engines light at liftoff; the centre core
+// throttles down so it is still burning after the side boosters separate; stage 1 flies a
+// pitch-kick + gravity turn; the second stage (one Merlin Vacuum) runs a closed-loop
+// altitude/vertical-rate guidance law until orbital insertion.
+//
+// Engine model: each engine has a fixed mass flow ṁ = F_vac / (g0 · Isp_vac) at full throttle and
+// a thrust that falls with ambient pressure, F = F_vac − p_a · A_e. The nozzle exit area A_e is the
+// one that reproduces the published sea-level thrust (845 kN Merlin 1D → A_e ≈ 0.68 m², a 0.93 m
+// exit). The published Merlin figures (845 / 914 kN, 282 / 311 s) do not all hold at one mass
+// flow; keeping both thrusts and the vacuum Isp gives a sea-level Isp of ≈ 287 s.
 
 import { isa, G0, P_SL } from './atmosphere.js';
 
@@ -8,16 +16,40 @@ export const MU_EARTH = 3.986004418e14;   // m³/s²
 export const R_EARTH = 6371000;           // m (mean)
 const OMEGA_EARTH = 7.2921159e-5;         // rad/s
 
-export const HELIOS = {
-  name: 'HELIOS-H',
-  launchLatitude: 28.5,                   // deg
-  booster: { count: 2, prop: 395700, dry: 22200, engines: 9, thrustVac: 914e3, ispSL: 282, ispVac: 311 },
-  core: { prop: 395700, dry: 25600, engines: 9, thrustVac: 914e3, ispSL: 282, ispVac: 311 },
-  upper: { prop: 107500, dry: 4500, engines: 1, thrustVac: 981e3, ispSL: 230, ispVac: 348 },
+const MERLIN_1D = { thrustSL: 845e3, thrustVac: 914e3, ispSL: 282, ispVac: 311 };
+const MERLIN_VAC = { thrustSL: 0, thrustVac: 981e3, ispSL: 0, ispVac: 348, exitArea: 7.07 };
+
+/**
+ * Falcon Heavy (Block 5) in its fully expendable configuration. Propellant loads follow the
+ * Falcon 9 figures in public references; dry masses are estimates (SpaceX does not publish them).
+ * With these numbers the liftoff mass without payload is 1,383.7 t; SpaceX's published
+ * 1,420,788 kg corresponds to a payload of about 37 t.
+ */
+export const FALCON_HEAVY = {
+  name: 'Falcon Heavy',
+  launchLatitude: 28.608,                 // deg, LC-39A
+  booster: { count: 2, prop: 395700, dry: 25600, engines: 9, ...MERLIN_1D },
+  core: { prop: 395700, dry: 28000, engines: 9, ...MERLIN_1D },
+  upper: { prop: 111500, dry: 4000, engines: 1, ...MERLIN_VAC },
   fairing: 1900,
-  coreThrottleDown: 0.55,
-  coreThrottleTime: 48,
+  coreThrottleDown: 0.55,                 // centre-core throttle setting during the booster phase (estimate)
+  coreThrottleTime: 40,                   // s after liftoff (SpaceX: "shortly after liftoff")
+  sepDelay: 3,                            // MECO → stage separation, s
+  sesDelay: 10,                           // MECO → second-engine start, s
+  boosterSepDelay: 3,                     // BECO → side-booster separation, s
 };
+
+/** Nozzle exit area that turns a stage's vacuum thrust into its sea-level thrust (m², per engine). */
+export function exitArea(stage) {
+  if (stage.exitArea != null) return stage.exitArea;
+  return (stage.thrustVac - stage.thrustSL) / P_SL;
+}
+
+/** Liftoff mass (kg) of a vehicle with a given payload. */
+export function liftoffMass(vehicle = FALCON_HEAVY, payload = 0) {
+  const B = vehicle.booster, C = vehicle.core, U = vehicle.upper;
+  return B.count * (B.dry + B.prop) + C.dry + C.prop + U.dry + U.prop + vehicle.fairing + payload;
+}
 
 function cdOfMach(m) {
   if (m < 0.6) return 0.30;
@@ -27,16 +59,39 @@ function cdOfMach(m) {
   return 0.24;
 }
 
-function engineThrust(stage, ambientP, throttle) {
+/** Thrust (N) and mass flow (kg/s) of all of a stage's engines at ambient pressure p (Pa). */
+export function engineThrust(stage, ambientP, throttle = 1) {
   const mdotEngine = stage.thrustVac / (G0 * stage.ispVac);
-  const isp = stage.ispVac - (stage.ispVac - stage.ispSL) * Math.min(1, ambientP / P_SL);
-  const mdot = mdotEngine * stage.engines * throttle;
-  return { thrust: mdot * G0 * isp, mdot };
+  const perEngine = Math.max(0, stage.thrustVac - ambientP * exitArea(stage));
+  return { thrust: perEngine * stage.engines * throttle, mdot: mdotEngine * stage.engines * throttle };
 }
 
 /** Ideal Δv of a stage via the Tsiolkovsky rocket equation. */
 export function tsiolkovsky(isp, m0, mf) {
   return isp * G0 * Math.log(m0 / mf);
+}
+
+/**
+ * Ideal (loss-free) Δv of each burn phase from the rocket equation, with the throttle schedule
+ * of simulateAscent: boost (27 engines, centre core throttled), centre core alone, second stage.
+ * Isp is the mean of sea-level and vacuum for the boost phase, vacuum afterwards.
+ */
+export function deltaVBudget(vehicle = FALCON_HEAVY, payload = 0) {
+  const B = vehicle.booster, C = vehicle.core, U = vehicle.upper;
+  const mdot = (s) => (s.thrustVac / (G0 * s.ispVac)) * s.engines;
+  const ispSL = (s) => (s.ispVac * (s.thrustVac - P_SL * exitArea(s))) / s.thrustVac;
+  const tBoost = B.prop / mdot(B);                       // each booster burns its own load
+  const kT = vehicle.coreThrottleTime, kD = vehicle.coreThrottleDown;
+  const coreInBoost = Math.min(C.prop, mdot(C) * (Math.min(kT, tBoost) + Math.max(0, tBoost - kT) * kD));
+  const m0 = liftoffMass(vehicle, payload);
+  const m1 = m0 - B.count * B.prop - coreInBoost;
+  const m1b = m1 - B.count * B.dry;
+  const m2 = m1b - (C.prop - coreInBoost);
+  const mU = U.dry + U.prop + payload;                     // fairing goes early in the burn
+  const boost = tsiolkovsky((ispSL(B) + B.ispVac) / 2, m0, m1);
+  const core = tsiolkovsky(C.ispVac, m1b, m2);
+  const upper = tsiolkovsky(U.ispVac, mU, mU - U.prop);
+  return { boost, core, upper, total: boost + core + upper, tBoost, coreInBoost, m0 };
 }
 
 /** Orbital elements from planar state. */
@@ -59,7 +114,7 @@ export function simulateAscent({
   payload = 15000,
   kickAngle = 14,       // deg, pitch-over angle at the end of the kick manoeuvre
   targetAltitude = 200e3,
-  vehicle = HELIOS,
+  vehicle = FALCON_HEAVY,
   dt = 0.05,
   sampleDt = 0.5,
   maxTime = 900,
@@ -73,7 +128,7 @@ export function simulateAscent({
   let upperProp = U.prop;
   let boostersAttached = true, coreAttached = true, fairingAttached = true;
   let phase = 'BOOST';                     // BOOST → CORE → COAST → UPPER → ORBIT | FAILED
-  let coastUntil = 0, upperIgnition = Infinity;
+  let coastUntil = 0, upperIgnition = Infinity, boosterSepAt = Infinity;
 
   const mass = () =>
     (boostersAttached ? B.count * B.dry + boosterProp : 0) +
@@ -90,7 +145,7 @@ export function simulateAscent({
   let nextSample = 0;
   let result = null;
   const ev = (code, label) => events.push({ t, code, label });
-  ev('LIFTOFF', 'Liftoff — all 27 engines at full thrust');
+  ev('LIFTOFF', 'Liftoff — 27 Merlin 1D engines, hold-down clamps released');
 
   while (t < maxTime) {
     const h = r - R_EARTH;
@@ -103,14 +158,14 @@ export function simulateAscent({
 
     // --- propulsion state
     let thrust = 0, mdotB = 0, mdotC = 0, mdotU = 0;
-    const coreThrottle = (phase === 'BOOST' && t > vehicle.coreThrottleTime) ? vehicle.coreThrottleDown : 1;
+    const coreThrottle = (boostersAttached && t > vehicle.coreThrottleTime) ? vehicle.coreThrottleDown : 1;
     if (phase === 'BOOST') {
       const b = engineThrust(B, atm.p, 1);
       const c = engineThrust(C, atm.p, coreThrottle);
       thrust = b.thrust * B.count + c.thrust;
       mdotB = b.mdot * B.count; mdotC = c.mdot;
     } else if (phase === 'CORE') {
-      const c = engineThrust(C, atm.p, 1);
+      const c = engineThrust(C, atm.p, coreThrottle);
       thrust = c.thrust; mdotC = c.mdot;
     } else if (phase === 'UPPER') {
       const u = engineThrust(U, atm.p, 1);
@@ -185,7 +240,7 @@ export function simulateAscent({
         mass: m, phase, thrust,
         boostersAttached, coreAttached, fairingAttached,
         enginesOn: { booster: mdotB > 0, core: mdotC > 0, upper: mdotU > 0 },
-        coreThrottle: phase === 'BOOST' ? coreThrottle : (phase === 'CORE' ? 1 : 0),
+        coreThrottle: phase === 'BOOST' || phase === 'CORE' ? coreThrottle : 0,
         ambientP: atm.p,
         drag: aDrag * m,
         weight: m * (MU_EARTH / (r * r)),
@@ -197,33 +252,36 @@ export function simulateAscent({
 
     // --- sequencing
     if (phase === 'BOOST' && t > vehicle.coreThrottleTime && !events.some((e) => e.code === 'THROTTLE')) {
-      ev('THROTTLE', `Core throttle-down to ${Math.round(vehicle.coreThrottleDown * 100)} %`);
+      ev('THROTTLE', `Centre core throttles down to ${Math.round(vehicle.coreThrottleDown * 100)} %`);
     }
     if (phase === 'BOOST' && boosterProp <= 0) {
-      ev('BECO', 'Booster engine cutoff (BECO)');
-      boostersAttached = false;
+      ev('BECO', 'Booster engine cutoff (BECO), side boosters');
       phase = 'CORE';
-      ev('BSEP', 'Side boosters separated');
+      boosterSepAt = t + vehicle.boosterSepDelay;
+    } else if (phase === 'CORE' && boostersAttached && t >= boosterSepAt) {
+      boostersAttached = false;
+      ev('BSEP', 'Side boosters separate (pneumatic pushers)');
+      ev('THROTTLE_UP', 'Centre core throttles back up to full thrust');
     } else if (phase === 'CORE' && coreProp <= 0) {
-      ev('MECO', 'Main engine cutoff (MECO)');
+      ev('MECO', 'Main engine cutoff (MECO), centre core');
       phase = 'COAST';
-      coastUntil = t + 3;
-      upperIgnition = t + 7;
+      coastUntil = t + vehicle.sepDelay;
+      upperIgnition = t + vehicle.sesDelay;
     } else if (phase === 'COAST' && coreAttached && t >= coastUntil) {
       coreAttached = false;
-      ev('SEP', 'Stage separation');
+      ev('SEP', 'Stage separation (interstage pusher)');
     } else if (phase === 'COAST' && !coreAttached && t >= upperIgnition) {
       phase = 'UPPER';
-      ev('SES', 'Upper stage ignition (SES-1)');
+      ev('SES', 'Second-engine start (SES-1), Merlin Vacuum');
     } else if (phase === 'UPPER') {
       if (fairingAttached && h > 110e3 && t > upperIgnition + 4) {
         fairingAttached = false;
-        ev('FAIRING', 'Payload fairing jettison');
+        ev('FAIRING', 'Payload fairing separation');
       }
       const el = planarElements(r, vr, vt);
       if (el.rp - R_EARTH >= targetAltitude - 8e3 || upperProp <= 0) {
         phase = el.rp - R_EARTH > 120e3 ? 'ORBIT' : 'FAILED';
-        ev('SECO', upperProp <= 0 ? 'Upper stage propellant depleted (SECO)' : 'Second engine cutoff (SECO)');
+        ev('SECO', upperProp <= 0 ? 'Second stage propellant depleted (SECO-1)' : 'Second-engine cutoff (SECO-1)');
         result = {
           success: phase === 'ORBIT',
           perigee: el.rp - R_EARTH,
@@ -262,10 +320,12 @@ export function simulateAscent({
   result.maxQ = maxQ;
   return { samples, events, result };
 
+  // frontal area: 5.2 m fairing (21.2 m²) plus two 3.66 m side boosters (2 × 10.5 m²), then the
+  // fairing alone, then the bare 3.66 m second stage
   function dragArea() {
-    if (boostersAttached) return 42.7;
+    if (boostersAttached) return 42.3;
     if (fairingAttached) return 21.2;
-    return 10.75;
+    return 10.5;
   }
 }
 
