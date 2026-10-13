@@ -123,7 +123,7 @@ export function buildCore(ctx) {
     const list = [];
     for (const r of vsvRows) {
       const t = coreAt(r.y)[1];
-      list.push(hoop(t + 0.08, r.y - 0.02, 0.008, { tubular: 96, arc: keep(Math.PI * 1.75) ? TAU : Math.PI * 1.5 }));
+      list.push(hoop(t + 0.08, r.y - 0.02, 0.008, { tubular: 64, start: keep.start, arc: keep.arc }));
       for (let i = 0; i < 36; i++) {
         const phi = (i / 36) * TAU;
         if (!keep(phi)) continue;
@@ -217,8 +217,7 @@ export function buildCore(ctx) {
   }, nozzles).userData.part.stationTemp = '3';
 
   const manifold = cut(cutPair((keep) => {
-    const arc = keep(Math.PI * 1.75) ? TAU : Math.PI * 1.5;
-    return merge([hoop(0.86, -3.275, 0.012, { arc, tubular: 120 }), hoop(0.885, -3.31, 0.012, { arc, tubular: 120 })]);
+        return merge([hoop(0.86, -3.275, 0.012, { start: keep.start, arc: keep.arc, tubular: 120 }), hoop(0.885, -3.31, 0.012, { start: keep.start, arc: keep.arc, tubular: 120 })]);
   }, GM.steel()));
   P('Fuel manifolds', {
     system: 'Fuel', material: 'Stainless-steel tubing', mass: 22, count: 2,
@@ -282,8 +281,7 @@ export function buildCore(ctx) {
     desc: 'Shroud segments ride a few tenths of a millimetre outside the blade tips. Every extra 0.25 mm of tip gap costs roughly 1 % in fuel burn, which is why the case is actively cooled to shrink it at cruise.',
   }, hptCase).userData.part.stationTemp = '45';
   const hptAcc = cut(cutPair((keep) => {
-    const arc = keep(Math.PI * 1.75) ? TAU : Math.PI * 1.5;
-    const list = [hoop(0.745, -3.84, 0.013, { arc }), hoop(0.745, -3.98, 0.013, { arc })];
+        const list = [hoop(0.745, -3.84, 0.013, { start: keep.start, arc: keep.arc }), hoop(0.745, -3.98, 0.013, { start: keep.start, arc: keep.arc })];
     if (keep(0.95)) {
       list.push(tube([P3(0.95, -3.1, 0.95), P3(0.9, -3.4, 0.95), P3(0.8, -3.7, 0.95), P3(0.745, -3.84, 0.95)], 0.02, { seg: 24 }));
       list.push(axialCyl(0.95, -3.05, 0.95, 0.04, 0.12, 14));
@@ -347,8 +345,7 @@ export function buildCore(ctx) {
     desc: 'The flared case that holds the six LPT nozzle rows. Its cone angle shows how much the gas expands: the annulus area grows about 2.5-fold from LPT inlet to exit.',
   }, lptC).userData.part.stationTemp = '5';
   const lptAcc = cut(cutPair((keep) => {
-    const arc = keep(Math.PI * 1.75) ? TAU : Math.PI * 1.5;
-    const list = ROWS.lptBlades.map((r) => hoop(coreAt(r.y)[1] + 0.075, r.y, 0.012, { arc, tubular: 96 }));
+        const list = ROWS.lptBlades.map((r) => hoop(coreAt(r.y)[1] + 0.075, r.y, 0.012, { start: keep.start, arc: keep.arc, tubular: 96 }));
     for (const phi of [0.3, 2.4]) {
       if (!keep(phi)) continue;
       const pts = ROWS.lptBlades.map((r) => P3(coreAt(r.y)[1] + 0.105, r.y, phi));

@@ -1,6 +1,6 @@
 // Geometry helpers for the GE90-115B model, all in the lathe frame (see layout.js): engine axis
-// +y, x = r·sin(phi), z = r·cos(phi). Static, axisymmetric pieces are built twice, whole and
-// with a sector removed, so the cutaway can be switched off. Rotor blades always stay whole
+// +y, x = r·sin(phi), z = r·cos(phi). Static pieces are built as two sectors, the one a cutaway
+// keeps and the one it removes, so the cutaway can be switched off. Rotor blades always stay whole
 // because they turn; everything axisymmetric (disks, drums, shafts) is cut like the casings.
 
 import * as THREE from 'three';
@@ -29,48 +29,60 @@ export function kept(phi, cut = 'engine') {
 
 export const P3 = (r, y, phi) => new THREE.Vector3(Math.sin(phi) * r, y, Math.cos(phi) * r);
 
+/** Selector for the kept sector of a cut, or (rest = true) for the sector it removes. */
+export function selector(cut = 'engine', rest = false) {
+  const c = CUTS[cut];
+  const f = rest ? (phi) => !kept(phi, cut) : (phi) => kept(phi, cut);
+  f.start = rest ? c.start + c.length : c.start;
+  f.arc = rest ? TAU - c.length : c.length;
+  return f;
+}
+
 /**
- * A lathe solid that can be cut. profile: [r, y] pairs (closed loop by default).
- * Returns a Group carrying userData.cutaway = { full, cut, caps }.
+ * A lathe solid that can be cut. profile: [r, y] pairs (closed loop by default), or a list of
+ * such profiles merged into one mesh. Built as two sectors — the part a cutaway keeps and the
+ * part it removes — so switching the cutaway off costs no extra triangles. Section caps (the
+ * red cut faces) show only with the cutaway on. Returns a Group with userData.cutaway.
  */
 export function cutLathe(profile, material, { seg = 64, caps = true, closed = true, cut = 'engine', capMat = null } = {}) {
-  // one profile, or several merged into the same pair of meshes; closed loops are made
-  // counter-clockwise in (r, y) so LatheGeometry's faces and normals point out of the material
+  // closed loops are made counter-clockwise in (r, y) so LatheGeometry's faces point out of the material
   let profiles = typeof profile[0][0] === 'number' ? [profile] : profile;
   if (closed) profiles = profiles.map(ccw);
-  profile = profiles[0];
   const c = CUTS[cut];
-  const segCut = Math.max(8, Math.round(seg * (c.length / TAU)));
+  const segKeep = Math.max(6, Math.round(seg * (c.length / TAU)));
+  const segRest = Math.max(4, seg - segKeep);
   const build = (p0, len, s) => merge(profiles.map((p) => lathe(closed ? p.concat([p[0]]) : p, s, p0, len)));
   const group = new THREE.Group();
-  const full = mesh(profiles.length > 1 ? build(0, TAU, seg) : lathe(closed ? profile.concat([profile[0]]) : profile, seg, 0, TAU), material);
-  const part = mesh(profiles.length > 1 ? build(c.start, c.length, segCut) : lathe(closed ? profile.concat([profile[0]]) : profile, segCut, c.start, c.length), material);
-  part.visible = false;
-  group.add(full, part);
+  const rest = mesh(build(c.start + c.length, TAU - c.length, segRest), material);
+  const keep = mesh(build(c.start, c.length, segKeep), material);
+  rest.visible = false;
+  group.add(keep, rest);
   const capMeshes = [];
   if (caps && closed) {
     const capGeo = merge(profiles.map((p) => new THREE.ShapeGeometry(new THREE.Shape(p.map(([r, y]) => new THREE.Vector2(r, y))))));
     for (const phi of [c.start, c.start + c.length]) {
       const m = mesh(capGeo, capMat || M.section(), { cast: false });
       m.rotation.y = phi - Math.PI / 2;
-      m.visible = false;
       group.add(m);
       capMeshes.push(m);
     }
   }
-  group.userData.cutaway = { full, cut: part, caps: capMeshes };
+  group.userData.cutaway = { rest, caps: capMeshes };
   return group;
 }
 
-/** A pair of meshes (whole / cut) made from a builder that takes a keep(phi) filter. */
+/**
+ * Ringed items (vane rows, nozzles, links …) split the same way. build(sel) returns the
+ * geometry for the items sel(phi) accepts; sel.start / sel.arc give the arc for anything
+ * continuous (hoops, rings).
+ */
 export function cutPair(build, material, cut = 'engine') {
   const group = new THREE.Group();
-  const full = mesh(build(() => true), material);
-  const g = build((phi) => kept(phi, cut));
-  const part = mesh(g, material);
-  part.visible = false;
-  group.add(full, part);
-  group.userData.cutaway = { full, cut: part, caps: [] };
+  const keep = mesh(build(selector(cut, false)), material);
+  const rest = mesh(build(selector(cut, true)), material);
+  rest.visible = false;
+  group.add(keep, rest);
+  group.userData.cutaway = { rest, caps: [] };
   return group;
 }
 
@@ -87,8 +99,7 @@ export function ccw(p) {
 export function setCut(group, on) {
   const c = group.userData.cutaway;
   if (!c) return;
-  c.full.visible = !on;
-  c.cut.visible = on;
+  c.rest.visible = !on;
   for (const m of c.caps) m.visible = on;
 }
 

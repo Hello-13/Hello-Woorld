@@ -230,7 +230,7 @@ export function buildAccessories(ctx) {
       if (!keep(phi)) continue;
       list.push(radialCyl(0.645, 0.81, -4.165, phi, 0.008, 6), boxAt(0.815, -4.165, phi, [0.03, 0.04, 0.04]));
     }
-    list.push(hoop(0.83, -4.165, 0.01, { tubular: 120, arc: keep(Math.PI * 1.75) ? TAU : Math.PI * 1.5 }));
+    list.push(hoop(0.83, -4.165, 0.01, { tubular: 96, start: keep.start, arc: keep.arc }));
     return merge(list);
   }, GM.connector());
   P('EGT thermocouples (T49)', {

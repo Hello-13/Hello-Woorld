@@ -220,7 +220,7 @@ export function buildFan(ctx) {
       list.push(boxAt(0.81, -1.67, phi + 0.11, [0.14, 0.02, 0.02]));
     }
     // unison ring that drives all the doors together
-    list.push(...[lathe([[0.79, -1.62], [0.81, -1.62], [0.81, -1.64], [0.79, -1.64], [0.79, -1.62]], 64)]);
+    list.push(lathe([[0.79, -1.64], [0.81, -1.64], [0.81, -1.62], [0.79, -1.62], [0.79, -1.64]], 48 * keep.arc / Math.PI / 2 | 0, keep.start, keep.arc));
     return merge(list);
   };
   const vbvGrp = cut(cutPair(vbv, GM.steel()));
