@@ -81,3 +81,17 @@ A guitar practice widget for my dashboard: tuner, chord of the day, metronome an
 ## Chem Bench
 
 [`chemistry-labs/`](chemistry-labs/) has interactive labs for every chapter of my chemistry course. Open `chemistry-labs/index.html` in a browser.
+
+---
+
+## AEROFORGE
+
+[`aeroforge/`](aeroforge/) is an interactive aerospace and defense engineering lab: detailed 3-D
+vehicles you can take apart system by system (X-ray, Blueprint, Systems and exploded views,
+guided tours), each with a physics lab: flight envelope, launch simulation, turbofan cycle,
+orbital transfer and endurance. See [`aeroforge/README.md`](aeroforge/README.md).
+
+```bash
+cd aeroforge && npm start   # http://localhost:8080
+cd aeroforge && npm test    # physics regression tests (node:test)
+```

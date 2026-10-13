@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AEROFORGE</title>
+<meta name="description" content="Interactive aerospace & defense engineering lab: detailed procedural 3-D vehicles with real flight, launch, propulsion and orbital physics.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,200..700&family=Public+Sans:ital,wght@0,300..700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<header class="nav">
+  <a class="brand" href="#" id="brand" aria-label="AEROFORGE, back to the first vehicle">
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4 28.5 27h-7.2L16 17.2 10.7 27H3.5Z" fill="currentColor"/></svg>
+    <span class="brand-name">AEROFORGE</span>
+  </a>
+  <nav class="nav-links" aria-label="Sections">
+    <button type="button" class="nav-link" data-nav="lab" id="nav-lab">Engineering lab</button>
+    <button type="button" class="nav-link" data-nav="specs" id="nav-specs">Specifications</button>
+    <button type="button" class="nav-link" data-nav="log" id="nav-log">Mission log</button>
+  </nav>
+  <div class="nav-tools">
+    <label class="quality" for="quality"><span class="quality-label">Graphics</span> <select id="quality"></select></label>
+    <span class="nav-fps" id="perf"><b id="res">--</b> <span class="nav-mp" id="mp"></span><span class="nav-sep" aria-hidden="true">·</span><b id="fps">--</b> fps</span>
+    <button type="button" class="nav-full" id="fullscreen" aria-pressed="false" hidden>Full screen</button>
+  </div>
+</header>
+
+<main class="stage" id="bay">
+  <div class="bay-gl" id="gl"></div>
+  <div class="stage-shade" aria-hidden="true"></div>
+
+  <section class="hero" id="hero" aria-labelledby="hud-name">
+    <p class="hero-eyebrow"><span id="hud-desig">—</span><span class="hero-rule" aria-hidden="true"></span><span id="hud-role"></span></p>
+    <h1 class="hero-name" id="hud-name">—</h1>
+    <p class="hero-tagline" id="hud-tagline"></p>
+    <dl class="hero-stats" id="hero-stats"></dl>
+    <div class="hero-cta">
+      <button type="button" class="btn btn-primary" id="tour-start">Start guided tour</button>
+      <button type="button" class="btn btn-line" id="open-lab">Open engineering lab</button>
+    </div>
+    <p class="hud-hint">Drag to orbit · scroll to zoom · click any part to inspect it</p>
+    <p class="orbit-note" id="orbit-note" hidden>Orbit view · Earth-centred inertial frame · spacecraft not to scale</p>
+  </section>
+
+  <div class="view-bar">
+    <div class="seg seg-modes" id="modes" role="radiogroup" aria-label="Render mode"></div>
+    <div class="seg seg-looks" id="looks" role="radiogroup" aria-label="Environment"></div>
+  </div>
+
+  <aside class="part-card" id="part-card" aria-live="polite" hidden></aside>
+  <aside class="tour-card" id="tour" aria-live="polite" hidden></aside>
+
+  <div class="hud-legend" id="legend" hidden>
+    <span class="legend-title" id="legend-title">Surface temperature</span>
+    <span class="legend-bar" id="legend-bar"></span>
+    <span class="legend-scale"><span id="legend-lo"></span><span id="legend-hi"></span></span>
+    <ul class="legend-systems" id="legend-systems"></ul>
+  </div>
+
+  <div class="hud-tools">
+    <label class="explode" for="explode">
+      <span class="tool-label">Exploded view</span>
+      <input type="range" id="explode" min="0" max="100" step="1" value="0">
+      <output id="explode-out" for="explode">0 %</output>
+    </label>
+    <button type="button" class="toggle" id="labels" aria-pressed="true"><span class="toggle-led" aria-hidden="true"></span><span>Labels</span></button>
+    <button type="button" class="toggle" id="spin" aria-pressed="true"><span class="toggle-led" aria-hidden="true"></span><span>Turntable</span></button>
+    <button type="button" class="tool-btn" id="reset-view">Reset view</button>
+  </div>
+</main>
+
+<nav class="fleet" aria-label="Fleet">
+  <ol class="fleet-list" id="fleet-list"></ol>
+</nav>
+
+<aside class="dossier" id="dossier" aria-label="Engineering dossier">
+  <header class="dossier-head">
+    <div class="dossier-title">
+      <span class="dossier-desig" id="dossier-desig">—</span>
+      <span class="dossier-name" id="dossier-name">—</span>
+    </div>
+    <button type="button" class="icon-btn" id="dossier-close" aria-label="Close the engineering dossier">×</button>
+  </header>
+  <div class="tabs" role="tablist" aria-label="Dossier sections">
+    <button type="button" role="tab" id="tab-lab-btn" data-tab="lab" aria-controls="tab-lab" aria-selected="true">Engineering lab</button>
+    <button type="button" role="tab" id="tab-specs-btn" data-tab="specs" aria-controls="tab-specs" aria-selected="false" tabindex="-1">Specifications</button>
+    <button type="button" role="tab" id="tab-log-btn" data-tab="log" aria-controls="tab-log" aria-selected="false" tabindex="-1">Mission log</button>
+  </div>
+  <section class="tab-panel" id="tab-lab" role="tabpanel" aria-labelledby="tab-lab-btn">
+    <div id="lab-root" class="lab"></div>
+  </section>
+  <section class="tab-panel" id="tab-specs" role="tabpanel" aria-labelledby="tab-specs-btn" hidden>
+    <div id="specs-root" class="specs"></div>
+  </section>
+  <section class="tab-panel" id="tab-log" role="tabpanel" aria-labelledby="tab-log-btn" hidden>
+    <p class="log-meta"><span id="tris">--</span> triangles on stage · <span id="utc">--:--:--</span> UTC</p>
+    <ol class="log" id="log"></ol>
+  </section>
+</aside>
+
+<div class="boot" id="boot" role="status">
+  <div class="boot-inner">
+    <svg class="boot-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4 28.5 27h-7.2L16 17.2 10.7 27H3.5Z" fill="currentColor"/></svg>
+    <span class="boot-name">AEROFORGE</span>
+    <span class="boot-bar" aria-hidden="true"><i id="boot-progress"></i></span>
+    <ul class="boot-log" id="boot-log"></ul>
+  </div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
