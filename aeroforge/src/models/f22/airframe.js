@@ -181,7 +181,7 @@ export function buildAirframe(ctx) {
     }
     P('Mid-fuselage titanium bulkheads', {
       system: 'Structure', material: 'Ti-6Al-4V bulkheads machined from large forgings', mass: 1150, explode: [0, 0.65, 0],
-      desc: 'Five heavy bulkheads (count simplified) carry wing bending loads across the fuselage around the inlet ducts and over the main weapons bay. Titanium is about 39 % of the F-22\'s structural weight, more than any earlier US fighter.',
+      desc: 'Five heavy bulkheads (count simplified) carry wing bending loads across the fuselage around the inlet ducts and over the main weapons bay. Titanium alloys make up about 40 % of the F-22\'s structural weight (sources give 39–42 %), more than any earlier US fighter.',
     }, mesh(merge(g), F.ti()));
   }
   // engine-bay frames
