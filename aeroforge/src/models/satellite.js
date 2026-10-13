@@ -77,7 +77,7 @@ export function buildSatellite({ compact = false } = {}) {
       ['Satellites', 'SV01–SV10; SV01 launched 23 Dec 2018'],
     ],
     heroStats: [['20,180', 'km', 'Orbit altitude'], [`+${rel.netUs.toFixed(1)}`, 'µs/day', 'Clock relativity'], ['15', 'yr', 'Design life']],
-    sources: 'Lockheed Martin GPS III product releases; U.S. Space Force and GPS.gov space-segment pages; IS-GPS-200, IS-GPS-705 and IS-GPS-800 signal specifications; Marquis & Reigh, "The GPS Block IIR and IIR-M broadcast L-band antenna panel" (NAVIGATION, 2015); L3Harris GPS III navigation-payload releases; Excelitas rubidium clock releases; NASA Space Geodesy Project and ILRS (SV09 laser retroreflector array); Spaceflight Now (SV01 launch profile); N. Ashby, "Relativity in the Global Positioning System" (Living Reviews in Relativity, 2003); Wikipedia "GPS Block III".',
+    sources: 'Lockheed Martin GPS III product releases; U.S. Space Force and GPS.gov space-segment pages; IS-GPS-200, IS-GPS-705 and IS-GPS-800 signal specifications; Marquis & Reigh, "The GPS Block IIR and IIR-M broadcast L-band antenna panel" (NAVIGATION, 2015); L3Harris GPS III navigation-payload releases; Lockheed Martin GPS III SV01 antenna-assembly release (2013); InsideGNSS, "GPS III" spacecraft overview; Excelitas rubidium clock releases; NASA Space Geodesy Project and ILRS (SV09 laser retroreflector array); Spaceflight Now (SV01 launch profile); N. Ashby, "Relativity in the Global Positioning System" (Living Reviews in Relativity, 2003); Wikipedia "GPS Block III".',
     fleetTag: 'Δv lab',
     root: A.root,
     body,

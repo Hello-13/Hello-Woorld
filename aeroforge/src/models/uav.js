@@ -131,29 +131,29 @@ export function buildUAV() {
     return 'tail';
   });
   P('SATCOM radome', {
-    system: 'Skin & fairings', skin: true, material: 'Dielectric composite shell, painted', mass: 22, explode: [1.3, 1.25, 0],
+    system: 'Skin & fairings', skin: true, material: 'Dielectric composite shell, painted', mass: 22, explode: [1.3, 2.1, -1.3],
     desc: 'The bulbous upper nose is a radome over the Ku-band satellite dish. It is transparent to the 12–18 GHz link signal, which is why the nose shape is set by a 0.7 m-class dish rather than by aerodynamics.',
   }, L(panels.get('radome'), m.radome));
   P('Lynx radome', {
-    system: 'Skin & fairings', skin: true, material: 'Dielectric composite shell, painted', mass: 7, explode: [1.6, -0.35, 0],
+    system: 'Skin & fairings', skin: true, material: 'Dielectric composite shell, painted', mass: 7, explode: [1.9, 0.5, -1.3],
     desc: 'Lower nose fairing over the AN/APY-8 Lynx radar antenna. Ku-band radar energy passes through it with little loss, so it carries no metal structure.',
   }, L(panels.get('lynx'), m.radome));
   const fwdSkin = P('Forward fuselage skin', {
-    system: 'Skin & fairings', skin: true, material: 'Carbon/epoxy sandwich panels (est.)', mass: 80, explode: [0.2, 1.35, 0],
+    system: 'Skin & fairings', skin: true, material: 'Carbon/epoxy sandwich panels (est.)', mass: 80, explode: [0.2, 1.95, -1.3],
     desc: 'Composite skin over the avionics bay and nose-gear well. The MQ-9 airframe is mostly composite with light-alloy fittings; access panels open the avionics racks from below and the sides.',
   }, L(panels.get('fwd'), m.skin));
   P('Centre fuselage skin', {
-    system: 'Skin & fairings', skin: true, material: 'Carbon/epoxy sandwich panels (est.)', mass: 55, explode: [0, 1.55, 0],
+    system: 'Skin & fairings', skin: true, material: 'Carbon/epoxy sandwich panels (est.)', mass: 55, explode: [0, 2.05, -1.3],
     desc: 'Skin around the wing carry-through, the fuselage fuel tank and the main-gear bays: the most heavily loaded part of the fuselage, where wing bending meets the body.',
   }, L(panels.get('ctr'), m.skin));
-  const aftSkin = P('Engine bay cowling', {
-    system: 'Skin & fairings', skin: true, material: 'Composite and titanium-faced panels (est.)', mass: 55, explode: [-0.2, 1.75, 0],
+  const aftSkin = role(P('Engine bay cowling', {
+    system: 'Skin & fairings', skin: true, material: 'Composite and titanium-faced panels (est.)', mass: 55, explode: [-0.2, 2.05, -1.3],
     desc: 'Removable cowling around the turboprop bay aft of the firewall. Panels near the exhaust stacks need heat-resistant facing; the rest hinge open for engine changes.',
-  }, L(panels.get('aft'), m.skin));
-  P('Tail cone', {
-    system: 'Skin & fairings', skin: true, material: 'Composite (est.)', mass: 14, explode: [-1.0, 0.9, 0],
+  }, L(panels.get('aft'), m.skin)), 'cowling');
+  role(P('Tail cone', {
+    system: 'Skin & fairings', skin: true, material: 'Composite (est.)', mass: 14, explode: [-1.0, 1.7, -1.3],
     desc: 'Tapers the fuselage into the spinner so the pusher propeller works in smooth, attached flow; it houses the drive shaft and the accessory drives.',
-  }, L(panels.get('tail'), m.skin));
+  }, L(panels.get('tail'), m.skin)), 'tailcone');
 
   // ============================================================== fuselage structure
   const fwdFrames = [hoop(0.95, { from: -Math.PI, to: 0, n: 20 }), ...[2.05, 2.6, 3.15, 3.6].map((s) => hoop(s))];
@@ -242,28 +242,28 @@ export function buildUAV() {
       root: W_TIP, tip: { le: [W_TIP.le[0] - 0.03, W_TIP.le[1] + 0.002, WING.semi], chord: W_TIP.chord - 0.05, t: W_TIP.t * 0.45 }, stations: 2, n: 28,
     }), W_TIP.le[2]);
     const wing = P(`Wing skin (${sn})`, {
-      system: 'Skin & fairings', skin: true, material: 'Carbon/epoxy skins, integral leading edge (est.)', mass: 125, explode: [0, 1.05, 1.75 * side],
+      system: 'Skin & fairings', skin: true, material: 'Carbon/epoxy skins, integral leading edge (est.)', mass: 125, explode: [0, 1.5, 1.9 * side],
       desc: 'A long, straight, high-aspect-ratio wing: 20.1 m span over about 24 m², aspect ratio near 17. Induced drag falls with span squared, which is what buys the 27-hour endurance.',
     }, [wbox, ...fills, tipCap].map((g) => L(f(g), m.skin)));
     if (side < 0) wing.userData.part.desc = 'Port wing skin, mirror of the starboard one. The skins are bonded to the spars and ribs and also form the walls of the integral fuel bays (estimate of the internal layout).';
 
     P(`Main spar (${sn})`, {
-      system: 'Structure', material: 'Carbon-fibre spar caps on a composite web (est.)', mass: 62, explode: [0, 0.4, 1.75 * side],
+      system: 'Structure', material: 'Carbon-fibre spar caps on a composite web (est.)', mass: 62, explode: [0, 0.75, 1.9 * side],
       desc: 'The main bending member, near 15 % chord where the section is deep. At 1 g it carries roughly half the aircraft’s weight from the tip to the carry-through box.',
     }, L(f(sparGeo(0.42, 9.95, 0.15, { width: 0.04, steps: 14 })), m.composite));
     P(`Rear spar (${sn})`, {
-      system: 'Structure', material: 'Carbon-fibre composite (est.)', mass: 24, explode: [0, 0.4, 1.75 * side],
+      system: 'Structure', material: 'Carbon-fibre composite (est.)', mass: 24, explode: [0, 0.75, 1.9 * side],
       desc: 'Closes the torsion box at 69 % chord and carries the flap and aileron hinges. Two spars and the skins form a closed box that resists twisting.',
     }, L(f(sparGeo(0.42, 9.7, 0.69, { width: 0.025, steps: 14 })), m.composite));
     P(`Wing ribs (${sn})`, {
-      system: 'Structure', material: 'Composite and machined aluminium at hardpoints (est.)', mass: 26, count: RIBS.length, explode: [0, 0.2, 1.75 * side],
+      system: 'Structure', material: 'Composite and machined aluminium at hardpoints (est.)', mass: 26, count: RIBS.length, explode: [0, 0.4, 1.9 * side],
       desc: 'Ribs keep the airfoil shape and stabilise the skins against buckling; the heavier ribs at 2.4, 4.0 and 5.6 m from the centreline carry the pylon loads (spacing estimated).',
     }, L(f(merge(RIBS.map((z) => ribGeo(z, 0.012, 0.72)))), m.primer));
 
     const r0 = wsec(TANK[0]), r1 = wsec(TANK[1]);
     const tankG = twistGeo(wingPanel({ root: { ...r0, t: r0.t * 0.9 }, tip: { ...r1, t: r1.t * 0.9 }, c0: 0.165, c1: 0.675, stations: 10, twist: twistAt(TANK[1]) - twistAt(TANK[0]), withChord: false }), TANK[0]);
     P(`Wing fuel tank (${sn})`, {
-      system: 'Fuel', material: 'Sealed integral bay / bladder (est.)', mass: 20, explode: [0, -0.45, 1.75 * side],
+      system: 'Fuel', material: 'Sealed integral bay / bladder (est.)', mass: 20, explode: [0, -0.35, 1.9 * side],
       desc: 'Fuel in the wing box between the spars, from the root to about 8.4 m out: ≈ 750 L per wing in this model (the real split is not published). Wing fuel sits where the lift is, so it relieves wing bending and barely moves the centre of gravity as it burns.',
       callout: side > 0, anchor: wpt(3.4, 0.42, 1, -0.04).map((v, i) => (i === 2 ? v * side : v)),
     }, L(f(tankG), m.fuel));
@@ -273,13 +273,13 @@ export function buildUAV() {
     const flapG = f(wingPanel({ root: W_ROOT, tip: W_TIP, c0: 0.745, c1: 1, eta0: zE(FLAP[0] + 0.01), eta1: zE(FLAP[1] - 0.01), stations: 4, twist: WING.twist, n: 28 }));
     const fH = hingedMesh(flapG, m.skin, hp(FLAP[0]), hp(FLAP[1]));
     P(`Flap (${sn})`, {
-      system: 'Flight controls', material: 'Composite (est.)', mass: 9, explode: [-0.65, 1.05, 1.75 * side],
+      system: 'Flight controls', material: 'Composite (est.)', mass: 9, explode: [-0.7, 1.5, 1.9 * side],
       desc: 'Plain flap over the inboard trailing edge. Lowered for take-off and landing it raises the wing’s maximum lift so the aircraft can use ordinary runways.',
     }, fH.pivot);
     const ailG = f(wingPanel({ root: W_ROOT, tip: W_TIP, c0: 0.745, c1: 1, eta0: zE(AIL[0] + 0.01), eta1: zE(AIL[1] - 0.01), stations: 4, twist: WING.twist, n: 28 }));
     const aH = hingedMesh(ailG, m.skin, hp(AIL[0]), hp(AIL[1]));
     P(`Aileron (${sn})`, {
-      system: 'Flight controls', material: 'Composite (est.)', mass: 8, explode: [-0.65, 1.05, 1.75 * side],
+      system: 'Flight controls', material: 'Composite (est.)', mass: 8, explode: [-0.7, 1.5, 1.9 * side],
       desc: 'Outboard roll control, moving opposite to the other aileron. Far from the centreline, a small deflection gives a large rolling moment.',
     }, aH.pivot);
     for (const h of [fH, aH]) { h.mesh.castShadow = true; h.mesh.receiveShadow = true; }
@@ -288,23 +288,23 @@ export function buildUAV() {
     const servo = (z) => { const c = wpt(z, 0.715, 0); return box(0.04, 0.045, 0.2, [c[0], c[1], c[2]]); };
     const horn = (z) => { const a = wpt(z, 0.715, 0), b = wpt(z, 0.77, -1, -0.01); return tubeBetween(a, b, 0.006, 6); };
     P(`Wing servos (${sn})`, {
-      system: 'Flight controls', material: 'Electromechanical actuators (est.)', mass: 6, count: 2, explode: [-0.3, 0.6, 1.75 * side],
+      system: 'Flight controls', material: 'Electromechanical actuators (est.)', mass: 6, count: 2, explode: [-0.4, 1.0, 1.9 * side],
       desc: 'Electric servo actuators behind the rear spar drive the flap and the aileron through short pushrods. The MQ-9 flies by wire with no hydraulic flight controls (actuator type per GA-ASI descriptions; sizes estimated).',
     }, L(f(merge([servo(2.7), horn(2.7), servo(7.0), horn(7.0)])), m.lruOlive));
     const harnessPts = [[0.45, 0.705], [3.0, 0.705], [6.0, 0.705], [9.2, 0.705], [9.85, 0.4], [9.95, 0.08]].map(([z, cf]) => wpt(z, cf, 0));
     P(`Wing wiring (${sn})`, {
-      system: 'Electrical', material: 'Shielded harness in conduit (est.)', mass: 4, explode: [0, 0.6, 1.75 * side],
+      system: 'Electrical', material: 'Shielded harness in conduit (est.)', mass: 4, explode: [0, 1.0, 1.9 * side],
       desc: 'Power and signal runs to the wing servos, the wingtip radio antenna and the navigation light, routed along the rear spar outside the fuel bay.',
     }, L(f(merge([pipe(harnessPts, 0.008, 5, 60), tubeBetween(wpt(2.7, 0.705, 0), wpt(2.75, 0.715, 0), 0.006, 5), tubeBetween(wpt(7.0, 0.705, 0), wpt(7.05, 0.715, 0), 0.006, 5)])), m.harness));
     const lens = new THREE.SphereGeometry(0.03, 12, 8).scale(1.4, 0.8, 1).translate(...wpt(10.0, 0.04, 0)).translate(0.02, 0, 0.03);
     P(`Navigation light (${sn})`, {
-      system: 'Electrical', material: 'LED position light', mass: 0.5, explode: [0, 1.05, 1.95 * side],
+      system: 'Electrical', material: 'LED position light', mass: 0.5, explode: [0, 1.5, 2.1 * side],
       desc: side > 0 ? 'Green position light on the starboard wingtip, red on the port one: other pilots can tell which way the aircraft is heading at night.' : 'Red position light on the port wingtip. The MQ-9 flies in shared airspace, so it carries the same lights as a crewed aircraft.',
     }, L(f(lens), side > 0 ? m.navGreen : m.navRed, { cast: false }));
     const pod = latheX([[0.001, -0.4], [0.02, -0.33], [0.024, -0.1], [0.022, 0.05], [0.001, 0.12]], 12);
     pod.translate(wpt(10.05, 0.45, 0)[0], wpt(10.05, 0.45, 0)[1], WING.semi - 0.01);
     P(`Wingtip V/UHF antenna (${sn})`, {
-      system: 'Communications', material: 'Dielectric fairing (shape approximate)', mass: 1, explode: [0, 1.05, 2.05 * side],
+      system: 'Communications', material: 'Dielectric fairing (shape approximate)', mass: 1, explode: [0, 1.5, 2.2 * side],
       desc: 'Block 5 aircraft carry VHF/UHF voice-radio antennas at the wingtips for the two ARC-210 radios, so ground forces and air traffic control can talk to the crew through the aircraft (fairing shape approximate).',
     }, L(f(pod), m.dark));
 
@@ -319,7 +319,7 @@ export function buildUAV() {
       stnInfo.push({ x: le[0] - chord * 0.45, yBot: yTop - h - 0.03, z });
     }
     P(`Pylons (${sn})`, {
-      system: 'Weapons', material: 'Aluminium pylons with release units and sway braces', mass: 53, count: 3, explode: [0, -0.75, 1.75 * side],
+      system: 'Weapons', material: 'Aluminium pylons with release units and sway braces', mass: 53, count: 3, explode: [0, -0.75, 1.9 * side],
       desc: side > 0 ? 'Three under-wing stations: inboard (rated about 1,500 lb, 680 kg), middle (about 600–750 lb) and outboard (about 150–200 lb); press figures differ. Inboard stations can also take fuel tanks.' : 'Port inboard, middle and outboard pylons. With the centreline station there are seven stations in all, for up to 3,000 lb (1,361 kg) of external stores.',
     }, [L(f(merge(pyl)), m.skin), L(f(merge(rack)), m.darkMetal)]);
 
@@ -329,7 +329,7 @@ export function buildUAV() {
     const gy = gb.yBot - g.radius - 0.012, gx = gb.x - 0.05;
     const place = (geo) => f(geo.clone().translate(gx, gy, gb.z));
     storeParts.gbu.push(P(`GBU-12 Paveway II (${sn})`, {
-      system: 'Weapons', material: 'Mk 82 steel bomb body, laser guidance kit', mass: 230, massSource: 'Published GBU-12 figure (≈ 230 kg)', explode: [0, -1.05, 2.0 * side],
+      system: 'Weapons', material: 'Mk 82 steel bomb body, laser guidance kit', mass: 230, massSource: 'Published GBU-12 figure (≈ 230 kg)', explode: [0, -1.1, 2.1 * side],
       desc: 'A 500 lb-class Mk 82 bomb with a laser seeker and steering canards on the nose and folding wings at the tail: 3.27 m long, 0.27 m across. It steers toward laser energy reflected from a marked spot.',
       callout: side > 0, anchor: [gx + 1.2, gy - 0.12, gb.z * side],
     }, [L(place(g.body), m.olive), L(place(g.guidance), m.seeker), L(place(g.dome), m.glass), L(place(g.band), m.yellow)]));
@@ -339,14 +339,14 @@ export function buildUAV() {
     const lg = launcher();
     const ly = md.yBot - 0.07, lx = md.x - 0.05;
     storeParts.launcher.push(P(`M299 launcher (${sn})`, {
-      system: 'Weapons', material: 'Aluminium launcher with electronics assembly', mass: 35, explode: [0, -0.85, 1.85 * side],
+      system: 'Weapons', material: 'Aluminium launcher with electronics assembly', mass: 35, explode: [0, -0.9, 2.0 * side],
       desc: 'An M299-family Hellfire launcher in a two-rail fit. Its electronics pass the laser code and power to each missile before launch (mass estimated).',
     }, L(f(lg.clone().translate(lx, ly, md.z)), m.darkMetal)));
     const hf = hellfire();
     const hy = ly - 0.095 - 0.021 - hf.radius;
     const pair = (geo) => f(merge([-1, 1].map((k) => geo.clone().translate(lx - 0.02, hy, md.z + 0.12 * k))));
     storeParts.hellfire.push(P(`AGM-114 Hellfire pair (${sn})`, {
-      system: 'Weapons', material: 'Steel/aluminium airframe, semi-active laser seeker', mass: 98, massSource: 'Published AGM-114 figure (45–49 kg each)', count: 2, explode: [0, -1.25, 1.85 * side],
+      system: 'Weapons', material: 'Steel/aluminium airframe, semi-active laser seeker', mass: 98, massSource: 'Published AGM-114 figure (45–49 kg each)', count: 2, explode: [0, -1.2, 2.0 * side],
       desc: 'Two laser-guided Hellfire missiles, each 1.63 m long and 0.18 m in diameter. The seeker under the nose dome homes on a laser spot with a matching pulse code.',
       callout: side < 0, anchor: [lx + 0.8, hy - 0.1, (md.z + 0.12) * side],
     }, [L(pair(hf.body), m.olive), L(pair(hf.dome), m.glass), L(pair(hf.band), m.yellow), L(pair(hf.motor), m.brown)]));
@@ -359,7 +359,7 @@ export function buildUAV() {
     rootF.push(side > 0 ? g : mirror(g));
   }
   P('Wing root fairings', {
-    system: 'Skin & fairings', skin: true, material: 'Composite fillets (est.)', mass: 8, count: 2, explode: [0, 1.2, 0],
+    system: 'Skin & fairings', skin: true, material: 'Composite fillets (est.)', mass: 8, count: 2, explode: [0, 1.75, -1.3],
     desc: 'Fillets that blend the wing into the fuselage side, cutting the interference drag where the two flows meet.',
   }, rootF.map((g) => L(g, m.skin)));
 
@@ -567,7 +567,7 @@ export function buildUAV() {
     vents.push(box(0.12, 0.012, 0.05, wpt(9.1, 0.5, -1, -0.002).map((v, i) => (i === 2 ? v * zs : v))));
   }
   P('Fuel vents', {
-    system: 'Fuel', material: 'Vent lines to flush under-wing outlets (est.)', mass: 1, count: 2, explode: [0, -0.2, 2.6],
+    system: 'Fuel', material: 'Vent lines to flush under-wing outlets (est.)', mass: 1, count: 2, explode: [0, -0.1, 2.6],
     desc: 'Vent lines let air into the tanks as fuel is used and let fuel expand in the heat on the ramp without straining the tanks.',
   }, L(merge(vents), m.pipe));
 
@@ -919,6 +919,8 @@ export function buildUAV() {
         case 'oil': return amb + 60 + th * 25;
         case 'generator': return amb + 40 + th * 25;
         case 'battery': return amb + 12;
+        case 'cowling': return amb + 30 + th * 40;   // skin over the engine and the exhaust stacks
+        case 'tailcone': return amb + 18 + th * 20;
         default: break;
       }
       if (info.system === 'Avionics' || info.system === 'Flight controls' && /computer/i.test(info.name)) return amb + 28;

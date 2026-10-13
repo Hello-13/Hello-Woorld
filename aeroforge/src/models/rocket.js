@@ -44,12 +44,12 @@ export function buildRocket() {
 
   // exploded view: the vehicle rises off the mount and steps forward (+z) clear of the
   // transporter-erector; skins pull back toward their original place to bare the internals
-  const centre = buildCore(A, coreG, { kind: 'centre', prefix: 'Centre core', explodeBase: [0, 5, 6], paint: { soot: 0.05, streaks: 6, seed: 5 } });
+  const centre = buildCore(A, coreG, { kind: 'centre', prefix: 'Centre core', explodeBase: [0, 3, 6], paint: { soot: 0.05, streaks: 6, seed: 5 } });
   const boosters = [
-    buildCore(A, boosterG[0], { kind: 'booster', prefix: 'Side booster A', explodeBase: [7.5, 5, 6], paint: { soot: 0.2, streaks: 36, seed: 9 }, attachSide: 1 }),
-    buildCore(A, boosterG[1], { kind: 'booster', prefix: 'Side booster B', explodeBase: [-7.5, 5, 6], paint: { soot: 0.22, streaks: 40, seed: 13 }, attachSide: -1 }),
+    buildCore(A, boosterG[0], { kind: 'booster', prefix: 'Side booster A', explodeBase: [7.0, 3, 6], paint: { soot: 0.2, streaks: 36, seed: 9 }, attachSide: 1 }),
+    buildCore(A, boosterG[1], { kind: 'booster', prefix: 'Side booster B', explodeBase: [-7.0, 3, 6], paint: { soot: 0.22, streaks: 40, seed: 13 }, attachSide: -1 }),
   ];
-  const upper = buildUpper(A, upperG, { explodeBase: [0, 17, 6] });
+  const upper = buildUpper(A, upperG, { explodeBase: [0, 14, 6] });
   const pad = buildPad(A, site, base);
 
   // ----------------------------------------------------------------- exhaust (effects, not parts)
@@ -102,6 +102,8 @@ export function buildRocket() {
     launching: false,
   };
   let followY = FOLLOW_STACK;
+  const fairPart = A.parts.find((p) => p.userData.part.name === 'Fairing half A');
+  const exploded = () => fairPart.position.lengthSq() > 0.25;
 
   const allFins = [...centre.fins, ...boosters.flatMap((b) => b.fins)];
   const setFins = (fins, k) => { for (const m of fins) m.rotation.x = (-Math.PI / 2) * smooth(k); };
@@ -136,7 +138,7 @@ export function buildRocket() {
     pivotY: STACK0 + PIVOT,
     parts: A.parts,
     // with the pad showing, frame a little tighter so the vehicle, not the hardstand, fills the view
-    view: { dir: [1.0, 0.2, 1.35], get fill() { return siteShown() ? 0.8 : 1.0; } },
+    view: { dir: [1.0, 0.2, 1.35], get fill() { return siteShown() && !exploded() ? 0.8 : 1.0; } },
     displaySize: 13,
     thermalRange: [60, 1800],
     state: st,

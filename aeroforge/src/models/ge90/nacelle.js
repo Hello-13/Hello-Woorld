@@ -76,7 +76,7 @@ export function buildNacelle(ctx) {
   P('Thrust reverser cascades', {
     system: 'Propulsion', material: 'Carbon-fibre cascade vane boxes on an aluminium torque box', mass: 260,
     explode: [-0.5, -0.55, -1.0], temp: 300,
-    desc: 'Grids of curved vanes hidden under the sleeves. When the sleeves open, bypass air blocked in the duct escapes through them and is turned forward, so the fan stream pushes the aircraft backwards — up to about a third of take-off thrust on the landing roll.',
+    desc: 'Grids of curved vanes hidden under the sleeves. When the sleeves open, bypass air blocked in the duct escapes through them and is turned forward, so the fan stream pushes the aircraft backwards.',
     callout: true, anchor: [-1.78, -2.0, -0.08],
   }, [cascRings, rails]);
 

@@ -305,7 +305,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     const inter = P('interstage', {
       system: 'Separation', skin: true, material: 'Carbon-fibre / aluminium-honeycomb sandwich, black thermal paint', mass: 2100,
       desc: 'Carbon-composite shroud between the stages, 6.6 m long. It covers the Merlin Vacuum nozzle and carries the grid fins and cold-gas thrusters, and stays with the centre core at separation.',
-      callout: true, anchor: [R + 0.05, 44.2, 0.3], explode: [0, 3.2, 0],
+      callout: true, anchor: [R + 0.05, 44.2, 0.3], explode: [0, 2.0, 0],
     }, [mesh(barrel(R, Y.s1Top, Y.interTop, { rings: 3 }), FM.blackTPS()), mesh(barrel(R - 0.03, Y.s1Top, Y.interTop), FM.compositeInner())]);
     inter.userData.part.thermalRole = 'ambient';
     const sep = [];
@@ -319,7 +319,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     P('stage-separation pushers & latches', {
       system: 'Separation', count: 4, material: 'Pneumatic pushers, mechanical latches (collets), separation ring', mass: 180,
       desc: 'Mechanical latches hold the second stage on the interstage ring; at separation they release and pneumatic pushers drive the stages apart — no explosives, so the system can be tested on the actual flight hardware. Count and placement simplified.',
-      explode: [0, 4.4, 0],
+      explode: [0, 2.9, 0],
     }, mesh(merge(sep), FM.aluDark()));
     finY = Y.interTop - 0.45;
   } else {
@@ -361,13 +361,13 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   const gf = P('grid fins', {
     system: 'Recovery', count: 4, material: 'Cast and machined titanium', mass: 4 * 180,
     desc: 'Stowed flat for ascent, the four lattice fins swing out after separation and steer the falling booster through re-entry. Block 5 fins are titanium, about 1.2 × 1.5 m, and survive re-entry heating without ablative coating.',
-    callout: centre, anchor: [polar(R + 0.3, 45)[0], finY - 0.8, polar(R + 0.3, 45)[1]], explode: centre ? [0, 3.6, 0] : [0, 2.4, 0],
+    callout: centre, anchor: [polar(R + 0.3, 45)[0], finY - 0.8, polar(R + 0.3, 45)[1]], explode: centre ? [0, 2.4, 0] : [0, 2.4, 0],
   }, finGroup);
   gf.userData.part.thermalRole = 'ambient';
   P('grid-fin actuators', {
     system: 'Hydraulics', count: 4, material: 'Closed-loop hydraulic actuators in aerodynamic housings', mass: 4 * 35,
     desc: 'Each fin rotates on a hydraulic actuator in a housing at its root, driven by the stage\'s hydraulic power unit.',
-    explode: centre ? [0, 3.9, 0] : [0, 2.7, 0],
+    explode: centre ? [0, 2.7, 0] : [0, 2.7, 0],
   }, mesh(merge(finActs), FM.black()));
 
   // ------------------------------------------------------------------ landing legs (stowed)
@@ -417,7 +417,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   P('cold-gas thrusters & N₂ tanks', {
     system: 'Attitude control', count: 2, material: 'Nitrogen thruster pods, composite-overwrapped N₂ tanks', mass: 160,
     desc: 'Pods of nitrogen cold-gas thrusters flip the stage after separation and hold its attitude outside the atmosphere, where grid fins have no air to work with.',
-    explode: centre ? [0, 3.2, 1.2] : [0, 2.2, 1.2],
+    explode: centre ? [0, 2.0, 1.2] : [0, 2.2, 1.2],
   }, [mesh(merge(cg), FM.black()), mesh(merge(n2), FM.copv())]);
 
   const rw = [];

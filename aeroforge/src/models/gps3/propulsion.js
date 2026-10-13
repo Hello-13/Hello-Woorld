@@ -65,7 +65,14 @@ export function buildPropulsion(P) {
     system: 'Fuel', material: 'Titanium alloy sphere', mass: 34, temp: 293, explode: [0, 0, -0.85],
     desc: `About ${GPS3.oxLoad} kg of nitrogen tetroxide (estimate), used only by the apogee engine. Hydrazine and NTO ignite on contact (hypergolic), so the engine needs no igniter and restarts reliably for every apogee burn.`,
   }, [mesh(new THREE.SphereGeometry(OX.r, 48, 28).translate(0, 0, OX.z), G.tank()), mesh(merge(oxMounts), G.aluminium())]);
-  const heStraps = [cylG(HE.c, HE.r + 0.006, 0.03, 'z', 32), boxG([HE.c[0], HE.c[1], HE.c[2] - HE.r - 0.1], [0.08, 0.08, 0.2])];
+  // equatorial strap and two struts back to the central cylinder wall (clear of the reaction wheel below)
+  const inward = [-HE.c[0], -HE.c[1]].map((v) => v / Math.hypot(HE.c[0], HE.c[1]));
+  const heStraps = [cylG(HE.c, HE.r + 0.006, 0.03, 'z', 32)];
+  for (const dz of [-0.07, 0.07]) {
+    const a = [HE.c[0] + inward[0] * (HE.r - 0.01), HE.c[1] + inward[1] * (HE.r - 0.01), HE.c[2] + dz];
+    const b = [inward[0] * -(RC + 0.005), inward[1] * -(RC + 0.005), HE.c[2] + dz];
+    heStraps.push(pipeG([a, b], 0.014, 8));
+  }
   P('Helium pressurant tank', {
     system: 'Fuel', material: 'Carbon-overwrapped titanium-lined pressure vessel', mass: 20, temp: 293, explode: [0.6, 0.6, -0.3],
     desc: 'Stores helium at around 300 bar (estimate). A regulator feeds it to the propellant tanks at a steady pressure so the apogee engine burns at a constant mixture ratio.',

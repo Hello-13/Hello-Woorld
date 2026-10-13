@@ -72,7 +72,7 @@ export default [
     title: 'Seven stations',
     body: 'Six under-wing pylons and a centreline station carry up to 1,361 kg of stores. Shown: a GBU-12 laser-guided bomb on each inboard station and two Hellfire missiles on each middle station. Every kilogram of stores is a kilogram of fuel not carried, and every pylon adds drag.',
     key: 'MTOW 4,760 kg = empty 2,223 kg + fuel + payload: weight is the currency of the mission.',
-    explode: 0.25, focus: STORES, view: { dir: [0.6, -0.45, 1] },
+    explode: 0.25, focus: STORES, view: { dir: [0.6, 0.14, 1], fill: 0.85 },
   },
   {
     title: 'Wheels and control surfaces',

@@ -48,7 +48,7 @@ export function buildPayload(P) {
   ]);
   P('L-band antenna panel', {
     system: 'Payload', material: 'White-painted aluminium honeycomb ground plane', mass: 38, temp: 245, explode: [0, 0, 2.05],
-    desc: 'Ground plane for the twelve L-band helices that broadcast every GPS signal to the whole visible Earth. GPS III keeps the two-ring, 12-helix layout of the Block IIR/IIR-M panel (four inner, eight outer); its exact element design is not public. Diameter estimated at 1.36 m.',
+    desc: 'Ground plane of the Earth-coverage L-band antenna, which broadcasts the civil and military (M-code) navigation signals to the whole visible Earth. Modelled on the two-ring, 12-helix layout of the Block IIR/IIR-M panel (four inner, eight outer); GPS III\'s exact element design and the placement of its crosslink antennas are not public. Diameter estimated at 1.36 m.',
     callout: true, anchor: [PANEL_R * 0.72, -PANEL_R * 0.72, PANEL_Z],
   }, mesh(panel, G.whitePaint()));
 

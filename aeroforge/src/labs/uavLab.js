@@ -22,8 +22,8 @@ export function mountUavLab(root, ctx) {
     value: p.stores,
     onChange: (k) => { p.stores = k; dirty = true; v.setStores?.(k); ctx.log(v.designation, `Stores: ${LOADOUTS[k].detail} · ${fmt.n(LOADOUTS[k].mass)} kg`, 'info'); },
   });
-  const sAlt = slider({ label: 'Loiter altitude', min: 0, max: 15240, step: 100, value: p.altitude, unit: 'm', format: (x) => `${fmt.n(x)} (${fmt.n(x * 3.2808)} ft)`, onInput: set('altitude') });
-  const sSpd = slider({ label: 'True airspeed', min: 40, max: 140, step: 1, value: p.speed, unit: 'm/s', format: (x) => `${x} (${Math.round(x * 1.944)} kt)`, onInput: set('speed') });
+  const sAlt = slider({ label: 'Loiter altitude', min: 0, max: 15240, step: 100, value: p.altitude, format: (x) => `${fmt.n(x)} m (${fmt.n(x * 3.2808)} ft)`, onInput: set('altitude') });
+  const sSpd = slider({ label: 'True airspeed', min: 40, max: 140, step: 1, value: p.speed, format: (x) => `${x} m/s (${Math.round(x * 1.944)} kt)`, onInput: set('speed') });
   const sTr = slider({ label: 'Transit to the orbit (each way)', min: 0, max: 1500, step: 10, value: p.transit, unit: 'km', onInput: set('transit') });
   const tAir = toggle({ label: 'Airborne', value: false, onChange: (on) => { v.setAirborne(on); ctx.setFlightLook(on); ctx.log(v.designation, on ? 'Wheels up · climbing to the orbit on the C-band link, then handed over to the SATCOM crew' : 'Recovered by the launch-and-recovery crew', 'info'); } });
   const tLaser = toggle({ label: 'Laser designator', value: false, onChange: (on) => { v.setLaser(on); ctx.log(v.designation, on ? 'MTS-B laser on · designating' : 'Laser safe', on ? 'warn' : 'info'); } });
