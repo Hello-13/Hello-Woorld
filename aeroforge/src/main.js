@@ -167,7 +167,8 @@ async function start() {
   function renderLooks() {
     const f = app.entry;
     lookGroup.replaceChildren(...f.looks.map((k) => {
-      const b = el('button', { type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(k === app.look), 'data-look': k, text: LOOKS[k].label });
+      const text = (k === 'orbit' && f.orbit?.label) || LOOKS[k].label;
+      const b = el('button', { type: 'button', role: 'radio', class: 'seg-btn', 'aria-checked': String(k === app.look), 'data-look': k, text });
       b.addEventListener('click', () => setLook(k));
       return b;
     }));
@@ -285,6 +286,20 @@ async function start() {
 
   // ------------------------------------------------------------------ picking & callouts
   const callouts = new Callouts((part) => selectPart(part));
+  // labels keep clear of whatever interface panels are showing
+  const calloutPanels = ['.nav', '#hero', '.view-bar', '#part-card', '#tour', '#legend', '.hud-tools', '.fleet', '#dossier'];
+  callouts.obstacles = () => {
+    const box = stage.labels.domElement.getBoundingClientRect();
+    const out = [];
+    for (const sel of calloutPanels) {
+      const e = document.querySelector(sel);
+      if (!e || e.hidden) continue;
+      const cs = getComputedStyle(e), r = e.getBoundingClientRect();
+      if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 0.05 || !r.width || !r.height) continue;
+      out.push([r.left - box.left, r.top - box.top, r.right - box.left, r.bottom - box.top]);
+    }
+    return out;
+  };
   const hoverTip = el('div', { class: 'hover-tip', role: 'tooltip', hidden: true });
   document.body.append(hoverTip);
   const placeTip = (e) => {
@@ -528,6 +543,7 @@ async function start() {
     app.current = v;
     groundLook = null;
     app.look = app.looks[f.id] || f.looks[0];
+    stage.env.setOrbitView(f.orbit || null);
     stage.env.applyLook(app.look);
     v.setLook?.(app.look);
     renderLooks();
@@ -614,6 +630,7 @@ async function start() {
 
   // ------------------------------------------------------------------ frame loop
   let clockAcc = 1;
+  let calloutAcc = 0;
   stage.onFrame((dt, t) => {
     const v = app.current;
     if (!v) return;
@@ -628,6 +645,12 @@ async function start() {
     tour.update(dt);
     app.lab?.update(dt, t);
     stage.controls.autoRotate = app.autoRotate && !stage.tween && !(v.state?.launching);
+    calloutAcc += dt;
+    if (calloutAcc > 0.1 && app.labels) {
+      calloutAcc = 0;
+      const box = stage.labels.domElement;
+      callouts.layout(stage.camera, box.clientWidth, box.clientHeight);
+    }
     clockAcc += dt;
     if (clockAcc > 0.5) {
       clockAcc = 0;

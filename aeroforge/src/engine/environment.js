@@ -375,6 +375,8 @@ export class Environment {
     this.earth = null;
     this.earthAlt = 520;
     this.earthAngle = 0;
+    this.orbitAltitude = null;   // per-vehicle override of the orbit look's altitude (setOrbitView)
+    this.earthDip = null;        // angle of the Earth's centre below the horizontal when it is a ball in the sky
     this.earthDrift = 0;
     this.sunDir = new THREE.Vector3(0.4, 0.8, 0.3).normalize();
     this.cloudSpeed = 0;
@@ -488,6 +490,17 @@ export class Environment {
     e.setFade(alpha);
   }
 
+  /** Per-vehicle orbit look: altitude in km (null = the look's default). From high orbits the Earth
+   *  is a ball rather than a horizon, so it is placed ahead of the camera and below the horizontal,
+   *  following the camera's heading: it stays behind the vehicle while the turntable turns. */
+  setOrbitView(o) {
+    this.orbitAltitude = o?.altitude ?? null;
+    this.earthDip = null;
+    if (!o) return;
+    const rho = Math.asin(R_EARTH_KM / (R_EARTH_KM + o.altitude));
+    if (rho < 0.8) this.earthDip = rho + 0.12;              // disc's upper edge ~7° below the horizontal
+  }
+
   applyLook(name) {
     const L = LOOKS[name];
     if (!L) return;
@@ -542,7 +555,7 @@ export class Environment {
 
     // earth backdrop
     if (L.earth) {
-      this.setEarthView(L.earth.altitude, 0, 1);
+      this.setEarthView(this.orbitAltitude ?? L.earth.altitude, 0, 1);
       this.earth.setSun(dir);
     } else if (this.earth) {
       this.earth.group.visible = false;
@@ -664,7 +677,14 @@ export class Environment {
       const r = d * (R_EARTH_KM / (R_EARTH_KM + this.earthAlt));
       const g = this.earth.group;
       g.scale.setScalar(r);
-      g.position.set(camera.position.x, camera.position.y - d, camera.position.z);
+      if (this.earthDip && this.look === 'orbit' && !this.space) {
+        const f = camera.getWorldDirection(this._earthFwd || (this._earthFwd = new THREE.Vector3()));
+        f.y = 0;
+        if (f.lengthSq() < 1e-6) f.set(0, 0, -1);
+        f.normalize().multiplyScalar(Math.cos(this.earthDip));
+        f.y = -Math.sin(this.earthDip);
+        g.position.copy(camera.position).addScaledVector(f, d);
+      } else g.position.set(camera.position.x, camera.position.y - d, camera.position.z);
       if (this.look === 'orbit' && !this.space) this.earthDrift += dt * 0.0011 * 6;   // ~7.6 km/s ground speed (×6 for legibility)
       const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), this.earthAngle + this.earthDrift);
       g.quaternion.copy(q).multiply(this.earthBase);

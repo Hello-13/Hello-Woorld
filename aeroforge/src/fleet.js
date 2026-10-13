@@ -1,5 +1,6 @@
 // The fleet: which model, lab and environment each vehicle uses, in shortcut-key order.
-// Hero figures come from the vehicle's own `heroStats`; `stats` here is only a fallback.
+// Hero figures come from the vehicle's own `heroStats`; `stats` here is only a fallback. `orbit` sets
+// the altitude (km) and label of the 'orbit' look's Earth for that vehicle.
 
 // Each vehicle's model and lab load as separate modules (see load()), so one that fails to load or
 // build is left out with an error in the console instead of stopping the whole app.
@@ -19,6 +20,6 @@ export const FLEET = [
   vehicle('uav', 'uav.js', 'buildUAV', 'uavLab.js', 'mountUavLab', { labName: 'Mission endurance', lift: 1.2, looks: ['showroom', 'hangar'], stats: [['27', 'h', 'Endurance'], ['15.2', 'km', 'Ceiling'], ['1,700', 'kg', 'Payload']] }),
   vehicle('turbofan', 'turbofan.js', 'buildTurbofan', 'engineLab.js', 'mountEngineLab', { labName: 'Brayton cycle', lift: 0.8, looks: ['showroom', 'hangar'], stats: [['513', 'kN', 'Take-off thrust'], ['3.25', 'm', 'Fan diameter'], ['42', ': 1', 'Pressure ratio']] }),
   vehicle('rocket', 'rocket.js', 'buildRocket', 'rocketLab.js', 'mountRocketLab', { labName: 'Launch simulator', lift: 5.5, looks: ['pad', 'showroom', 'hangar'], stats: [['63.8', 't', 'Payload to LEO'], ['22.8', 'MN', 'Liftoff thrust'], ['27', '', 'Engines at liftoff']] }),
-  vehicle('satellite', 'satellite.js', 'buildSatellite', 'orbitLab.js', 'mountOrbitLab', { labName: 'Orbital transfer', lift: 0, looks: ['orbit', 'showroom', 'hangar'], stats: [['20,180', 'km', 'Orbit altitude'], ['55', '°', 'Inclination'], ['15', 'yr', 'Design life']] }),
-  vehicle('hubble', 'hubble.js', 'buildHubble', 'hubbleLab.js', 'mountHubbleLab', { labName: 'Optics & orbit', lift: 0, looks: ['orbit', 'showroom'], stats: [['2.4', 'm', 'Primary mirror'], ['0.05', '″', 'Resolution'], ['540', 'km', 'Orbit']] }),
+  vehicle('satellite', 'satellite.js', 'buildSatellite', 'orbitLab.js', 'mountOrbitLab', { orbit: { altitude: 20180, label: 'Medium Earth orbit' }, labName: 'Orbital transfer', lift: 0, looks: ['orbit', 'showroom', 'hangar'], stats: [['20,180', 'km', 'Orbit altitude'], ['55', '°', 'Inclination'], ['15', 'yr', 'Design life']] }),
+  vehicle('hubble', 'hubble.js', 'buildHubble', 'hubbleLab.js', 'mountHubbleLab', { orbit: { altitude: 515, label: 'Low Earth orbit' }, labName: 'Optics & orbit', lift: 0, looks: ['orbit', 'showroom'], stats: [['2.4', 'm', 'Primary mirror'], ['0.05', '″', 'Resolution'], ['540', 'km', 'Orbit']] }),
 ].map((f, i) => ({ ...f, key: String(i + 1) }));

@@ -36,7 +36,7 @@ export class OrbitScene {
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xffc640, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     glow.scale.setScalar(0.32);
     this.sat.add(glow);
-    this.satLabel = label('SENTINEL-4', 'orbit-label is-sat');
+    this.satLabel = label('', 'orbit-label is-sat');   // the lab sets the vehicle's designation
     this.satLabel.position.set(0, 0.25, 0);
     this.sat.add(this.satLabel);
     this.group.add(this.sat);

@@ -233,13 +233,17 @@ button, input, output, select { font: inherit; color: inherit; }
 body.is-orbit .hud-hint, body.is-orbit .view-bar, body.is-orbit .explode, body.is-orbit #spin, body.is-orbit .hero-stats { display: none; }
 
 /* ------------------------------------------------------------------ callouts on the model */
-.callout { position: relative; display: flex; align-items: flex-end; background: none; border: 0; padding: 0; cursor: pointer; pointer-events: auto; }
-.callout-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 2px rgba(4, 6, 10, 0.75), 0 0 12px rgba(255, 255, 255, 0.5); transform: translate(-3px, 3px); }
-.callout-line { width: 28px; height: 1px; background: rgba(238, 242, 246, 0.6); transform: rotate(-35deg) translate(-2px, -6px); transform-origin: left; }
+.callout { position: relative; display: block; width: 0; height: 0; background: none; border: 0; padding: 0; cursor: pointer; pointer-events: auto; }
+.callout-dot { position: absolute; left: -3.5px; top: -3.5px; width: 7px; height: 7px; border-radius: 50%; background: var(--text); box-shadow: 0 0 0 2px rgba(4, 6, 10, 0.75), 0 0 12px rgba(255, 255, 255, 0.5); }
+.callout-line {
+  position: absolute; left: 0; top: 0; width: 28px; height: 1px; background: rgba(238, 242, 246, 0.6);
+  transform-origin: 0 50%; transform: rotate(-0.68rad); transition: transform 0.25s var(--ease), width 0.25s var(--ease);
+}
 .callout-text {
+  position: absolute; left: 0; top: 0;
   font: 600 10px/1 var(--font-ui); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text); white-space: nowrap;
   background: rgba(4, 6, 10, 0.55); border: 1px solid rgba(238, 242, 246, 0.16); padding: 5px 8px; border-radius: 2px;
-  backdrop-filter: blur(6px); transform: translate(-4px, -21px); transition: background 0.2s, color 0.2s;
+  backdrop-filter: blur(6px); transform: translate(22px, -38px); transition: background 0.2s, color 0.2s, transform 0.25s var(--ease);
 }
 .callout:hover .callout-text, .callout.is-selected .callout-text { background: var(--text); color: var(--ink-on-light); border-color: var(--text); }
 .orbit-label { font: 500 11px/1 var(--font-data); color: var(--soft); background: rgba(4, 6, 10, 0.66); padding: 4px 7px; border-radius: 2px; white-space: nowrap; }
