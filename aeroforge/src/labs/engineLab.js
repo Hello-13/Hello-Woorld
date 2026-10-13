@@ -1,16 +1,19 @@
-// Brayton-cycle lab: solves the two-spool separate-exhaust turbofan cycle and drives
-// spool speeds, combustor glow, flow particles and thermal colours in the bay.
+// Brayton-cycle lab for the GE90-115B: solves the two-spool, separate-exhaust turbofan cycle
+// (fan, 4-stage booster, 9-stage HPC, 2-stage HPT, 6-stage LPT) and drives the spool speeds,
+// combustor glow, flow particles, station planes and thermal colours in the bay.
 
-import { solveTurbofan, DEFAULT_CYCLE } from '../physics/turbofan.js';
+import { solveTurbofan, DEFAULT_CYCLE, GE90 } from '../physics/turbofan.js';
 import { el, slider, toggle, readouts, section, segmented, fmt } from '../ui/dom.js';
 import { LineChart } from '../ui/chart.js';
 import * as THREE from 'three';
 import { solidBounds } from '../engine/stage.js';
 
+// 777-300ER operating points: sea-level static take-off, a mid-climb point, and cruise at
+// FL350 and Mach 0.84
 const PRESETS = {
   takeoff: { altitude: 0, mach: 0, label: 'Take-off' },
   climb: { altitude: 5000, mach: 0.55, label: 'Climb' },
-  cruise: { altitude: 10668, mach: 0.82, label: 'Cruise FL350' },
+  cruise: { altitude: 10668, mach: 0.84, label: 'Cruise M0.84' },
 };
 
 export function mountEngineLab(root, ctx) {
@@ -28,6 +31,7 @@ export function mountEngineLab(root, ctx) {
   const sMach = slider({ label: 'Flight Mach', min: 0, max: 0.9, step: 0.01, value: p.mach, format: (x) => x.toFixed(2), onInput: set('mach') });
   const sThr = slider({ label: 'Throttle (TIT schedule)', min: 0, max: 100, step: 1, value: 100, unit: '%', onInput: (x) => { p.throttle = x / 100; dirty = true; } });
   const sFpr = slider({ label: 'Fan pressure ratio', min: 1.3, max: 1.9, step: 0.01, value: p.fpr, format: (x) => x.toFixed(2), onInput: set('fpr') });
+  const sLpc = slider({ label: 'Booster pressure ratio (fan hub + 4 stages)', min: 1.5, max: 3.5, step: 0.05, value: p.lpcpr, format: (x) => x.toFixed(2), onInput: set('lpcpr') });
   const sOpr = slider({ label: 'Overall pressure ratio', min: 15, max: 60, step: 1, value: p.opr, onInput: set('opr') });
   const sTit = slider({ label: 'Turbine inlet temperature', min: 1300, max: 2000, step: 10, value: p.tit, unit: 'K', onInput: set('tit') });
   const sBpr = slider({ label: 'Bypass ratio', min: 3, max: 14, step: 0.1, value: p.bpr, format: (x) => x.toFixed(1), onInput: set('bpr') });
@@ -55,6 +59,7 @@ export function mountEngineLab(root, ctx) {
     { key: 'v9', label: 'Core jet velocity', unit: 'm/s' }, { key: 'v19', label: 'Fan jet velocity', unit: 'm/s' },
     { key: 'eth', label: 'Thermal efficiency' }, { key: 'ep', label: 'Propulsive efficiency' },
     { key: 'n1', label: 'N1 fan speed', unit: '%' }, { key: 'n2', label: 'N2 core speed', unit: '%' },
+    { key: 'rpm', label: 'N1 / N2', unit: 'rpm' }, { key: 'egt', label: 'EGT (T49)', unit: '°C' },
   ]);
   const table = el('table', { class: 'station-table' });
   const ts = new LineChart({
@@ -64,9 +69,9 @@ export function mountEngineLab(root, ctx) {
   });
 
   root.append(
-    el('p', { class: 'lab-intro', text: 'A real two-spool cycle analysis: compressor and turbine efficiencies, burner pressure loss, fan-to-LPT work matching and ideally expanded nozzles. Change the design and watch the engine respond.' }),
+    el('p', { class: 'lab-intro', text: `The GE90-115B cycle, solved station by station: fan, 4-stage booster and 9-stage HP compressor, a burner pressure loss, the 2-stage HP turbine driving the compressor and the 6-stage LP turbine driving fan and booster, then two ideally expanded nozzles. The design point is tuned to the certified 513 kN (115,300 lbf) take-off at overall pressure ratio 42 and bypass ratio 7.2; fan, booster and turbine-inlet values are not published and are modelled. Change the design and watch the engine respond.` }),
     section('Operating point', preset.el, sAlt.el, sMach.el, sThr.el),
-    section('Cycle design', sFpr.el, sOpr.el, sTit.el, sBpr.el),
+    section('Cycle design', sFpr.el, sLpc.el, sOpr.el, sTit.el, sBpr.el),
     status,
     section('Performance', ro.el),
     section('Cycle', ts.el),
@@ -79,6 +84,9 @@ export function mountEngineLab(root, ctx) {
     const r = solveTurbofan(p);
     v.setStations(r.stations);
     v.state.throttle = p.throttle;
+    v.state.n1 = r.n1;
+    v.state.n2 = r.n2;
+    v.state.fromLab = true;
     ro.set('F', fmt.n(r.thrust / 1000, 1));
     ro.set('tsfc', Number.isFinite(r.tsfc) ? (r.tsfc * 1e6).toFixed(2) : '—');
     ro.set('spec', fmt.n(r.specThrust, 0));
@@ -91,6 +99,9 @@ export function mountEngineLab(root, ctx) {
     ro.set('ep', p.mach > 0 ? fmt.pct(r.etaP) : 'n/a at rest');
     ro.set('n1', fmt.n(r.n1, 1));
     ro.set('n2', fmt.n(r.n2, 1));
+    ro.set('rpm', `${fmt.n(r.n1Rpm, 0)} / ${fmt.n(r.n2Rpm, 0)}`);
+    const egtC = r.egt - 273.15;
+    ro.set('egt', fmt.n(egtC, 0), r.valid && r.egtMargin < 0 ? 'crit' : r.valid && r.egtMargin < 40 ? 'warn' : '');
     if (!r.valid) {
       status.textContent = 'No valid operating point: the turbines cannot supply the compressor and fan work. Raise turbine inlet temperature or lower the bypass or fan pressure ratio.';
       status.dataset.state = 'crit';
@@ -98,8 +109,10 @@ export function mountEngineLab(root, ctx) {
       status.textContent = `Fan work-limited: the LPT can only hold a fan pressure ratio of ${r.fpr.toFixed(2)} (asked for ${r.fprRequested.toFixed(2)}).`;
       status.dataset.state = 'warn';
     } else {
-      status.textContent = `Matched: ${fmt.n(r.thrust / 1000, 0)} kN at ${(r.tsfc * 1e6).toFixed(1)} g/(kN·s). Burner exit ${fmt.n(r.Tt4, 0)} K; the core nozzle runs ${fmt.n(r.byStation['9'].T, 0)} K.`;
-      status.dataset.state = 'ok';
+      const lbf = r.thrust / 4.44822;
+      const margin = r.egtMargin;
+      status.textContent = `Matched: ${fmt.n(r.thrust / 1000, 0)} kN (${fmt.n(lbf / 1000, 1)}k lbf) at ${(r.tsfc * 1e6).toFixed(1)} g/(kN·s). Burner exit ${fmt.n(r.Tt4, 0)} K; EGT ${fmt.n(r.egt - 273.15, 0)} °C, ${margin >= 0 ? `${fmt.n(margin, 0)} °C inside` : `${fmt.n(-margin, 0)} °C over`} the ${fmt.n(GE90.egtLimitK - 273.15, 0)} °C take-off limit.`;
+      status.dataset.state = margin < 0 ? 'warn' : 'ok';
     }
     if (r.fanLimited !== lastLimited) {
       ctx.log(v.designation, r.fanLimited ? 'LPT work limit reached — fan pressure ratio rolled back' : 'Fan and LPT matched', r.fanLimited ? 'warn' : 'ok');
@@ -136,7 +149,7 @@ export function mountEngineLab(root, ctx) {
 
   return {
     update() { if (dirty) { dirty = false; compute(); } },
-    dispose() { v.setStationPlanes(false); },
+    dispose() { v.setStationPlanes(false); v.state.fromLab = false; },
     api: {
       setDisplay({ flow, stations, cutaway } = {}) {
         if (flow != null) tFlow.set(flow);

@@ -63,18 +63,22 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   });
   const skinMat = tankMaterial(paintMap, span[1] - span[0]);
   const tankBarrel = (y0, y1) => barrel(R, y0, y1, { v0y: span[0], v1y: span[1], rings: Math.max(2, Math.round((y1 - y0) / 4)) });
+  // internal ring frames at the barrel-section welds (they also give Blueprint its station lines)
+  const frameYs = [Y.engSectionTop, 7.4, 11.2, 15.0, 20.4, 24.2, 28.0, 31.8, 35.6, Y.loxTop, Y.s1Top - 0.05];
+  const frames = (y0, y1) => merge(frameYs.filter((y) => y >= y0 && y <= y1).map((y) => hoop(R - 0.035, 0.03, y, { seg: 72, tube: 4 })));
+  const frameMat = FM.aluDark();
 
   const lox = P('LOX tank', {
     system: 'Fuel', skin: true, material: 'Aluminium-lithium 2195, friction-stir welded barrel sections', mass: Math.round(4300 * k),
     desc: `Upper tank: about 278 t of liquid oxygen, densified to −207 °C (66 K) so more fits in the same volume. Its forward skirt carries the ${centre ? 'interstage and the forward booster attach fittings' : 'forward section, grid fins and the forward attach fitting'}.`,
     explode: [0, 1.2, -6.5],
-  }, mesh(tankBarrel(Y.commonDome, Y.s1Top), skinMat));
+  }, [mesh(tankBarrel(Y.commonDome, Y.s1Top), skinMat), mesh(frames(Y.commonDome + 0.1, Y.s1Top), frameMat)]);
   lox.userData.part.thermalRole = 'lox';
   const rp1 = P('RP-1 tank', {
     system: 'Fuel', skin: true, material: 'Aluminium-lithium 2195', mass: Math.round(2500 * k),
     desc: 'Lower tank: about 118 t of RP-1, a refined kerosene, chilled to about −7 °C. The LOX downcomer runs down its centre to the engines.',
     explode: [0, -0.6, -6.5],
-  }, mesh(tankBarrel(Y.engSectionTop, Y.commonDome), skinMat));
+  }, [mesh(tankBarrel(Y.engSectionTop, Y.commonDome), skinMat), mesh(frames(Y.engSectionTop, Y.commonDome), frameMat)]);
   rp1.userData.part.thermalRole = 'rp1';
   P('engine section skin', {
     system: 'Skin & fairings', skin: true, material: 'Aluminium skin panels with thermal protection coating', mass: Math.round(450 * k),

@@ -131,11 +131,11 @@ export function buildNacelle(ctx) {
   }, [cut(cutLathe(ifs, GM.coreCowl(), N)), bif]);
 
   // ------------------------------------------------------------------ pylon (strut) stub
-  const pylon = merge([
-    boxAt(2.22, -2.3, UP, [0.46, 3.2, 0.5]),
-    boxAt(1.86, -1.75, UP, [0.3, 0.34, 0.38]),
-    boxAt(1.56, -4.75, UP, [1.08, 1.5, 0.42]).applyMatrix4(new THREE.Matrix4()),
-  ]);
+  // side profile (y, r) of the strut stub, extruded across its 0.42 m width at 12 o'clock
+  const side = [[-0.55, 1.99], [-0.75, 2.2], [-1.05, 2.42], [-5.7, 2.42], [-5.7, 1.5], [-5.48, 1.07], [-5.05, 1.05], [-4.55, 1.12], [-4.1, 1.5], [-3.9, 1.99]];
+  const shape = new THREE.Shape(side.map(([y, r]) => new THREE.Vector2(-r, y)));
+  const pylon = new THREE.ExtrudeGeometry(shape, { depth: 0.42, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 2, curveSegments: 4 });
+  pylon.translate(0, 0, -0.21);
   P('Pylon (strut) stub', {
     system: 'Structure', material: 'Titanium and steel box beam (Boeing)', mass: 900,
     explode: [-1.3, -0.2, 0], temp: 300,
