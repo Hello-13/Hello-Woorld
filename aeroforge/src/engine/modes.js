@@ -116,7 +116,8 @@ export class RenderModes {
     const key = `${k}|${range[0]}|${range[1]}`;
     if (!this.thermalMats.has(key)) {
       const c = inferno((k - range[0]) / (range[1] - range[0]));
-      this.thermalMats.set(key, new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.55, roughness: 0.75, metalness: 0.05 }));
+      // a thermal imager sees emission, not reflected studio light: mostly emissive, faint shading
+      this.thermalMats.set(key, new THREE.MeshStandardMaterial({ color: c.clone().multiplyScalar(0.3), emissive: c, emissiveIntensity: 1.0, roughness: 0.85, metalness: 0, envMapIntensity: 0.12 }));
     }
     return this.thermalMats.get(key);
   }

@@ -7,7 +7,7 @@
 <meta name="description" content="Interactive aerospace & defense engineering lab: detailed procedural 3-D vehicles with real flight, launch, propulsion and orbital physics.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,200..700&family=Public+Sans:ital,wght@0,300..700;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="styles.css">
 <script type="importmap">
 {
@@ -19,84 +19,99 @@
 </script>
 </head>
 <body>
-<div class="app">
-  <header class="topbar">
-    <div class="brand">
-      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 29 27H20.5L16 18.5 11.5 27H3Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="miter"/><path d="M16 11.5 19 17h-6Z" fill="currentColor"/></svg>
-      <span class="brand-name">AEROFORGE</span>
-      <span class="brand-sub">Aerospace &amp; defense engineering lab</span>
-    </div>
-    <div class="status" aria-label="System status">
-      <span class="pill"><span class="pill-led" aria-hidden="true"></span>Systems nominal</span>
-      <span class="readout"><b id="utc">--:--:--</b> UTC</span>
-      <span class="readout"><b id="fps">--</b> FPS</span>
-      <span class="readout"><b id="tris">--</b> triangles</span>
-      <label class="readout quality" for="quality">Quality <select id="quality"></select></label>
-    </div>
-  </header>
-
-  <nav class="fleet" aria-label="Fleet">
-    <h2 class="eyebrow">Fleet</h2>
-    <ul class="fleet-list" id="fleet-list"></ul>
-    <p class="fleet-note">All five vehicles are fictional designs, modelled procedurally from public engineering principles.</p>
+<header class="nav">
+  <a class="brand" href="#" id="brand" aria-label="AEROFORGE, back to the first vehicle">
+    <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4 28.5 27h-7.2L16 17.2 10.7 27H3.5Z" fill="currentColor"/></svg>
+    <span class="brand-name">AEROFORGE</span>
+  </a>
+  <nav class="nav-links" aria-label="Sections">
+    <button type="button" class="nav-link" data-nav="lab" id="nav-lab">Engineering lab</button>
+    <button type="button" class="nav-link" data-nav="specs" id="nav-specs">Specifications</button>
+    <button type="button" class="nav-link" data-nav="log" id="nav-log">Mission log</button>
   </nav>
+  <div class="nav-tools">
+    <label class="quality" for="quality"><span class="quality-label">Graphics</span> <select id="quality"></select></label>
+    <span class="nav-fps" aria-label="Frames per second"><b id="fps">--</b> fps</span>
+  </div>
+</header>
 
-  <main class="bay" id="bay">
-    <div class="bay-gl" id="gl"></div>
-    <div class="bay-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-    <div class="hud-id">
-      <span class="hud-desig" id="hud-desig">—</span>
-      <span class="hud-name" id="hud-name">—</span>
-      <span class="hud-role" id="hud-role"></span>
-      <button type="button" class="btn btn-primary tour-start" id="tour-start">Start guided tour</button>
-      <p class="hud-hint">Drag to orbit · scroll or pinch to zoom · click a part · keys 1–5, M, X, L, R</p>
-      <p class="orbit-note" id="orbit-note" hidden>Orbit view · Earth-centred inertial frame · spacecraft not to scale</p>
-    </div>
-    <aside class="tour-card" id="tour" aria-live="polite" hidden></aside>
-    <div class="hud-right">
-      <div class="hud-modes seg" id="modes" role="radiogroup" aria-label="Render mode"></div>
-      <div class="hud-looks seg" id="looks" role="radiogroup" aria-label="Environment"></div>
-    </div>
-    <aside class="part-card" id="part-card" aria-live="polite" hidden></aside>
-    <div class="hud-tools">
-      <label class="explode" for="explode">
-        <span class="ctl-label">Exploded view</span>
-        <input type="range" id="explode" min="0" max="100" step="1" value="0">
-        <output id="explode-out" for="explode">0 %</output>
-      </label>
-      <button type="button" class="toggle" id="labels" aria-pressed="true"><span class="toggle-led" aria-hidden="true"></span><span>Labels</span></button>
-      <button type="button" class="toggle" id="spin" aria-pressed="true"><span class="toggle-led" aria-hidden="true"></span><span>Turntable</span></button>
-      <button type="button" class="btn btn-ghost" id="reset-view">Reset view</button>
-    </div>
-    <div class="hud-legend" id="legend" hidden>
-      <span class="ctl-label" id="legend-title">Surface temperature</span>
-      <span class="legend-bar" id="legend-bar"></span>
-      <span class="legend-scale"><span id="legend-lo"></span><span id="legend-hi"></span></span>
-    </div>
-  </main>
+<main class="stage" id="bay">
+  <div class="bay-gl" id="gl"></div>
+  <div class="stage-shade" aria-hidden="true"></div>
 
-  <aside class="inspector" aria-label="Inspector">
-    <div class="tabs" role="tablist" aria-label="Inspector sections">
-      <button type="button" role="tab" id="tab-lab-btn" data-tab="lab" aria-controls="tab-lab" aria-selected="true">Engineering lab</button>
-      <button type="button" role="tab" id="tab-specs-btn" data-tab="specs" aria-controls="tab-specs" aria-selected="false" tabindex="-1">Specs &amp; parts</button>
+  <section class="hero" id="hero" aria-labelledby="hud-name">
+    <p class="hero-eyebrow"><span id="hud-desig">—</span><span class="hero-rule" aria-hidden="true"></span><span id="hud-role"></span></p>
+    <h1 class="hero-name" id="hud-name">—</h1>
+    <p class="hero-tagline" id="hud-tagline"></p>
+    <dl class="hero-stats" id="hero-stats"></dl>
+    <div class="hero-cta">
+      <button type="button" class="btn btn-primary" id="tour-start">Start guided tour</button>
+      <button type="button" class="btn btn-line" id="open-lab">Open engineering lab</button>
     </div>
-    <section class="tab-panel" id="tab-lab" role="tabpanel" aria-labelledby="tab-lab-btn">
-      <div id="lab-root" class="lab"></div>
-    </section>
-    <section class="tab-panel" id="tab-specs" role="tabpanel" aria-labelledby="tab-specs-btn" hidden>
-      <div id="specs-root" class="specs"></div>
-    </section>
-  </aside>
+    <p class="hud-hint">Drag to orbit · scroll to zoom · click any part to inspect it</p>
+    <p class="orbit-note" id="orbit-note" hidden>Orbit view · Earth-centred inertial frame · spacecraft not to scale</p>
+  </section>
 
-  <section class="ribbon" aria-label="Event log">
-    <h2 class="eyebrow">Event log</h2>
+  <div class="view-bar">
+    <div class="seg seg-modes" id="modes" role="radiogroup" aria-label="Render mode"></div>
+    <div class="seg seg-looks" id="looks" role="radiogroup" aria-label="Environment"></div>
+  </div>
+
+  <aside class="part-card" id="part-card" aria-live="polite" hidden></aside>
+  <aside class="tour-card" id="tour" aria-live="polite" hidden></aside>
+
+  <div class="hud-legend" id="legend" hidden>
+    <span class="legend-title" id="legend-title">Surface temperature</span>
+    <span class="legend-bar" id="legend-bar"></span>
+    <span class="legend-scale"><span id="legend-lo"></span><span id="legend-hi"></span></span>
+  </div>
+
+  <div class="hud-tools">
+    <label class="explode" for="explode">
+      <span class="tool-label">Exploded view</span>
+      <input type="range" id="explode" min="0" max="100" step="1" value="0">
+      <output id="explode-out" for="explode">0 %</output>
+    </label>
+    <button type="button" class="toggle" id="labels" aria-pressed="true"><span class="toggle-led" aria-hidden="true"></span><span>Labels</span></button>
+    <button type="button" class="toggle" id="spin" aria-pressed="true"><span class="toggle-led" aria-hidden="true"></span><span>Turntable</span></button>
+    <button type="button" class="tool-btn" id="reset-view">Reset view</button>
+  </div>
+</main>
+
+<nav class="fleet" aria-label="Fleet">
+  <ol class="fleet-list" id="fleet-list"></ol>
+</nav>
+
+<aside class="dossier" id="dossier" aria-label="Engineering dossier">
+  <header class="dossier-head">
+    <div class="dossier-title">
+      <span class="dossier-desig" id="dossier-desig">—</span>
+      <span class="dossier-name" id="dossier-name">—</span>
+    </div>
+    <button type="button" class="icon-btn" id="dossier-close" aria-label="Close the engineering dossier">×</button>
+  </header>
+  <div class="tabs" role="tablist" aria-label="Dossier sections">
+    <button type="button" role="tab" id="tab-lab-btn" data-tab="lab" aria-controls="tab-lab" aria-selected="true">Engineering lab</button>
+    <button type="button" role="tab" id="tab-specs-btn" data-tab="specs" aria-controls="tab-specs" aria-selected="false" tabindex="-1">Specifications</button>
+    <button type="button" role="tab" id="tab-log-btn" data-tab="log" aria-controls="tab-log" aria-selected="false" tabindex="-1">Mission log</button>
+  </div>
+  <section class="tab-panel" id="tab-lab" role="tabpanel" aria-labelledby="tab-lab-btn">
+    <div id="lab-root" class="lab"></div>
+  </section>
+  <section class="tab-panel" id="tab-specs" role="tabpanel" aria-labelledby="tab-specs-btn" hidden>
+    <div id="specs-root" class="specs"></div>
+  </section>
+  <section class="tab-panel" id="tab-log" role="tabpanel" aria-labelledby="tab-log-btn" hidden>
+    <p class="log-meta"><span id="tris">--</span> triangles on stage · <span id="utc">--:--:--</span> UTC</p>
     <ol class="log" id="log"></ol>
   </section>
-</div>
+</aside>
 
 <div class="boot" id="boot" role="status">
   <div class="boot-inner">
+    <svg class="boot-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4 28.5 27h-7.2L16 17.2 10.7 27H3.5Z" fill="currentColor"/></svg>
     <span class="boot-name">AEROFORGE</span>
+    <span class="boot-bar" aria-hidden="true"><i id="boot-progress"></i></span>
     <ul class="boot-log" id="boot-log"></ul>
   </div>
 </div>

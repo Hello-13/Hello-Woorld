@@ -40,12 +40,19 @@ All five designs are fictional and modelled from public engineering principles.
 - **Moving parts** — flaperons, ailerons, all-moving stabilators, rudders, 2-D thrust-vectoring
   nozzles, landing-gear retraction, weapons-bay doors with trapeze launchers, independent N1/N2
   spools, a propeller, a gimballed EO/IR turret with laser designator, solar-array deployment.
+- **Showroom** — the default stage for the aircraft and the engine: a graphite cyclorama, a
+  polished floor carrying a blurred mirror reflection of the vehicle and soft contact shadows,
+  and reflections from a procedurally built softbox studio. Selecting a vehicle opens with a
+  slow camera reveal, the way a product film does.
 - **Photographic rendering** — image-based lighting from real HDR environment maps, a physically
   based sky, AgX tone mapping, multisampled HDR post-processing with ground-truth ambient occlusion,
   bloom on emissives only, and procedural PBR surfaces (panel lines, rivets, weathering, carbon
-  weave, multi-layer insulation, concrete) with decals and stencils. Quality presets (Ultra, High,
-  Balanced, Performance) step down automatically if the frame rate drops.
-- **Environments** — hangar, photo studio, open sky above a cloud deck, a dawn launch pad with
+  weave, multi-layer insulation, concrete) with decals and stencils, and a final grade (gentle
+  S-curve, split toning, lens fall-off). Graphics presets (Ultra, High, Balanced, Performance)
+  scale resolution, MSAA, ambient occlusion, mirror reflections and shadow resolution; Ultra is
+  the default on desktops with 8+ cores, and the preset steps down automatically if the frame
+  rate drops.
+- **Environments** — showroom, hangar, open sky above a cloud deck, a dawn launch pad with
   floodlights, and low Earth orbit. During a launch the sky darkens with altitude, the stars come
   out and the curved Earth (NASA Blue Marble by day, city lights by night, clouds and an
   atmospheric rim) rises into view at its true angular size for the current altitude.
@@ -82,8 +89,9 @@ file system will not work because browsers block ES modules on `file://`.
 | `X` | Toggle exploded view |
 | `L` | Toggle callouts |
 | `R` | Reset the camera |
-| `Esc` | Clear the selection |
+| `Esc` | Clear the selection, then close the engineering dossier |
 | **Start guided tour** | Step through the vehicle's lesson (Back / Next, or click a progress dot) |
+| **Engineering lab** / **Specifications** / **Mission log** | Open the dossier panel on that section |
 
 A vehicle can be deep-linked with `#fighter`, `#rocket`, `#turbofan`, `#satellite` or `#uav`.
 
@@ -107,7 +115,7 @@ aeroforge/
 ├── src/
 │   ├── main.js            app shell: fleet, modes, picking, explode, inspector, labs, event log
 │   ├── physics/           atmosphere, aero, launch, turbofan, orbital, endurance (no DOM)
-│   ├── engine/            stage (renderer + post-processing), environments, Earth, render modes,
+│   ├── engine/            stage (renderer + post-processing), environments, showroom, Earth, render modes,
 │   │                      picking, callouts, force arrows, decals, procedural surfaces,
 │   │                      geometry toolkit (loft / NACA wing / lathe / lattice), shaders, orbit scene
 │   ├── models/            fighter, rocket, turbofan, satellite, uav

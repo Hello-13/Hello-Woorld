@@ -13,11 +13,13 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { Environment } from './environment.js';
 
+// showroom.reflect: mirror-floor resolution (fraction of the canvas, 0 = off);
+// showroom.contact: contact-shadow map size; contactEvery: refresh every n frames
 export const QUALITY = {
-  ultra: { label: 'Ultra', dpr: 2, msaa: 4, ao: 1, shadow: 4096 },
-  high: { label: 'High', dpr: 1.5, msaa: 4, ao: 0.5, shadow: 2048 },
-  balanced: { label: 'Balanced', dpr: 1.25, msaa: 4, ao: 0, shadow: 2048 },
-  performance: { label: 'Performance', dpr: 1, msaa: 0, ao: 0, shadow: 1024 },
+  ultra: { label: 'Ultra', dpr: 2, msaa: 4, ao: 1, shadow: 4096, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
+  high: { label: 'High', dpr: 1.5, msaa: 4, ao: 0.5, shadow: 2048, showroom: { reflect: 0.38, contact: 512, contactEvery: 1 } },
+  balanced: { label: 'Balanced', dpr: 1.25, msaa: 4, ao: 0, shadow: 2048, showroom: { reflect: 0, contact: 512, contactEvery: 2 } },
+  performance: { label: 'Performance', dpr: 1, msaa: 0, ao: 0, shadow: 1024, showroom: { reflect: 0, contact: 256, contactEvery: 3 } },
 };
 const ORDER = ['ultra', 'high', 'balanced', 'performance'];
 
@@ -69,15 +71,29 @@ const SanitizeShader = {
     }`,
 };
 
+// Final grade in display space: a touch of lateral chromatic aberration toward the corners, a
+// gentle S-curve, split toning (cool shadows, warm highlights), vignette and fine grain.
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, time: { value: 0 }, vignette: { value: 0.32 }, grain: { value: 0.028 } },
+  uniforms: {
+    tDiffuse: { value: null }, time: { value: 0 }, vignette: { value: 0.3 }, grain: { value: 0.022 },
+    aberration: { value: 0.0045 }, contrast: { value: 0.14 }, split: { value: 0.035 },
+  },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse; uniform float time; uniform float vignette; uniform float grain; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float time; uniform float vignette; uniform float grain;
+    uniform float aberration; uniform float contrast; uniform float split; varying vec2 vUv;
     float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main() {
-      vec4 c = texture2D(tDiffuse, vUv);
       vec2 d = vUv - 0.5;
+      vec2 off = d * dot(d, d) * aberration * 4.0;
+      vec4 c = texture2D(tDiffuse, vUv);
+      c.r = texture2D(tDiffuse, vUv - off).r;
+      c.b = texture2D(tDiffuse, vUv + off).b;
+      vec3 x = clamp(c.rgb, 0.0, 1.0);
+      c.rgb = mix(c.rgb, x * x * (3.0 - 2.0 * x), contrast);
+      float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+      c.rgb += vec3(-0.35, 0.05, 0.6) * (1.0 - smoothstep(0.0, 0.45, l)) * split * 0.5;
+      c.rgb += vec3(0.5, 0.18, -0.4) * smoothstep(0.55, 1.0, l) * split;
       float v = smoothstep(0.95, 0.25, length(d * vec2(1.15, 1.0)));
       c.rgb *= mix(1.0 - vignette, 1.0, v);
       c.rgb += (hash(vUv * 1024.0 + fract(time) * 37.0) - 0.5) * grain;
@@ -118,7 +134,7 @@ export class Stage {
     this.controls.minDistance = 2;
     this.controls.maxDistance = 220;
     this.controls.maxPolarAngle = Math.PI * 0.495;
-    this.controls.autoRotateSpeed = 0.55;
+    this.controls.autoRotateSpeed = 0.4;
     this.controls.target.set(0, 2.5, 0);
 
     this.env = new Environment(this);
@@ -131,7 +147,8 @@ export class Stage {
     const coarse = window.matchMedia?.('(pointer: coarse)').matches || window.innerWidth < 900;
     let saved = null;
     try { saved = localStorage.getItem('aeroforge.quality'); } catch { /* storage blocked */ }
-    this.quality = QUALITY[saved] ? saved : (coarse ? 'balanced' : 'high');
+    const cores = navigator.hardwareConcurrency || 4;
+    this.quality = QUALITY[saved] ? saved : (coarse ? 'balanced' : cores >= 8 ? 'ultra' : 'high');
     if (saved) this.autoQuality = false;
     this.buildComposer();
 
@@ -160,6 +177,8 @@ export class Stage {
       key.shadow.map = null;
     }
     if (this.composer) { for (const p of this.composer.passes) p.dispose?.(); this.composer.dispose(); }
+    this.env.showroom.setQuality(q.showroom);
+    this._grace = (this.time || 0) + 4;     // shader compiles after a rebuild are not a slow frame rate
     const rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples: q.msaa });
     const composer = new EffectComposer(this.renderer, rt);
     this.composer = composer;
@@ -178,8 +197,8 @@ export class Stage {
     this.outline.edgeStrength = 4;
     this.outline.edgeGlow = 0.35;
     this.outline.edgeThickness = 1.2;
-    this.outline.visibleEdgeColor.set(0xffb000);
-    this.outline.hiddenEdgeColor.set(0x6b4a06);
+    this.outline.visibleEdgeColor.set(0x8cc4ff);
+    this.outline.hiddenEdgeColor.set(0x24466e);
     if (this._outlined) this.outline.selectedObjects = this._outlined;
     composer.addPass(this.outline);
     composer.addPass(new ShaderPass(SanitizeShader));     // before bloom, the pass that spreads pixels
@@ -213,16 +232,41 @@ export class Stage {
     this.renderer.setSize(w, h, false);
     this.composer.setSize(w, h);
     this.labels.setSize(w, h);
+    this.env.showroom.resize();
     this.camera.aspect = w / h;
     this.applyViewShift();
   }
 
   /** Slide the projection centre (fractions of width / height) so a panel doesn't cover the subject;
-   *  positive x moves the subject right, positive y moves it up. */
+   *  positive x moves the subject right, positive y moves it up. Eases there over ~0.5 s. */
   setViewShift(f, fy = 0) {
-    this._shift = f;
-    this._shiftY = fy;
+    this._shiftTarget = [f, fy];
+    if (this.reducedMotion || this._shift === undefined) {
+      this._shift = f;
+      this._shiftY = fy;
+      this.applyViewShift();
+    }
+  }
+
+  stepViewShift(dt) {
+    const t = this._shiftTarget;
+    if (!t) return;
+    const k = 1 - Math.exp(-dt * 7);
+    const dx = t[0] - (this._shift || 0), dy = t[1] - (this._shiftY || 0);
+    if (Math.abs(dx) < 1e-4 && Math.abs(dy) < 1e-4) {
+      if (dx || dy) { this._shift = t[0]; this._shiftY = t[1]; this.applyViewShift(); }
+      return;
+    }
+    this._shift = (this._shift || 0) + dx * k;
+    this._shiftY = (this._shiftY || 0) + dy * k;
     this.applyViewShift();
+  }
+
+  /** Half-angle tangents of the part of the frame the subject can use: frameCover / frameCoverY are
+   *  the fractions of width / height hidden behind interface panels. */
+  frameTan() {
+    const t = Math.tan((this.camera.fov * Math.PI) / 360);
+    return { tanV: t * (1 - (this.frameCoverY || 0)), tanH: t * this.camera.aspect * (1 - (this.frameCover || 0)) };
   }
 
   applyViewShift() {
@@ -244,7 +288,7 @@ export class Stage {
       this.fps = this._fpsN / this._fpsAcc;
       this._fpsAcc = 0; this._fpsN = 0;
       // adaptive quality: step down after ~3 s below 26 fps
-      if (this.autoQuality && document.visibilityState === 'visible') {
+      if (this.autoQuality && document.visibilityState === 'visible' && this.time > this._grace) {
         this._slow = this.fps < 26 ? this._slow + 1 : 0;
         if (this._slow >= 6) {
           const i = ORDER.indexOf(this.quality);
@@ -253,9 +297,13 @@ export class Stage {
         }
       }
     }
+    this.stepViewShift(dt);
     if (this.tween) this.stepTween(dt);
     for (const fn of this.frameHooks) fn(dt, this.time);
     this.controls.update();
+    // shadow maps render once per frame, in the beauty pass, not again in AO / outline sub-passes
+    this.renderer.shadowMap.autoUpdate = false;
+    this.renderer.shadowMap.needsUpdate = true;
     this.env.update(dt, this.camera);
     this.grade.uniforms.time.value = this.time;
     this.composer.render();
@@ -263,7 +311,7 @@ export class Stage {
   }
 
   /** Mount a vehicle: scale to display size, seat it on the deck and frame the camera. */
-  setVehicle(vehicle, { animate = true } = {}) {
+  setVehicle(vehicle, { animate = true, reveal = false } = {}) {
     this.holder.clear();
     const root = vehicle.root;
     if (!vehicle._fitted) {
@@ -282,25 +330,43 @@ export class Stage {
       });
     }
     this.holder.add(root);
-    this.frameVehicle(vehicle, animate);
+    this.frameVehicle(vehicle, animate, { reveal });
   }
 
-  frameVehicle(vehicle, animate = true) {
+  /** Frame the camera on a vehicle. reveal: start low and close off the quarter and pull back
+   *  into the hero framing, the way a product film opens. */
+  frameVehicle(vehicle, animate = true, { reveal = false } = {}) {
     const root = vehicle.root;
     const box = solidBounds(root);
-    const sphere = box.getBoundingSphere(new THREE.Sphere());
     const dir = new THREE.Vector3(...vehicle.view.dir).normalize();
-    const fovV = (this.camera.fov * Math.PI) / 180;
-    const fovH = 2 * Math.atan(Math.tan(fovV / 2) * this.camera.aspect);
-    // the bounding sphere over-estimates elongated airframes, so pull in by ~25 %
-    const dist = Math.max(sphere.radius / Math.sin(fovV / 2), sphere.radius / Math.sin(fovH / 2)) * (vehicle.view.fill || 1) * 0.74;
-    const target = sphere.center.clone();
+    const target = box.getCenter(new THREE.Vector3());
     if (vehicle.view.targetY != null) target.y = vehicle.view.targetY;
+    // exact fit: the distance at which every corner of the bounding box sits inside the frame
+    const { tanV, tanH } = this.frameTan();
+    const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), dir).normalize();
+    const up = new THREE.Vector3().crossVectors(dir, right).normalize();
+    let need = 0;
+    const c = new THREE.Vector3();
+    for (let i = 0; i < 8; i++) {
+      c.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).sub(target);
+      const z = c.dot(dir);
+      need = Math.max(need, z + Math.abs(c.dot(right)) / tanH, z + Math.abs(c.dot(up)) / tanV);
+    }
+    const dist = need * 1.06 * (vehicle.view.fill || 1);
     const pos = target.clone().addScaledVector(dir, Math.min(dist, this.controls.maxDistance * 0.92));
+    if (reveal && animate && !this.reducedMotion) {
+      const start = dir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.75);
+      start.y = Math.max(0.04, start.y * 0.35);
+      start.normalize();
+      this.camera.position.copy(target).addScaledVector(start, Math.min(dist, this.controls.maxDistance * 0.92) * 0.62);
+      this.controls.target.copy(target);
+      this.flyTo(pos, target, 3.2, 'out');
+      return;
+    }
     this.flyTo(pos, target, animate ? 1.4 : 0);
   }
 
-  flyTo(position, target, duration = 1.2) {
+  flyTo(position, target, duration = 1.2, ease = 'inOut') {
     if (duration <= 0 || this.reducedMotion) {
       this.camera.position.copy(position);
       this.controls.target.copy(target);
@@ -310,7 +376,7 @@ export class Stage {
     this.tween = {
       t: 0, d: duration,
       p0: this.camera.position.clone(), p1: position.clone(),
-      t0: this.controls.target.clone(), t1: target.clone(),
+      t0: this.controls.target.clone(), t1: target.clone(), ease,
     };
   }
 
@@ -325,7 +391,7 @@ export class Stage {
     const tw = this.tween;
     tw.t += dt;
     const k = Math.min(1, tw.t / tw.d);
-    const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+    const e = tw.ease === 'out' ? 1 - Math.pow(1 - k, 4) : k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
     this.camera.position.lerpVectors(tw.p0, tw.p1, e);
     this.controls.target.lerpVectors(tw.t0, tw.t1, e);
     if (k >= 1) this.tween = null;

@@ -112,7 +112,9 @@ export class OrbitScene {
 
   frame(animate = true) {
     const r2 = this.cfg ? this.cfg.r2 * S : 10;
-    const d = Math.max(9, r2 * 2.5);
+    // back off when interface panels cover part of the frame
+    const { tanV, tanH } = this.stage.frameTan();
+    const d = Math.max(9, r2 * 2.5) * Math.max(1, 0.29 / Math.min(tanV, tanH));
     this.stage.flyTo(new THREE.Vector3(d * 0.35, d * 0.55, d * 0.85), new THREE.Vector3(0, 0, 0), animate ? 1.6 : 0);
   }
 

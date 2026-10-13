@@ -460,6 +460,8 @@ export function buildRocket() {
     fleetTag: '60 t LEO',
     root: A.root,
     rigPivot, stack, ground,
+    /** The pad site (tower, tanks, flame trench) belongs to the launch-pad look only. */
+    setLook(look) { site.visible = look === 'pad'; },
     parts: A.parts,
     view: { dir: [1.0, 0.18, 1.35], fill: 1.0 },
     displaySize: 13,

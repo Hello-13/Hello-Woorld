@@ -204,6 +204,7 @@ function tiled(set, rx, ry = rx) {
     if (!t) continue;
     const c = t.clone();
     c.repeat.set(rx, ry);
+    c.anisotropy = 8;          // keeps panel lines crisp at grazing angles (clamped to the GPU's limit)
     c.needsUpdate = true;
     out[k] = c;
   }
@@ -214,15 +215,16 @@ function tiled(set, rx, ry = rx) {
 export const SKIN = {
   stealth: () => once('s.stealth', () => {
     const t = tiled(aircraftSkin({ seed: 7 }), 1 / 2.6);
-    return new THREE.MeshStandardMaterial({ color: 0x5c646c, ...t, normalScale: new THREE.Vector2(0.55, 0.55), roughness: 1, metalness: 0.3 });
+    // low-observable coating: dark satin grey under a thin, slightly glossy topcoat
+    return new THREE.MeshPhysicalMaterial({ color: 0x4a5159, ...t, normalScale: new THREE.Vector2(0.55, 0.55), roughness: 1, metalness: 0.28, clearcoat: 0.32, clearcoatRoughness: 0.32 });
   }),
   stealthWing: () => once('s.stealthWing', () => {
     const t = tiled(aircraftSkin({ seed: 13 }), 1 / 2.2);
-    return new THREE.MeshStandardMaterial({ color: 0x545c64, ...t, normalScale: new THREE.Vector2(0.5, 0.5), roughness: 1, metalness: 0.3 });
+    return new THREE.MeshPhysicalMaterial({ color: 0x454c54, ...t, normalScale: new THREE.Vector2(0.5, 0.5), roughness: 1, metalness: 0.28, clearcoat: 0.32, clearcoatRoughness: 0.32 });
   }),
   uav: () => once('s.uav', () => {
     const t = tiled(aircraftSkin({ seed: 29, sawtooth: false }), 1 / 2.4);
-    return new THREE.MeshStandardMaterial({ color: 0xa3aab1, ...t, normalScale: new THREE.Vector2(0.35, 0.35), roughness: 1, metalness: 0.08 });
+    return new THREE.MeshPhysicalMaterial({ color: 0xa3aab1, ...t, normalScale: new THREE.Vector2(0.35, 0.35), roughness: 1, metalness: 0.08, clearcoat: 0.4, clearcoatRoughness: 0.22 });
   }),
   uavDark: () => once('s.uavDark', () => {
     const t = tiled(aircraftSkin({ seed: 31, sawtooth: false, rivets: false }), 1 / 2.4);

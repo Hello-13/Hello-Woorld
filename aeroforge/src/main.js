@@ -25,12 +25,18 @@ import { mountEngineLab } from './labs/engineLab.js';
 import { mountOrbitLab } from './labs/orbitLab.js';
 import { mountUavLab } from './labs/uavLab.js';
 
+// stats: the three headline figures shown under each vehicle's name (from its spec sheet)
 const FLEET = [
-  { id: 'fighter', key: '1', build: buildFighter, lab: mountFighterLab, labName: 'Flight envelope', lift: 1.4, looks: ['hangar', 'studio'] },
-  { id: 'rocket', key: '2', build: buildRocket, lab: mountRocketLab, labName: 'Launch simulator', lift: 5.5, looks: ['pad', 'hangar', 'studio'] },
-  { id: 'turbofan', key: '3', build: buildTurbofan, lab: mountEngineLab, labName: 'Brayton cycle', lift: 0.8, looks: ['hangar', 'studio'] },
-  { id: 'satellite', key: '4', build: buildSatellite, lab: mountOrbitLab, labName: 'Orbital transfer', lift: 0, looks: ['orbit', 'studio', 'hangar'] },
-  { id: 'uav', key: '5', build: buildUAV, lab: mountUavLab, labName: 'Mission endurance', lift: 1.2, looks: ['hangar', 'studio'] },
+  { id: 'fighter', key: '1', build: buildFighter, lab: mountFighterLab, labName: 'Flight envelope', lift: 1.4, looks: ['showroom', 'hangar'],
+    stats: [['2.25', 'Mach', 'Top speed'], ['19.8', 'km', 'Service ceiling'], ['+9', 'g', 'Load limit']] },
+  { id: 'rocket', key: '2', build: buildRocket, lab: mountRocketLab, labName: 'Launch simulator', lift: 5.5, looks: ['pad', 'showroom', 'hangar'],
+    stats: [['60', 't', 'Payload to LEO'], ['22.8', 'MN', 'Liftoff thrust'], ['27', '', 'Engines at liftoff']] },
+  { id: 'turbofan', key: '3', build: buildTurbofan, lab: mountEngineLab, labName: 'Brayton cycle', lift: 0.8, looks: ['showroom', 'hangar'],
+    stats: [['400', 'kN', 'Take-off thrust'], ['9.5', ': 1', 'Bypass ratio'], ['42', ': 1', 'Pressure ratio']] },
+  { id: 'satellite', key: '4', build: buildSatellite, lab: mountOrbitLab, labName: 'Orbital transfer', lift: 0, looks: ['orbit', 'showroom', 'hangar'],
+    stats: [['0.30', 'm', 'Ground resolution'], ['9.8', 'kW', 'Array power'], ['19.3', 'm', 'Array span']] },
+  { id: 'uav', key: '5', build: buildUAV, lab: mountUavLab, labName: 'Mission endurance', lift: 1.2, looks: ['showroom', 'hangar'],
+    stats: [['27', 'h', 'Endurance'], ['15.2', 'km', 'Ceiling'], ['16.8', '', 'Wing aspect ratio']] },
 ];
 const MODE_LABEL = { studio: 'Studio', xray: 'X-ray', blueprint: 'Blueprint', thermal: 'Thermal', pressure: 'Pressure' };
 const SYSTEM_HUES = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9', '#e66767', '#7f93a8'];
@@ -38,14 +44,19 @@ const SYSTEM_HUES = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#90
 const $ = (id) => document.getElementById(id);
 const boot = $('boot');
 const bootLog = $('boot-log');
-const bootLine = (text) => { bootLog.append(el('li', { text })); };
+let bootStep = 0;
+const bootLine = (text) => {
+  bootLog.append(el('li', { text }));
+  const bar = document.getElementById('boot-progress');
+  if (bar) bar.style.width = `${Math.min(100, (++bootStep / 8) * 100)}%`;
+};
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
 async function start() {
   bootLine('Loading typefaces');
   try {
     await Promise.race([
-      Promise.all([document.fonts.load('700 112px "Chakra Petch"'), document.fonts.ready]),
+      Promise.all([document.fonts.load('250 112px "Archivo"'), document.fonts.load('400 15px "Public Sans"'), document.fonts.ready]),
       new Promise((r) => setTimeout(r, 1800)),
     ]);
   } catch { /* fall back to system faces */ }
@@ -75,12 +86,13 @@ async function start() {
 
   const app = {
     current: null, entry: null, lab: null, mode: 'studio', explode: 0, explodeTarget: 0,
-    labels: true, autoRotate: !stage.reducedMotion, selected: null, hovered: null, orbit: false, isolated: false, tab: 'lab',
+    labels: false, autoRotate: !stage.reducedMotion, selected: null, hovered: null, orbit: false, isolated: false, tab: 'lab',
   };
 
   // ------------------------------------------------------------------ DOM refs
   const fleetList = $('fleet-list');
   const hudDesig = $('hud-desig'), hudName = $('hud-name'), hudRole = $('hud-role');
+  const hero = $('hero'), heroTagline = $('hud-tagline'), heroStats = $('hero-stats');
   const modeGroup = $('modes');
   const explodeInput = $('explode');
   const explodeOut = $('explode-out');
@@ -94,11 +106,10 @@ async function start() {
   // ------------------------------------------------------------------ fleet rail
   for (const f of FLEET) {
     const v = f.vehicle;
-    const b = el('button', { type: 'button', class: 'fleet-item', 'aria-pressed': 'false', 'data-id': f.id },
-      el('span', { class: 'fi-top' }, el('span', { class: 'fi-desig', text: v.designation }), el('kbd', { class: 'fi-key', title: `Shortcut: ${f.key}`, text: f.key })),
+    const b = el('button', { type: 'button', class: 'fleet-item', 'aria-pressed': 'false', 'data-id': f.id, 'aria-keyshortcuts': f.key },
+      el('span', { class: 'fi-top' }, el('span', { class: 'fi-key', title: `Keyboard shortcut ${f.key}`, text: `0${f.key}` }), el('span', { class: 'fi-desig', text: v.designation })),
       el('span', { class: 'fi-name', text: v.name }),
-      el('span', { class: 'fi-role', text: v.role }),
-      el('span', { class: 'fi-tag', text: v.fleetTag }));
+      el('span', { class: 'fi-role', text: v.role }));
     b.addEventListener('click', () => select(f.id));
     fleetList.append(el('li', {}, b));
     f.button = b;
@@ -156,6 +167,7 @@ async function start() {
     app.look = k;
     if (remember) app.looks[app.entry.id] = k;
     stage.env.applyLook(k);
+    app.current.setLook?.(k);
     modes.apply(app.current, app.mode, app.selected);
     for (const b of lookGroup.children) b.setAttribute('aria-checked', String(b.dataset.look === k));
     stage.frameVehicle(app.current);
@@ -187,6 +199,7 @@ async function start() {
     explodeOut.textContent = `${explodeInput.value} %`;
   };
   const pressed = (b, v) => b.setAttribute('aria-pressed', String(v));
+  pressed(labelsBtn, app.labels);
   labelsBtn.addEventListener('click', () => { app.labels = !app.labels; pressed(labelsBtn, app.labels); callouts.setVisible(app.labels && !app.orbit); });
   const setAutoRotate = (v) => { app.autoRotate = v; pressed(spinBtn, v); };
   spinBtn.addEventListener('click', () => setAutoRotate(!app.autoRotate));
@@ -195,8 +208,10 @@ async function start() {
 
   // ------------------------------------------------------------------ tabs
   const tabs = [...document.querySelectorAll('[role="tab"]')];
+  const navLinks = [...document.querySelectorAll('.nav-link')];
   function setTab(name) {
     app.tab = name;
+    syncNav();
     for (const t of tabs) {
       const on = t.dataset.tab === name;
       t.setAttribute('aria-selected', String(on));
@@ -211,6 +226,48 @@ async function start() {
       n.focus(); setTab(n.dataset.tab);
     }
   }));
+
+  // ------------------------------------------------------------------ dossier (slide-in engineering panel)
+  const dossier = $('dossier');
+  const narrow = () => window.matchMedia('(max-width: 900px)').matches;
+  const dossierOpen = () => document.body.classList.contains('has-dossier');
+  function syncNav() {
+    for (const n of navLinks) n.setAttribute('aria-current', String(dossierOpen() && n.dataset.nav === app.tab));
+  }
+  function setDossier(open, tab) {
+    const wasOpen = dossierOpen();
+    if (tab) setTab(tab);
+    document.body.classList.toggle('has-dossier', open);
+    try { localStorage.setItem('aeroforge.dossier', open ? '1' : '0'); } catch { /* storage blocked */ }
+    const changed = dossierOpen() !== wasOpen;
+    syncNav();
+    updateViewShift();
+    if (changed && app.current) reframe();
+  }
+  for (const n of navLinks) {
+    n.addEventListener('click', () => setDossier(!(dossierOpen() && app.tab === n.dataset.nav), n.dataset.nav));
+  }
+  $('open-lab').addEventListener('click', () => setDossier(true, 'lab'));
+  $('dossier-close').addEventListener('click', () => setDossier(false));
+  $('brand').addEventListener('click', (e) => { e.preventDefault(); select(FLEET[0].id); });
+
+  // The render keeps the subject clear of whatever covers the window: the hero copy (or tour
+  // card) on the left and the dossier on the right. On phones the content flows below instead.
+  function updateViewShift() {
+    if (narrow()) { stage.setViewShift(0); stage.frameCover = 0; stage.frameCoverY = 0; return; }
+    const w = Math.max(1, stage.container.clientWidth), h = Math.max(1, stage.container.clientHeight);
+    const right = dossierOpen() ? dossier.offsetWidth / w : 0;
+    const left = tour.active ? 0.15 : dossierOpen() ? (app.orbit ? 0.13 : 0.07) : 0.14;
+    // nav bar above; fleet index and view tools below
+    const top = 68 / h, bottom = 156 / h;
+    stage.setViewShift(left - right / 2, (bottom - top) / 2);
+    stage.frameCover = Math.min(0.6, right + left * 1.6);
+    stage.frameCoverY = top + bottom;
+  }
+  const reframe = () => {
+    if (!tour.active && !app.orbit && !app.current?.state?.launching) stage.frameVehicle(app.current);
+  };
+  window.addEventListener('resize', () => updateViewShift());
 
   // ------------------------------------------------------------------ picking & callouts
   const callouts = new Callouts((part) => selectPart(part));
@@ -287,12 +344,15 @@ async function start() {
     log: (src, msg, level) => log.push(src, msg, level),
     onStart: () => {
       selectPart(null); setAutoRotate(false); document.body.classList.add('is-touring');
+      callouts.setVisible(true);
       tourBtn.textContent = 'Exit tour';
-      // keep the subject clear of the tour card: beside it on wide screens, above it on phones
-      if (stage.container.clientWidth > 700) stage.setViewShift(0.17);
-      else stage.setViewShift(0, 0.22);
+      updateViewShift();
     },
-    onStop: () => { document.body.classList.remove('is-touring'); stage.setViewShift(0); tourBtn.textContent = 'Start guided tour'; },
+    onStop: () => {
+      document.body.classList.remove('is-touring'); tourBtn.textContent = 'Start guided tour';
+      callouts.setVisible(app.labels && !app.orbit);
+      updateViewShift();
+    },
   });
   tourBtn.addEventListener('click', () => (tour.active ? tour.stop() : tour.start(app.entry.id)));
 
@@ -331,6 +391,7 @@ async function start() {
     callouts.setVisible(app.labels && !on);
     orbitNote.hidden = !on;
     document.body.classList.toggle('is-orbit', on);
+    updateViewShift();
     if (on) {
       if (app.mode !== 'studio') modes.apply(app.current, 'studio', null);
       stage.env.setSpaceView(true);
@@ -369,8 +430,9 @@ async function start() {
     groundLook = null;
     app.look = app.looks[f.id] || f.looks[0];
     stage.env.applyLook(app.look);
+    v.setLook?.(app.look);
     renderLooks();
-    stage.setVehicle(v);
+    stage.setVehicle(v, { reveal: true });
     if (v._baseY == null) v._baseY = v.root.position.y;
     syncModeButtons();
     if (app.mode === 'pressure' && !v.aero) setMode('studio', { quiet: true });
@@ -382,6 +444,14 @@ async function start() {
     hudDesig.textContent = v.designation;
     hudName.textContent = v.name;
     hudRole.textContent = v.role;
+    heroTagline.textContent = v.tagline;
+    heroStats.replaceChildren(...f.stats.map(([val, unit, label]) => el('div', { class: 'hero-stat' },
+      el('dt', { text: label }), el('dd', {}, val, unit ? el('span', { class: 'stat-unit', text: unit }) : null))));
+    $('dossier-desig').textContent = `${v.designation} · ${f.labName}`;
+    $('dossier-name').textContent = v.name;
+    hero.classList.remove('is-entering');
+    void hero.offsetWidth;            // restart the entrance animation
+    hero.classList.add('is-entering');
     labTitle.textContent = f.labName;
     renderSpecs(v);
     updateLegend();
@@ -419,7 +489,9 @@ async function start() {
     else if (k === 'x') setExplode(app.explodeTarget > 0.5 ? 0 : 1);
     else if (k === 'l') labelsBtn.click();
     else if (k === 'r') resetBtn.click();
-    else if (e.key === 'Escape') { isolate(false); selectPart(null); }
+    else if (e.key === 'Escape') {
+      if (app.selected) { isolate(false); selectPart(null); } else if (dossierOpen() && !narrow()) setDossier(false);
+    }
   });
 
   // ------------------------------------------------------------------ frame loop
@@ -447,6 +519,10 @@ async function start() {
   });
 
   const initial = FLEET.find((f) => f.id === location.hash.slice(1)) ? location.hash.slice(1) : 'fighter';
+  let reopen = false;
+  try { reopen = localStorage.getItem('aeroforge.dossier') === '1'; } catch { /* storage blocked */ }
+  if (reopen && !narrow()) document.body.classList.add('has-dossier');
+  updateViewShift();
   select(initial);
   // deep links also work after load (pasted or edited URL, back/forward)
   window.addEventListener('hashchange', () => {
@@ -456,7 +532,7 @@ async function start() {
   setTab('lab');
   log.push('SYS', 'AEROFORGE online · render core, physics and labs nominal', 'ok');
   boot.classList.add('is-done');
-  setTimeout(() => { boot.hidden = true; }, 600);
+  setTimeout(() => { boot.hidden = true; }, 900);
 }
 
 start();

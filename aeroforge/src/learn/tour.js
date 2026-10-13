@@ -71,8 +71,8 @@ export class TourPlayer {
     for (const p of focus.length ? focus : [v.root]) box.union(solidBounds(p));
     const sph = box.getBoundingSphere(new THREE.Sphere());
     const dir = new THREE.Vector3(...(step.view?.dir || v.view.dir)).normalize();
-    const fovV = (stage.camera.fov * Math.PI) / 180;
-    const fovH = 2 * Math.atan(Math.tan(fovV / 2) * stage.camera.aspect);
+    const { tanV, tanH } = stage.frameTan();
+    const fovV = 2 * Math.atan(tanV), fovH = 2 * Math.atan(tanH);
     const fill = step.view?.fill || 1;
     // a vertical view shift (phones) leaves roughly the upper half for the subject, so back off
     const room = 1 + (stage._shiftY || 0) * 2;

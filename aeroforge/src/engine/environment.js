@@ -9,11 +9,17 @@ import { skyDome, gridFloor } from './effects.js';
 import { concrete, floorMarkings, fbm } from './surface.js';
 import { rng } from './materials.js';
 import { createEarth } from './earth.js';
+import { Showroom, showroomEnvironment } from './showroom.js';
 
 const R_EARTH_KM = 6371;
 
 /** Per-look settings. Sun directions are world-space (y up). */
 export const LOOKS = {
+  showroom: {
+    label: 'Showroom', env: 'showroom', background: 'showroom', envIntensity: 1.0,
+    exposure: 1.06, floor: 'showroom', turntable: false, maxDistance: 60, sun: [0.42, 0.86, 0.36],
+    key: { color: 0xfff8f0, intensity: 2.1 }, hemi: [0x9fb4cc, 0x0c0e11, 0.16], rim: 1.7, rim2: 0.9,
+  },
   hangar: {
     label: 'Hangar', hdri: 'warehouse', hdriSun: [0.57, 51], background: 'hdri', blur: 0.05, bgIntensity: 0.34, envIntensity: 0.95,
     exposure: 1.12, bgRotation: 0.2, floor: 'hangar', turntable: true,
@@ -234,7 +240,7 @@ function turntable() {
   const bevel = new THREE.Mesh(new THREE.TorusGeometry(8.5, 0.11, 12, 160), new THREE.MeshStandardMaterial({ color: 0xa6adb4, metalness: 1, roughness: 0.22 }));
   bevel.rotation.x = -Math.PI / 2;
   bevel.position.y = -0.03;
-  const ringMat = new THREE.MeshStandardMaterial({ color: 0x1a1000, emissive: 0xffb000, emissiveIntensity: 2.6 });
+  const ringMat = new THREE.MeshStandardMaterial({ color: 0x050a12, emissive: 0x7fb8ff, emissiveIntensity: 2.6 });
   const ring = new THREE.Mesh(new THREE.TorusGeometry(8.78, 0.025, 6, 200), ringMat);
   ring.rotation.x = -Math.PI / 2;
   ring.position.y = -0.17;
@@ -279,8 +285,10 @@ export class Environment {
     const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.3);
     const rim = new THREE.DirectionalLight(0x9fd0ff, 0.6);
     rim.position.set(-14, 9, -12);
-    scene.add(key, key.target, hemi, rim);
-    this.lights = { key, hemi, rim };
+    const rim2 = new THREE.DirectionalLight(0xffd9b0, 0);
+    rim2.position.set(15, 6, -10);
+    scene.add(key, key.target, hemi, rim, rim2);
+    this.lights = { key, hemi, rim, rim2 };
     this.floods = [];
     for (const [x, z] of [[18, 14], [-16, 18], [6, -20]]) {
       const s = new THREE.SpotLight(0xdfe8ff, 0, 140, 0.32, 0.6, 1.2);
@@ -319,7 +327,9 @@ export class Environment {
     // ground group: everything that should scroll away during a launch
     this.ground = new THREE.Group();
     scene.add(this.ground);
-    this.floors = { hangar: hangarFloor(), studio: studioCove(), pad: padGround(), clouds: cloudDeck() };
+    this.showroom = new Showroom(stage);
+    scene.add(this.showroom.dome);
+    this.floors = { hangar: hangarFloor(), studio: studioCove(), pad: padGround(), clouds: cloudDeck(), showroom: this.showroom.group };
     for (const f of Object.values(this.floors)) { f.visible = false; this.ground.add(f); }
     this.turn = turntable();
     this.ground.add(this.turn.group);
@@ -409,6 +419,7 @@ export class Environment {
     for (const [k, f] of Object.entries(this.floors)) f.visible = L.floor === k;
     this.turn.group.visible = !!L.turntable;
     this.sky.visible = L.background === 'sky';
+    this.showroom.dome.visible = L.background === 'showroom';
     this.gradient.visible = false;
     this.grid.visible = false;
     this.stars.material.uniforms.opacity.value = L.background === 'space' ? 1 : 0;
@@ -439,6 +450,7 @@ export class Environment {
     this.lights.hemi.groundColor.set(L.hemi[1]);
     this.lights.hemi.intensity = L.hemi[2];
     this.lights.rim.intensity = L.rim;
+    this.lights.rim2.intensity = L.rim2 || 0;
     for (const f of this.floods) f.intensity = L.floods ? 140 : 0;
     if (L.sky) {
       const u = this.sky.material.uniforms;
@@ -474,6 +486,10 @@ export class Environment {
         }
         this.scene.environmentRotation.set(0, L.bgRotation || 0, 0);
       });
+    } else if (L.env === 'showroom') {
+      this.showroomEnv = this.showroomEnv || showroomEnvironment(this.pmrem);
+      this.scene.environment = this.showroomEnv;
+      this.scene.environmentRotation.set(0, 0, 0);
     } else {
       this.scene.environment = this.spaceEnv();
       this.scene.environmentRotation.set(0, 0, 0);
@@ -494,6 +510,7 @@ export class Environment {
       this.grid.visible = true;
       this.grid.material.uniforms.color.value.set(blue ? 0x8cc4ff : 0x1f5f86);
       this.sky.visible = false;
+      this.showroom.dome.visible = false;
       this.stars.material.uniforms.opacity.value = 0;
       for (const f of Object.values(this.floors)) f.visible = false;
       this.turn.group.visible = false;
@@ -513,6 +530,7 @@ export class Environment {
       this.scene.background = new THREE.Color(0x000000);
       this.scene.backgroundBlurriness = 0;
       this.sky.visible = false;
+      this.showroom.dome.visible = false;
       this.gradient.visible = false;
       this.grid.visible = false;
       this.stars.material.uniforms.opacity.value = 1;
@@ -558,6 +576,7 @@ export class Environment {
   }
 
   update(dt, camera) {
+    if (this.showroom.dome.visible || this.floors.showroom.visible) this.showroom.update(camera);
     this.sky.position.copy(camera.position);
     this.stars.position.copy(camera.position);
     this.gradient.position.copy(camera.position);
