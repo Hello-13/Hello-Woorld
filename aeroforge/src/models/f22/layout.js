@@ -93,7 +93,9 @@ export const bWb = (s) => bW(s) - 0.4 * bD(s);           // lower outer corner o
 /** B's upper surface height at lateral position z (0 ≤ z ≤ W). */
 export function upperB(s, z) {
   const w = bW(s), ht = bHT(s);
-  return bezY([[0, ht], [w * 0.45, ht], [w * 0.72, ht * 0.8], [w, 0]], clamp(z, 0, w));
+  // over the engine bays the deck stays flat further out, so the 1.22 m F119s fit under it
+  const k = smooth(12.6, 13.8, s);
+  return bezY([[0, ht], [w * lerp(0.45, 0.6, k), ht], [w * lerp(0.72, 0.86, k), ht * lerp(0.8, 0.84, k)], [w, 0]], clamp(z, 0, w));
 }
 // Beside the cockpit the upper fuselage sides stand steeply (~58°, close to the fins' 62° from
 // horizontal) so the canopy sill sits high: the one-piece canopy is then ≈ 0.73 m deep, near the
@@ -135,13 +137,15 @@ export function bottomAt(s, z) {
 const SILL = [[3.45, 0.0], [3.6, 0.17], [3.9, 0.33], [4.3, 0.45], [4.8, 0.53], [5.3, 0.565], [5.7, 0.57], [6.1, 0.55], [6.45, 0.48], [6.75, 0.33], [6.95, 0.12], [7.02, 0.0]];
 export const CANOPY_S0 = 3.45, CANOPY_S1 = 7.02;
 export const sillW = (s) => (s <= CANOPY_S0 || s >= CANOPY_S1 ? 0 : mono(SILL, s));
-export const HOLE_S0 = 3.62, HOLE_S1 = 6.92;    // cockpit opening under the canopy
+// cockpit opening under the canopy: the skin carries on under the front third of the canopy as the
+// coaming over the forward avionics bay; the forward pressure bulkhead and instrument panel sit at HOLE_S0
+export const HOLE_S0 = 4.45, HOLE_S1 = 6.92;
 // canopy height above the fuselage centre line along its length (apex ≈ 1.2 m above the chine)
 const CAN_H = [[3.45, 0], [3.62, 0.09], [3.9, 0.24], [4.3, 0.4], [4.75, 0.52], [5.25, 0.585], [5.65, 0.6], [6.05, 0.55], [6.4, 0.42], [6.7, 0.25], [6.92, 0.08], [7.02, 0]];
 export const canopyTop = (s) => upperA(s, 0) + mono(CAN_H, s);
 
 // nose-gear well (in A's belly) and its doors
-export const NOSE_WELL = { s0: 3.95, s1: 5.75, z: 0.24 };
+export const NOSE_WELL = { s0: 3.95, s1: 5.75, z: 0.24, hump0: 5.12, hump1: 5.74 };
 
 // ------------------------------------------------------------------ ring builders
 const NU = 12, NL = 11;
@@ -193,6 +197,10 @@ export function ringA(s) {
 
 const B_UP = [0, 0.08, 0.16, 0.24, 0.32, 0.40, 0.48, 0.55, 0.62, 0.69, 0.75, 0.81, 0.86, 0.905, 0.94, 0.97, 1];
 export const SIDE_BAY = { s0: 8.5, s1: 11.6, y0: -0.42, y1: -0.82 };
+/** Countermeasure (flare) bay behind each side bay: the middle third of the side-bay wall band. */
+export const CM_BAY = { s0: 11.65, s1: 12.05 };
+/** Lower engine-change doors under each engine bay (bottom-sample quads 28–34, z ≈ 0.2–1.4). */
+export const ENGINE_DOOR = { s0: 13.5, s1: 16.8, q0: 28, q1: 34 };
 export const MAIN_BAY = { s0: 8.45, s1: 12.35, z: 0.78 };
 export const MAIN_WELL = { s0: 11.2, s1: 12.95, z0: 0.86, z1: 1.46 };
 /** Wall fractions (chine → lower corner) with exact side-bay edges. */
@@ -291,15 +299,18 @@ export const COWL_TAUS = [0, 0.015, 0.04, 0.08, 0.13, 0.2, 0.28, 0.37, 0.47, 0.5
 
 // ------------------------------------------------------------------ inlet duct centre line (right side)
 export const FAN_S = 13.38;                      // F119 fan face
-export const ENG_Z = 0.78, ENG_Y = -0.02;        // engine centre line
+export const ENG_Z = 0.74, ENG_Y = -0.02;        // engine centre line
+/** F119-PW-100 envelope (Wikipedia, from the USAF technical order): 38 in (0.97 m) at the inlet,
+ *  48 in (1.22 m) overall, 50 in (1.27 m) maximum over the external accessories; 196 in long. */
+export const F119 = { rInlet: 0.4826, rCase: 0.6, rAug: 0.575, rMax: 0.635 };
 export const DUCT = [
   // [s, z, y, width, height, roundness 0 (lip shape) … 1 (circle)]
   [7.6, 1.36, -0.30, 0.66, 0.76, 0.12],
   [8.4, 1.33, -0.13, 0.62, 0.72, 0.25],
   [9.4, 1.26, -0.04, 0.66, 0.72, 0.38],
   [10.4, 1.17, 0.01, 0.72, 0.74, 0.52],
-  [11.4, 1.05, 0.04, 0.82, 0.80, 0.70],
-  [12.4, 0.90, 0.03, 0.92, 0.90, 0.88],
+  [11.4, 1.04, 0.04, 0.82, 0.80, 0.70],
+  [12.4, 0.875, 0.03, 0.92, 0.90, 0.88],
   [FAN_S, ENG_Z, ENG_Y, 0.98, 0.98, 1.0],
 ];
 
@@ -312,15 +323,26 @@ export const WING = {
 export const wingLE = (z) => WING.apex + z * tan(WING.le);
 export const wingTE = (z) => WING.apex + WING.c0 + z * tan(WING.te);
 export const wingY = (z) => -0.02 - (z - 1.45) * tan(WING.anhedral);
-/** wingPanel section at span z (root t/c 5.92 %, tip 4.29 % — NACA 64A-series per public data). */
+/** wingPanel section at span z (root t/c 5.92 %, tip 4.29 % per public data). The real wing uses
+ *  NACA 64A-series sections with conical camber and twist; the model's sections are symmetric. */
 export function wingSection(z) {
   const eta = (z - 1.45) / (WING.semi - 1.45);
   return { le: [X(wingLE(z)), wingY(z), z], chord: wingTE(z) - wingLE(z), t: lerp(0.0592, 0.0429, eta) };
 }
-export const STAB = { rootZ: 1.55, tipZ: 4.42, rootLE: 14.97, rootC: 3.95, y: -0.1, pivotS: 16.75 };
+export const STAB = { rootZ: 1.55, tipZ: 4.42, rootLE: 14.97, rootC: 3.95, y: -0.1, pivotS: 16.75, notchZ: 1.95 };
+const stabLEraw = (z) => STAB.rootLE + (z - STAB.rootZ) * tan(42 * DEG);
+/**
+ * Stabilator leading edge at span z. Inboard of notchZ the leading edge is cut back to run just
+ * behind the wing-root trailing edge, so the all-moving tail clears the fixed wing at full travel.
+ */
+export function stabLE(z) {
+  if (z >= STAB.notchZ) return stabLEraw(z);
+  const a = wingTE(STAB.rootZ) + 0.06, b = stabLEraw(STAB.notchZ);
+  return lerp(a, b, (z - STAB.rootZ) / (STAB.notchZ - STAB.rootZ));
+}
 export function stabSection(z) {
   const d = z - STAB.rootZ;
-  const le = STAB.rootLE + d * tan(42 * DEG);
+  const le = stabLE(z);
   const te = STAB.rootLE + STAB.rootC - d * tan(17 * DEG);
   const eta = d / (STAB.tipZ - STAB.rootZ);
   return { le: [X(le), STAB.y, z], chord: te - le, t: lerp(0.045, 0.035, eta) };

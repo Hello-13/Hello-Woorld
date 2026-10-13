@@ -166,12 +166,15 @@ export function buildWeapons(ctx) {
       const holder = new THREE.Group();
       holder.add(mesh(geo9, F.missile()));
       holder.add(mesh(new THREE.SphereGeometry(0.03, 12, 8).translate(1.5, 0, 0), F.seeker(), { cast: false }));
-      const rail = mesh(new THREE.BoxGeometry(2.3, 0.05, 0.06).translate(0, 0.095, 0), F.boxLight());
-      holder.add(rail);
+      // the launch rail belongs to the LAU-141/A: it rides out on the trapeze with the missile
+      const railHolder = new THREE.Group();
+      railHolder.add(mesh(merge([new THREE.BoxGeometry(2.3, 0.05, 0.06).translate(0, 0.095, 0), new THREE.BoxGeometry(0.4, 0.06, 0.1).translate(-0.9, 0.13, 0), new THREE.BoxGeometry(0.16, 0.04, 0.12).translate(0.95, 0.125, 0)]), F.boxLight()));
       const stow = V(X(10.05), -0.66, side * 1.45), out = V(X(10.05), -1.05, side * 1.88);
       holder.position.copy(stow);
+      railHolder.position.copy(stow);
       const arms = [];
       const armG = new THREE.Group();
+      armG.add(railHolder);
       for (const ds of [-0.7, 0.7]) {
         const arm = mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 8), F.steel());
         armG.add(arm);
@@ -185,9 +188,38 @@ export function buildWeapons(ctx) {
       P(`LAU-141/A trapeze launcher (${R})`, {
         system: 'Weapons', material: 'Steel arms, hydraulic drive, rail with plume deflector', mass: 45,
         explode: [0, -0.2, 0.8 * side],
-        desc: 'Essentially an F-16 wingtip launch rail on a swinging hydraulic trapeze: doors open, the arms push the missile out, the seeker locks on, the missile fires off the rail and everything retracts within seconds.',
+        desc: 'Essentially an F-16 wingtip launch rail on a swinging hydraulic trapeze: doors open, the arms carry the rail and missile out into the airflow, the seeker locks on, the missile fires off the rail and everything retracts within seconds.',
       }, armG);
-      bay.trapeze.push({ holder, stow, out, arms });
+      bay.trapeze.push({ holder, rail: railHolder, stow, out, arms });
+
+      // countermeasure bay behind the side bay: flare magazines behind a small flush door
+      const cst = ctx.sB.filter((s) => s >= FR.CM_BAY.s0 - 1e-6 && s <= FR.CM_BAY.s1 + 1e-6);
+      const cgrid = cst.map((s) => {
+        const wf = FR.wallFractions(s);
+        return [wf[5], (wf[5] + wf[6]) / 2, wf[6]].map((f) => { const [zz, y] = FR.wallB(s, f); return [X(s), y, side * (zz + 0.002)]; });
+      });
+      const cdoor = slab(cgrid, () => [0, 0.005, -side * 0.025], V(0, 0, side));
+      P(`Countermeasure bay door (${R})`, {
+        system: 'Skin & fairings', skin: true, material: 'Composite door', mass: 3,
+        explode: [0, -0.15, 1.45 * side],
+        desc: 'A small flush door on the side of the inlet trunk that opens only to release countermeasures.',
+      }, mesh(cdoor, F.skin()));
+      const mg = [];
+      const sm = (FR.CM_BAY.s0 + FR.CM_BAY.s1) / 2;
+      const wfm = FR.wallFractions(sm);
+      const [zm, ym] = FR.wallB(sm, (wfm[5] + wfm[6]) / 2);
+      for (const ds of [-0.1, 0.1]) {
+        const b = new THREE.BoxGeometry(0.17, 0.1, 0.07);
+        mg.push(b.translate(X(sm + ds), ym, side * (zm - 0.07)));
+      }
+      const cells = [];
+      for (const ds of [-0.1, 0.1]) for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) cells.push(new THREE.CylinderGeometry(0.012, 0.012, 0.004, 6).rotateX(Math.PI / 2).translate(X(sm + ds - 0.06 + i * 0.04), ym - 0.03 + j * 0.03, side * (zm - 0.033)));
+      mg.push(FR.pipe([[sm, ym + 0.06, side * (zm - 0.08)], [sm - 0.3, ym + 0.15, side * (zm - 0.15)], [sm - 0.9, ym + 0.2, side * (zm - 0.2)]], 0.008, 5));
+      P(`Countermeasure dispenser (${R})`, {
+        system: 'Weapons', material: 'Dispenser magazines of MJU-39/40 flare cartridges, sequencer', mass: 25, count: 2,
+        explode: [0, -0.3, 0.95 * side],
+        desc: 'Flare magazines in the small bay behind the side weapons bay. Cued by the defensive systems, the pilot (or the system) fires flares through the door to decoy infrared-guided missiles (cartridge count illustrative).',
+      }, [mesh(merge(mg), F.box()), mesh(merge(cells), F.copper())]);
     }
   }
 

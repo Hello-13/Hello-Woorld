@@ -72,6 +72,7 @@ export const F = {
   copper: () => M.copper(),
   yellow: () => std('f22.yellow', { color: 0xc9a227, roughness: 0.5, metalness: 0.2 }),
   orange: () => std('f22.orange', { color: 0xd06a28, roughness: 0.5, metalness: 0.2 }),
+  red: () => std('f22.red', { color: 0xa8241c, roughness: 0.5, metalness: 0.2 }),
   lens: () => std('f22.lens', { color: 0x1a1d20, roughness: 0.12, metalness: 0.3 }),
   probe: () => std('f22.probe', { color: 0x9aa0a6, roughness: 0.3, metalness: 0.95 }),
   nozzle: () => std('f22.nozzle', { color: 0x4b4744, roughness: 0.5, metalness: 0.7 }),

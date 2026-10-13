@@ -1,7 +1,13 @@
-// F-22A internal systems: fuel (fuselage and wing tanks, lines, refuelling receptacle, vent /
-// dump), hydraulics (two independent 4,000 psi systems), electrical (270 V DC generation, APU and
-// stored-energy system, batteries, distribution), environmental control and thermal management,
-// avionics and sensors (AN/APG-77, CIPs, CNI, ALR-94, AAR-56, air data), lighting and antennas.
+// F-22A utility systems, each traceable end to end in the Systems view:
+//   fuel        tanks → transfer pumps → feed tank → boost pumps → engine feed lines → engine pump;
+//               refuelling receptacle → manifold → tanks; vent / dump; inert-gas (OBIGGS) system
+//   hydraulics  engine-driven pumps → system A (right) / B (left) lines → actuators; reservoirs,
+//               accumulators; utility lines to the landing gear and brakes
+//   electrical  generators → aft and forward distribution centres → converters → loads; APU,
+//               stored-energy system, batteries
+//   ECS         engine bleed → heat exchangers → air-cycle machine → cockpit and avionics; PAO
+//               liquid loop → fuel–PAO heat exchangers; OBOGS; engine-bay and dry-bay fire protection
+// Avionics, sensors, antennas and lights are in ./avionics.js.
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
@@ -11,14 +17,14 @@ import { F } from './materials.js';
 import * as FR from './frame.js';
 import { merge, slab, hinge, mirror } from './util.js';
 
-const { X, mono, lerp } = FR;
+const { X, mono, lerp, smooth } = FR;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const box = (s, y, z, ls, h, w) => FR.boxS(s, y, z, ls, h, w);
 
 const ductCols = [1, 2, 3, 4, 5].map((c) => FR.DUCT.map((r) => [r[0], r[c]]));
 /** Inlet duct centre, size at station s (right side). */
-function ductAt(s) { const [zc, yc, w, h] = ductCols.map((k) => mono(k, s)); return { zc, yc, w, h }; }
-function ductTop(s, z) {
+export function ductAt(s) { const [zc, yc, w, h] = ductCols.map((k) => mono(k, s)); return { zc, yc, w, h }; }
+export function ductTop(s, z) {
   const { zc, yc, w, h } = ductAt(s);
   const u = Math.abs(z - zc) / (w / 2);
   if (u >= 1) return yc;
@@ -26,7 +32,7 @@ function ductTop(s, z) {
 }
 
 /** Outward normal of the forward-fuselage upper surface at (s, z) (z signed). */
-function normalA(s, z) {
+export function normalA(s, z) {
   const az = Math.abs(z), e = 0.01;
   const dy = (FR.upperA(s, az + e) - FR.upperA(s, az - e)) / (2 * e);
   return V(0, 1, -dy * Math.sign(z)).normalize();
@@ -80,12 +86,16 @@ function saddle(s, { ybot, zo = 1.45, gapTop = 0.07 }) {
 export function buildSystems(ctx) {
   const { P, anim } = ctx;
   const tanks = [];
+  const EZ = FR.ENG_Z;
 
   // ================================================================== fuel
-  const st1 = range(7.08, 8.35, 6);
+  // F-1 behind the cockpit over the inlet ducts, with a well in its top for the refuelling receptacle
+  const st1 = [7.08, 7.3, 7.5, 7.64, 7.78, 8.0, 8.2, 8.35];
+  const recWell = (s, z) => 0.24 * smooth(7.5, 7.7, s) * (1 - smooth(0.15, 0.25, z));
   const t1 = tankLoft(st1, (s) => {
     const zA = FR.aW(s) - 0.1;
-    const half = range(0, zA, 6).map((z) => [z, FR.topAt(s, z) - 0.07]);
+    const zs = [0, 0.08, 0.15, 0.2, 0.25, 0.32, ...range(0.4, zA, 4)];
+    const half = zs.map((z) => [z, FR.topAt(s, z) - 0.07 - recWell(s, z)]);
     half.push([zA, -0.45], [0, -0.45]);
     return half;
   });
@@ -121,9 +131,9 @@ export function buildSystems(ctx) {
   ctx.fuel = { kg, vols };
   const fuelMat = F.tank();
   tanks.push(P('Forward fuselage tank (F-1)', {
-    system: 'Fuel', material: 'Integral tank in the fuselage structure, foam-free, nitrogen inerted', mass: kg[0],
+    system: 'Fuel', material: 'Integral tank in the fuselage structure, nitrogen-enriched-air inerted', mass: kg[0],
     explode: [0.6, 1.9, 0],
-    desc: `Behind the cockpit bulkhead, above the nose-gear area. Modelled capacity ≈ ${kg[0].toLocaleString('en-US')} kg (${L(kg[0]).toLocaleString('en-US')} L) of JP-8 — tank sizes are estimates scaled so all tanks hold the published 8,200 kg; mass shown is the fuel.`,
+    desc: `Behind the cockpit, over the inlet ducts, with a well in its top for the refuelling receptacle. Modelled capacity ≈ ${kg[0].toLocaleString('en-US')} kg (${L(kg[0]).toLocaleString('en-US')} L) of JP-8 — tank sizes are estimates scaled so all tanks hold the published 8,200 kg; mass shown is the fuel.`,
   }, mesh(t1.geo, fuelMat)));
   tanks.push(P('Centre fuselage tank (F-2)', {
     system: 'Fuel', material: 'Integral tank wrapped over the inlet ducts and weapons bay', mass: kg[1],
@@ -133,29 +143,63 @@ export function buildSystems(ctx) {
   tanks.push(P('Aft fuselage feed tank (F-3)', {
     system: 'Fuel', material: 'Integral tank with boost pumps', mass: kg[2],
     explode: [-0.3, 2.0, 0],
-    desc: `Just ahead of the engines. Boost pumps here keep both engines fed in any attitude, including inverted and high-g flight. Modelled capacity ≈ ${kg[2].toLocaleString('en-US')} kg (estimate).`,
+    desc: `Just ahead of the engines. Every other tank transfers into it, and its boost pumps keep both engines fed in any attitude, including inverted and high-g flight. Modelled capacity ≈ ${kg[2].toLocaleString('en-US')} kg (estimate).`,
   }, mesh(t3.geo, fuelMat)));
   for (const side of [1, -1]) {
     const R = side > 0 ? 'right' : 'left';
     tanks.push(P(`Wing tank (${R})`, {
       system: 'Fuel', material: 'Integral (wet) wing box, sealed', mass: kg[3],
       explode: [0, 0.8, 2.55 * side],
-      desc: `The wing box itself is the tank, between the front and rear spars. Modelled capacity ≈ ${kg[3].toLocaleString('en-US')} kg (estimate). Two 2,270 L drop tanks can be added for ferry flights, at the cost of stealth.`,
+      desc: `The wing box itself is the tank, between the front and rear spars. Modelled capacity ≈ ${kg[3].toLocaleString('en-US')} kg (estimate). Two 600 US gal (2,270 L) tanks can be hung on the inboard hardpoints for ferry flights, at the cost of stealth.`,
     }, mesh(side > 0 ? tw.geo : mirror(tw.geo), fuelMat)));
   }
+  // pumps: transfer pumps in the wing roots and F-2, boost pumps in the bottom of F-3
   {
     const g = [];
     for (const side of [1, -1]) {
-      g.push(FR.pipe([[11.4, -0.05, side * 2.2], [11.6, -0.12, side * 1.7], [11.9, -0.18, side * 0.7], [12.6, -0.3, side * 0.3]], 0.03, 6));
-      g.push(FR.pipe([[12.9, -0.3, side * 0.25], [13.2, -0.4, side * 0.45], [13.5, -0.5, side * 0.65], [13.7, -0.55, side * 0.75]], 0.03, 6));
-      g.push(FR.pipe([[8.4, 0.1, side * 0.3], [10.5, -0.1, side * 0.25], [12.6, -0.25, side * 0.22]], 0.025, 6));
+      const sec = FR.wingSection(2.05);
+      g.push(FR.cylX(FR.SN - (sec.le[0] - 0.6 * sec.chord), sec.le[1] - 0.03, side * 2.05, 0.22, 0.06, 0.06, 14));
+      g.push(FR.cylX(11.6, -0.12, side * 0.32, 0.22, 0.055, 0.055, 14));
     }
-    g.push(FR.pipe([[7.5, 0.2, 0], [8.5, 0.15, 0.15], [10, 0.1, 0.15]], 0.025, 6));
-    P('Fuel feed & transfer lines', {
-      system: 'Fuel', material: 'Aluminium / titanium tubing', mass: 60,
+    P('Fuel transfer pumps', {
+      system: 'Fuel', material: 'Electrically driven centrifugal pumps', mass: 24, count: 4,
+      explode: [0, 1.0, 0.9],
+      desc: 'Pumps in each wing-root tank and in F-2 move fuel toward the feed tank in a set sequence, so the centre of gravity stays where the flight controls expect it as fuel burns off.',
+    }, mesh(merge(g), F.orange()));
+    const b = [];
+    for (const side of [1, -1]) {
+      b.push(new THREE.CylinderGeometry(0.07, 0.07, 0.16, 14).translate(X(13.1), -0.3, side * 0.35));
+      b.push(new THREE.BoxGeometry(0.12, 0.05, 0.12).translate(X(13.1), -0.36, side * 0.35));
+    }
+    P('Feed-tank boost pumps', {
+      system: 'Fuel', material: 'Submerged electric boost pumps with ejector pumps', mass: 16, count: 2,
+      explode: [-0.6, 0.7, 0],
+      desc: 'Submerged in the bottom of the feed tank, one per engine, they push fuel at positive pressure into the engine feed lines so the engine pumps never cavitate, even at high altitude or under negative g.',
+    }, mesh(merge(b), F.orange()));
+  }
+  {
+    // transfer lines: wings and F-2 → feed tank
+    const g = [];
+    for (const side of [1, -1]) {
+      g.push(FR.pipe([[11.4, -0.05, side * 2.2], [11.6, -0.12, side * 1.7], [11.9, -0.16, side * 0.7], [12.6, -0.3, side * 0.3]], 0.03, 6));
+      g.push(FR.pipe([[8.4, 0.1, side * 0.3], [10.5, -0.1, side * 0.25], [11.5, -0.12, side * 0.32], [12.6, -0.25, side * 0.22]], 0.025, 6));
+    }
+    g.push(FR.pipe([[7.5, -0.4, 0.12], [8.2, -0.25, 0.2], [8.6, -0.1, 0.25]], 0.025, 6));
+    P('Fuel transfer lines', {
+      system: 'Fuel', material: 'Aluminium / titanium tubing', mass: 45,
       explode: [0, 1.25, 0],
-      desc: 'Transfer pumps move fuel from the wing and fuselage tanks to the feed tank to keep the centre of gravity in place; feed lines run from there to each engine\'s fuel pump. Refuelling flow from the receptacle runs forward to aft.',
+      desc: 'Carry fuel from the wing tanks, F-1 and F-2 to the feed tank. The tanks are interconnected so a damaged tank can be isolated and the rest still feed both engines.',
     }, mesh(merge(g), F.pipe()));
+    for (const side of [1, -1]) {
+      const R = side > 0 ? 'right' : 'left';
+      const ez = EZ * side, fy = FR.ENG_Y - 0.7;
+      P(`Engine feed line (${R})`, {
+        system: 'Fuel', material: 'Self-sealing titanium feed line with shut-off valve', mass: 8,
+        explode: [-0.9, 0.2, 0.7 * side],
+        desc: 'Runs from its boost pump in the feed tank, through a fire shut-off valve at the engine-bay firewall, to the engine-mounted fuel pump on the gearbox.',
+      }, mesh(merge([FR.pipe([[13.1, -0.38, side * 0.35], [13.22, -0.52, side * 0.48], [13.34, -0.66, side * 0.7], [13.46, fy + 0.02, ez + side * 0.1]], 0.024, 6, 12),
+        new THREE.BoxGeometry(0.06, 0.08, 0.08).translate(X(13.3), -0.62, side * 0.62)]), F.pipe()));
+    }
   }
   {
     // dorsal air-refuelling receptacle: slipway trough with the nozzle socket at its aft end
@@ -167,7 +211,7 @@ export function buildSystems(ctx) {
     P('Air-refuelling receptacle', {
       system: 'Fuel', material: 'Aluminium slipway and receptacle', mass: 25,
       explode: [0.2, 2.7, 0],
-      desc: 'A USAF flying-boom receptacle on the spine behind the canopy. A tanker\'s boom plugs in here; at full rate it can refill the internal tanks in a few minutes.',
+      desc: 'A USAF flying-boom receptacle centred on the spine behind the canopy, in its own well in the top of tank F-1. A tanker\'s boom plugs in here; at full rate it can refill the internal tanks in a few minutes.',
     }, mesh(merge(g), F.yellow()));
     const grid = [];
     for (const s of [s0, (s0 + s1) / 2, s1]) grid.push([-0.15, -0.05, 0.05, 0.15].map((z) => [X(s), FR.topAt(s, z) + 0.003, z]));
@@ -181,14 +225,60 @@ export function buildSystems(ctx) {
       desc: 'Rotates down into the spine to expose the receptacle and its lights, and closes flush afterwards.',
     }, h.pivot);
     anim.arDoor = h;
+    // refuel manifold: receptacle → F-1 → gallery along the spine → F-2, F-3 and both wings
+    const m = [];
+    m.push(FR.pipe([[8.28, FR.topAt(8.28, 0) - 0.2, 0], [8.4, 0.2, 0.08], [9.0, 0.32, 0.18], [11.0, 0.32, 0.2], [12.6, 0.28, 0.2]], 0.03, 6));
+    for (const side of [1, -1]) m.push(FR.pipe([[10.6, 0.32, side * 0.2], [10.9, 0.25, side * 0.9], [11.2, 0.05, side * 1.95], [11.4, 0.0, side * 2.4]], 0.022, 6));
+    m.push(FR.pipe([[8.3, FR.topAt(8.3, 0) - 0.22, 0], [8.0, 0.1, -0.1], [7.7, -0.1, -0.15]], 0.022, 6));
+    P('Refuelling manifold', {
+      system: 'Fuel', material: 'Aluminium manifold with level-control shut-off valves', mass: 22,
+      explode: [0.1, 2.35, 0],
+      desc: 'Distributes fuel from the receptacle (or a ground pressure-refuelling point) to every tank; float-operated shut-off valves close each tank as it fills.',
+    }, mesh(merge(m), F.pipe()));
+  }
+  {
+    // quantity probes: vertical capacitance probes through each tank
+    const g = [];
+    const probe = (s, z, y0, y1) => g.push(new THREE.CylinderGeometry(0.012, 0.012, y1 - y0, 6).translate(X(s), (y0 + y1) / 2, z));
+    probe(7.3, 0.4, -0.42, FR.topAt(7.3, 0.4) - 0.09);
+    probe(8.1, -0.45, -0.42, FR.topAt(8.1, 0.45) - 0.09);
+    for (const [s, z] of [[9.0, 0.3], [10.2, -0.3], [11.4, 0.3], [9.6, -1.3], [10.8, 1.3]]) probe(s, z, ductTop(s, Math.abs(z)) + 0.07, FR.topAt(s, Math.abs(z)) - 0.09);
+    probe(12.85, 0.2, -0.35, FR.topAt(12.85, 0.2) - 0.09);
+    probe(12.85, -0.6, ductTop(12.85, 0.6) + 0.07, FR.topAt(12.85, 0.6) - 0.09);
+    for (const side of [1, -1]) {
+      for (const z of [2.4, 3.4, 4.6]) {
+        const sec = FR.wingSection(z);
+        const sx = sec.le[0] - 0.42 * sec.chord;
+        const h = naca00(0.42, sec.t) * sec.chord * 0.8;
+        g.push(new THREE.CylinderGeometry(0.01, 0.01, 2 * h, 6).translate(sx, sec.le[1], side * z));
+      }
+    }
+    P('Fuel quantity probes', {
+      system: 'Fuel', material: 'Capacitance gauging probes', mass: 8, count: 15,
+      explode: [0, 2.9, 0.4],
+      desc: 'Capacitance probes in every tank measure the fuel height (fuel and air have different permittivity); the fuel-management computer turns them into mass, which the up-front displays show (probe count illustrative).',
+    }, mesh(merge(g), F.copper()));
   }
   P('Fuel vent & dump system', {
     system: 'Fuel', material: 'Titanium vent lines, dump mast between the nozzles', mass: 18,
     explode: [-1.0, -0.2, 0],
     desc: 'Vent lines keep tank pressure in limits as fuel is used and altitude changes; a dump line exits between the nozzles so fuel can be jettisoned to reach a safe landing weight.',
   }, mesh(merge([FR.pipe([[12.9, 0.2, 0.1], [14.5, 0.3, 0.1], [16.5, 0.25, 0.08], [17.6, -0.05, 0.0], [18.05, -0.08, 0.0]], 0.025, 6), FR.cylX(18.08, -0.08, 0, 0.12, 0.035, 0.03, 10)]), F.pipe()));
+  {
+    // OBIGGS: an air-separation module strips oxygen from bleed air; nitrogen-enriched air fills the ullage
+    const g = [FR.cylX(7.2, -0.6, 0, 0.5, 0.075, 0.075, 16), FR.cylX(6.92, -0.6, 0, 0.06, 0.09, 0.09, 16)];
+    const l = [];
+    l.push(FR.pipe([[7.45, -0.6, 0], [7.6, -0.5, 0.05], [7.7, -0.4, 0.05]], 0.016, 5));
+    l.push(FR.pipe([[7.7, -0.4, 0.05], [8.45, 0.05, 0.1], [9.0, 0.42, 0.1], [11.5, 0.42, 0.1], [12.8, 0.36, 0.1]], 0.014, 5));
+    for (const side of [1, -1]) l.push(FR.pipe([[11.0, 0.42, side * 0.1], [11.3, 0.3, side * 0.9], [11.6, 0.02, side * 2.0], [11.9, -0.07, side * 3.0]], 0.012, 5));
+    P('Inert-gas generating system (OBIGGS)', {
+      system: 'Fuel', material: 'Hollow-fibre air-separation module, distribution lines', mass: 30,
+      explode: [0.6, -1.65, 0],
+      desc: 'An air-separation module passes engine bleed air through hollow fibres that let oxygen escape, leaving nitrogen-enriched air that is piped into the space above the fuel in every tank, so a hit cannot ignite the vapour (module position approximate).',
+    }, [mesh(merge(g), F.boxLight()), mesh(merge(l), F.pipe())]);
+  }
 
-  // ================================================================== hydraulics
+  // ================================================================== hydraulics: two independent 4,000 psi systems
   for (const side of [1, -1]) {
     const R = side > 0 ? 'right' : 'left';
     const g = [];
@@ -199,31 +289,53 @@ export function buildSystems(ctx) {
       explode: [-0.1, -1.0, 1.0 * side],
       desc: `Two engine-driven pumps on the ${R} accessory drive pressurise ${side > 0 ? 'system A' : 'system B'} at 4,000 psi (27.6 MPa) — higher than the usual 3,000 psi, so actuators and lines can be smaller and lighter.`,
     }, mesh(merge(g), F.hyd()));
+    const S = side > 0 ? 'A' : 'B';
+    P(`Hydraulic reservoir (system ${S})`, {
+      system: 'Hydraulics', material: 'Bootstrap (self-pressurising) piston reservoir', mass: 15,
+      explode: [0.1, -1.25, 0.55 * side],
+      desc: `System ${S} has its own pressurised reservoir, so a leak in one system cannot drain the other. A bootstrap piston keeps the fluid under pressure so the pumps are fed at any altitude or attitude.`,
+    }, mesh(merge([FR.cylX(13.0, -0.62, side * 0.5, 0.42, 0.09, 0.09, 14), FR.cylX(13.25, -0.62, side * 0.5, 0.08, 0.05, 0.05, 10)]), F.hyd()));
+    P(`Hydraulic accumulators (system ${S})`, {
+      system: 'Hydraulics', material: 'Nitrogen-charged steel accumulators', mass: 10,
+      explode: [0.2, -1.45, 0.3 * side],
+      desc: `A gas-charged accumulator on system ${S} smooths pump ripple and supplies peak flow when several actuators move at once.`,
+    }, mesh(new THREE.SphereGeometry(0.09, 14, 10).translate(X(12.75), -0.62, side * 0.17), F.steel()));
   }
-  P('Hydraulic reservoirs (A & B)', {
-    system: 'Hydraulics', material: 'Bootstrap reservoirs', mass: 30, count: 2,
-    explode: [0, -1.2, 0],
-    desc: 'Each of the two independent systems has its own pressurised reservoir, so a leak in one cannot drain the other; every flight-control actuator is fed by both.',
-  }, mesh(merge([FR.cylX(13.0, -0.62, 0.5, 0.42, 0.09, 0.09, 14), FR.cylX(13.0, -0.62, -0.5, 0.42, 0.09, 0.09, 14)]), F.hyd()));
-  P('Hydraulic accumulators', {
-    system: 'Hydraulics', material: 'Nitrogen-charged steel accumulators', mass: 24, count: 3,
-    explode: [0, -1.35, 0.3],
-    desc: 'Gas-charged accumulators store pressurised fluid to smooth pump ripple, back up the wheel brakes and give an emergency stroke for critical actuators.',
-  }, mesh(merge([new THREE.SphereGeometry(0.09, 14, 10).translate(X(12.75), -0.62, 0.17), new THREE.SphereGeometry(0.09, 14, 10).translate(X(12.75), -0.62, -0.17), new THREE.CapsuleGeometry(0.06, 0.18, 4, 10).rotateZ(Math.PI / 2).translate(X(12.5), -0.66, 0)]), F.steel()));
+  P('Brake & emergency accumulator', {
+    system: 'Hydraulics', material: 'Nitrogen-charged steel accumulator', mass: 6,
+    explode: [0.2, -1.6, 0],
+    desc: 'Holds a reserve of pressurised fluid for the wheel brakes and emergency gear extension if both pumps are lost.',
+  }, mesh(new THREE.CapsuleGeometry(0.06, 0.18, 4, 10).rotateZ(Math.PI / 2).translate(X(12.5), -0.66, 0), F.steel()));
+  for (const side of [1, -1]) {
+    const z = side, S = side > 0 ? 'A' : 'B';
+    const g = [];
+    // pump → reservoir / manifold, then aft to the stabilator, rudder and nozzle area, outboard to the wing
+    g.push(FR.pipe([[14.2, -0.42, z * 1.38], [13.6, -0.5, z * 1.0], [13.2, -0.6, z * 0.6]], 0.016, 5));
+    g.push(FR.pipe([[14.2, -0.42, z * 1.38], [15.5, -0.35, z * 1.4], [16.2, -0.26, z * 1.38]], 0.016, 5));
+    g.push(FR.pipe([[14.6, -0.35, z * 1.4], [14.6, 0.15, z * 1.42], [14.9, 0.3, z * 1.42], [16.4, 0.36, z * 1.45]], 0.014, 5));
+    g.push(FR.pipe([[13.2, -0.55, z * 1.0], [13.4, -0.15, z * 1.6], [13.6, -0.1, z * 2.6], [13.9, -0.15, z * 4.2]], 0.014, 5));
+    // forward along the bay edge to the leading-edge flap drive, bay doors and nose
+    g.push(FR.pipe([[13.2, -0.6, z * 0.6], [12.6, -0.7, z * 0.84], [10.5, -0.74, z * 0.84], [8.5, -0.7, z * 0.84], [8.0, -0.5, z * 1.2], [8.6, -0.1, z * 1.75]], 0.016, 5, 40));
+    // crossfeed: each system also reaches the other side's stabilator and rudder actuators
+    g.push(FR.pipe([[16.0, -0.3, z * 1.38], [16.1, -0.55, z * 0.6], [16.15, -0.58, -z * 0.6], [16.25, -0.3, -z * 1.3]], 0.012, 5));
+    P(`Hydraulic lines (system ${S})`, {
+      system: 'Hydraulics', material: 'Titanium tubing (4,000 psi)', mass: 35,
+      explode: [0, -0.6, 0.35 * side],
+      desc: `System ${S} lines run from the ${side > 0 ? 'right' : 'left'} pumps to the stabilator, rudder, flaperon, aileron and leading-edge-flap actuators on both sides — every primary flight-control actuator is fed by both systems — and to the weapons-bay doors and launchers.`,
+    }, mesh(merge(g), F.hyd()));
+  }
   {
     const g = [];
     for (const side of [1, -1]) {
-      const z = side;
-      g.push(FR.pipe([[14.2, -0.42, z * 1.38], [13.6, -0.5, z * 1.0], [12.6, -0.7, z * 0.84], [10.5, -0.74, z * 0.84], [8.5, -0.7, z * 0.84], [6.0, -0.5, z * 0.6], [4.4, -0.32, z * 0.2]], 0.016, 5, 60));
-      g.push(FR.pipe([[14.2, -0.42, z * 1.38], [15.5, -0.35, z * 1.4], [16.4, -0.26, z * 1.38]], 0.016, 5));
-      g.push(FR.pipe([[14.6, -0.35, z * 1.4], [14.6, 0.15, z * 1.42], [14.9, 0.24, z * 1.42]], 0.014, 5));
-      g.push(FR.pipe([[13.2, -0.55, z * 1.0], [13.4, -0.15, z * 1.6], [13.6, -0.1, z * 2.6], [13.9, -0.15, z * 4.2]], 0.014, 5));
-      g.push(FR.pipe([[11.0, -0.72, z * 0.84], [11.3, -0.6, z * 1.2]], 0.014, 5));
+      g.push(FR.pipe([[12.5, -0.62, side * 0.06], [12.2, -0.62, side * 0.5], [11.6, -0.55, side * 0.88], [11.3, -0.48, side * 1.0], [11.24, -0.47, side * 1.02]], 0.012, 5));
+      g.push(FR.pipe([[11.6, -0.55, side * 0.88], [11.42, -0.5, side * 1.1], [11.3, -0.55, side * 1.28]], 0.01, 5));      // brake line to the strut
+      g.push(FR.pipe([[12.3, -0.6, side * 0.75], [12.6, -0.52, side * 0.95]], 0.01, 5));                                  // door jack
     }
-    P('Hydraulic lines (A & B)', {
-      system: 'Hydraulics', material: 'Titanium tubing (4,000 psi)', mass: 70,
-      explode: [0, -0.55, 0],
-      desc: 'Two separate line runs, one per system, take pressure to the flight-control actuators, the landing gear, nose-wheel steering, brakes, and the weapons-bay doors and launchers.',
+    g.push(FR.pipe([[12.5, -0.66, 0.05], [10.0, -0.86, 0.79], [7.0, -0.55, 0.3], [5.8, -0.2, 0.2], [4.6, -0.12, 0.08], [4.36, -0.11, 0.02]], 0.012, 5, 60));
+    P('Landing-gear & brake hydraulic lines', {
+      system: 'Hydraulics', material: 'Titanium and steel tubing, flexible hoses across the gear pivots', mass: 18,
+      explode: [0.3, -1.55, 0],
+      desc: 'Utility lines from the manifold beside the accumulators to the main and nose gear actuators, the door jacks, nose-wheel steering and the wheel brakes; flexible hoses cross each trunnion.',
     }, mesh(merge(g), F.hyd()));
   }
 
@@ -242,7 +354,7 @@ export function buildSystems(ctx) {
     explode: [0.2, 0.9, -1.3],
     desc: 'Part of the auxiliary power generation system (AlliedSignal, now Honeywell), embedded in the left wing root: it starts the engines without ground carts and can restart them in flight. Inlet and exhaust door positions are approximate.',
   }, mesh(merge([FR.cylX(11.95, -0.08, -1.8, 0.56, 0.1, 0.09, 18), box(11.62, -0.08, -1.8, 0.1, 0.2, 0.2),
-    FR.pipe([[12.2, -0.08, -1.8], [12.3, -0.04, -1.82], [12.36, 0.08, -1.84]], 0.045, 8, 6)]), F.boxLight()));
+    FR.pipe([[12.2, -0.08, -1.8], [12.3, -0.06, -1.82], [12.36, 0.0, -1.84]], 0.045, 8, 6)]), F.boxLight()));
   P('Stored-energy system', {
     system: 'Electrical', material: 'High-pressure gas bottle and turbine', mass: 30,
     explode: [0.5, -1.85, 0.2],
@@ -253,22 +365,64 @@ export function buildSystems(ctx) {
     explode: [0.4, -0.9, -0.6],
     desc: 'Batteries power the APU start and hold essential systems for a short time if all generation is lost.',
   }, mesh(merge([box(6.5, -0.55, 0.5, 0.3, 0.16, 0.22), box(6.5, -0.55, -0.5, 0.3, 0.16, 0.22)]), F.box()));
+  P('Aft power distribution centres', {
+    system: 'Electrical', material: 'Solid-state power controllers and contactors', mass: 30, count: 2,
+    explode: [-0.4, -1.05, 0],
+    desc: 'Beside the keel ahead of the engine bays, they take each generator\'s 270 V DC output, switch it onto the buses and protect the aft loads (location approximate).',
+  }, mesh(merge([box(13.8, -0.62, 0.1, 0.4, 0.12, 0.1), box(13.8, -0.62, -0.1, 0.4, 0.12, 0.1)]), F.box()));
+  P('Forward power distribution centres', {
+    system: 'Electrical', material: 'Solid-state power controllers, circuit-breaker-free', mass: 40, count: 2,
+    explode: [0.5, -0.65, 0],
+    desc: 'Under the cockpit floor, they feed the avionics, cockpit and forward loads; solid-state controllers replace most circuit breakers and can reset a fault from the cockpit.',
+  }, mesh(merge([box(5.6, -0.27, 0.42, 0.6, 0.2, 0.12), box(5.6, -0.27, -0.42, 0.6, 0.2, 0.12)]), F.box()));
+  P('Converter-regulators (270 V → 28 V DC)', {
+    system: 'Electrical', material: 'Solid-state DC–DC converters', mass: 20, count: 2,
+    explode: [0.6, -1.2, 0.5],
+    desc: 'Step the 270 V DC primary power down to 28 V DC for the many standard-voltage loads (lights, valves, older equipment); inverters supply the few AC loads.',
+  }, mesh(merge([box(6.15, -0.32, 0.42, 0.24, 0.18, 0.11), box(6.15, -0.32, -0.42, 0.24, 0.18, 0.11)]), F.boxLight()));
   {
-    const g = [box(5.6, -0.3, 0.42, 0.6, 0.24, 0.12), box(5.6, -0.3, -0.42, 0.6, 0.24, 0.12)];
-    for (const z of [1, -1]) g.push(FR.pipe([[3.0, -0.2, z * 0.25], [5.0, -0.3, z * 0.42], [7.5, -0.5, z * 0.6], [10.5, -0.18, z * 0.5], [13.0, 0.5, z * 0.4], [16.5, 0.28, z * 1.05]], 0.025, 6));
-    P('Power distribution (270 V DC)', {
-      system: 'Electrical', material: 'Solid-state power controllers, wiring harnesses', mass: 160,
-      explode: [0.5, -0.65, 0],
-      desc: 'Power distribution centres switch and protect the 270 V DC buses and convert power for 28 V DC and AC loads; harnesses run the length of the jet.',
+    const g = [];
+    for (const z of [1, -1]) {
+      g.push(FR.pipe([[3.0, -0.2, z * 0.25], [5.0, -0.3, z * 0.36], [6.3, -0.3, z * 0.48], [7.5, -0.52, z * 0.55], [9.0, -0.215, z * 0.62], [12.3, -0.215, z * 0.62], [12.9, -0.45, z * 0.3], [13.6, -0.6, z * 0.12]], 0.022, 6, 70));
+      g.push(FR.pipe([[13.7, -0.6, z * 0.16], [13.45, -0.56, z * 0.9], [13.3, -0.45, z * 1.28]], 0.02, 6));           // generator feeders
+      g.push(FR.pipe([[13.9, -0.6, z * 0.12], [15.5, -0.6, z * 0.12], [16.2, -0.4, z * 0.15]], 0.016, 5));             // aft loads
+    }
+    P('Main wiring harnesses', {
+      system: 'Electrical', material: 'Shielded copper harnesses in conduits', mass: 120,
+      explode: [0.3, -0.35, 0],
+      desc: 'Two separated harness runs, one down each side, link the generators, distribution centres and loads; keeping them apart means one hit cannot cut both.',
     }, mesh(merge(g), F.box()));
   }
 
   // ================================================================== environmental control & thermal management
-  P('Environmental control system', {
-    system: 'Environmental control', material: 'Air-cycle machine, water separator', mass: 110,
-    explode: [0.4, -1.1, 0],
-    desc: 'Engine bleed air is cooled through heat exchangers and an air-cycle machine to pressurise and air-condition the cockpit and cool equipment (layout and position approximate).',
-  }, mesh(merge([FR.cylX(6.45, -0.45, 0, 0.36, 0.13, 0.11, 18), box(6.05, -0.42, 0.22, 0.32, 0.26, 0.24), box(6.05, -0.42, -0.22, 0.32, 0.26, 0.24)]), F.boxLight()));
+  {
+    // engine bleed air forward along the weapons-bay edges to the ECS bay under the cockpit
+    const g = [];
+    for (const side of [1, -1]) g.push(FR.pipe([[14.55, -0.6, side * 0.42], [14.0, -0.62, side * 0.5], [13.3, -0.6, side * 0.66], [12.6, -0.55, side * 0.82], [8.6, -0.52, side * 0.82], [7.6, -0.56, side * 0.5], [6.6, -0.48, side * 0.3]], 0.03, 8, 60));
+    P('Engine bleed-air ducts', {
+      system: 'Environmental control', material: 'Insulated titanium ducting with shut-off and pressure-regulating valves', mass: 30,
+      explode: [0.2, -1.05, 0],
+      desc: 'Hot, high-pressure air tapped from each engine\'s compressor runs forward to the environmental control system and the inert-gas generator; valves at each engine shut it off in a fire (routing approximate).',
+    }, mesh(merge(g), F.tiDull()));
+    P('ECS heat exchangers', {
+      system: 'Environmental control', material: 'Aluminium plate-fin cores, fuel- and ram-air cooled', mass: 45, count: 2,
+      explode: [0.4, -1.3, -0.4],
+      desc: 'Bleed air is first cooled in heat exchangers; with so few cooling inlets on a stealthy airframe, much of the heat goes into the fuel rather than into ram air.',
+    }, mesh(merge([box(6.05, -0.42, 0.22, 0.32, 0.26, 0.24), box(6.05, -0.42, -0.22, 0.32, 0.26, 0.24)]), F.copper()));
+    P('Air-cycle machine & water separator', {
+      system: 'Environmental control', material: 'Turbine / compressor air-cycle machine, water separator', mass: 55,
+      explode: [0.4, -1.5, 0],
+      desc: 'Expanding the cooled bleed air through a turbine drops its temperature far below ambient; a water separator dries it before it goes to the cockpit and the air-cooled avionics (position approximate).',
+    }, mesh(merge([FR.cylX(6.45, -0.45, 0, 0.36, 0.13, 0.11, 18), FR.cylX(6.7, -0.45, 0, 0.14, 0.08, 0.08, 14)]), F.boxLight()));
+    const d = [];
+    for (const side of [1, -1]) d.push(FR.pipe([[6.3, -0.4, side * 0.08], [6.4, -0.15, side * 0.3], [6.2, 0.05, side * 0.44], [5.4, 0.05, side * 0.44]], 0.035, 8));
+    d.push(FR.pipe([[6.25, -0.45, 0], [5.0, -0.12, 0.3], [4.0, -0.1, 0.3], [3.3, -0.05, 0.36]], 0.03, 8));
+    P('Cockpit & avionics air ducts', {
+      system: 'Environmental control', material: 'Composite and aluminium ducting', mass: 15,
+      explode: [0.5, -0.4, 0.2],
+      desc: 'Carry conditioned air to the cockpit outlets, the canopy demist and the forward avionics bay, and keep the cockpit pressurised.',
+    }, mesh(merge(d), F.duct()));
+  }
   P('Fuel–PAO heat exchangers', {
     system: 'Environmental control', material: 'Aluminium plate-fin cores', mass: 45, count: 2,
     explode: [0.4, -1.35, 0.4],
@@ -283,188 +437,37 @@ export function buildSystems(ctx) {
     FR.pipe([[2.62, 0.0, -0.36], [3.0, -0.12, -0.38], [4.5, -0.28, -0.42], [6.0, -0.45, -0.42], [7.2, -0.6, -0.38]], 0.02, 6),
     FR.pipe([[3.05, 0.3, 0.2], [3.3, 0.36, 0.0], [3.05, 0.3, -0.2]], 0.016, 6),
   ]), F.ductDark()));
+  P('PAO pump & reservoir', {
+    system: 'Environmental control', material: 'Electric coolant pump, pressurised reservoir', mass: 18,
+    explode: [0.6, -1.65, 0.6],
+    desc: 'Circulates the PAO coolant round the loop; the reservoir takes up its expansion as it heats.',
+  }, mesh(merge([FR.cylX(6.95, -0.6, -0.35, 0.22, 0.07, 0.07, 14), new THREE.SphereGeometry(0.08, 14, 10).translate(X(6.95), -0.6, 0.35)]), F.boxLight()));
   P('OBOGS oxygen concentrator', {
     system: 'Environmental control', material: 'Molecular-sieve oxygen concentrator', mass: 18,
     explode: [0.2, 1.05, -0.6],
     desc: 'The on-board oxygen generation system strips nitrogen from engine bleed air to give the pilot breathing oxygen without liquid-oxygen servicing.',
   }, mesh(box(6.6, 0.12, -0.42, 0.24, 0.22, 0.16), F.boxLight()));
-
-  // ================================================================== avionics
-  P('Common integrated processors', {
-    system: 'Avionics', material: 'Liquid-cooled modular processor racks', mass: 120, count: 2,
-    explode: [1.9, 1.2, 0],
-    desc: 'Two liquid-cooled processor racks (with space for a third) run the radar, EW, CNI and fusion software. Sensor fusion merges every sensor\'s tracks into one picture before the pilot sees it.',
-  }, mesh(merge([box(3.27, 0.14, 0.2, 0.55, 0.3, 0.25), box(3.27, 0.14, -0.2, 0.55, 0.3, 0.25)]), F.box()));
-  P('CNI suite', {
-    system: 'Avionics', material: 'Integrated comm / nav / identification modules', mass: 70,
-    explode: [2.1, -0.75, 0],
-    desc: 'Communication, navigation and identification functions (radios, IFF, TACAN, landing aids) share common modules rather than separate boxes for each radio.',
-  }, mesh(merge([box(3.22, -0.19, 0.16, 0.6, 0.2, 0.24), box(3.22, -0.19, -0.16, 0.6, 0.2, 0.24)]), F.boxLight()));
-  P('Intra-flight data link', {
-    system: 'Avionics', material: 'Low-probability-of-intercept data link', mass: 15,
-    explode: [0.6, 0.6, 1.1],
-    desc: 'IFDL shares sensor tracks silently between F-22s in a flight using narrow, hard-to-detect transmissions.',
-  }, mesh(merge([box(4.9, -0.22, 0.42, 0.4, 0.18, 0.12)]), F.box()));
-  P('Inertial navigation & GPS', {
-    system: 'Avionics', material: 'Ring-laser-gyro inertial reference with embedded GPS', mass: 18,
-    explode: [2.0, 1.75, 0],
-    desc: 'Measures the jet\'s attitude, velocity and position, corrected by GPS, for navigation, weapons and the flight controls.',
-  }, mesh(box(2.86, 0.08, 0, 0.18, 0.18, 0.22), F.box()));
-  P('Vehicle management system computers', {
-    system: 'Flight controls', material: 'Redundant flight-control processors', mass: 25, count: 3,
-    explode: [2.2, 1.95, 0.6],
-    desc: 'Fly-by-wire computers turn stick and throttle inputs into surface and nozzle commands many times a second. The airframe is unstable in pitch for agility, so they never stop correcting (channel count illustrative).',
-  }, mesh(merge([box(4.3, -0.22, 0.36, 0.3, 0.16, 0.12), box(4.3, -0.22, -0.36, 0.3, 0.16, 0.12), box(4.7, -0.22, -0.36, 0.3, 0.16, 0.12)]), F.boxLight()));
-
-  // ================================================================== AN/APG-77 radar
   {
-    const tilt = 20 * FR.DEG;
-    const face = new THREE.CircleGeometry(1, 48).scale(0.45, 0.31, 1).rotateY(Math.PI / 2).rotateZ(-tilt).translate(X(2.46), -0.03, 0);
-    const back = new THREE.CylinderGeometry(1, 1, 0.06, 48).rotateX(Math.PI / 2).scale(0.45, 0.31, 1).rotateY(Math.PI / 2).rotateZ(-tilt).translate(X(2.5), -0.03, 0);
-    // tile rows: thin strips that read as the subarrays of transmit/receive modules
-    const rows = [];
-    for (let k = -6; k <= 6; k++) {
-      const yy = k * 0.05;
-      const half = 0.45 * Math.sqrt(Math.max(0, 1 - (yy / 0.31) ** 2));
-      if (half < 0.05) continue;
-      rows.push(new THREE.BoxGeometry(0.004, 0.006, half * 2).translate(0, yy, 0));
-    }
-    const grid = merge(rows).rotateZ(-tilt).translate(X(2.455), -0.03, 0);
-    const array = P('AN/APG-77 AESA array', {
-      system: 'Sensors', material: 'Gallium-arsenide transmit/receive modules on a cooled backplane', mass: 220,
-      explode: [2.5, 0.35, 0], callout: true, anchor: [X(2.4), 0.3, 0],
-      desc: 'About 1,956 thumb-sized transmit/receive modules (the most cited figure; sources range ~1,900–2,000) steer the beam electronically in microseconds with no moving antenna. The fixed array is tilted back so it never squares up to another radar.',
-    }, [mesh(face, F.array()), mesh(back, F.alu()), mesh(grid, F.tile(), { cast: false })]);
-    void array;
-    const m = [];
-    for (const [a, b] of [[[2.55, 0.18, 0.25], [2.6, 0.16, 0.25]], [[2.55, 0.18, -0.25], [2.6, 0.16, -0.25]], [[2.5, -0.22, 0.25], [2.6, -0.22, 0.25]], [[2.5, -0.22, -0.25], [2.6, -0.22, -0.25]]]) m.push(FR.pipe([a, b], 0.03, 6, 2));
-    m.push(new THREE.TorusGeometry(1, 0.03, 6, 48).scale(0.4, 0.27, 1).rotateY(Math.PI / 2).rotateZ(-tilt).translate(X(2.53), -0.03, 0));
-    P('APG-77 array mount & coolant manifold', {
-      system: 'Sensors', material: 'Aluminium mount, PAO manifold', mass: 40,
-      explode: [2.0, 0.35, 0],
-      desc: 'Holds the array at its fixed tilt on the radar bulkhead and feeds liquid coolant to the cold plates behind the modules — an AESA turns much of its power into heat.',
-    }, mesh(merge(m), F.alu()));
-    P('APG-77 receiver / exciter & power supply', {
-      system: 'Sensors', material: 'Radar receiver, exciter and power-supply modules', mass: 60,
-      explode: [1.6, 0.85, 0],
-      desc: 'Generates the radar waveforms and digitises the returns; the signal processing itself runs in the common integrated processors.',
-    }, mesh(merge([box(2.7, 0.18, 0, 0.16, 0.12, 0.4), box(2.7, -0.22, 0, 0.16, 0.1, 0.36)]), F.boxLight()));
-  }
-
-  // ================================================================== distributed sensors
-  {
+    // fire protection: extinguisher bottles ahead of the engine bays, with spray lines into each bay
     const g = [];
-    const patch = (p, n, w = 0.12, h = 0.05) => {
-      const geo = new THREE.BoxGeometry(w, 0.008, h);
-      geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), n.clone().normalize()));
-      geo.translate(p.x, p.y, p.z);
-      g.push(geo);
-    };
+    for (const z of [0.11, -0.11]) g.push(new THREE.SphereGeometry(0.08, 14, 10).translate(X(13.45), 0.36, z));
+    const l = [];
     for (const side of [1, -1]) {
-      for (const eta of [0.2, 0.45, 0.7, 0.92]) {
-        const z = 1.45 + eta * (FR.WING.semi - 1.45);
-        const sec = FR.wingSection(z);
-        patch(V(sec.le[0] - 0.02 * sec.chord, sec.le[1] + naca00(0.02, sec.t) * sec.chord + 0.002, side * z), V(0.2, 1, 0), 0.1, 0.16);
-      }
-      for (const eta of [0.35, 0.8]) {
-        const z = 1.45 + eta * (FR.WING.semi - 1.45);
-        const sec = FR.wingSection(z);
-        patch(V(sec.le[0] - 0.9 * sec.chord, sec.le[1] + 0.012, side * z), V(0, 1, 0), 0.08, 0.14);
-      }
-      for (const s of [1.8, 2.3, 4.0]) { const z = FR.aW(s) - 0.07; patch(V(X(s), FR.upperA(s, z) + 0.003, side * z), normalA(s, side * z), 0.12, 0.04); }
-      for (const s of [16.2, 17.0]) patch(V(X(s), FR.topAt(s, 1.4) + 0.004, side * 1.4), V(0, 1, side * 0.3));
-      patch(V(X(17.2), -FR.bD(17.2) - 0.004, side * 1.0), V(0, -1, 0));
+      l.push(FR.pipe([[13.45, 0.36, side * 0.18], [13.7, 0.5, side * 0.35], [14.5, 0.55, side * 0.42], [16.0, 0.5, side * 0.42]], 0.01, 5));
+      l.push(FR.pipe([[14.0, 0.53, side * 0.4], [14.2, 0.45, side * 1.2], [14.4, 0.2, side * 1.36]], 0.008, 5));
     }
-    P('AN/ALR-94 EW apertures', {
-      system: 'Sensors', material: 'Conformal broadband antennas', mass: 30, count: 30,
-      explode: [0, 0.3, 0],
-      desc: 'A passive receiver system of more than 30 antennas blended into the wings and fuselage. It detects, identifies and locates radar emitters well beyond their own detection range, often cueing the APG-77 (antenna positions illustrative).',
-    }, mesh(merge(g), F.composite()));
-  }
-  {
-    const g = [];
-    const eye = (p, n) => {
-      const geo = new THREE.CylinderGeometry(0.055, 0.06, 0.02, 18);
-      geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), n.clone().normalize()));
-      geo.translate(p.x, p.y, p.z);
-      g.push(geo);
-    };
-    for (const side of [1, -1]) {
-      eye(V(X(3.2), FR.upperA(3.2, 0.45) + 0.004, side * 0.45), normalA(3.2, side * 0.45));
-      eye(V(X(3.4), FR.bottomAt(3.4, 0.35) - 0.004, side * 0.35), V(0, -1, side * 0.6));
-      eye(V(X(16.8), -FR.bD(16.8) * 0.6, side * (FR.bW(16.8) - 0.05)), V(0, -0.3, side));
-    }
-    P('AN/AAR-56 missile launch detectors', {
-      system: 'Sensors', material: 'Infrared sensor windows', mass: 18, count: 6,
-      explode: [0, 0.3, 0.4],
-      desc: 'Six infrared sensors give all-round coverage to warn of a missile launch and cue countermeasures (window positions approximate).',
-    }, mesh(merge(g), F.lens()));
-  }
-  {
-    const g = [];
-    for (const side of [1, -1]) {
-      for (const [s, dy] of [[2.05, -0.05], [2.5, 0.06]]) {
-        const z = FR.aW(s) - 0.02;
-        const y = FR.aYC(s) + dy;
-        g.push(FR.pipe([[s, y, side * z], [s - 0.02, y, side * (z + 0.07)]], 0.008, 6, 2));
-        g.push(FR.cylX(s - 0.1, y, side * (z + 0.07), 0.2, 0.006, 0.008, 6));
-      }
-    }
-    P('Air-data probes', {
-      system: 'Sensors', material: 'Heated multi-function pitot-static probes', mass: 6, count: 4,
-      explode: [1.6, 0, 0.45],
-      desc: 'Small L-shaped probes on the sides of the nose measure total and static pressure and flow angle for the flight controls and air-data computers; they are electrically heated against ice (count approximate).',
-    }, mesh(merge(g), F.probe()));
-  }
-
-  // ================================================================== lighting and antennas
-  {
-    const red = [], green = [], white = [], form = [];
-    for (const { side, le, chord } of ctx.wingTips) {
-      const lens = new THREE.SphereGeometry(0.045, 12, 8).scale(1.6, 0.6, 0.6).translate(le.x - 0.15 * chord, le.y, le.z + side * 0.005);
-      (side > 0 ? green : red).push(lens);
-      form.push(new THREE.BoxGeometry(0.5, 0.006, 0.05).translate(le.x - 0.55 * chord, le.y + 0.03, le.z - side * 0.15));
-    }
-    for (const side of [1, -1]) { const pts = []; for (let s = 4.3; s <= 4.91; s += 0.15) { const z = FR.aW(s) - 0.07; pts.push([s, FR.upperA(s, z) + 0.004, side * z]); } form.push(FR.pipe(pts, 0.011, 6, 8)); }
-    white.push(new THREE.SphereGeometry(0.035, 10, 8).translate(X(18.62), -0.08, -1.52));
-    // steady, modest intensities: these are small lamps, not light sources for the scene
-    const lamp = (c, e, k) => new THREE.MeshStandardMaterial({ color: c, emissive: e, emissiveIntensity: k, roughness: 0.4 });
-    const navG = mesh(merge(green), lamp(0x002200, 0x2bff6a, 2.2), { cast: false });
-    const navR = mesh(merge(red), lamp(0x220000, 0xff2a1a, 2.2), { cast: false });
-    const navW = mesh(merge(white), lamp(0x222222, 0xffffff, 1.6), { cast: false });
-    const strips = mesh(merge(form), lamp(0x3a4a34, 0x7dffa0, 0.12), { cast: false });
-    anim.lamps = [navG.material, navR.material, navW.material, strips.material];
-    P('Navigation & formation lights', {
-      system: 'Electrical', material: 'LED position lights, electroluminescent formation strips', mass: 5,
-      explode: [0, 0.6, 0],
-      desc: 'Red and green position lights at the wing tips and a white tail light; low-intensity electroluminescent strips on the chines, wing tips and fins let a wingman hold formation at night without showing far.',
-    }, [navG, navR, navW, strips]);
-    const stMat = M.strobe().clone();
-    const s1 = new THREE.SphereGeometry(0.04, 12, 8).scale(1.4, 0.7, 1).translate(X(16.9), FR.topAt(16.9, 0) + 0.02, 0);
-    const s2 = new THREE.SphereGeometry(0.04, 12, 8).scale(1.4, 0.7, 1).translate(X(12.8), -FR.bD(12.8) - 0.02, 0);
-    P('Anti-collision strobes', {
-      system: 'Electrical', material: 'White LED strobes', mass: 2, count: 2,
-      explode: [-0.4, 0.9, 0],
-      desc: 'White anti-collision strobes on the spine and belly (positions approximate). They flash about once a second in flight and stay off on the ground.',
-    }, mesh(merge([s1, s2]), stMat, { cast: false }));
-    anim.strobe = stMat;
-    // blade and flush antennas
-    const blade = (s, y, up, h, c) => {
-      const sh = new THREE.Shape();
-      sh.moveTo(0, 0); sh.lineTo(c, 0); sh.lineTo(c * 0.62, h); sh.lineTo(c * 0.3, h); sh.closePath();
-      const g = new THREE.ExtrudeGeometry(sh, { depth: 0.016, bevelEnabled: false });
-      g.translate(-c / 2, 0, -0.008);
-      g.rotateY(Math.PI);
-      if (up < 0) g.rotateX(Math.PI);
-      return g.translate(X(s), y, 0);
-    };
-    const ant = [blade(9.9, FR.topAt(9.9, 0) - 0.01, 1, 0.13, 0.26), blade(6.2, FR.bottomAt(6.2, 0) + 0.01, -1, 0.12, 0.22)];
-    ant.push(box(10.8, FR.topAt(10.8, 0) + 0.002, 0, 0.14, 0.006, 0.14));
-    P('Communication antennas', {
-      system: 'Communications', material: 'Composite blade and flush patch antennas', mass: 8, count: 3,
-      explode: [0, 0.85, 0],
-      desc: 'Only a few small blades break the outline: UHF/VHF and IFF blades on the spine and belly and a flush GPS patch; most CNI antennas are buried flush in the skin.',
-    }, mesh(merge(ant), F.wing()));
+    P('Engine-bay fire extinguishers', {
+      system: 'Environmental control', material: 'Pressurised extinguishing-agent bottles, spray tubes, fire / overheat detector loops', mass: 22, count: 2,
+      explode: [-0.3, 1.55, 0],
+      desc: 'Detector loops in each engine bay warn of fire or overheat; the pilot can then shut off fuel and fire one or both bottles, which flood the bay through spray tubes (agent and positions approximate).',
+    }, [mesh(merge(g), F.red()), mesh(merge(l), F.pipe())]);
+    const d = [];
+    for (const side of [1, -1]) for (const s of [9.2, 10.4]) d.push(new THREE.CapsuleGeometry(0.035, 0.1, 4, 8).rotateZ(Math.PI / 2).translate(X(s), FR.topAt(s, 1.5) - 0.1, side * 1.5));
+    P('Dry-bay fire suppression', {
+      system: 'Environmental control', material: 'Fast-acting suppressant canisters with optical fire detectors', mass: 10, count: 4,
+      explode: [0, 1.75, 0.5],
+      desc: 'Small canisters in the dry bays around the fuel tanks and inlet ducts fire within milliseconds of an optical sensor seeing a flash from a hit, smothering a fire before it can grow (positions approximate).',
+    }, mesh(merge(d), F.orange()));
   }
   return { tanks };
 }

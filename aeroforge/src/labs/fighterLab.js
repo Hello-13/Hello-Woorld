@@ -1,11 +1,12 @@
 // F-22A flight-envelope lab: ISA atmosphere, lift/drag polar, load factor and the specific-excess-
 // power (Ps) curve that energy-manoeuvrability theory is built on, for the real jet's weights and
-// F119 thrust. The airframe in the bay follows the stick: stabilators, flaperons, ailerons, rudders
-// and the ±20° 2-D thrust-vectoring nozzles.
+// F119 thrust (src/models/f22/performance.js: the shared aero model plus supersonic F119 dry-thrust
+// ram recovery, a post-stall lift break and the 104 kPa dynamic-pressure limit). The airframe in
+// the bay follows the stick: stabilators, flaperons, ailerons, rudders and the ±20° 2-D nozzles.
 
 import * as THREE from 'three';
-import { flightState, psSweep, liftSlope, FIGHTER } from '../physics/aero.js';
-import { isa } from '../physics/atmosphere.js';
+import { FIGHTER } from '../physics/aero.js';
+import { flight, psCurve, trimAlpha } from '../models/f22/performance.js';
 import { el, slider, toggle, readouts, section, button, fmt } from '../ui/dom.js';
 import { LineChart } from '../ui/chart.js';
 import { ForceArrows, kN } from '../engine/forces.js';
@@ -13,21 +14,13 @@ import { ForceArrows, kN } from '../engine/forces.js';
 // gross weight = empty + internal fuel + stores: 19,700 + 8,200 + 1,510 = 29,410 kg (published)
 const STORES = FIGHTER.massCombat - FIGHTER.massEmpty - FIGHTER.fuelInternal;   // pilot, 6 × AIM-120C, 2 × AIM-9X, 480 rds, fluids
 
-/** Angle of attack (deg) for 1 g level flight at a condition. */
-function trimAlpha({ altitude, mach }, mass) {
-  const atm = isa(altitude);
-  const V = mach * atm.a;
-  const q = 0.5 * atm.rho * V * V;
-  return Math.round(((mass * 9.80665) / (q * FIGHTER.wingArea * liftSlope(mach))) * (180 / Math.PI) * 10) / 10;
-}
-
 const PRESETS = [
   { label: 'Supercruise · M 1.76', c: { altitude: 12200, mach: FIGHTER.machSupercruise, alpha: 'trim', throttle: 0.8 },
-    note: 'Published supercruise: Mach 1.76 at altitude on military power, with no afterburner. This conceptual model\'s dry thrust falls short there (see the chart note) — slide Mach down to about 1.4 to find where it supercruises.' },
+    note: 'Published supercruise: Mach 1.76 at altitude on military power, with no afterburner. Here dry thrust only just balances drag — this is the top of the supercruise range at combat weight; burn some fuel and the margin grows.' },
   { label: 'Top speed · M 2.25', c: { altitude: 12200, mach: FIGHTER.machMax, alpha: 'trim', throttle: 1 },
     note: 'Published top speed: Mach 2.25 at altitude in full afterburner.' },
   { label: 'Sea level · M 1.21', c: { altitude: 0, mach: FIGHTER.machSeaLevel, alpha: 'trim', throttle: 1 },
-    note: 'At sea level the limit is Mach 1.21 (800 kt): dynamic pressure, not thrust, sets it.' },
+    note: 'At sea level the limit is Mach 1.21 (800 kt): dynamic pressure (≈ 104 kPa), not thrust, sets it — there is still plenty of excess power, and the Ps curve stops at that limit.' },
   { label: '9 g turn', c: { altitude: 4000, mach: 0.85, alpha: 18.5, throttle: 1 },
     note: 'A 9 g turn at the structural limit: lift is nine times the weight. Ps goes deeply negative — even full afterburner cannot hold the energy, so the turn bleeds speed.' },
 ];
@@ -42,7 +35,7 @@ export function mountFighterLab(root, ctx) {
 
   const sAlt = slider({ label: 'Altitude', min: 0, max: 20000, step: 100, value: p.altitude, unit: 'm', onInput: (x) => { p.altitude = x; mark(); } });
   const sMach = slider({ label: 'Mach number', min: 0.2, max: 2.4, step: 0.01, value: p.mach, format: (x) => x.toFixed(2), onInput: (x) => { p.mach = x; mark(); } });
-  const sAoA = slider({ label: 'Angle of attack', min: -4, max: 30, step: 0.5, value: p.alpha, unit: '°', format: (x) => x.toFixed(1), onInput: (x) => { p.alpha = x; mark(); } });
+  const sAoA = slider({ label: 'Angle of attack', min: -4, max: 40, step: 0.5, value: p.alpha, unit: '°', format: (x) => x.toFixed(1), onInput: (x) => { p.alpha = x; mark(); } });
   const sThr = slider({
     label: 'Throttle (both F119s)', min: 0, max: 100, step: 1, value: p.throttle * 100,
     format: (x) => (x > 80 ? `A/B ${Math.round(((x - 80) / 20) * 100)} %` : x === 80 ? 'MIL' : `${x} %`),
@@ -98,12 +91,12 @@ export function mountFighterLab(root, ctx) {
   })));
 
   root.append(
-    el('p', { class: 'lab-intro', text: 'Fly the F-22A through its envelope. Lift, drag and twin-F119 thrust come from a conceptual-design aero model over the 1976 Standard Atmosphere, set to the published wing area, weights and thrust; the jet in the bay answers every control input.' }),
+    el('p', { class: 'lab-intro', text: 'Fly the F-22A through its envelope. Lift, drag and twin-F119 thrust come from a conceptual-design aero model over the 1976 Standard Atmosphere, set to the published wing area, weights and thrust; it reproduces the published supercruise (Mach 1.76), top speed (Mach 2.25) and 9 g. The jet in the bay answers every control input.' }),
     section('Published conditions', presetRow, presetNote),
     section('Flight condition', sAlt.el, sMach.el, sAoA.el, sThr.el, sFuel.el),
     status,
     section('Air data & performance', ro.el),
-    section('Energy manoeuvrability', chart.el, el('p', { class: 'lab-note', text: 'Where the curve is above zero the jet can still climb or accelerate at 1 g; its right-hand zero crossing is the top level-flight speed at this altitude. Grey marks: published supercruise (M 1.76) and top speed (M 2.25). The model\'s dry thrust falls off faster with altitude than the real F119\'s, so at military power it tops out near M 1.4 rather than 1.76.' })),
+    section('Energy manoeuvrability', chart.el, el('p', { class: 'lab-note', text: 'Where the curve is above zero the jet can still climb or accelerate at 1 g; its right-hand zero crossing is the top level-flight speed at this altitude, and where it simply stops, the 104 kPa dynamic-pressure limit has been reached. Grey marks: published supercruise (M 1.76) and top speed (M 2.25). Above Mach 1 the inlet\'s ram compression keeps the F119\'s dry thrust up, which is what makes supercruise possible.' })),
     section('Controls', sPitch.el, sRoll.el, sYaw.el, el('div', { class: 'btn-row' }, tFlight.el, tBay.el, tForces.el, demoBtn)),
   );
 
@@ -111,7 +104,7 @@ export function mountFighterLab(root, ctx) {
   let prevWarn = '';
   const compute = () => {
     const m = mass();
-    const f = flightState({ ...p, mass: m });
+    const f = flight({ ...p, mass: m });
     v.state.flight = f;
     ctx.modes.setFlow({ alphaDeg: p.alpha, mach: p.mach, stall: f.stalled ? 1 : 0, tau: 0.045 });
     v.state.mach = p.mach;
@@ -134,11 +127,10 @@ export function mountFighterLab(root, ctx) {
     ro.set('ps', fmt.n(f.ps, 0), f.ps < 0 ? 'warn' : 'ok');
     ro.set('stag', fmt.n(f.stagnationT, 0), f.stagnationT > 400 ? 'warn' : '');
     ro.set('wl', fmt.n(m / FIGHTER.wingArea, 0));
-    const seaLevelLimit = p.altitude < 3000 && p.mach > FIGHTER.machSeaLevel + 0.01;
     let msg, level = 'ok';
-    if (f.stalled) { msg = `Stalled: angle of attack is past the wing's ${FIGHTER.alphaStall}° stall. Thrust vectoring keeps the real jet controllable beyond 60°, but lift collapses — lower the nose to recover.`; level = 'crit'; }
+    if (f.stalled) { msg = `Stalled: past the wing's ${FIGHTER.alphaStall}° stall the flow separates and lift falls (CL ${f.cl.toFixed(2)}) while drag soars. Thrust vectoring keeps the real jet controllable beyond 60°; lower the nose to recover.`; level = 'crit'; }
     else if (f.overG) { msg = `Over-g: ${f.n.toFixed(1)} g exceeds the +${FIGHTER.gLimit} / ${FIGHTER.gNegLimit} g structural limit. Reduce angle of attack or speed.`; level = 'crit'; }
-    else if (seaLevelLimit) { msg = `Over-speed: low down the F-22A is limited to Mach ${FIGHTER.machSeaLevel} (800 kt) by dynamic pressure on the structure — ${fmt.n(f.q / 1000, 0)} kPa here.`; level = 'warn'; }
+    else if (f.overQ) { msg = `Over-speed: ${fmt.n(f.q / 1000, 0)} kPa of dynamic pressure is past the structure's ≈ ${fmt.n(FIGHTER.qMax / 1000, 0)} kPa limit (Mach ${FIGHTER.machSeaLevel}, 800 kt, at sea level). Slow down or climb.`; level = 'warn'; }
     else if (p.mach > FIGHTER.machMax + 0.01) { msg = `Beyond the envelope: the published top speed is Mach ${FIGHTER.machMax}; inlet and skin temperatures (${fmt.n(f.stagnationT, 0)} K stagnation) set the limit.`; level = 'warn'; }
     else if (f.ps < 0) { msg = `Drag exceeds thrust by ${fmt.n((f.D - f.T) / 1000, 0)} kN: the jet is bleeding energy at ${fmt.n(-f.ps, 0)} m/s.`; level = 'warn'; }
     else if (p.mach > 1 && p.throttle <= 0.8) msg = `Supercruise: supersonic on dry thrust with ${fmt.n(f.ps, 0)} m/s of excess power — no afterburner, so far less fuel and heat.`;
@@ -149,7 +141,7 @@ export function mountFighterLab(root, ctx) {
     if (level !== 'ok' && msg.split(':')[0] !== prevWarn) ctx.log(v.designation, msg.split(':')[0], level);
     prevWarn = level === 'ok' ? '' : msg.split(':')[0];
 
-    const sweep = psSweep({ altitude: p.altitude, throttle: p.throttle, mass: m });
+    const sweep = psCurve({ altitude: p.altitude, throttle: p.throttle, mass: m });
     const ys = sweep.map((s) => s.ps).filter(Number.isFinite);
     chart.setData({ ps: sweep.map((s) => ({ x: s.mach, y: s.ps })) }, {
       xDomain: [0.2, 2.5], zero: true,

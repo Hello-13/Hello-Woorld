@@ -12,8 +12,8 @@ export const FIGHTER = {
   massCombat: 29410,        // kg, typical combat / gross weight (64,840 lb)
   thrustMilSL: 2 * 116e3,   // N, dry (2 × F119-PW-100, ≈ 26,000 lbf class)
   thrustMaxSL: 2 * 156e3,   // N, full afterburner (2 × 35,000 lbf class)
-  clMax: 1.65,
-  alphaStall: 26,           // deg, wing alone; thrust vectoring lets the jet fly far beyond it
+  clMax: 1.6,               // matches liftSlope(0.3) × alphaStall, so lift peaks at the stall and then falls
+  alphaStall: 32,           // deg, wing with leading-edge flaps; thrust vectoring lets the jet fly far beyond it
   gLimit: 9,                // +9 / −3 g
   // published figures the lab and tests compare the model against (not used by the equations)
   massEmpty: 19700,         // kg (43,340 lb)
@@ -25,6 +25,8 @@ export const FIGHTER = {
   ceiling: 19812,           // m (65,000 ft)
   gNegLimit: -3,
   tvcDeg: 20,               // 2-D nozzles vector ±20° in pitch
+  qMax: 103.9e3,            // Pa, dynamic-pressure limit (Mach 1.21 = 800 kt at sea level)
+  dryLapseSupersonic: 0.55, // F119 dry-thrust density lapse exponent above Mach 1.4 (ram recovery), vs 0.78
 };
 
 const AR = (FIGHTER.span ** 2) / FIGHTER.wingArea;

@@ -1,8 +1,8 @@
 // Lockheed Martin / Boeing F-22A Raptor — air-dominance fighter, modelled system by system at
 // real scale (18.92 m long, 13.56 m span, 5.08 m tall). Axes: nose toward +x, y up, right wing
 // toward +z; fuselage stations s are metres aft of the nose (x = 9.46 − s). The geometry lives in
-// ./f22/: frame.js (outer mould line), airframe.js, propulsion.js, systems.js, weapons.js,
-// gear.js and cockpit.js. Military detail stays at the level of public fact sheets and museum
+// ./f22/: layout.js / frame.js (outer mould line), airframe.js, propulsion.js, systems.js,
+// avionics.js, weapons.js, gear.js and cockpit.js. Military detail stays at the level of public fact sheets and museum
 // cutaways; positions of internal equipment are approximate where they are not published.
 
 import * as THREE from 'three';
@@ -15,6 +15,7 @@ import * as FR from './f22/frame.js';
 import { buildAirframe } from './f22/airframe.js';
 import { buildPropulsion } from './f22/propulsion.js';
 import { buildSystems } from './f22/systems.js';
+import { buildAvionics } from './f22/avionics.js';
 import { buildWeapons } from './f22/weapons.js';
 import { buildGear } from './f22/gear.js';
 import { buildCockpit } from './f22/cockpit.js';
@@ -61,6 +62,7 @@ export function buildFighter() {
   buildWeapons(ctx);
   buildGear(ctx);
   buildSystems(ctx);
+  buildAvionics(ctx);
 
   // ------------------------------------------------------------------ markings (projected decals)
   attitude.updateMatrixWorld(true);
@@ -144,7 +146,9 @@ export function buildFighter() {
     parts: A.parts,
     view: { dir: [1.05, 0.5, 1.15], fill: 1.0 },
     displaySize: 11,
-    thermalRange: [200, 1600],
+    // a narrow scale centred on airframe heating: at Mach 2 the skins (≈ 370–385 K) sit mid-scale,
+    // well clear of the −57 °C air (≈ 217 K, near black), while the hot section saturates above 600 K
+    thermalRange: [200, 600],
     state,
     targets,
     fuel: ctx.fuel,
@@ -154,26 +158,33 @@ export function buildFighter() {
     temperatureOf(info) {
       const f = state.flight;
       const T = f ? f.atm.T : 288;
-      const stag = f ? recoveryTemperature(f.atm.T, state.mach, 0.89) : 288;
+      const M = f ? state.mach : 0;
+      const T0 = T * (1 + 0.2 * M * M);                 // ideal stagnation temperature
+      const heat = (k) => T + (T0 - T) * k;             // k = 1 stagnation point, ≈ 0.89 turbulent recovery
+      const amb = f ? heat(0.89) : 288;
+      // engine sections heat only while the engines run
+      const run = state.running || 0;
       const thr = state.throttle, ab = Math.max(0, (thr - 0.8) / 0.2);
+      const eng = (hot) => amb + run * Math.max(0, hot - amb);
       switch (info.thermalRole) {
-        case 'stagnation': return stag;
-        case 'leadingEdge': return T + (stag - T) * 0.92;
-        case 'fan': return stag + thr * 60;
-        case 'compressor': return stag + 120 + thr * 480;
-        case 'combustor': return 620 + thr * 480;
-        case 'turbine': return 680 + thr * 560;
-        case 'augmentor': return 560 + thr * 360 + ab * 620;
-        case 'nozzle': return 520 + thr * 520 + ab * 460;
+        case 'stagnation': return heat(0.97);
+        case 'leadingEdge': return heat(0.93);
+        case 'fan': return eng(heat(1) + 25 + thr * 60);
+        case 'compressor': return eng(heat(1) + 140 + thr * 480);
+        case 'combustor': return eng(620 + thr * 480);
+        case 'turbine': return eng(680 + thr * 560);
+        case 'augmentor': return eng(560 + thr * 360 + ab * 620);
+        case 'nozzle': return eng(520 + thr * 520 + ab * 460);
         default: break;
       }
-      if (info.skin) return T + (stag - T) * 0.8;
-      if (info.system === 'Fuel') return Math.min(330, 290 + (stag - T) * 0.15);
+      if (info.skin) return heat(0.89);
+      if (info.system === 'Fuel') return Math.min(330, 290 + (T0 - T) * 0.15);
       if (info.system === 'Avionics' || info.system === 'Sensors') return 315;
       if (info.system === 'Hydraulics') return 345;
-      if (info.system === 'Weapons') return T + (stag - T) * 0.4;
+      if (info.system === 'Weapons') return heat(0.4);
       if (info.system === 'Crew systems') return 295;
-      return T + (stag - T) * 0.6;
+      if (info.system === 'Propulsion') return eng(heat(1) + 60);
+      return heat(0.6);
     },
     update(dt, t) {
       state.gear = approach(state.gear, targets.gear, 0.4, dt);
@@ -190,6 +201,8 @@ export function buildFighter() {
       }
       const doorOpen = smooth(0, 0.15, state.gear) * 1;
       for (const d of anim.gearDoors) d.h.set(d.angle * doorOpen);
+      // braces fold, actuators telescope, door jacks follow their doors
+      for (const link of anim.gearLinks) link(ku);
 
       // weapons bays: doors first, then the ejectors and trapeze launchers
       const b = state.bay;
@@ -205,6 +218,7 @@ export function buildFighter() {
       }
       for (const tz of anim.bay.trapeze) {
         tz.holder.position.lerpVectors(tz.stow, tz.out, ke);
+        if (tz.rail) tz.rail.position.copy(tz.holder.position);
         for (const a of tz.arms) {
           tp.copy(tz.holder.position).add(a.attach);
           stretch(a.arm, a.pivot, tp);

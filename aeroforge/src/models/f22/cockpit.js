@@ -16,6 +16,10 @@ const { X } = FR;
  * at every station, with dense, evenly spaced segments and normals taken from the analytic
  * surface so highlights travel across it continuously.
  */
+// fraction of the canopy length (cosine parameter) over which the normals at each pinched tip ease
+// into the fuselage's own: ≈ 0.7 m at each end, which keeps the turn between neighbouring rows
+// under about 7° everywhere (≈ 4° over the body of the bubble)
+const TIP_BLEND = 0.3;
 function canopyGeometry(nu = 84, nv = 56) {
   const s0 = FR.CANOPY_S0, s1 = FR.CANOPY_S1;
   const pt = (u, v) => {
@@ -41,6 +45,21 @@ function canopyGeometry(nu = 84, nv = 56) {
       const du = new THREE.Vector3(pu1[0] - pu0[0], pu1[1] - pu0[1], pu1[2] - pu0[2]);
       const dv = new THREE.Vector3(pv1[0] - pv0[0], pv1[1] - pv0[1], pv1[2] - pv0[2]);
       const n = du.cross(dv).normalize();
+      // outward: away from the sill midline below the point
+      const sC = s0 + (s1 - s0) * (0.5 - 0.5 * Math.cos(Math.PI * uu));
+      const out = new THREE.Vector3(0, p[1] - (FR.upperA(sC, FR.sillW(sC)) - 0.05), p[2]);
+      if (n.dot(out) < 0) n.negate();
+      // toward the two pinched tips the bubble melts into the fuselage: blend toward the skin's own
+      // normal there, so neighbouring vertices never turn sharply and highlights fade out smoothly
+      const w = FR.smooth(0, TIP_BLEND, u) * FR.smooth(0, TIP_BLEND, 1 - u);
+      if (w < 1) {
+        const sTip = s0 + (s1 - s0) * (0.5 - 0.5 * Math.cos(Math.PI * u));
+        const zz = p[2], e2 = 0.01;
+        const dydz = (FR.upperA(sTip, Math.abs(zz) + e2) - FR.upperA(sTip, Math.max(0, Math.abs(zz) - e2))) / (2 * e2);
+        const dyds = (FR.upperA(sTip + e2, Math.abs(zz)) - FR.upperA(sTip - e2, Math.abs(zz))) / (2 * e2);
+        const nf = new THREE.Vector3(dyds, 1, -dydz * Math.sign(zz || 1)).normalize();
+        n.lerp(nf, 1 - w).normalize();
+      }
       nrm.push(n.x, n.y, n.z);
     }
   }
@@ -68,6 +87,22 @@ function canopyGeometry(nu = 84, nv = 56) {
 
 const box = (s, y, z, ls, h, w) => FR.boxS(s, y, z, ls, h, w);
 
+// cockpit layout (stations s, metres aft of the nose): forward pressure bulkhead and instrument
+// panel at s 4.45–4.9, HUD combiner at s 4.98 (≈ 0.6 m ahead of the pilot's eye, about a third of
+// the way back along the canopy), design eye near s 5.56 under the canopy apex (s 5.65)
+const PANEL_S = 4.86, PANEL_TILT = -0.22;
+const SEAT_S = 5.7;
+const EYE = [5.56, 0.95];
+
+/** A box on the instrument-panel face: (y, z) on the panel, size w × h, standing off by d. */
+function onPanel(y, z, w, h, d = 0.035, depth = 0.02) {
+  const g = new THREE.BoxGeometry(depth, h, w);
+  g.rotateZ(PANEL_TILT);
+  // the panel face leans back: its aft face moves aft as y rises
+  const x = X(PANEL_S) - d + (y - 0.35) * Math.tan(-PANEL_TILT);
+  return g.translate(x, y, z);
+}
+
 export function buildCockpit(ctx) {
   const { P } = ctx;
 
@@ -76,8 +111,8 @@ export function buildCockpit(ctx) {
   can.renderOrder = 2;
   P('Canopy', {
     system: 'Crew systems', skin: true, material: 'Monolithic polycarbonate (two 3/8 in sheets fusion-bonded), gold indium-tin-oxide coating', mass: 163,
-    explode: [0, 2.2, 0], callout: true, anchor: [X(5.4), 1.3, 0],
-    desc: 'A single frameless bubble about 3.6 m long, among the largest monolithic polycarbonate parts ever formed (about 360 lb). Its thin gold indium-tin-oxide film conducts, so radar energy reflects off the canopy instead of entering the cockpit and bouncing off the pilot\'s helmet.',
+    explode: [0, 4.2, 0], callout: true, anchor: [X(4.75), FR.canopyTop(4.75) + 0.005, 0],
+    desc: 'A single frameless bubble about 140 × 45 × 27 in (3.56 × 1.14 × 0.69 m), among the largest monolithic polycarbonate parts ever formed (about 360 lb). Its thin gold indium-tin-oxide film conducts, so radar energy reflects off the canopy instead of entering the cockpit and bouncing off the pilot\'s helmet.',
   }, can);
   {
     const g = [];
@@ -85,114 +120,168 @@ export function buildCockpit(ctx) {
       const pts = [];
       for (let s = FR.CANOPY_S0 + 0.06; s <= FR.CANOPY_S1 - 0.04; s += 0.12) pts.push([s, FR.upperA(s, FR.sillW(s)) - 0.005, side * (FR.sillW(s) + 0.012)]);
       g.push(FR.pipe(pts, 0.022, 6, 60));
+      // inflatable seal along the inside of the sill
+      const seal = [];
+      for (let s = FR.HOLE_S0 + 0.05; s <= FR.HOLE_S1 - 0.05; s += 0.15) seal.push([s, FR.upperA(s, FR.sillW(s)) - 0.03, side * (FR.sillW(s) - 0.03)]);
+      g.push(FR.pipe(seal, 0.012, 5, 40));
     }
-    // aft hinge and the electro-mechanical actuator behind the seat
-    g.push(FR.pipe([[6.62, 0.2, 0], [6.8, 0.58, 0]], 0.035, 8, 4));
-    g.push(box(6.86, 0.6, 0, 0.12, 0.05, 0.26));
-    P('Canopy frame & actuator', {
-      system: 'Crew systems', material: 'Titanium sill frame, electro-mechanical actuator', mass: 60,
-      explode: [0, 1.65, 0],
-      desc: 'The transparency is bonded into a low sill frame with no bow frame across the pilot\'s view. The canopy hinges at the back and is raised by an actuator behind the seat; for ejection the frame is jettisoned by rocket motors.',
+    P('Canopy sill frame & seals', {
+      system: 'Crew systems', material: 'Titanium sill frame, inflatable pressure seal', mass: 45,
+      explode: [0, 3.4, 0],
+      desc: 'The transparency is bonded into a low sill frame with no bow frame across the pilot\'s view. When the canopy locks, a seal inflates against the sill to hold cockpit pressure; for ejection the whole canopy and frame are jettisoned by rocket motors.',
     }, mesh(merge(g), F.canopyFrame()));
+    const a = [];
+    a.push(FR.pipe([[6.62, 0.2, 0], [6.8, 0.58, 0]], 0.035, 8, 4));
+    a.push(box(6.86, 0.6, 0, 0.12, 0.05, 0.26));
+    for (const side of [1, -1]) a.push(FR.cylX(6.9, 0.56, side * 0.12, 0.08, 0.025, 0.025, 10));
+    for (const side of [1, -1]) a.push(new THREE.CylinderGeometry(0.03, 0.03, 0.18, 10).rotateZ(Math.PI / 2 - 0.5).translate(X(6.75), 0.45, side * 0.32));
+    P('Canopy actuator & jettison rockets', {
+      system: 'Crew systems', material: 'Electro-mechanical actuator, aft hinge, solid-propellant jettison motors', mass: 15,
+      explode: [0, 2.7, 0],
+      desc: 'The canopy hinges at the back and an actuator behind the seat raises it for entry. In an ejection, small rocket motors throw the canopy clear a fraction of a second before the seat fires.',
+    }, mesh(merge(a), F.canopyFrame()));
   }
 
-  // ------------------------------------------------------------------ cockpit tub
+  // ------------------------------------------------------------------ cockpit tub, consoles, panel, pedals
   {
     const g = [];
-    g.push(box(5.3, -0.06, 0, 3.2, 0.04, 0.9));                                     // floor
-    for (const side of [1, -1]) {
-      g.push(box(5.55, 0.12, side * 0.43, 1.7, 0.34, 0.16));                         // side consoles
-      g.push(box(5.5, 0.17, side * 0.47, 1.8, 0.48, 0.03));                          // tub walls (below the sills)
-    }
-    // instrument panel (tilted back) and glare shield
-    const panel = new THREE.BoxGeometry(0.06, 0.46, 0.62).rotateZ(-0.22).translate(X(4.05), 0.2, 0);
-    g.push(panel);
-    g.push(box(4.0, 0.42, 0, 0.3, 0.04, 0.56));
-    // rudder pedals
-    for (const side of [1, -1]) g.push(new THREE.BoxGeometry(0.05, 0.22, 0.1).rotateZ(0.4).translate(X(4.3), 0.04, side * 0.16));
-    P('Cockpit tub & consoles', {
-      system: 'Crew systems', material: 'Aluminium tub, composite consoles', mass: 140,
-      explode: [0, 1.0, 0],
-      desc: 'The pressurised single-seat cockpit: floor, rudder pedals, side consoles and the instrument panel under a glare shield. Cockpit pressure and conditioned air come from the environmental control system.',
+    g.push(box(5.67, -0.05, 0, 2.44, 0.04, 0.9));                                     // floor, s 4.45–6.9
+    g.push(box((FR.NOSE_WELL.hump0 + FR.NOSE_WELL.hump1) / 2, 0.015, 0, FR.NOSE_WELL.hump1 - FR.NOSE_WELL.hump0, 0.06, 0.26));   // hump over the stowed nose wheel
+    for (const side of [1, -1]) g.push(box(5.66, 0.17, side * 0.47, 2.3, 0.44, 0.03));   // tub side walls below the sills
+    g.push(box(6.88, 0.2, 0, 0.03, 0.5, 0.9));                                         // aft wall
+    P('Cockpit tub & floor', {
+      system: 'Crew systems', material: 'Aluminium pressure tub', mass: 85,
+      explode: [0, 0.85, 0],
+      desc: 'The pressurised single-seat cockpit between the forward and aft pressure bulkheads. The stowed nose wheel sits under a small hump in the floor; pressure and conditioned air come from the environmental control system.',
     }, mesh(merge(g), F.panel()));
+    for (const side of [1, -1]) {
+      const R = side > 0 ? 'right' : 'left';
+      const c = [box(5.62, 0.12, side * 0.4, 1.2, 0.34, 0.15)];
+      const sw = [];
+      for (const [s0, l] of [[5.25, 0.22], [5.55, 0.26], [5.88, 0.3]]) sw.push(box(s0, 0.296, side * 0.4, l, 0.012, 0.12));
+      P(`${side > 0 ? 'Right' : 'Left'} console`, {
+        system: 'Crew systems', material: 'Composite console, edge-lit control panels', mass: 18,
+        explode: [0, 1.15, 0.75 * side],
+        desc: side > 0
+          ? 'Right-hand console: the side-stick at its forward end, with panels behind it for lights, oxygen and environmental controls (panel layout simplified).'
+          : 'Left-hand console: the throttles at its forward end, with panels for engine start, fuel, the landing gear and the canopy (panel layout simplified).',
+      }, [mesh(merge(c), F.panel()), mesh(merge(sw), F.boxLight())]);
+      void R;
+    }
+    const pn = [];
+    pn.push(new THREE.BoxGeometry(0.06, 0.42, 0.66).rotateZ(PANEL_TILT).translate(X(PANEL_S), 0.35, 0));   // main panel, y 0.14–0.56
+    pn.push(onPanel(0.06, 0, 0.19, 0.2, 0, 0.06));                                                     // centre pedestal between the knees
+    pn.push(box(4.72, 0.555, 0, 0.36, 0.03, 0.62));                                                    // glare shield
+    P('Instrument panel & glare shield', {
+      system: 'Crew systems', material: 'Machined aluminium panel, anti-glare coaming', mass: 30,
+      explode: [0.6, 1.2, 0],
+      desc: 'Carries the four multifunction displays and the integrated control panel. There are no round dials: the two up-front displays double as the standby flight instruments and fuel gauge.',
+    }, mesh(merge(pn), F.panel()));
+    const pd = [];
+    for (const side of [1, -1]) {
+      pd.push(new THREE.BoxGeometry(0.04, 0.22, 0.1).rotateZ(0.35).translate(X(4.78), 0.1, side * 0.17));
+      pd.push(FR.cylX(4.7, 0.04, side * 0.17, 0.14, 0.012, 0.012, 6));
+    }
+    P('Rudder pedals', {
+      system: 'Crew systems', material: 'Aluminium pedals on adjustable rails, toe brakes', mass: 6,
+      explode: [0.9, 0.65, 0],
+      desc: 'Yaw and toe-brake inputs go to the vehicle-management computers as electrical signals; the pedals adjust fore and aft to the pilot\'s leg length.',
+    }, mesh(merge(pd), F.boxLight()));
   }
 
   // ------------------------------------------------------------------ ACES II ejection seat
   {
-    const g = [], y = [];
-    const back = new THREE.BoxGeometry(0.12, 0.95, 0.5).rotateZ(0.3).translate(X(6.12), 0.52, 0);
+    const S = SEAT_S, g = [], y = [];
+    const back = new THREE.BoxGeometry(0.12, 0.95, 0.5).rotateZ(0.3).translate(X(S + 0.24), 0.52, 0);
     g.push(back);
-    g.push(box(5.88, 0.06, 0, 0.5, 0.16, 0.52));                                    // bucket
-    g.push(new THREE.BoxGeometry(0.18, 0.2, 0.34).rotateZ(0.3).translate(X(6.22), 0.94, 0));  // headrest / parachute
-    for (const side of [1, -1]) g.push(new THREE.BoxGeometry(0.08, 0.9, 0.05).rotateZ(0.3).translate(X(6.2), 0.5, side * 0.27));  // rails
-    g.push(FR.cylX(6.32, 0.18, 0, 0.28, 0.05, 0.05, 10));                            // catapult / rocket
-    y.push(FR.pipe([[5.62, 0.12, -0.12], [5.56, 0.22, 0], [5.62, 0.12, 0.12]], 0.018, 6, 10));   // ejection handle
-    y.push(box(5.66, 0.16, 0, 0.12, 0.03, 0.4));
-    const cush = [box(5.9, 0.17, 0, 0.42, 0.06, 0.42), new THREE.BoxGeometry(0.06, 0.6, 0.4).rotateZ(0.3).translate(X(6.04), 0.52, 0)];
+    g.push(box(S, 0.06, 0, 0.5, 0.16, 0.52));                                           // bucket / survival kit
+    g.push(new THREE.BoxGeometry(0.18, 0.2, 0.34).rotateZ(0.3).translate(X(S + 0.34), 0.94, 0));   // headrest / parachute
+    for (const side of [1, -1]) g.push(new THREE.BoxGeometry(0.08, 0.9, 0.05).rotateZ(0.3).translate(X(S + 0.32), 0.5, side * 0.27));  // rails
+    g.push(FR.cylX(S + 0.44, 0.18, 0, 0.28, 0.05, 0.05, 10));                          // catapult / rocket
+    y.push(FR.pipe([[S - 0.26, 0.12, -0.12], [S - 0.32, 0.22, 0], [S - 0.26, 0.12, 0.12]], 0.018, 6, 10));   // centre ejection handle
+    y.push(box(S - 0.22, 0.16, 0, 0.12, 0.03, 0.4));
+    const cush = [box(S + 0.02, 0.17, 0, 0.42, 0.06, 0.42), new THREE.BoxGeometry(0.06, 0.6, 0.4).rotateZ(0.3).translate(X(S + 0.16), 0.52, 0)];
     P('ACES II ejection seat', {
       system: 'Crew systems', material: 'Aluminium structure, rocket catapult, parachute', mass: 75,
-      explode: [0, 2.3, 0], callout: true, anchor: [X(6.25), 1.08, 0.2],
-      desc: 'A zero-zero seat: it can save the pilot even at zero height and zero airspeed. Pulling the handle fires a catapult and an under-seat rocket; the seat selects its parachute-deployment mode from airspeed and altitude.',
+      explode: [0, 2.0, 0], callout: true, anchor: [X(S + 0.32), 0.42, 0.28],
+      desc: 'A zero-zero seat: it can save the pilot even at zero height and zero airspeed. Pulling the centre handle between the knees fires a catapult and an under-seat rocket; the seat selects its parachute-deployment mode from airspeed and altitude.',
     }, [mesh(merge(g), F.seat()), mesh(merge(y), F.yellow()), mesh(merge(cush), F.cushion())]);
   }
 
   // ------------------------------------------------------------------ pilot
   {
-    const s = [], hm = [];
-    s.push(new THREE.CapsuleGeometry(0.17, 0.42, 6, 12).rotateZ(0.32).translate(X(5.92), 0.5, 0));  // torso
+    const S = SEAT_S, s = [], hm = [];
+    s.push(new THREE.CapsuleGeometry(0.17, 0.42, 6, 12).rotateZ(0.32).translate(X(S + 0.04), 0.5, 0));  // torso
     for (const side of [1, -1]) {
-      s.push(FR.pipe([[5.85, 0.22, side * 0.12], [5.35, 0.3, side * 0.13], [4.95, 0.12, side * 0.14], [4.4, 0.06, side * 0.16]], 0.065, 8, 16));  // legs
-      s.push(FR.pipe([[5.95, 0.72, side * 0.2], [5.75, 0.45, side * 0.27], [5.45, 0.4, side * 0.36]], 0.045, 8, 12));    // arms
+      // hip → knee → heel ≈ 0.45 + 0.45 m, heel on the floor near the pedals
+      s.push(FR.pipe([[S - 0.02, 0.22, side * 0.12], [S - 0.25, 0.3, side * 0.13], [S - 0.48, 0.34, side * 0.15], [S - 0.68, 0.18, side * 0.165], [S - 0.84, 0.04, side * 0.17]], 0.065, 8, 16));  // legs
+      s.push(FR.pipe([[S + 0.07, 0.72, side * 0.2], [S - 0.13, 0.45, side * 0.27], [S - 0.42, 0.4, side * 0.37]], 0.045, 8, 12));    // arms to stick / throttles
     }
-    hm.push(new THREE.SphereGeometry(0.15, 20, 14).translate(X(5.88), 0.99, 0));
-    const visor = new THREE.SphereGeometry(0.152, 18, 10, -Math.PI / 2 - 0.9, 1.8, Math.PI * 0.32, Math.PI * 0.3).rotateY(Math.PI).translate(X(5.88), 0.99, 0);
-    const mask = new THREE.CylinderGeometry(0.045, 0.06, 0.1, 10).rotateZ(Math.PI / 2).translate(X(5.74), 0.92, 0);
+    hm.push(new THREE.SphereGeometry(0.15, 20, 14).translate(X(S - 0.02), 0.99, 0));
+    const visor = new THREE.SphereGeometry(0.152, 18, 10, -Math.PI / 2 - 0.9, 1.8, Math.PI * 0.32, Math.PI * 0.3).rotateY(Math.PI).translate(X(S - 0.02), 0.99, 0);
+    const mask = new THREE.CylinderGeometry(0.045, 0.06, 0.1, 10).rotateZ(Math.PI / 2).translate(X(S - 0.16), 0.92, 0);
     P('Pilot', {
       system: 'Crew systems', material: 'Pressure-breathing / anti-g ensemble, helmet', mass: 100,
-      explode: [0, 2.85, 0],
-      desc: 'One pilot flies the whole mission. An anti-g suit and pressure breathing help hold consciousness at the airframe\'s +9 g limit; oxygen comes from the on-board oxygen generating system.',
+      explode: [0, 2.6, 0],
+      desc: 'One pilot flies the whole mission, eyes about 0.6 m behind the HUD. An anti-g suit and pressure breathing help hold consciousness at the airframe\'s +9 g limit; oxygen comes from the on-board oxygen generating system.',
     }, [mesh(merge(s), F.suit()), mesh(merge(hm), F.helmet()), mesh(visor, F.visor()), mesh(mask, F.black())]);
   }
 
   // ------------------------------------------------------------------ HOTAS: side-stick and throttles
   {
-    const g = [new THREE.CylinderGeometry(0.018, 0.022, 0.16, 10).translate(X(5.32), 0.37, 0.4), box(5.32, 0.46, 0.4, 0.06, 0.05, 0.05), box(5.32, 0.295, 0.4, 0.1, 0.01, 0.08)];
+    const sS = SEAT_S - 0.43;
+    const g = [new THREE.CylinderGeometry(0.018, 0.022, 0.16, 10).translate(X(sS), 0.37, 0.4), box(sS, 0.46, 0.4, 0.06, 0.05, 0.05), box(sS, 0.295, 0.4, 0.1, 0.01, 0.08)];
     P('Side-stick controller', {
       system: 'Crew systems', material: 'Force-sensing grip', mass: 3,
-      explode: [0, 1.5, 0.4],
+      explode: [0, 1.6, 0.4],
       desc: 'A right-hand side-stick that barely moves: it senses the pilot\'s force and sends commands to the flight-control computers, with buttons for weapons and sensors under the fingers (hands on throttle and stick, HOTAS).',
     }, mesh(merge(g), F.black()));
+    const tS = SEAT_S - 0.32;
     const t = [];
-    for (const dz of [-0.035, 0.035]) t.push(new THREE.BoxGeometry(0.06, 0.12, 0.05).rotateZ(-0.3).translate(X(5.45), 0.36, -0.4 + dz));
-    t.push(box(5.45, 0.3, -0.4, 0.3, 0.02, 0.14));
+    for (const dz of [-0.035, 0.035]) t.push(new THREE.BoxGeometry(0.06, 0.12, 0.05).rotateZ(-0.3).translate(X(tS), 0.36, -0.4 + dz));
+    t.push(box(tS, 0.3, -0.4, 0.3, 0.02, 0.14));
     P('Throttles', {
       system: 'Crew systems', material: 'Twin throttle grips', mass: 4,
-      explode: [0, 1.5, -0.4],
+      explode: [0, 1.6, -0.4],
       desc: 'Two throttles on the left console, one per F119. Pushing past the military-power detent lights the afterburners.',
     }, mesh(merge(t), F.black()));
   }
 
-  // ------------------------------------------------------------------ HUD, up-front controls and displays
+  // ------------------------------------------------------------------ HUD, ICP, up-front and multifunction displays
   {
-    const body = [box(4.08, 0.48, 0, 0.2, 0.08, 0.24)];
-    const comb = new THREE.BoxGeometry(0.01, 0.18, 0.2).rotateZ(0.55).translate(X(4.16), 0.62, 0);
-    const icp = [box(4.0, 0.34, 0, 0.06, 0.1, 0.24)];
-    const ufd = [];
-    for (const side of [1, -1]) ufd.push(new THREE.BoxGeometry(0.02, 0.09, 0.12).rotateZ(-0.22).translate(X(4.02), 0.34, side * 0.2));
-    P('HUD & up-front controls', {
-      system: 'Crew systems', material: 'Holographic combiner, integrated control panel, two up-front displays', mass: 22,
-      explode: [0.6, 1.4, 0],
-      desc: 'The head-up display projects flight and targeting symbols focused at infinity on a glass combiner. Below it sit the integrated control panel for data entry and two small up-front displays for communication, navigation and warnings.',
-    }, [mesh(merge([...body, ...icp]), F.panel()), mesh(comb, F.hud(), { cast: false }), mesh(merge(ufd), F.displayAmber())]);
-    const scr = [];
-    const at = (y, z, w, h) => new THREE.BoxGeometry(0.02, h, w).rotateZ(-0.22).translate(X(4.02) + (y - 0.2) * 0.22, y, z);
-    scr.push(at(0.17, 0, 0.2, 0.2));                       // primary MFD, 8 × 8 in
-    for (const side of [1, -1]) scr.push(at(0.19, side * 0.22, 0.16, 0.16));    // secondary MFDs, 6.25 × 6.25 in
-    scr.push(at(-0.01, 0, 0.16, 0.16));
-    P('Multifunction displays', {
-      system: 'Crew systems', material: 'Colour active-matrix LCDs', mass: 26,
-      explode: [0.9, 1.25, 0],
-      desc: 'A large 8 × 8 in primary display shows the fused tactical picture from all sensors, with three 6.25 × 6.25 in secondary displays around it. Sensor fusion means the pilot sees tracks, not raw radar returns.',
-    }, mesh(merge(scr), F.display()));
+    const body = [box(4.84, 0.61, 0, 0.24, 0.09, 0.24), box(4.84, 0.665, 0, 0.12, 0.02, 0.2)];
+    const comb = new THREE.BoxGeometry(0.01, 0.2, 0.2).rotateZ(0.5).translate(X(4.98), 0.78, 0);
+    const frame = [FR.pipe([[4.92, 0.67, -0.105], [4.99, 0.86, -0.105]], 0.008, 5, 2), FR.pipe([[4.92, 0.67, 0.105], [4.99, 0.86, 0.105]], 0.008, 5, 2)];
+    P('Head-up display', {
+      system: 'Crew systems', material: 'Projector unit under a holographic combiner glass', mass: 16,
+      explode: [0.7, 1.75, 0],
+      desc: 'A wide-field-of-view monochrome HUD that serves as a primary flight instrument: symbols focused at infinity are projected onto the combiner about 0.6 m in front of the pilot\'s eye, so flight data and targets overlay the outside world.',
+    }, [mesh(merge([...body, ...frame]), F.panel()), mesh(comb, F.hud(), { cast: false })]);
+    const icp = [onPanel(0.495, 0, 0.22, 0.09, 0.035, 0.05)];
+    const keys = [];
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 5; c++) keys.push(onPanel(0.475 + r * 0.04, -0.08 + c * 0.04, 0.025, 0.025, 0.065, 0.012));
+    const ufd = [onPanel(0.495, 0.17, 0.1, 0.076), onPanel(0.495, -0.17, 0.1, 0.076)];
+    P('Integrated control panel & up-front displays', {
+      system: 'Crew systems', material: 'Keypad panel, two 3 × 4 in colour LCDs', mass: 6,
+      explode: [0.95, 1.5, 0],
+      desc: 'Under the HUD, the integrated control panel (ICP) is the keypad for communication, navigation and autopilot entries. The two 3 × 4 in up-front displays beside it show cautions, warnings and CNI data, and double as the standby flight instruments and fuel gauge.',
+    }, [mesh(merge([...icp, ...keys]), F.panel()), mesh(merge(ufd), F.displayAmber())]);
+    const bez = [onPanel(0.33, 0, 0.23, 0.23, 0.03, 0.025)];
+    P('Primary multifunction display', {
+      system: 'Crew systems', material: '8 × 8 in colour active-matrix LCD with bezel keys', mass: 9,
+      explode: [1.25, 1.2, 0],
+      desc: 'The 8 × 8 in primary display under the ICP shows the fused tactical situation from every sensor: tracks, not raw radar returns, which is what sensor fusion means for the pilot.',
+    }, [mesh(merge(bez), F.panel()), mesh(onPanel(0.33, 0, 0.203, 0.203, 0.045, 0.01), F.display())]);
+    const sb = [], sd = [];
+    for (const [yy, zz] of [[0.31, 0.235], [0.31, -0.235], [0.07, 0]]) {
+      sb.push(onPanel(yy, zz, 0.185, 0.185, 0.03, 0.025));
+      sd.push(onPanel(yy, zz, 0.159, 0.159, 0.045, 0.01));
+    }
+    P('Secondary multifunction displays', {
+      system: 'Crew systems', material: 'Three 6.25 × 6.25 in colour LCDs', mass: 15, count: 3,
+      explode: [1.25, 0.85, 0],
+      desc: 'Three 6.25 × 6.25 in displays around the primary one (left, right, and low in the centre between the knees) show tactical detail, stores management and system pages; with the two up-front displays and the PMFD that makes six colour LCDs.',
+    }, [mesh(merge(sb), F.panel()), mesh(merge(sd), F.display())]);
   }
+  void EYE;
 }
