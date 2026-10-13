@@ -115,3 +115,9 @@ test('the fuel step shows the whole fuel system, wing tanks included', () => {
   const missing = [...fuel].filter((n) => !step.focus.includes(n));
   assert.deepEqual(missing, [], 'fuel parts left out of the fuel step');
 });
+
+test('about a dozen callouts at most, each anchored on its part', () => {
+  const lines = modelSrc.split('\n').filter((l) => /callout: (true|side [<>] 0)/.test(l));
+  assert.ok(lines.length >= 6 && lines.length <= 12, `${lines.length} callouts (the brief keeps them to about 12)`);
+  for (const l of lines) assert.match(l, /anchor: /, `callout without an anchor: ${l.trim()}`);
+});

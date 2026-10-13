@@ -330,7 +330,7 @@ export function buildUAV() {
     P(`Wing fuel tank (${sn})`, {
       system: 'Fuel', material: 'Sealed integral bay / bladder (est.)', mass: 20, explode: [0, -0.35, 1.9 * side],
       desc: 'Fuel in the wing box between the spars, from the root to about 8.4 m out: ≈ 750 L per wing in this model (the real split is not published). Wing fuel sits where the lift is, so it relieves wing bending and barely moves the centre of gravity as it burns.',
-      callout: side > 0, anchor: wpt(6.4, 0.42, 1, 0).map((v, i) => (i === 2 ? v * side : v)),
+      callout: side > 0, anchor: wpt(6.82, 0.42, 1, 0).map((v, i) => (i === 2 ? v * side : v)),
     }, L(f(tankG), m.fuel));
 
     // trailing-edge surfaces
@@ -423,7 +423,7 @@ export function buildUAV() {
     storeParts.hellfire.push(P(`AGM-114 Hellfire pair (${sn})`, {
       system: 'Weapons', material: 'Steel/aluminium airframe, semi-active laser seeker', mass: 98, massSource: 'Published AGM-114 figure (45–49 kg each)', count: 2, explode: [0, -1.2, 2.0 * side],
       desc: 'Two laser-guided Hellfire missiles, each 1.63 m long and 0.18 m in diameter. The seeker under the nose dome homes on a laser spot with a matching pulse code.',
-      callout: side < 0, anchor: [lx - 0.42, hy - 0.1, md.z * side],   // the port pair, between the two missiles (placed so no label covers another part's dot)
+      callout: side < 0, anchor: [lx - 0.42, hy - 0.06, (md.z + 0.19) * side],   // the port pair: the outboard missile's lower flank
     }, [L(pair(hf.body), m.olive), L(pair(hf.dome), m.glass), L(pair(hf.band), m.yellow), L(pair(hf.motor), m.brown)]));
   }
   // wing root fairings (both sides)
@@ -1250,8 +1250,9 @@ export function buildUAV() {
     aero: true,
     root: A.root,
     parts: A.parts,
-    // a high front quarter: the planform reads, and the nose sensors' and the tail's labels stack without covering each other's dots
-    view: { dir: [1, 1.03, 1], fill: 0.95 },
+    // a raised front quarter: the planform reads, and the nose sensors' and the tail's labels stack
+    // without covering one another's dots (anchors and this view were laid out together)
+    view: { dir: [1.19, 1.05, 1], fill: 0.85 },
     displaySize: 11.5,
     thermalRange: [230, 560],
     state,
