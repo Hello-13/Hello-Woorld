@@ -16,7 +16,10 @@ import {
   X, prof, fusePoint, fuselageLoft, stationsWithBreaks, splitTris, merge, box, lru, cylX, tubeBetween, pipe, latheX,
   hoop, bulkhead, applyMat, WING, wsec, W_ROOT, W_TIP, wpt, sparGeo, ribGeo,
 } from './mq9/shape.js';
-import { ENGINE_Y, SHAFT_Y, PROP_X, STATIONS, turbineGeo, compressorGeo, gearboxGeo, shaftGeo, exhaustGeo, bladesGeo, hubGeo, spinnerGeo } from './mq9/powerplant.js';
+import {
+  ENGINE_Y, SHAFT_Y, PROP_X, STATIONS, combustorGeo, turbineGeo, manifoldGeo, ignitersGeo, collectorGeo, compressorGeo, impellersGeo,
+  mainShaftGeo, screenGeo, gearboxGeo, shaftGeo, exhaustGeo, bladesGeo, hubGeo, spinnerGeo,
+} from './mq9/powerplant.js';
 import { gbu12, hellfire, launcher, pylon } from './mq9/stores.js';
 
 const deg = Math.PI / 180;
@@ -47,7 +50,7 @@ function materials() {
     harness: std({ color: 0xd2d0c4, roughness: 0.75, metalness: 0.0 }),
     pipe: std({ color: 0xb9bec3, roughness: 0.35, metalness: 0.85 }),
     hot: M.inconel(), titanium: M.titanium(), gun: M.gunmetal(), alu: M.aluminium(), darkMetal: M.darkMetal(),
-    rubber: M.rubber(), intake: M.intake(),
+    rubber: M.rubber(), intake: M.intake(), copper: M.copper(),
     blade: std({ color: 0x3b3f44, roughness: 0.45, metalness: 0.15 }),
     dish: std({ color: 0xdfe2e3, roughness: 0.5, metalness: 0.1, side: THREE.DoubleSide }),
     turret: std({ color: 0x8e959b, roughness: 0.42, metalness: 0.3 }),
@@ -242,18 +245,19 @@ export function buildUAV() {
     system: 'Structure', material: 'Titanium sheet (est.)', mass: 9, explode: [0.15, 0.95, 0],
     desc: 'Fireproof bulkhead between the engine bay and the fuel and electronics ahead of it. Titanium keeps its strength at flame temperatures where aluminium would melt.',
   }, L(bulkhead(7.62), m.titanium));
-  const mount = [new THREE.TorusGeometry(0.24, 0.012, 6, 36).rotateY(Math.PI / 2).translate(X(8.3), ENGINE_Y, 0)];
+  const XM = X(STATIONS.turbine1);              // mount ring at the compressor / combustor joint
+  const mount = [new THREE.TorusGeometry(0.235, 0.012, 6, 36).rotateY(Math.PI / 2).translate(XM, ENGINE_Y, 0)];
   for (const th of [0.75, Math.PI - 0.75, -0.75, -Math.PI + 0.75]) {
     const a = fusePoint(7.64, th, 0.05);
-    const b = [X(8.3), ENGINE_Y + Math.sin(th) * 0.24, Math.cos(th) * 0.24];
+    const b = [XM, ENGINE_Y + Math.sin(th) * 0.235, Math.cos(th) * 0.235];
     mount.push(tubeBetween(a, b, 0.012, 8));
-    const b2 = [X(8.3), ENGINE_Y + Math.sin(th + (th > 0 ? 0.6 : -0.6)) * 0.24, Math.cos(th + (th > 0 ? 0.6 : -0.6)) * 0.24];
+    const b2 = [XM, ENGINE_Y + Math.sin(th + (th > 0 ? 0.6 : -0.6)) * 0.235, Math.cos(th + (th > 0 ? 0.6 : -0.6)) * 0.235];
     mount.push(tubeBetween(a, b2, 0.01, 8));
   }
-  for (const zs of [1, -1]) mount.push(tubeBetween(fusePoint(9.55, zs > 0 ? 0.3 : Math.PI - 0.3, 0.04), [X(9.45), ENGINE_Y + 0.12, 0.2 * zs], 0.012, 8));
+  for (const zs of [1, -1]) mount.push(tubeBetween(fusePoint(8.9, zs > 0 ? 0.35 : Math.PI - 0.35, 0.04), [X(8.82), ENGINE_Y + 0.2, 0.17 * zs], 0.012, 8));
   P('Engine mount truss', {
     system: 'Structure', material: 'Welded steel tube with elastomeric isolators (est.)', mass: 14, explode: [0, 1.15, 0],
-    desc: 'A tubular truss from the firewall to a mount ring on the turbine case, with a rear brace at the gearbox. Rubber isolators keep engine vibration out of the airframe and the sensors.',
+    desc: 'A tubular truss from the firewall to a mount ring at the compressor–combustor joint, with a rear brace from the aft frame to the gearbox. Rubber isolators keep engine vibration out of the airframe and the sensors (layout estimated).',
   }, L(merge(mount), m.darkMetal));
 
   // ============================================================== wings
@@ -480,29 +484,63 @@ export function buildUAV() {
   }, L(merge([box(0.36, 0.05, 0.035, [vfTip.le[0] - 0.22, 0, tipZ])]), m.darkMetal), fin);
 
   // ============================================================== propulsion
-  const tb = turbineGeo();
-  role(P('TPE331 turbine section', {
-    system: 'Propulsion', material: 'Nickel-alloy combustor and turbine, steel casing', mass: 60, explode: [0.35, 1.0, 0],
-    desc: 'The reverse-flow annular combustor wraps around a three-stage axial turbine that drives the compressor and, through the gearbox, the propeller. Gas entering the turbine is around 1,000 °C at full power, typical for an engine of this class.',
-    callout: true, anchor: [X(8.25), ENGINE_Y + 0.25, 0.22],
-  }, [L(tb.hot, m.hot), L(tb.fittings, m.pipe)]), 'turbine');
-  const cp = compressorGeo();
-  role(P('TPE331 compressor section', {
-    system: 'Propulsion', material: 'Titanium impellers, aluminium/steel housings', mass: 68, explode: [0, 1.0, 0],
-    desc: 'Two centrifugal compressor stages in series raise the air to about 10:1 pressure ratio before it is ducted forward to the combustor. Centrifugal stages are short and rugged, ideal for a compact turboprop.',
-  }, [L(cp.case, m.titanium), L(cp.screen, m.darkMetal)]), 'compressor');
+  // TPE331-10GD, 1.10 m from the exhaust collector (s 7.88) to the gearbox face (s 8.98); see mq9/powerplant.js
+  const XT0 = X(STATIONS.turbine0), XG = X(STATIONS.gear1);
+  const cb = combustorGeo();
+  role(P('TPE331 combustor & turbine case', {
+    system: 'Propulsion', material: 'Steel case, nickel-alloy hot section', mass: 22, explode: [0.55, 1.05, 0],
+    desc: 'The hot section of the Honeywell TPE331-10GD (900 shp). The whole engine, gearbox included, is only 1.09 m long and weighs 175 kg (385 lb) dry, because the reverse-flow combustor folds the gas path back around the turbine (published TPE331-10 figures; installed position estimated).',
+    callout: true, anchor: [X(8.08), ENGINE_Y + 0.22, 0.05],
+  }, L(cb.casing, m.hot)), 'turbine');
+  role(P('Annular combustor liner', {
+    system: 'Propulsion', material: 'Nickel-alloy liner with cooling holes', mass: 6, explode: [0.55, 0.55, 0.55],
+    desc: 'Compressed air runs forward outside the liner, turns 180° into it, burns with the fuel and turns again into the first turbine nozzle. Folding the flow this way is what keeps the TPE331 short.',
+  }, L(cb.liner, m.hot)), 'turbine');
+  const tg = turbineGeo();
+  role(P('Three-stage axial turbine', {
+    system: 'Propulsion', material: 'Nickel-superalloy discs and blades', mass: 22, count: 3, explode: [0.55, 0.55, -0.55],
+    desc: 'Three turbine stages on the single shaft extract the gas energy that drives both the two-stage compressor and, through the gearbox, the propeller. Each stage is a nozzle ring that turns the flow and a bladed disc that it spins (stage spacing estimated).',
+  }, [L(tg.rotors, m.hot), L(tg.nozzles, m.darkMetal)]), 'turbine');
+  role(P('Fuel manifold & nozzles', {
+    system: 'Propulsion', material: 'Stainless manifold, atomising nozzles', mass: 3, count: 10, explode: [0.75, 1.3, 0.4],
+    desc: 'A ring manifold feeds the atomising fuel nozzles that spray metered fuel into the combustor (ten shown; the real count is not given in public sources).',
+  }, L(manifoldGeo(10), m.pipe)), 'turbine');
+  role(P('Igniter plugs', {
+    system: 'Propulsion', material: 'Surface-discharge igniters', mass: 0.6, count: 2, explode: [0.75, 1.3, -0.4],
+    desc: 'Two igniter plugs light the combustor during the start; once the flame holds on its own they are switched off.',
+  }, L(ignitersGeo(), m.darkMetal)), 'turbine');
+  role(P('Exhaust collector', {
+    system: 'Propulsion', material: 'Inconel', mass: 6, explode: [0.95, 0.8, 0],
+    desc: 'An annular duct at the forward end of the engine gathers the turbine exhaust, at several hundred degrees, and hands it to the two side stacks.',
+  }, L(collectorGeo(), m.hot)), 'exhaust');
+  role(P('TPE331 compressor housing', {
+    system: 'Propulsion', material: 'Aluminium and steel housings, diffusers and crossover ducts', mass: 30, explode: [0, 1.05, 0],
+    desc: 'Houses the two centrifugal stages in series: crossover ducts carry the air from the first stage to the second, which raises it to roughly 10:1 pressure ratio (pressure ratio is typical of the TPE331-10 class, not a published figure).',
+  }, L(compressorGeo(), m.titanium)), 'compressor');
+  role(P('Centrifugal impellers', {
+    system: 'Propulsion', material: 'Titanium impellers', mass: 9, count: 2, explode: [0, 0.55, 0.55],
+    desc: 'Two centrifugal impellers on the main shaft fling the air outward into their diffusers. A centrifugal stage does the work of several axial stages in a short, rugged package.',
+  }, L(impellersGeo(), m.titanium)), 'compressor');
+  P('Main shaft & bearings', {
+    system: 'Propulsion', material: 'Steel shaft, three rolling-element bearings', mass: 6, count: 3, explode: [0, 0.55, -0.55],
+    desc: 'One shaft carries the turbine, both impellers and the gearbox input pinion, turning at about 41,700 rpm at 100 % speed (TPE331-10 figure); three bearings support it (positions estimated).',
+  }, L(mainShaftGeo(), m.pipe));
+  P('Inlet screen', {
+    system: 'Propulsion', material: 'Stainless wire screen', mass: 1, explode: [-0.25, 0.8, 0],
+    desc: 'A mesh drum between the gearbox and the first compressor stage that keeps runway debris out of the impellers.',
+  }, L(screenGeo(), m.darkMetal));
   role(P('Propeller reduction gearbox', {
-    system: 'Propulsion', material: 'Magnesium/aluminium case, steel gears', mass: 47, explode: [-0.45, 1.0, 0],
-    desc: 'Steps the engine’s ≈ 41,700 rpm down to propeller speed (TPE331-10 installations run the propeller near 1,590 rpm, about 26:1). Its offset output puts the propeller shaft above the engine centreline.',
+    system: 'Propulsion', material: 'Aluminium case, steel gears', mass: 50, explode: [-0.55, 1.05, 0],
+    desc: 'Steps the engine’s ≈ 41,700 rpm down to ≈ 1,590 propeller rpm (about 26:1 on the TPE331-10). Its offset output puts the propeller shaft above the engine centreline, and its pads drive the generators, governor and fuel control.',
   }, L(gearboxGeo(), m.gun)), 'gearbox');
   const inlet = [
     lru(0.55, 0.1, 0.26, [X(7.6), 1.87, 0], 0.04),
-    pipe([[X(7.45), 1.84, 0], [X(7.9), 1.82, 0], [X(8.5), 1.82, 0], [X(8.85), 1.8, 0], [X(9.1), 1.68, 0]], 0.05, 10, 40).translate(0, -1.82, 0).scale(1, 0.6, 1).translate(0, 1.82, 0),
-    new THREE.TorusGeometry(0.2, 0.035, 8, 32).rotateY(Math.PI / 2).translate(X(9.15), ENGINE_Y, 0),
+    pipe([[X(7.45), 1.84, 0], [X(7.85), 1.826, 0], [X(8.3), 1.825, 0], [X(8.52), 1.8, 0], [X(8.6), 1.76, 0]], 0.05, 10, 40).translate(0, -1.825, 0).scale(1, 0.4, 1).translate(0, 1.825, 0),
+    new THREE.TorusGeometry(0.19, 0.03, 8, 32).rotateY(Math.PI / 2).translate(X(8.62), ENGINE_Y, 0),
   ];
   P('Engine air inlet & plenum', {
-    system: 'Propulsion', material: 'Composite duct, aluminium plenum (layout approximate)', mass: 7, explode: [0, 1.5, 0],
-    desc: 'A dorsal ram-air scoop feeds a duct and an annular plenum around the inlet screen behind the gearbox, where the TPE331 draws its air (scoop position from photographs; duct routing estimated).',
+    system: 'Propulsion', material: 'Composite duct, aluminium plenum (layout approximate)', mass: 7, explode: [0, 1.6, 0],
+    desc: 'A dorsal ram-air scoop feeds a flat duct over the engine and an annular plenum around the inlet screen, just ahead of the gearbox, where the TPE331 draws its air (scoop position from photographs; duct routing estimated).',
   }, [L(merge(inlet), m.skin), L(box(0.004, 0.07, 0.22, [X(7.6) + 0.279, 1.875, 0]), m.intake)]);
   role(P('Exhaust stacks', {
     system: 'Propulsion', material: 'Inconel', mass: 6, count: 2, explode: [0.2, 0.35, 0],
@@ -513,38 +551,73 @@ export function buildUAV() {
     desc: 'Engine and gearbox oil rejects its heat to ram air through a ventral scoop and cooler matrix. At 15 km the air is thin, so the cooler is sized for climbing slowly at high power.',
   }, [L(merge([lru(0.6, 0.09, 0.22, [X(7.3), 1.165, 0], 0.03), box(0.13, 0.13, 0.22, [X(7.2), 1.27, 0])]), m.skin), L(box(0.004, 0.06, 0.18, [X(7.0) + 0.004, 1.155, 0]), m.intake)]), 'oil');
   role(P('Oil tank', {
-    system: 'Propulsion', material: 'Aluminium tank', mass: 5, explode: [0, 0.75, -0.45],
-    desc: 'Holds the engine and gearbox lubricating oil (a few litres; estimate). The same oil cools the gearbox bearings and drives the propeller pitch control.',
-  }, L(merge([cylX(X(8.95), X(8.62), 0.06, 0.06, 1.43, -0.24, 16), cylX(X(8.7), X(8.66), 0.025, 0.025, 1.5, -0.24, 8)]), m.alu)), 'oil');
+    system: 'Propulsion', material: 'Aluminium tank with filler and sight gauge', mass: 4, explode: [0, 0.75, -0.6],
+    desc: 'Holds the engine and gearbox lubricating oil (a few litres; size and position estimated). The same oil cools the bearings, lubricates the gears and works the propeller pitch change.',
+  }, L(merge([cylX(XG + 0.03, XG + 0.29, 0.04, 0.04, 1.52, -0.245, 16), cylX(XG + 0.22, XG + 0.25, 0.018, 0.018, 1.565, -0.245, 8)]), m.alu)), 'oil');
+  const oilLines = [];
+  for (const [dz, dy] of [[0, 0], [0.035, 0.02]]) {
+    oilLines.push(pipe([[XG + 0.12, 1.475 + dy, -0.2 + dz], [X(8.6), 1.43 + dy, -0.24 + dz], [X(8.1), 1.42 + dy, -0.25 + dz], [X(7.7), 1.36 + dy, -0.2 + dz], [X(7.35), 1.29 + dy, -0.09 + dz]], 0.008, 6, 40));
+  }
+  role(P('Engine oil lines', {
+    system: 'Propulsion', material: 'Stainless tube and fire-sleeved hose', mass: 2, count: 2, explode: [0, -0.3, -0.75],
+    desc: 'Supply and return lines between the engine’s oil system and the ventral oil cooler, through the firewall in fire-resistant fittings (routing estimated).',
+  }, L(merge(oilLines), m.pipe)), 'oil');
+  const fcu = [
+    lru(0.14, 0.08, 0.09, [XG - 0.08, 1.47, 0.1]),
+    pipe([[XG - 0.02, 1.45, 0.14], [X(8.9), 1.43, 0.21], [X(8.4), 1.42, 0.215], [X(8.26), 1.38, 0.1], [X(8.22), 1.36, 0.05]], 0.006, 6, 30),
+  ];
   role(P('Fuel control unit', {
-    system: 'Propulsion', material: 'Engine-driven fuel pump and metering unit', mass: 6, explode: [0.3, 0.55, 0.55],
-    desc: 'The engine-driven high-pressure pump and fuel metering unit at the end of the feed line. The DEEC trims how much fuel it meters to the combustor’s fuel nozzles (ten shown; count and position approximate).',
-  }, L(merge([lru(0.16, 0.11, 0.1, [X(8.15), ENGINE_Y - 0.1, 0.26]), tubeBetween([X(8.15), ENGINE_Y - 0.04, 0.24], [X(8.4), ENGINE_Y + 0.02, 0.22], 0.008, 6)]), m.darkMetal)), 'compressor');
+    system: 'Propulsion', material: 'Engine-driven fuel pump and metering unit', mass: 6, explode: [-0.4, 0.4, 0.75],
+    desc: 'The engine-driven high-pressure pump and fuel metering unit on the gearbox, at the end of the feed line from the collector tank; a metered line takes the fuel forward to the combustor manifold. The DEEC trims how much it meters (position approximate).',
+  }, L(merge(fcu), m.darkMetal)), 'compressor');
   P('Propeller governor', {
-    system: 'Propulsion', material: 'Flyweight governor and oil pump on the gearbox', mass: 3, explode: [-0.6, 0.85, 0.3],
+    system: 'Propulsion', material: 'Flyweight governor and oil pump on the gearbox', mass: 3, explode: [-0.75, 0.85, 0.3],
     desc: 'Holds propeller speed constant: flyweights sense rpm and meter gearbox oil to the pitch-change piston, coarsening the blades when the engine speeds up (position approximate).',
-  }, L(cylX(X(9.65) - 0.1, X(9.65) - 0.01, 0.035, 0.035, 1.765, 0.1, 14), m.gun));
+  }, L(cylX(XG - 0.1, XG - 0.01, 0.035, 0.035, 1.765, 0.1, 14), m.gun));
   role(P('Ignition exciter', {
-    system: 'Propulsion', material: 'Capacitor-discharge ignition unit', mass: 2, explode: [0, 0.9, -0.5],
-    desc: 'Fires the two igniter plugs in the combustor during start; once the flame is self-sustaining the exciter switches off.',
-  }, L(lru(0.12, 0.06, 0.08, [X(8.8), ENGINE_Y + 0.2, -0.17]), m.lruOlive)), 'generator');
+    system: 'Propulsion', material: 'Capacitor-discharge ignition unit', mass: 2, explode: [0.3, 1.0, -0.7],
+    desc: 'Charges a capacitor and fires the two igniter plugs during the start through shielded leads; once the flame is self-sustaining the exciter switches off.',
+  }, L(merge([lru(0.12, 0.06, 0.08, [X(8.1), ENGINE_Y + 0.2, -0.17]), ...[0.7, -0.7].map((a) => pipe([[X(8.1), ENGINE_Y + 0.2, -0.17], [XT0 - 0.09, ENGINE_Y + Math.cos(a) * 0.255, Math.sin(a) * 0.255]], 0.004, 5, 8))]), m.lruOlive)), 'generator');
+  const egt = [new THREE.TorusGeometry(0.226, 0.005, 5, 40).rotateY(Math.PI / 2).translate(XT0 - 0.025, ENGINE_Y, 0)];
+  for (let k = 0; k < 8; k++) {
+    const a = ((k + 0.5) / 8) * Math.PI * 2;
+    egt.push(tubeBetween([XT0 - 0.025, ENGINE_Y + Math.cos(a) * 0.2, Math.sin(a) * 0.2], [XT0 - 0.025, ENGINE_Y + Math.cos(a) * 0.235, Math.sin(a) * 0.235], 0.005, 5));
+  }
+  egt.push(pipe([[XT0 - 0.025, ENGINE_Y + 0.15, 0.17], [X(7.75), 1.68, 0.21], [X(7.62), 1.65, 0.2], [X(7.54), 1.62, 0.2]], 0.005, 5, 20));
+  role(P('EGT thermocouple harness', {
+    system: 'Propulsion', material: 'Chromel-alumel thermocouples on a ring harness', mass: 1, count: 8, explode: [0.95, 0.55, 0.5],
+    desc: 'Probes in the gas path average the exhaust gas temperature, the TPE331’s key limit; the DEEC uses it to stop the engine over-temperaturing (probe count and position estimated).',
+  }, L(merge(egt), m.copper)), 'turbine');
+  P('Torque & speed pickups', {
+    system: 'Propulsion', material: 'Torque sensor and magnetic speed pickup', mass: 1, count: 2, explode: [-0.55, 1.35, 0.3],
+    desc: 'Torque measured inside the gearbox and engine speed from a magnetic pickup are what the crew’s power gauges show: shaft power = torque × rpm (positions estimated).',
+  }, L(merge([cylX(XG + 0.12, XG + 0.2, 0.022, 0.022, ENGINE_Y + 0.2, -0.1, 10), cylX(XG + 0.06, XG + 0.1, 0.015, 0.015, ENGINE_Y + 0.21, 0.08, 10)]), m.darkMetal));
+  P('DEEC engine control', {
+    system: 'Propulsion', material: 'Digital electronic engine control unit', mass: 4, explode: [0.4, 0.75, 0.6],
+    desc: 'The digital electronic engine control (developed by Honeywell and GA-ASI and first fitted to production Predator B aircraft) schedules fuel and propeller pitch for the commanded power and guards the temperature and torque limits, ahead of the firewall where it stays cool.',
+  }, L(lru(0.08, 0.2, 0.2, [X(7.5), 1.6, 0.2]), m.lruOlive));
   P('Propeller drive shaft', {
-    system: 'Propulsion', material: 'Steel shaft with flexible couplings', mass: 8, explode: [-1.0, 0.45, 0],
-    desc: 'Carries up to 900 shp (671 kW) from the gearbox to the propeller flange through the tail cone, with flexible couplings for misalignment.',
+    system: 'Propulsion', material: 'Steel shaft with flexible couplings', mass: 9, explode: [-1.0, 0.45, 0],
+    desc: 'Carries up to 900 shp (671 kW) from the gearbox output to the propeller flange through the tail cone, with flexible couplings at both ends for misalignment (shaft length depends on the installation, estimated here).',
   }, L(shaftGeo(), m.titanium));
+  const brg = [cylX(X(9.6) - 0.03, X(9.6) + 0.03, 0.06, 0.06, SHAFT_Y, 0, 18)];
+  for (const a of [0.6, Math.PI - 0.6, -Math.PI / 2]) brg.push(tubeBetween([X(9.6), SHAFT_Y + Math.sin(a) * 0.06, Math.cos(a) * 0.06], fusePoint(9.6, a, 0.03), 0.01, 6));
+  P('Shaft support bearing', {
+    system: 'Propulsion', material: 'Sealed ball bearing in a braced housing', mass: 2, explode: [-1.3, 0.75, 0],
+    desc: 'Holds the long drive shaft in the middle so it cannot whirl at propeller speed; three braces tie the housing to the fuselage frame (estimated).',
+  }, L(merge(brg), m.darkMetal));
   const propSpin = new THREE.Group();
   propSpin.position.set(PROP_X, SHAFT_Y, 0);
   const hubSpin = new THREE.Group();
   hubSpin.position.copy(propSpin.position);
   const blades = merge(bladesGeo(3));
   blades.computeVertexNormals();
-  const propPart = P('Three-blade propeller', {
+  P('Three-blade propeller', {
     system: 'Propulsion', material: 'Carbon-fibre composite blades (est.)', mass: 24, count: 3, explode: [-2.3, 0, 0],
     desc: 'A three-blade, variable-pitch pusher propeller about 2.6 m across (diameter estimated; the extended-range modification adds a fourth blade). Behind the wing and sensors it never blocks the view or disturbs the nose.',
-    callout: true, anchor: [0, 0.9, 0.25],
+    callout: true, anchor: [PROP_X + 0.03, SHAFT_Y + 0.15, 0.06],
   }, propSpin);
   propSpin.add(L(blades, m.blade));
-  propPart.userData.part.anchor.set(PROP_X, SHAFT_Y + 0.8, 0.25);
   P('Propeller hub & pitch control', {
     system: 'Propulsion', material: 'Aluminium hub, oil-operated pitch change', mass: 20, explode: [-1.75, 0, 0],
     desc: 'Holds the blade roots and twists them: oil pressure moves a piston in the dome to change pitch, which keeps the engine at constant speed as power and airspeed change.',
@@ -554,10 +627,6 @@ export function buildUAV() {
     system: 'Skin & fairings', skin: true, material: 'Composite spinner', mass: 4, explode: [-2.85, 0, 0],
     desc: 'Fairs the hub into the tail cone so the flow into the propeller roots stays smooth.',
   }, L(spinnerGeo().translate(PROP_X, SHAFT_Y, 0), m.skin));
-  P('DEEC engine control', {
-    system: 'Propulsion', material: 'Digital electronic engine control unit', mass: 4, explode: [0.4, 0.75, 0.3],
-    desc: 'The digital electronic engine control (developed by Honeywell and GA-ASI and first fitted to production Predator B aircraft) schedules fuel and propeller pitch for the commanded power, improving fuel economy.',
-  }, L(lru(0.08, 0.2, 0.2, [X(7.5), 1.6, 0.2]), m.lruOlive));
 
   // ============================================================== fuel system
   const ftRings = [];
