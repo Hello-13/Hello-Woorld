@@ -646,7 +646,7 @@ async function start() {
     app.lab?.update(dt, t);
     stage.controls.autoRotate = app.autoRotate && !stage.tween && !(v.state?.launching);
     calloutAcc += dt;
-    if (calloutAcc > 0.1 && app.labels) {
+    if (calloutAcc > 0.1 && callouts.visible) {          // labels on, or a tour step showing its parts
       calloutAcc = 0;
       const box = stage.labels.domElement;
       callouts.layout(stage.camera, box.clientWidth, box.clientHeight);

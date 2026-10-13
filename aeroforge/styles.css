@@ -509,7 +509,11 @@ input[type="range"]:focus-visible { outline-offset: 0; }
 .tour-body { margin: 0; font-size: 15px; line-height: 1.65; color: var(--soft); max-width: 62ch; }
 .tour-key { margin: 0; display: grid; gap: 5px; padding: 11px 13px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line); border-radius: 3px; font: 500 12.5px/1.5 var(--font-data); color: var(--text); }
 .tour-key-label { font: 500 10px/1 var(--font-data); letter-spacing: 0.18em; text-transform: uppercase; color: var(--cyan); }
-.tour-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 4px; }
+.tour-nav {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  position: sticky; bottom: -16px; margin: 0 -22px -16px; padding: 10px 22px 16px;   /* stays in view while the step scrolls */
+  z-index: 1; background: #06090e; border-top: 1px solid var(--line);
+}
 .tour-dots { list-style: none; margin: 0; padding: 0; display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; }
 .tour-dot { width: 16px; height: 3px; padding: 0; border: 0; border-radius: 1px; background: var(--line-strong); cursor: pointer; transition: background 0.2s; }
 .tour-dot[aria-current="true"] { background: var(--text); }

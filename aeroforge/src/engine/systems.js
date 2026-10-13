@@ -25,7 +25,7 @@ export const SYSTEMS = {
   'Communications':         { color: '#818cf8', blurb: 'Antennas, transponders and data links.' },
   'Optics':                 { color: '#e0f2fe', blurb: 'Mirrors, baffles, focal-plane instruments and their supports.' },
   'Rotor system':           { color: '#f59e0b', blurb: 'Blades, hubs, swashplates and rotor controls.' },
-  'Drive system':           { color: '#d97706', blurb: 'Gearboxes, shafts and couplings between engines and rotors.' },
+  'Drive system':           { color: '#d946ef', blurb: 'Gearboxes, shafts and couplings between engines and rotors.' },
   'Recovery':               { color: '#94a3b8', blurb: 'Landing legs, grid fins, parachutes and recovery aids.' },
   'Separation':             { color: '#f97316', blurb: 'Interstages, pushers, clamps and separation devices.' },
   'Ground support':         { color: '#cbd5e1', blurb: 'Pad, tower, stands and handling equipment.' },

@@ -82,7 +82,8 @@ export class Callouts {
     for (const o of live) {
       o.obj.getWorldPosition(v).project(camera);
       if (v.z > 1) continue;
-      const w = o.w || (o.w = o.text.offsetWidth || 120), h = o.h || (o.h = o.text.offsetHeight || 20);
+      if (!o.w && o.text.offsetWidth) { o.w = o.text.offsetWidth; o.h = o.text.offsetHeight; o.slot = -1; }   // measured once shown
+      const w = o.w || 120, h = o.h || 20;
       items.push({ o, x: (v.x * 0.5 + 0.5) * width, y: (-v.y * 0.5 + 0.5) * height, w, h });
     }
     items.sort((a, b) => a.y - b.y);                 // top to bottom: upper labels claim upward slots first

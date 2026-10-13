@@ -97,6 +97,20 @@ export class RenderModes {
     this.cpBody = new THREE.MeshStandardMaterial({ color: 0x8e959c, roughness: 0.7, metalness: 0.1 });
   }
 
+  /** X-ray material dimmed to weight w (0..1): dense rows of blades or vanes set a low weight so the
+   *  additive glow of many stacked layers does not wash the view out. */
+  xrayWeighted(w) {
+    if (!(w < 1)) return this.xray;
+    const k = Math.max(0.05, Math.round(w * 20) / 20);
+    let mat = this.xrayDim?.get(k);
+    if (!mat) {
+      mat = xrayMaterial(0x5fd4ff, 1.8, 0.06);
+      mat.uniforms.color.value.multiplyScalar(k);
+      (this.xrayDim || (this.xrayDim = new Map())).set(k, mat);
+    }
+    return mat;
+  }
+
   meshes(vehicle) {
     if (!vehicle._meshes) {
       const list = [];
@@ -174,7 +188,8 @@ export class RenderModes {
         if (edges) edges.visible = false;
         m.castShadow = true;
       } else if (mode === 'xray') {
-        m.material = inSel(m) ? this.xraySel : partOf(m)?.userData.part.skin ? this.xraySkin : this.xray;
+        const info = partOf(m)?.userData.part;
+        m.material = inSel(m) ? this.xraySel : info?.skin ? this.xraySkin : this.xrayWeighted(m.userData.xrayWeight ?? info?.xrayWeight ?? 1);
         if (edges) edges.visible = false;
         m.castShadow = false;
       } else if (mode === 'systems') {

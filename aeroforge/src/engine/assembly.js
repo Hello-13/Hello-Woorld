@@ -26,6 +26,8 @@ export class Assembly {
    *   massSource where the mass comes from, e.g. 'GE Aviation type certificate data'
    *   count      how many identical items the part represents (e.g. 22 fan blades)
    *   skin       true for exterior skins / fairings: ghosted in the Systems view, faint in X-ray
+   *   xrayWeight 0..1 (default 1): dims the part in X-ray, for dense rows of blades or vanes; a mesh's
+   *              own userData.xrayWeight overrides it
    *   temp (K), explode: [x,y,z] (m), callout, anchor: [x,y,z]
    * }
    */
@@ -41,6 +43,7 @@ export class Assembly {
       massSource: info.massSource || null,
       count: info.count ?? null,
       skin: !!info.skin,
+      xrayWeight: info.xrayWeight ?? 1,
       temp: info.temp ?? 288,
       desc: info.desc || '',
       callout: !!info.callout,
