@@ -544,7 +544,7 @@ export function buildUAV() {
     callout: true, anchor: [0, 0.9, 0.25],
   }, propSpin);
   propSpin.add(L(blades, m.blade));
-  propPart.userData.part.anchor.set(PROP_X, SHAFT_Y + 0.9, 0.25);
+  propPart.userData.part.anchor.set(PROP_X, SHAFT_Y + 0.8, 0.25);
   P('Propeller hub & pitch control', {
     system: 'Propulsion', material: 'Aluminium hub, oil-operated pitch change', mass: 20, explode: [-1.75, 0, 0],
     desc: 'Holds the blade roots and twists them: oil pressure moves a piston in the dome to change pitch, which keeps the engine at constant speed as power and airspeed change.',
@@ -924,7 +924,7 @@ export function buildUAV() {
       ['Propeller', '3-blade variable-pitch pusher (≈ 2.6 m, estimate)'], ['Cruise speed', '313 km/h (169 kt); USAF quotes ≈ 370 km/h'],
       ['Max speed', '482 km/h (260 kt); GA-ASI quotes 444 km/h (240 KTAS)'], ['Ceiling', '15,240 m (50,000 ft)'],
       ['Endurance', '27 h clean (GA-ASI)'], ['Range', '1,850 km (1,000 nmi, USAF)'],
-      ['Stores stations', '7: six under-wing, one centreline'], ['Crew', '2 remote: pilot and sensor operator'],
+      ['Stores stations', '7: six under-wing, one centreline'], ['Wing station ratings', '1,500 / 600 / 200 lb (inboard / middle / outboard)'], ['Crew', '2 remote: pilot and sensor operator'],
     ],
     heroStats: [['27', 'h', 'Endurance'], ['15.2', 'km', 'Ceiling'], ['1,701', 'kg', 'Payload']],
     sources: 'USAF MQ-9 Reaper fact sheet (af.mil); GA-ASI MQ-9A specification sheet; NAVAIR MQ-9A product page; DOT&E annual reports FY2011 and FY2017; NASA Ikhana (Predator B) fact sheets; GA-ASI releases on the trailing-arm main gear (2012) and Block 5 electrical system; Defense Update and Flight International on the Lynx AN/APY-8; Wikipedia articles on the MQ-9, TPE331, GBU-12 and AGM-114. Internal layout and component masses are estimates.',

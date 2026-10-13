@@ -39,7 +39,7 @@ export default [
     body: 'Each Pratt & Whitney F119-PW-100 is a twin-spool turbofan built for supercruise: a three-stage fan of blisks driven by one LP turbine stage, a six-stage compressor driven by one HP stage, the two spools spinning in opposite directions. The low bypass ratio (0.30) and hot core give high thrust per kilogram of air. A three-zone augmentor injects fuel from curved, radar-absorbent vanes that also hide the turbine.',
     key: 'Thrust ≈ ṁ (V_exit − V_flight): about 116 kN dry and 156 kN with afterburner per engine, from a 2,270 kg engine with an overall pressure ratio near 26.',
     focus: ['F119 fan (right)', 'F119 HP compressor (right)', 'F119 annular combustor (right)', 'F119 HP turbine (right)', 'F119 LP turbine (right)', 'F119 augmentor (right)', '2-D vectoring nozzle (right)', 'Accessory gearbox & AMAD (right)', 'FADEC engine control (right)', 'Engine mounts (right)'],
-    mode: 'systems', explode: 0.8, view: { dir: [0.25, 0.5, 1] },
+    mode: 'systems', explode: 0.8, view: { dir: [0.15, 0.55, 1], fill: 1.45 },
   },
   {
     title: 'Thrust vectoring',
@@ -73,14 +73,14 @@ export default [
     body: 'A tricycle gear: a steerable single-wheel nose leg that retracts aft into a well under the cockpit, and two main legs that fold into wells beneath the inlet ducts, their wheels turning flat as they go. Each main wheel has a carbon brake, and every door edge is serrated like the weapons-bay doors. An emergency tail hook between the engines can catch a runway cable.',
     key: 'An oleo strut turns the sink energy ½ m v² into heat by forcing oil through an orifice: a 29 t jet touching down at 3 m/s (10 ft/s) brings about 130 kJ.',
     focus: ['Nose gear strut & steering', 'Nose wheel & tyre', 'Nose gear doors', ...BOTH('Main gear strut'), ...BOTH('Main gear drag brace & retraction actuator'), ...BOTH('Main wheel & carbon brake'), ...BOTH('Main gear door'), 'Arresting hook'],
-    view: { dir: [0.9, 0.08, 1], fill: 0.9 },
+    view: { dir: [0.9, 0.1, 1], fill: 0.8 },
   },
   {
     title: 'Weapons bays and the gun',
     body: 'The main bay holds six AIM-120C AMRAAMs on LAU-142/A launchers that push each missile clear of the bay\'s turbulent air in a fraction of a second; each side bay swings an AIM-9X out on an LAU-141/A trapeze so its seeker can see the target first. The doors are open for under a second per shot. An M61A2 20 mm cannon with 480 rounds sits in the right wing root behind a door that opens only while it fires.',
     key: 'External stores can multiply a stealth jet\'s radar cross-section many times over — carrying them inside is what keeps the shape clean.',
     focus: ['Main weapons bay', ...BOTH('Main bay door'), 'AIM-120C AMRAAM ×3 (right main bay)', 'AIM-120C AMRAAM ×3 (left main bay)', ...BOTH('LAU-142/A AVEL launchers ×3'), 'AIM-9X Sidewinder (right side bay)', 'AIM-9X Sidewinder (left side bay)', ...BOTH('LAU-141/A trapeze launcher'), ...BOTH('Side bay door'), 'M61A2 20 mm cannon', 'Linear linkless ammunition system', 'Gun-port door'],
-    view: { dir: [0.4, -0.3, 1] }, demo: 'bay',
+    view: { dir: [0.45, -0.3, 1], fill: 1.25 }, demo: 'bay',
   },
   {
     title: 'One pilot, fused sensors',

@@ -60,7 +60,7 @@ export default [
     body: 'The Black Hawk was the first helicopter designed from the outset to crash-survival standards. In a hard impact the oleos\' crash stage and the drag beams absorb energy first, then the crushable belly; the cabin roof beams hold the gearbox up, and the pilots\' armoured seats and the hanging troop seats stroke downward to limit spinal loads. The two fuel cells survive a 20 m drop test, and breakaway valves seal every line that tears loose.',
     key: 'Design goal: a livable space and no post-crash fire in a vertical impact of about 11.6 m/s (38 ft/s).',
     focus: ['Main gear oleo (right)', 'Main gear oleo (left)', 'Main gear drag beam (right)', 'Main gear drag beam (left)', 'Keel beams & crushable belly', 'Cabin frames & roof beams', 'Armoured crashworthy pilot seats', 'Troop seats', 'Crew chief & gunner seats', 'Fuel cell (right)', 'Fuel cell (left)', 'Fuel lines & breakaway valves'],
-    mode: 'systems', view: { dir: [0.8, 0.5, -1.2], fill: 1.2 },
+    mode: 'systems', view: { dir: [1.1, 0.8, 0.45], fill: 1.0 },
   },
   {
     title: 'The glass cockpit',
