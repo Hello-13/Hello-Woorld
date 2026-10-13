@@ -58,8 +58,8 @@ export function buildPayload(P) {
   P('Clock baseplate', {
     system: 'Thermal control', material: 'Aluminium plate with heaters and thermostats', mass: 8, temp: 293, explode: [0, 1.25, 0],
     desc: 'A temperature-controlled mounting plate with four clock positions. A rubidium standard\'s frequency shifts slightly with temperature, so the plate holds the clocks to a fraction of a degree as the satellite swings between sunlight and eclipse.',
-  }, mesh(boxG([-0.455, IY - 0.01, 1.1], [0.7, 0.02, 0.48]), G.silverBox()));
-  const CLK_X = [-0.72, -0.555, -0.39];
+  }, mesh(boxG([-0.47, IY - 0.01, 1.1], [0.74, 0.02, 0.48]), G.silverBox()));
+  const CLK_X = [-0.75, -0.57, -0.39];
   CLK_X.forEach((x, k) => {
     const c = [x, IY - 0.02 - 0.075, 1.1], s = [0.15, 0.15, 0.3];
     const pkg = unit(c, s, G.silverBox(), { mount: '+y', conn: '-z', n: 2 });
@@ -72,8 +72,8 @@ export function buildPayload(P) {
         : 'One of the three rubidium atomic frequency standards. A one-nanosecond clock error is a 30 cm range error, so the spares are kept ready to take over (mass estimated).',
     }, pkg);
   });
-  const slot = [boxG([-0.225, IY - 0.026, 1.1], [0.15, 0.012, 0.3])];
-  for (const dx of [-0.055, 0.055]) for (const dz of [-0.12, 0.12]) slot.push(cylG([-0.225 + dx, IY - 0.035, 1.1 + dz], 0.008, 0.012, 'y', 8));
+  const slot = [boxG([-0.21, IY - 0.026, 1.1], [0.15, 0.012, 0.3])];
+  for (const dx of [-0.055, 0.055]) for (const dz of [-0.12, 0.12]) slot.push(cylG([-0.21 + dx, IY - 0.035, 1.1 + dz], 0.008, 0.012, 'y', 8));
   P('Fourth clock slot', {
     system: 'Payload', material: 'Mounting pad with inserts, harness connector', mass: 1, temp: 293, explode: [0, 1.15, 0],
     desc: 'GPS III was designed with a fourth clock position for a new or experimental frequency standard, such as a hydrogen maser, so future clocks can be tried in orbit without redesigning the payload (shown empty).',

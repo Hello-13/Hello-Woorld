@@ -18,13 +18,21 @@ export function mountOrbitLab(root, ctx) {
   const stage = ctx.stage;
   if (!orbitScene) orbitScene = new OrbitScene(stage);
   const os = orbitScene;
-  if (os.satLabel?.element) os.satLabel.element.textContent = v.designation;
+  // orbitScene.js hard-codes the label text and sits it just above the glow, where it can cover the
+  // parking-orbit label at the start; name the satellite and lift its label clear (shared-file fix suggested)
+  const nameSat = () => { if (os.satLabel?.element) { os.satLabel.element.textContent = v.designation; os.satLabel.position.set(0, 0.5, 0); } };
+  nameSat();
   const p = { h1: GPS3.transferPerigee, h2: GPS3.altitude, di: 0, launcherBurn1: true };
   let inOrbitView = false;
   let dirty = true;
 
   const sH1 = slider({ label: 'Perigee / parking orbit altitude', min: 200, max: 2000, step: 10, value: p.h1, unit: 'km', onInput: (x) => { p.h1 = x; if (p.h2 < x + 100) sH2.set(x + 100); dirty = true; } });
-  const sH2 = slider({ label: 'Target orbit altitude', min: 500, max: 40000, step: 10, value: p.h2, unit: 'km', onInput: (x) => { p.h2 = Math.max(x, p.h1 + 100); dirty = true; } });
+  // 1 km steps so 20,180 km (GPS) and 35,786 km (GEO) are both exact; the target is kept 100 km above the perigee
+  const sH2 = slider({ label: 'Target orbit altitude', min: 500, max: 40000, step: 1, value: p.h2, unit: 'km', onInput: (x) => {
+    p.h2 = Math.max(x, p.h1 + 100);
+    if (p.h2 !== x) sH2.set(p.h2, true);
+    dirty = true;
+  } });
   const sDi = slider({ label: 'Plane change at apogee', min: 0, max: 60, step: 0.5, value: p.di, unit: '°', format: (x) => x.toFixed(1), onInput: (x) => { p.di = x; dirty = true; } });
   const tL = toggle({ label: 'Launcher flies burn 1', value: true, onChange: (on) => { p.launcherBurn1 = on; dirty = true; } });
   const preset = (h1, h2, di, lb) => { sH1.set(h1); sH2.set(h2); sDi.set(di); tL.set(lb); };
@@ -38,7 +46,7 @@ export function mountOrbitLab(root, ctx) {
     os.requestTransfer();
     ctx.log(v.designation, `Transfer armed · burn 1 (${p.launcherBurn1 ? 'launcher upper stage' : 'apogee engine'}) at the next perigee pass`, 'info');
   });
-  const tDeploy = toggle({ label: 'Solar arrays deployed', value: true, onChange: (on) => { v.setDeploy(on ? 1 : 0); ctx.log(v.designation, on ? 'Release nuts fired · panels unfolding' : 'Wings folding against the radiators for launch', 'info'); } });
+  const tDeploy = toggle({ label: 'Solar arrays and antennas deployed', value: true, onChange: (on) => { v.setDeploy(on ? 1 : 0); ctx.log(v.designation, on ? 'Frangibolts released · panels unfolding · JIB antennas out' : 'Wings folded against the radiators and antennas stowed, as for launch and the apogee burns', 'info'); } });
 
   const ro = readouts([
     { key: 'v1', label: 'Parking / perigee circular speed', unit: 'km/s' }, { key: 'v2', label: 'Target orbit speed', unit: 'km/s' },
@@ -74,12 +82,12 @@ export function mountOrbitLab(root, ctx) {
   const cross = clockCrossoverAlt();
 
   root.append(
-    el('p', { class: 'lab-intro', text: 'GPS III is not launched straight into its final orbit. Falcon 9 leaves it in an elliptical transfer orbit already tilted to 55°, roughly 400 km by 20,200 km; the satellite\'s own liquid apogee engine then fires at apogee, over several passes, to make the orbit circular at 20,180 km. Plan that climb, see what propellant it costs, and see why the clocks have to be tuned for relativity.' }),
+    el('p', { class: 'lab-intro', text: 'GPS III is not launched straight into its final orbit. Falcon 9 leaves it in an elliptical transfer orbit already tilted to 55°, roughly 400 km by 20,200 km; the satellite\'s own liquid apogee engine then fires at apogee, over several passes and with the solar wings still folded, to make the orbit circular at 20,180 km. Plan that climb, see what propellant it costs, and see why the clocks have to be tuned for relativity.' }),
     section('Transfer', sH1.el, sH2.el, sDi.el, el('div', { class: 'btn-row' }, tL.el), el('div', { class: 'btn-row' }, gpsBtn, leoBtn, geoBtn)),
-    section('Δv budget', ro.el, el('h4', { class: 'lab-sub', text: `Propellant at Isp ${ISP} s (estimate) from ${fmt.n(M0)} kg · ${fmt.n(PROP)} kg loaded` }), meter, status),
-    section('Clocks and relativity', rel.el, relChart.el, el('p', { class: 'lab-note', text: `Below about ${fmt.n(cross, 0)} km the speed effect wins and an orbiting clock runs slow; above it the weaker gravity wins and it runs fast. At GPS altitude the clocks gain about 38.6 µs a day, so before launch they are set to tick slightly slow, at 10.22999999543 MHz instead of 10.23 MHz. The small extra effect of a slightly elliptical orbit is corrected by every receiver.` })),
+    section('Δv budget', ro.el, el('h4', { class: 'lab-sub', text: `Propellant at Isp ${ISP} s (estimate) from ${fmt.n(M0)} kg at launch · ${fmt.n(PROP)} kg loaded (Space Force fact-sheet masses)` }), meter, status),
+    section('Clocks and relativity', rel.el, relChart.el, el('p', { class: 'lab-note', text: `Below about ${fmt.n(cross, 0)} km the speed effect wins and an orbiting clock runs slow; above it the weaker gravity wins and it runs fast. At GPS altitude the clocks gain about 38.6 µs a day, so before launch they are set to tick slightly slow, at 10.22999999543 MHz instead of 10.23 MHz. IS-GPS-200 quotes Δf/f = −4.4647 × 10⁻¹⁰ for the nominal 26,560 km orbit radius. The small extra effect of a slightly elliptical orbit is corrected by every receiver.` })),
     section('Orbit view', el('div', { class: 'btn-row' }, viewBtn, flyBtn), met.el),
-    section('Trade study', chart.el, el('p', { class: 'lab-note', text: 'A Hohmann transfer\'s total Δv peaks and then falls for very high targets — beyond a radius ratio of about 15.6, a bi-elliptic transfer becomes cheaper. The satellite\'s share is the apogee burn alone when the launcher flies burn 1.' })),
+    section('Trade study', chart.el, el('p', { class: 'lab-note', text: 'Total Hohmann Δv keeps rising across this chart: it peaks at a radius ratio of 15.58, far beyond 40,000 km from a low orbit. Bi-elliptic transfers can be cheaper above a ratio of about 11.9 and always are above 15.58. The satellite\'s share is the apogee burn alone when the launcher flies burn 1.' })),
     section('Spacecraft', el('div', { class: 'btn-row' }, tDeploy.el)),
   );
 
@@ -91,7 +99,7 @@ export function mountOrbitLab(root, ctx) {
     ctx.setOrbitMode(on);
     os.show(on);
     if (on) {
-      if (os.satLabel?.element) os.satLabel.element.textContent = v.designation;
+      nameSat();
       os.attachModel(ctx.cloneForOrbit());
       os.frame();
       ctx.log(v.designation, 'Orbit view · Earth-centred inertial frame · antennas aimed at the Earth', 'info');
@@ -116,7 +124,12 @@ export function mountOrbitLab(root, ctx) {
     meter.setAttribute('aria-valuenow', String(Math.round(prop)));
     meterText.textContent = `${fmt.n(prop)} kg of ${fmt.n(PROP)} kg`;
     if (frac > 1) {
-      status.textContent = `Not feasible: needs ${fmt.n(prop - PROP)} kg more propellant than GPS III carries. That is why it rides a launcher-supplied transfer orbit instead of climbing from a low parking orbit on its own.`;
+      const why = !p.launcherBurn1
+        ? 'That is why it rides a launcher-supplied transfer orbit instead of climbing from a low parking orbit on its own.'
+        : p.di > 0.5
+          ? `Even with the launcher flying burn 1, the apogee burn plus a ${p.di.toFixed(1)}° plane change is more than the tanks hold; launchers fly as much of the plane change as they can.`
+          : 'Even with the launcher flying burn 1, this apogee burn is more than the tanks hold; the launcher would have to raise the perigee or fly part of the circularisation.';
+      status.textContent = `Not feasible: needs ${fmt.n(prop - PROP)} kg more propellant than GPS III carries. ${why}`;
       status.dataset.state = 'crit';
     } else if (frac > 0.85) {
       status.textContent = `Feasible with ${fmt.n(PROP - prop)} kg left — the reserve for 15 years of station-keeping, wheel momentum dumps and the final move to a disposal orbit above the constellation.`;

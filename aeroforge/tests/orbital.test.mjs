@@ -54,6 +54,11 @@ test('GPS clock relativity matches the published correction', () => {
 });
 
 test('GPS III propellant budget: launcher transfer orbit feasible, climbing alone from LEO is not', () => {
+  // Space Force fact sheet: launch weight 8,115 lb, on-orbit weight 4,764 lb, 97 × 70 × 134 in
+  const LB = 0.45359237, IN = 0.0254;
+  close(GPS3.launchMass, 8115 * LB, 0.5, 'launch mass kg');
+  close(GPS3.dryMass, 4764 * LB, 0.5, 'on-orbit mass kg');
+  [97, 70, 134].forEach((d, i) => close(GPS3.size[i], d * IN, 0.006, 'fact-sheet size m'));
   assert.equal(GPS3.propellant, GPS3.launchMass - GPS3.dryMass);
   close(GPS3.fuelLoad + GPS3.oxLoad, GPS3.propellant, 1e-9, 'fuel + oxidiser = propellant loaded');
   const h = hohmann(GPS3.transferPerigee, GPS3.altitude, 0);
