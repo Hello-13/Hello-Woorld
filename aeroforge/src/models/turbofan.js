@@ -1,367 +1,77 @@
-// TF-90 — fictional high-bypass two-spool turbofan in museum-cutaway form.
-// Every rotor row is real lofted, twisted blade geometry; the LP spool (fan, booster, LPT)
-// and HP spool (HPC, HPT) turn at independent N1 / N2 speeds.
+// GE Aerospace GE90-115B — the high-bypass turbofan of the Boeing 777-300ER and 777F, shown as a
+// museum cutaway on a display cradle, inside its Boeing nacelle.
+//
+// Axes: the engine is built in a lathe frame (engine axis +y, intake forward; x = r·sin(phi),
+// z = r·cos(phi); see ge90/layout.js) which is turned so that the engine axis lies along world +x
+// (intake towards +x), world y is up and +z faces the default camera. In that frame +x is world
+// down, so phi = 0 faces the viewer and phi = 3π/2 is the top (pylon).
+// Cutaway: the casings lose the upper quadrant facing the viewer and the nacelle loses its whole
+// viewer half; rotor blades stay whole and turn — N1 (fan, booster, LP turbine) and N2 (HP
+// compressor and turbine) at their own speeds. Axisymmetric rotor drums are drawn cut and still.
 
 import * as THREE from 'three';
 import { Assembly, mesh } from '../engine/assembly.js';
-import { lathe, loftRings, airfoilLoop, ringArray, beam, rod, mergeGeometries, orientOutward } from '../engine/geometry.js';
-import { M, SKIN } from '../engine/materials.js';
-import { decal, danger, stencilText } from '../engine/decals.js';
-import { decalTexture } from '../engine/surface.js';
+import { beam, mergeGeometries } from '../engine/geometry.js';
+import { M } from '../engine/materials.js';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { inferno } from '../engine/effects.js';
+import { setCut, sector } from './ge90/geom.js';
+import { STATIONS, NACELLE, coreAt, bypassAt, FAN_NOZZLE_Y, PLUG_TIP } from './ge90/layout.js';
+import { buildNacelle } from './ge90/nacelle.js';
+import { buildFan } from './ge90/fan.js';
+import { buildCore } from './ge90/core.js';
+import { buildAccessories } from './ge90/accessories.js';
 
-const CUT = Math.PI * 1.5;   // keep 270°, remove the quadrant facing the viewer
-
-/** One blade lofted from hub to tip; local frame: engine axis = +Y, blade radial along +X. */
-function bladeGeometry({ rHub, rTip, chordHub, chordTip, staggerHub, staggerTip, tHub = 0.08, tTip = 0.04, camber = 0.05, y = 0, stations = 5, n = 10, sweep = 0 }) {
-  const rings = [];
-  for (let k = 0; k <= stations; k++) {
-    const f = k / stations;
-    const r = rHub + (rTip - rHub) * f;
-    const chord = chordHub + (chordTip - chordHub) * f;
-    const st = ((staggerHub + (staggerTip - staggerHub) * f) * Math.PI) / 180;
-    const t = tHub + (tTip - tHub) * f;
-    const loop = airfoilLoop(t, n, 0, 1, camber);
-    const ca = -Math.cos(st), ct = Math.sin(st);        // chord direction: aft + tangential
-    const na = Math.sin(st), nt = Math.cos(st);         // thickness direction
-    rings.push(loop.map(([xc, yt]) => {
-      const c = (xc - 0.5) * chord, h = yt * chord;
-      const ax = y + c * ca + h * na - sweep * f;
-      const tg = c * ct + h * nt;
-      return [r, ax, tg];
-    }));
-  }
-  return orientOutward(loftRings(rings, { capStart: true, capEnd: true }));
-}
-
-function row(opts, count, material, temp) {
-  const g = ringArray(bladeGeometry(opts), count, 'y');
-  g.computeVertexNormals();
-  const m = mesh(g, material);
-  if (temp) m.userData.temp = temp;
-  return m;
-}
-
-function cutLathe(profile, material, { seg = 72, caps = true, closed = true } = {}) {
-  const prof = closed ? profile.concat([profile[0]]) : profile;
-  const group = new THREE.Group();
-  const full = mesh(lathe(prof, seg, 0, Math.PI * 2), material);
-  const cut = mesh(lathe(prof, Math.round(seg * 0.75), 0, CUT), material);
-  cut.visible = false;
-  group.add(full, cut);
-  const capMeshes = [];
-  if (caps && closed) {
-    const shape = new THREE.Shape(profile.map(([r, y]) => new THREE.Vector2(r, y)));
-    const capGeo = new THREE.ShapeGeometry(shape);
-    for (const phi of [0, CUT]) {
-      const c = mesh(capGeo, M.section(), { cast: false });
-      c.rotation.y = phi - Math.PI / 2;
-      c.visible = false;
-      group.add(c);
-      capMeshes.push(c);
-    }
-  }
-  group.userData.cutaway = { full, cut, caps: capMeshes };
-  return group;
-}
-
-function setCut(group, on) {
-  const c = group.userData.cutaway;
-  if (!c) return;
-  c.full.visible = !on;
-  c.cut.visible = on;
-  for (const m of c.caps) m.visible = on;
-}
-
-// Core flow path (axial y → hub / tip radius) for particles and blade sizing
-const CORE_PATH = [
-  [0.95, 0.5, 0.82], [0.4, 0.52, 0.74], [0.2, 0.42, 0.66], [-0.95, 0.46, 0.52], [-1.05, 0.46, 0.64], [-1.55, 0.46, 0.64],
-  [-1.65, 0.46, 0.62], [-1.9, 0.46, 0.62], [-2.0, 0.44, 0.66], [-2.75, 0.42, 0.82], [-2.9, 0.38, 0.84], [-3.7, 0.04, 0.9],
-];
-function coreRadius(y) {
-  if (y >= CORE_PATH[0][0]) return [CORE_PATH[0][1], CORE_PATH[0][2]];
-  for (let i = 1; i < CORE_PATH.length; i++) {
-    if (y >= CORE_PATH[i][0]) {
-      const [y0, h0, t0] = CORE_PATH[i - 1], [y1, h1, t1] = CORE_PATH[i];
-      const f = (y - y0) / (y1 - y0);
-      return [h0 + (h1 - h0) * f, t0 + (t1 - t0) * f];
-    }
-  }
-  const last = CORE_PATH[CORE_PATH.length - 1];
-  return [last[1], last[2]];
-}
+const H = 2.6;                         // engine centreline height above the floor, m
+const N1_RPM = 2355, N2_RPM = 9332;    // 100 % speeds (FAA TCDS E00049EN)
+const SHOW = 0.02;                     // spools are shown turning at 1/50 of real speed
 
 export function buildTurbofan() {
   const A = new Assembly();
-  const eng = new THREE.Group();            // lathe frame: axis +Y (intake forward)
-  eng.rotation.z = -Math.PI / 2;            // → engine axis along world +X
-  eng.position.y = 2.3;
+  const eng = new THREE.Group();
+  eng.rotation.z = -Math.PI / 2;      // lathe +y → world +x, lathe +x → world down
+  eng.position.y = H;
   A.root.add(eng);
   const P = (name, info, objs) => A.part(name, info, objs, eng);
 
-  // cycle temperatures are pushed in by the lab (station id → K)
-  const T = { '2': 288, '13': 330, '3': 900, '4': 1750, '45': 1250, '5': 870, '9': 760 };
-  const lerpT = (a, b, f) => () => T[a] + (T[b] - T[a]) * f;
-
+  // cycle total temperatures pushed in by the lab (ARP755 station id → K); take-off defaults
+  const T = { '2': 288, '13': 339, '25': 375, '3': 926, '4': 1680, '45': 1205, '5': 812, '9': 729, '19': 293 };
+  const lt = (a, b, f) => () => T[a] + (T[b] - T[a]) * f;
   const cutGroups = [];
+  const cut = (g) => { cutGroups.push(g); return g; };
+  const spin = { n1: [], n2: [] };
+  const ctx = { P, T, lt, cut, spin };
 
-  // ----------------------------------------------------------------- nacelle
-  const nacMat = SKIN.nacelle();
-  const tint = (key, color, roughness = 0.42, metalness = 0.92) => {
-    tint.cache = tint.cache || new Map();
-    if (!tint.cache.has(key)) tint.cache.set(key, new THREE.MeshStandardMaterial({ color, roughness, metalness }));
-    return tint.cache.get(key);
-  };
-  const titanium = new THREE.MeshPhysicalMaterial({ color: 0xbcc2c7, metalness: 1, roughness: 0.2, clearcoat: 0.3, clearcoatRoughness: 0.15 });
-  // oxidation colours progress along the hot path; HPT airfoils wear an off-white thermal-barrier coat
-  const lerpHex = (a, b, f) => new THREE.Color(a).lerp(new THREE.Color(b), f);
-  const hpcTint = (i) => tint(`hpc${i}`, lerpHex(0xb8bec4, 0xa58a5c, Math.max(0, (i - 3) / 5)), 0.3, 1);
-  const lptTint = (i) => tint(`lpt${i}`, lerpHex(0x5e4a5e, 0xa08a66, i / 4), 0.45, 0.9);
-  const tbc = tint('tbc', 0xd6ccb8, 0.72, 0.08);
-  const inlet = cutLathe([[1.5, 1.3], [1.5, 1.6], [1.52, 2.3], [1.55, 2.55], [1.6, 2.64], [1.66, 2.64], [1.71, 2.56], [1.77, 2.2], [1.79, 1.6], [1.78, 1.3]], nacMat);
-  cutGroups.push(inlet);
-  const inletLiner = cutLathe([[1.497, 1.62], [1.512, 2.1], [1.522, 2.3]], SKIN.liner(), { closed: false, caps: false });
-  cutGroups.push(inletLiner);
-  inlet.add(inletLiner);
-  const inletPart = P('Inlet cowl', {
-    system: 'Nacelle', material: 'Aluminium lip, acoustic honeycomb liner', mass: 380, explode: [0, 2.8, 0], temp: 288,
-    desc: 'Diffuses the incoming flow to about Mach 0.6 at the fan face. The lip is bleed-air heated to prevent icing.',
-    callout: true, anchor: [0, 2.7, 1.8],
-  }, inlet);
-  inletPart.userData.part.stationTemp = '2';
-  const fanCowl = cutLathe([[1.42, -0.4], [1.5, 0.3], [1.5, 1.3], [1.78, 1.3], [1.74, 0.6], [1.67, -0.1], [1.6, -0.4]], nacMat);
-  cutGroups.push(fanCowl);
-  P('Fan cowl & thrust reverser', {
-    system: 'Nacelle', material: 'Carbon-fibre cowls, cascade reverser', mass: 640, explode: [0, -0.4, 0], temp: 300,
-    desc: 'Translating sleeve exposes cascade vanes that turn the bypass flow forward on landing.',
-  }, fanCowl);
+  buildNacelle(ctx);
+  buildFan(ctx);
+  buildCore(ctx);
+  buildAccessories(ctx);
 
-  // ----------------------------------------------------------------- fan
-  const spinner = mesh(lathe([[0.001, 2.28], [0.12, 2.22], [0.26, 2.05], [0.38, 1.8], [0.46, 1.55], [0.49, 1.3]], 48), M.spinner());
-  const fanBlades = row({ rHub: 0.47, rTip: 1.485, chordHub: 0.42, chordTip: 0.66, staggerHub: 28, staggerTip: 62, tHub: 0.1, tTip: 0.035, camber: 0.07, y: 1.55, stations: 7, n: 14, sweep: 0.12 }, 22, titanium, () => T['2'] + (T['13'] - T['2']) * 0.5);
-  const fanDisk = mesh(lathe([[0.15, 1.75], [0.5, 1.75], [0.5, 1.3], [0.15, 1.3]].concat([[0.15, 1.75]]), 48), M.gunmetal());
-  const fanSpin = new THREE.Group();
-  fanSpin.add(spinner, fanBlades, fanDisk);
-  const fanPart = P('Fan rotor', {
-    system: 'LP spool', material: 'Hollow titanium wide-chord blades', mass: 1400, explode: [0, 4.6, 0],
-    desc: '22 swept wide-chord blades, 3.0 m tip diameter. At take-off the tips run supersonic (~Mach 1.4 relative) — the source of the "buzz-saw" noise.',
-    callout: true, anchor: [0, 1.5, 1.35],
-  }, fanSpin);
-  fanPart.userData.part.stationTemp = '13';
-
-  // ----------------------------------------------------------------- fan frame: OGVs + splitter
-  const ogv = row({ rHub: 0.97, rTip: 1.49, chordHub: 0.22, chordTip: 0.24, staggerHub: -12, staggerTip: -14, tHub: 0.08, tTip: 0.08, camber: -0.06, y: 0.55, stations: 2, n: 8 }, 44, M.aluminium(), () => T['13']);
-  const struts = row({ rHub: 0.86, rTip: 1.5, chordHub: 0.5, chordTip: 0.5, staggerHub: 0, staggerTip: 0, tHub: 0.12, tTip: 0.12, y: 0.15, stations: 1, n: 8 }, 8, M.gunmetal(), () => T['13']);
-  P('Fan frame & outlet guide vanes', {
-    system: 'Structure', material: 'Composite OGVs, titanium frame', mass: 520, explode: [0, 2.0, 0], temp: 330,
-    desc: 'Outlet guide vanes remove the swirl the fan puts into the bypass stream; struts carry engine loads to the pylon.',
-  }, [ogv, struts]);
-
-  // ----------------------------------------------------------------- core cowl
-  const coreCowlMat = new THREE.MeshStandardMaterial({ color: 0xaab0b6, roughness: 0.32, metalness: 0.8, side: THREE.DoubleSide });
-  // thin aerodynamic core cowl …
-  const coreCowl = cutLathe([[0.86, 0.95], [0.88, 0.975], [0.92, 0.955], [0.99, 0.1], [1.0, -1.0], [0.97, -1.9], [0.87, -2.9], [0.85, -2.92], [0.845, -2.86], [0.94, -1.9], [0.968, -1.0], [0.958, 0.1], [0.892, 0.9]], coreCowlMat);
-  cutGroups.push(coreCowl);
-  // … and the structural core casing that hugs the gas path, leaving the core compartment open
-  const gasPath = [[0.95, 0.82], [0.4, 0.74], [0.2, 0.66], [-0.95, 0.52], [-1.05, 0.64], [-1.55, 0.64], [-1.65, 0.62], [-1.9, 0.62], [-2.0, 0.66], [-2.75, 0.82], [-2.86, 0.84]];
-  const casingProf = gasPath.map(([y, r]) => [r + 0.047, y]).concat(gasPath.slice().reverse().map(([y, r]) => [r + 0.012, y]));
-  const casing = cutLathe(casingProf, new THREE.MeshStandardMaterial({ color: 0x8d8f8e, roughness: 0.42, metalness: 0.85, side: THREE.DoubleSide }));
-  cutGroups.push(casing);
-  const coreCowlPart = P('Core cowl & casing', {
-    system: 'Nacelle', material: 'Composite cowl; titanium / Inconel core casings', mass: 520, explode: [0, 0, 0],
-    desc: 'The cowl splits the flow — about 1 kg of air in 10.5 goes through the core. Inside it, the core casing carries the plumbing, harnesses and bleed ducts.',
-  }, [coreCowl, casing]);
-  coreCowlPart.userData.part.stationTemp = '3';
-
-  // ----------------------------------------------------------------- LP compressor (booster)
-  const lpcRows = [];
-  [0.85, 0.65, 0.45].forEach((y, i) => {
-    const [hub, tip] = coreRadius(y);
-    lpcRows.push(row({ rHub: hub, rTip: tip - 0.01, chordHub: 0.11, chordTip: 0.1, staggerHub: 40, staggerTip: 55, tHub: 0.08, tTip: 0.06, camber: 0.05, y, stations: 2, n: 8 }, 54, titanium, lerpT('13', '3', 0.08 + i * 0.04)));
-  });
-  const lpcDrum = mesh(lathe([[0.48, 0.95], [0.5, 0.35], [0.4, 0.3], [0.4, 0.95], [0.48, 0.95]], 48), M.gunmetal());
-  const lpcSpin = new THREE.Group();
-  lpcSpin.add(...lpcRows, lpcDrum);
-  const lpcStators = [0.75, 0.55, 0.35].map((y, i) => {
-    const [hub, tip] = coreRadius(y);
-    return row({ rHub: hub + 0.01, rTip: tip, chordHub: 0.08, chordTip: 0.08, staggerHub: -30, staggerTip: -35, tHub: 0.08, tTip: 0.08, camber: -0.04, y, stations: 1, n: 6 }, 64, M.aluminium(), lerpT('13', '3', 0.1 + i * 0.04));
-  });
-  P('LP compressor (booster)', {
-    system: 'LP spool', material: 'Titanium blisks', mass: 330, explode: [0, 1.0, 0],
-    desc: 'Three booster stages on the fan shaft supercharge the core before the high-pressure compressor.',
-    callout: true, anchor: [0, 0.65, 0.95],
-  }, [lpcSpin, ...lpcStators]);
-
-  // ----------------------------------------------------------------- HP compressor
-  const hpcYs = Array.from({ length: 9 }, (_, i) => 0.15 - i * 0.13);
-  const hpcRows = hpcYs.map((y, i) => {
-    const [hub, tip] = coreRadius(y);
-    return row({ rHub: hub, rTip: tip - 0.008, chordHub: 0.07, chordTip: 0.065, staggerHub: 38, staggerTip: 50, tHub: 0.08, tTip: 0.06, camber: 0.05, y, stations: 1, n: 6 }, 48 + i * 4, hpcTint(i), lerpT('13', '3', 0.2 + (i / 8) * 0.8));
-  });
-  const hpcStators = hpcYs.map((y, i) => {
-    const [hub, tip] = coreRadius(y - 0.065);
-    return row({ rHub: hub + 0.008, rTip: tip, chordHub: 0.05, chordTip: 0.05, staggerHub: -28, staggerTip: -32, tHub: 0.08, tTip: 0.08, camber: -0.04, y: y - 0.065, stations: 1, n: 6 }, 60 + i * 4, M.aluminium(), lerpT('13', '3', 0.25 + (i / 8) * 0.75));
-  });
-  const hpDrum = mesh(lathe([[0.42, 0.22], [0.47, -1.0], [0.47, -1.95], [0.36, -1.95], [0.36, 0.22], [0.42, 0.22]], 48), M.inconel());
-  hpDrum.userData.temp = lerpT('3', '4', 0.1);
-  const hpcSpin = new THREE.Group();
-  hpcSpin.add(...hpcRows);
-  const hpcPart = P('HP compressor', {
-    system: 'HP spool', material: 'Ti-6246 front stages, Inconel 718 rear', mass: 610, explode: [0, -0.2, 1.9],
-    desc: 'Nine stages raise the pressure to the overall ratio (≈ 42 : 1 at take-off). Blades shrink stage by stage as the air densifies.',
-    callout: true, anchor: [0, -0.4, 0.75],
-  }, [hpcSpin, ...hpcStators]);
-  hpcPart.userData.part.stationTemp = '3';
-
-  // ----------------------------------------------------------------- combustor
-  const burnerMat = M.burner().clone();
-  const liner = mesh(lathe([[0.47, -1.02], [0.6, -1.0], [0.63, -1.1], [0.63, -1.52], [0.5, -1.56], [0.47, -1.5], [0.47, -1.02]], 64), new THREE.MeshStandardMaterial({ color: 0x8b7a6a, roughness: 0.4, metalness: 0.9, side: THREE.DoubleSide }));
-  const flame = mesh(lathe([[0.5, -1.08], [0.6, -1.1], [0.6, -1.48], [0.5, -1.5], [0.5, -1.08]], 64), burnerMat, { cast: false });
-  flame.scale.set(0.99, 1, 0.99);
-  flame.userData.temp = () => T['4'];
-  const nozzles = [];
-  for (let i = 0; i < 20; i++) {
-    const a = (i / 20) * Math.PI * 2;
-    nozzles.push(rod([Math.sin(a) * 0.8, -0.98, Math.cos(a) * 0.8], [Math.sin(a) * 0.55, -1.06, Math.cos(a) * 0.55], 0.016, 6).toNonIndexed());
-  }
-  const fuel = mesh(mergeGeometries(nozzles), M.copper());
-  const comb = P('Annular combustor', {
-    system: 'Hot section', material: 'Ceramic-matrix composite liner', mass: 180, explode: [0, -0.6, 2.6],
-    desc: 'Twenty lean-burn fuel injectors. Gas exits at the turbine inlet temperature — hotter than the melting point of the turbine alloy.',
-    callout: true, anchor: [0, -1.3, 0.75],
-  }, [liner, flame, fuel]);
-  comb.userData.part.stationTemp = '4';
-
-  // ----------------------------------------------------------------- HP turbine
-  const ngv = row({ rHub: 0.47, rTip: 0.62, chordHub: 0.09, chordTip: 0.09, staggerHub: -55, staggerTip: -55, tHub: 0.18, tTip: 0.16, camber: -0.12, y: -1.6, stations: 1, n: 8 }, 40, tbc, () => T['4'] * 0.97);
-  const hptRows = [-1.7, -1.86].map((y, i) => row({ rHub: 0.47, rTip: 0.615, chordHub: 0.07, chordTip: 0.065, staggerHub: 52, staggerTip: 58, tHub: 0.16, tTip: 0.12, camber: 0.12, y, stations: 1, n: 8 }, 70, tbc, lerpT('4', '45', 0.35 + i * 0.5)));
-  const hptSpin = new THREE.Group();
-  hptSpin.add(...hptRows);
-  const hpt = P('HP turbine', {
-    system: 'HP spool', material: 'Single-crystal CMSX-4, thermal-barrier coated', mass: 260, explode: [0, -1.2, 2.2],
-    desc: 'Two stages of film-cooled single-crystal blades drive the HP compressor at ~13,000 rpm.',
-  }, [ngv, hptSpin]);
-  hpt.userData.part.stationTemp = '45';
-
-  // ----------------------------------------------------------------- LP turbine
-  const lptYs = [-2.05, -2.22, -2.39, -2.56, -2.72];
-  const lptRows = lptYs.map((y, i) => {
-    const [hub, tip] = coreRadius(y);
-    return row({ rHub: hub, rTip: tip - 0.01, chordHub: 0.08, chordTip: 0.075, staggerHub: 48, staggerTip: 56, tHub: 0.12, tTip: 0.08, camber: 0.1, y, stations: 2, n: 8 }, 90 + i * 6, lptTint(i), lerpT('45', '5', 0.15 + (i / 4) * 0.85));
-  });
-  const lptStators = lptYs.map((y, i) => {
-    const [hub, tip] = coreRadius(y + 0.08);
-    return row({ rHub: hub + 0.01, rTip: tip, chordHub: 0.06, chordTip: 0.06, staggerHub: -45, staggerTip: -48, tHub: 0.12, tTip: 0.1, camber: -0.1, y: y + 0.08, stations: 1, n: 6 }, 80 + i * 6, M.inconel(), lerpT('45', '5', 0.1 + (i / 4) * 0.85));
-  });
-  const lptSpin = new THREE.Group();
-  lptSpin.add(...lptRows);
-  const lpt = P('LP turbine', {
-    system: 'LP spool', material: 'Titanium-aluminide (TiAl) blades', mass: 540, explode: [0, -2.6, 0],
-    desc: 'Five stages extract the work that drives the fan and booster through the LP shaft, at about a third of HP spool speed.',
-    callout: true, anchor: [0, -2.4, 0.85],
-  }, [lptSpin, ...lptStators]);
-  lpt.userData.part.stationTemp = '5';
-
-  // ----------------------------------------------------------------- shafts
-  const lpShaft = mesh(lathe([[0.12, 1.75], [0.12, -3.0], [0.09, -3.0], [0.09, 1.75], [0.12, 1.75]], 24), M.titanium());
-  const lptDisks = mesh(lathe([[0.12, -1.98], [0.43, -2.0], [0.43, -2.78], [0.12, -2.8], [0.12, -1.98]], 48), M.inconel());
-  lptDisks.userData.temp = lerpT('45', '5', 0.5);
-  const lpShaftSpin = new THREE.Group();
-  lpShaftSpin.add(lpShaft, lptDisks);
-  P('LP & HP shafts', {
-    system: 'Rotating group', material: 'Maraging steel LP shaft, Inconel HP drum', mass: 410, explode: [0, -0.5, -2.4],
-    desc: 'Two concentric spools: the LP shaft runs inside the hollow HP drum, each on its own bearings and at its own speed.',
-  }, [lpShaftSpin, hpDrum]);
-
-  // ----------------------------------------------------------------- exhaust
-  const plug = mesh(lathe([[0.38, -2.78], [0.4, -2.9], [0.32, -3.3], [0.16, -3.65], [0.001, -3.8]], 48), M.inconel());
-  plug.userData.temp = () => T['5'];
-  const exhaust = P('Exhaust plug & core nozzle', {
-    system: 'Hot section', material: 'Inconel 625', mass: 120, explode: [0, -2.8, 0],
-    desc: 'The core nozzle expands the hot stream to ambient pressure; the centre plug keeps the flow attached.',
-  }, plug);
-  exhaust.userData.part.stationTemp = '9';
-
-  // ----------------------------------------------------------------- core-compartment plumbing & harnesses
-  const P3 = (r, y, phi) => new THREE.Vector3(Math.sin(phi) * r, y, Math.cos(phi) * r);
-  const tube = (pts, radius, seg = 64) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), seg, radius, 6, false).toNonIndexed();
-  const steelPipe = [], copperPipe = [], harness = [];
-  const manifold = new THREE.TorusGeometry(0.8, 0.022, 8, 120).rotateX(Math.PI / 2).translate(0, -0.98, 0);
-  copperPipe.push(manifold.toNonIndexed());
-  copperPipe.push(tube([P3(0.8, -0.98, 2.6), P3(0.86, -0.7, 2.75), P3(0.9, -0.2, 2.9), P3(0.93, 0.5, 3.0)], 0.028));
-  for (const phi of [0.4, 2.5, 4.4]) {
-    steelPipe.push(tube([P3(0.74, -0.35, phi), P3(0.83, -0.6, phi + 0.08), P3(0.88, -1.2, phi + 0.22), P3(0.9, -1.7, phi + 0.3)], 0.042));
-  }
-  for (const [r0, phase] of [[0.79, 0], [0.83, 2.1]]) {
-    const pts = [];
-    for (let i = 0; i <= 40; i++) { const t = i / 40; pts.push(P3(r0 + t * 0.03, 0.6 - t * 3.0, phase + t * Math.PI * 2)); }
-    steelPipe.push(tube(pts, 0.012, 160));
-  }
-  for (const phase of [0.9, 3.4, 5.2]) {
-    const pts = [];
-    for (let i = 0; i <= 30; i++) { const t = i / 30; pts.push(P3(0.9, 0.7 - t * 3.0, phase + Math.sin(t * 6) * 0.08)); }
-    harness.push(tube(pts, 0.02, 120));
-    for (let k = 1; k < 10; k++) {
-      const c = P3(0.9, 0.7 - (k / 10) * 3.0, phase + Math.sin((k / 10) * 6) * 0.08);
-      harness.push(new THREE.BoxGeometry(0.06, 0.02, 0.06).translate(c.x, c.y, c.z).toNonIndexed());
-    }
-  }
-  const plumbing = new THREE.Group();
-  plumbing.add(mesh(mergeGeometries(steelPipe), new THREE.MeshStandardMaterial({ color: 0xb6bcc2, metalness: 1, roughness: 0.25 })));
-  plumbing.add(mesh(mergeGeometries(copperPipe), M.copper()));
-  plumbing.add(mesh(mergeGeometries(harness), new THREE.MeshStandardMaterial({ color: 0x2f3a2a, roughness: 0.8, metalness: 0.1 })));
-  P('Plumbing & harnesses', {
-    system: 'Accessories', material: 'Stainless fuel/oil lines, braided wiring looms', mass: 260, explode: [0, -0.3, 1.4], temp: 420,
-    desc: 'The fuel manifold rings the combustor and feeds twenty injectors; bleed ducts tap HPC air for cabin pressure and anti-ice; looms carry FADEC sensor signals.',
-    callout: true, anchor: [0.62, -0.98, 0.62],
-  }, plumbing);
-
-  // ----------------------------------------------------------------- accessory gearbox (fan-case mounted, port side)
-  const agb = new THREE.Group();
-  const box = mesh(new THREE.BoxGeometry(0.5, 0.9, 0.36), M.gunmetal());
-  box.position.set(0, 1.0, -1.92);
-  agb.add(box);
-  [[0.12, 1.28, -2.18], [-0.12, 0.86, -2.18], [0.16, 0.7, -2.16]].forEach(([x, y, z]) => {
-    const c = mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.24, 16), M.aluminium());
-    c.rotation.x = Math.PI / 2;
-    c.position.set(x, y, z);
-    agb.add(c);
-  });
-  P('Accessory gearbox', {
-    system: 'Accessories', material: 'Magnesium casing', mass: 150, explode: [0, 0, -1.2], temp: 360,
-    desc: 'Driven off the HP spool by a radial tower shaft: fuel pump, hydraulic pumps, oil system and the starter-generator.',
-  }, agb);
-
-  // ----------------------------------------------------------------- spools
-  const spinGroups = { n1: [fanSpin, lpcSpin, lptSpin, lpShaftSpin], n2: [hpcSpin, hptSpin] };
-
-  // ----------------------------------------------------------------- engine stand (GSE yellow), world frame
-  const stand = new THREE.Group();
+  // ------------------------------------------------------------------ display cradle (lathe frame: x down, floor at x = H)
+  const F = H - 0.1;
   const sg = [];
-  for (const z of [-0.95, 0.95]) sg.push(beam([2.2, 0.32, z], [-3.4, 0.32, z], 0.16, 0.16));
-  for (const x of [1.9, -0.2, -3.1]) sg.push(beam([x, 0.32, -0.95], [x, 0.32, 0.95], 0.14, 0.14));
-  for (const [x, top] of [[0.6, 0.5], [-1.6, 1.3]]) {
-    for (const z of [-0.6, 0.6]) sg.push(beam([x, 0.32, z * 1.5], [x, top, z], 0.12, 0.12));
-    sg.push(beam([x, top, -0.6], [x, top, 0.6], 0.12, 0.12));
+  for (const z of [-1.15, 1.15]) sg.push(beam([F, 1.3, z], [F, -6.0, z], 0.16, 0.16));
+  for (const y of [1.1, -0.8, -3.0, -4.55, -5.8]) sg.push(beam([F, y, -1.15], [F, y, 1.15], 0.14, 0.14));
+  // forward saddle under the nacelle, on two posts and a central pedestal
+  for (const z of [-0.98, 0.98]) sg.push(beam([F - 0.05, -0.8, z * 1.17], [1.86, -0.8, z], 0.12, 0.12));
+  sg.push(beam([F - 0.05, -0.8, 0], [2.06, -0.8, 0], 0.18, 0.18));
+  // aft yoke under the core cowl
+  sg.push(beam([F - 0.05, -4.55, 0], [1.06, -4.55, 0], 0.2, 0.2));
+  for (const z of [-1.15, 1.15]) sg.push(beam([F - 0.05, -4.55, z], [1.5, -4.55, z * 0.08], 0.1, 0.1));
+  const saddles = [sector(1.99, 2.07, -0.6, -1.0, Math.PI / 2 - 0.5, Math.PI / 2 + 0.5, 16), sector(1.0, 1.06, -4.38, -4.72, Math.PI / 2 - 0.6, Math.PI / 2 + 0.6, 16)];
+  const frame = mesh(mergeGeometries([...sg, ...saddles].map((g) => (g.index ? g.toNonIndexed() : g))), M.gse());
+  const casters = [];
+  for (const y of [1.15, -5.85]) for (const z of [-1.15, 1.15]) {
+    casters.push(new THREE.CylinderGeometry(0.11, 0.11, 0.09, 18).rotateX(Math.PI / 2).translate(H - 0.11, y, z).toNonIndexed());
   }
-  const frame = mesh(mergeGeometries(sg.map((g) => g.toNonIndexed())), M.gse());
-  stand.add(frame);
-  for (const x of [2.0, -3.2]) for (const z of [-0.95, 0.95]) {
-    const w = mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.1, 16), M.rubber());
-    w.rotation.x = Math.PI / 2;
-    w.position.set(x, 0.14, z);
-    const fork = mesh(new THREE.BoxGeometry(0.08, 0.2, 0.16), M.darkMetal());
-    fork.position.set(x, 0.24, z);
-    stand.add(w, fork);
-  }
-  const standPart = A.part('Transport stand', {
-    system: 'Ground support', material: 'Painted steel', mass: 900, explode: [0, -0.6, 0], temp: 293,
-    desc: 'Ground-support cradle used to move the engine around the shop; the yokes pick up the fan-case and core mounts.',
-  }, stand);
+  P('Display cradle', {
+    system: 'Ground support', material: 'Painted steel', mass: 1400,
+    explode: [0, 0, 0], temp: 293,
+    desc: 'Museum display cradle: a saddle under the nacelle and a yoke under the core. Shop stands for a bare GE90 instead bolt to the engine\'s own mount pads.',
+  }, [frame, mesh(mergeGeometries(casters), M.rubber())]);
 
-  // ----------------------------------------------------------------- flow particles (lathe frame)
-  const FLOW = 1600;
+  // ------------------------------------------------------------------ flow particles (lathe frame)
+  const FLOW = 2200;
   const fGeo = new THREE.BufferGeometry();
   const fPos = new Float32Array(FLOW * 3);
   const fCol = new Float32Array(FLOW * 3);
@@ -374,69 +84,61 @@ export function buildTurbofan() {
   flow.frustumCulled = false;
   flow.visible = false;
   eng.add(flow);
+  const Y0 = 2.2, CORE_END = -7.4, BY_END = -6.6;
   const seeds = Array.from({ length: FLOW }, (_, i) => ({
-    core: i % 10 === 0 || i % 10 === 5,
-    y: 3.2 - Math.random() * 8,
+    core: i % 4 === 0,
+    y: Y0 - Math.random() * (Y0 - CORE_END),
     th: Math.random() * Math.PI * 2,
     f: 0.08 + Math.random() * 0.84,
   }));
   const tempColor = (K) => {
     const t = Math.min(1, Math.max(0, (K - 250) / 1500));
-    // cool cyan → amber → white-hot
     const c = new THREE.Color();
     if (t < 0.5) c.setRGB(0.25 + t * 1.3, 0.75 - t * 0.2, 1.0 - t * 1.6);
     else c.setRGB(1.0, 0.65 + (t - 0.5) * 0.7, 0.2 + (t - 0.5) * 1.4);
     return c;
   };
+  const mix = (a, b, f) => a + (b - a) * Math.min(1, Math.max(0, f));
   const coreTemp = (y) => {
-    if (y > 0.95) return T['2'];
-    if (y > 0.25) return T['13'];
-    if (y > -1.0) return T['13'] + (T['3'] - T['13']) * ((0.25 - y) / 1.25);
-    if (y > -1.6) return T['3'] + (T['4'] - T['3']) * Math.min(1, (-1.0 - y) / 0.25);
-    if (y > -1.95) return T['4'] + (T['45'] - T['4']) * ((-1.6 - y) / 0.35);
-    if (y > -2.8) return T['45'] + (T['5'] - T['45']) * ((-1.95 - y) / 0.85);
-    return T['9'] + (T['5'] - T['9']) * Math.max(0, 1 + (y + 2.8) / 2.5);
+    if (y > 0) return T['2'];
+    if (y > -0.72) return mix(T['2'], T['13'], -y / 0.72);
+    if (y > -1.65) return mix(T['13'], T['25'], (-0.72 - y) / 0.93);
+    if (y > -2.12) return T['25'];
+    if (y > -3.1) return mix(T['25'], T['3'], (-2.12 - y) / 0.98);
+    if (y > -3.36) return T['3'];
+    if (y > -3.72) return T['3'] * Math.pow(T['4'] / T['3'], Math.min(1, (-3.36 - y) / 0.2));
+    if (y > -4.1) return mix(T['4'], T['45'], (-3.72 - y) / 0.38);
+    if (y > -5.1) return mix(T['45'], T['5'], (-4.1 - y) / 1.0);
+    return mix(T['5'], T['9'], (-5.1 - y) / 0.55);
+  };
+  const spinnerR = (y) => (y >= 0.8 ? 0 : y > 0 ? 0.47 * Math.pow((0.8 - y) / 0.8, 0.8) : 0.47);
+  const plugR = (y) => (y < PLUG_TIP ? 0 : Math.max(0, 0.47 * (y - PLUG_TIP) / (-5.65 - PLUG_TIP)));
+  const coreStream = (y) => {
+    if (y > 0) return [spinnerR(y), 0.86];
+    if (y > -0.72) return [mix(0.47, 0.555, -y / 0.72), mix(0.86, 0.875, -y / 0.72)];
+    if (y > -5.65) return coreAt(y);
+    return [plugR(y), 0.72 - (-5.65 - y) * 0.03];
+  };
+  const bypassStream = (y) => {
+    if (y > -0.72) return [0.9, 1.6];
+    if (y > FAN_NOZZLE_Y) return bypassAt(y);
+    const k = FAN_NOZZLE_Y - y;
+    return [Math.max(0.8, 1.04 - k * 0.04), 1.49 - k * 0.05];
   };
 
-  // markings: stencilled designation on the fan cowl, red danger band on the inlet
-  A.root.updateMatrixWorld(true);
-  const W = (r, yAx, phi) => [yAx, 2.3 - r * Math.sin(phi), r * Math.cos(phi)];
-  const N = (phi) => [0, -Math.sin(phi), Math.cos(phi)];
-  const cowlPart = A.parts.find((p) => p.name === 'Fan cowl & thrust reverser');
-  const inletP = A.parts.find((p) => p.name === 'Inlet cowl');
-  const logo = decalTexture('tf90', 1024, 256, (ctx, w, h) => {
-    ctx.fillStyle = 'rgba(28,32,38,0.92)';
-    ctx.font = '700 150px "Chakra Petch", sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('TF-90', w * 0.33, h * 0.55);
-    ctx.font = '600 70px "Barlow Semi Condensed", sans-serif';
-    ctx.fillText('CYCLONE', w * 0.78, h * 0.58);
-    ctx.fillRect(w * 0.6, h * 0.3, 4, h * 0.5);
-  });
-  cowlPart.add(decal(fanCowl.userData.cutaway.cut, logo, { at: W(1.74, 0.55, 0.8), dir: N(0.8), size: [1.5, 0.38, 0.3], angle: Math.PI / 2, into: cowlPart }));
-  cowlPart.add(decal(fanCowl.userData.cutaway.cut, stencilText('NO STEP', 'rgba(30,34,38,0.85)', true), { at: W(1.7, -0.05, 1.3), dir: N(1.3), size: [0.5, 0.13, 0.3], angle: Math.PI / 2, into: cowlPart }));
-  inletP.add(decal(inlet.userData.cutaway.cut, danger('DANGER · INTAKE'), { at: W(1.775, 2.05, 0.6), dir: N(0.6), size: [1.0, 0.31, 0.3], angle: Math.PI / 2, into: inletP }));
-
-  // station planes (SAE ARP755 numbering) with live total temperature / pressure labels
-  const STATIONS = [
-    ['2', 1.84, 0.47, 1.49], ['13', 0.25, 0.99, 1.49], ['3', -0.97, 0.46, 0.53], ['4', -1.59, 0.47, 0.62],
-    ['45', -1.95, 0.46, 0.62], ['5', -2.8, 0.42, 0.83], ['19', -0.42, 0.98, 1.42],
-  ];
+  // ------------------------------------------------------------------ station planes (SAE ARP755) with live labels
   const stationGroup = new THREE.Group();
   stationGroup.visible = false;
-  // labels sit above the nacelle (world up = local −x) on staggered rows, each with a leader
   const order = [...STATIONS].sort((a, b) => b[1] - a[1]).map((s) => s[0]);
   const leaderMat = new THREE.LineBasicMaterial({ color: 0xcfd8e2, transparent: true, opacity: 0.55, depthTest: false });
   const stationViz = STATIONS.map(([id, y, r0, r1]) => {
     const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.34, side: THREE.DoubleSide, depthWrite: false });
-    const ring = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 96).rotateX(-Math.PI / 2), mat);
-    ring.position.y = y;
-    ring.userData.fx = true; ring.userData.noAO = true; ring.userData.keepInModes = true;
-    ring.renderOrder = 12;
+    const ringMesh = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 96).rotateX(-Math.PI / 2), mat);
+    ringMesh.position.y = y;
     const edge = new THREE.Mesh(new THREE.TorusGeometry(r1, 0.008, 6, 128).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff }));
     edge.position.y = y;
-    edge.userData.fx = true; edge.userData.noAO = true; edge.userData.keepInModes = true;
-    const top = 1.95 + (order.indexOf(id) % 3) * 0.46;
+    for (const o of [ringMesh, edge]) { o.userData.fx = true; o.userData.noAO = true; o.userData.keepInModes = true; o.renderOrder = 12; }
+    const top = NACELLE.maxR + 0.75 + (order.indexOf(id) % 3) * 0.42;
     const leader = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-r1, y, 0), new THREE.Vector3(-top, y, 0)]), leaderMat);
     leader.renderOrder = 13;
     leader.userData.fx = true; leader.userData.noAO = true; leader.userData.keepInModes = true;
@@ -447,7 +149,7 @@ export function buildTurbofan() {
     const label = new CSS2DObject(el);
     label.center.set(0.5, 1);
     label.position.set(-top, y, 0);
-    stationGroup.add(ring, edge, leader, label);
+    stationGroup.add(ringMesh, edge, leader, label);
     const [tEl, pEl] = el.querySelectorAll('span');
     return { id, mat, edgeMat: edge.material, tEl, pEl, label };
   });
@@ -455,25 +157,41 @@ export function buildTurbofan() {
 
   A.finalize();
 
-  const state = { throttle: 0.6, n1: 0, n2: 0, cutaway: true, flow: false, a1: 0, a2: 0 };
+  const state = { throttle: 1, n1: 100, n2: 100, cutaway: true, flow: false, a1: 0, a2: 0, fromLab: false };
   const applyCut = (on) => { state.cutaway = on; cutGroups.forEach((g) => setCut(g, on)); };
   applyCut(true);
+  const burnerMat = ctx.burnerMat;
 
   const vehicle = {
     id: 'turbofan',
-    designation: 'TF-90',
-    name: 'CYCLONE',
-    role: 'High-bypass turbofan',
-    tagline: 'Two-spool · bypass ratio 9.5 · overall pressure ratio 42',
-    summary: 'A widebody-class engine shown as a museum cutaway. Of every 10.5 kg of air the fan moves, 1 kg enters the core, is compressed 42-fold, burned at 1,750 K and expanded through two turbines that drive everything upstream. The rest bypasses the core and makes most of the thrust.',
+    designation: 'GE90-115B',
+    name: 'GE90',
+    role: 'High-bypass turbofan · Boeing 777',
+    tagline: '115,300 lbf · 3.25 m composite fan · overall pressure ratio 42',
+    summary: 'The world\'s most powerful certified jet engine in service, built for the Boeing 777-300ER and 777F. A 3.25 m fan of 22 swept carbon-fibre blades moves about 1.6 tonnes of air a second at take-off; roughly one kilogram in eight passes through the core, where a 4-stage booster and 9-stage HP compressor squeeze it 42-fold, a dual annular combustor heats it, and 2 HP and 6 LP turbine stages expand it to drive everything upstream. The bypass air makes most of the thrust. Shown as a cutaway in its Boeing nacelle.',
     specs: [
-      ['Fan diameter', '3.0 m'], ['Length', '6.1 m'], ['Bypass ratio', '9.5 : 1'], ['Overall PR', '42 : 1'],
-      ['Turbine inlet', '1,750 K'], ['Take-off thrust', '≈ 400 kN'], ['Cruise TSFC', '≈ 17.9 g/(kN·s)'], ['Dry mass', '≈ 7,200 kg'],
+      ['Manufacturer', 'GE Aerospace, with Safran, IHI and Avio Aero'],
+      ['Aircraft', 'Boeing 777-300ER, 777F, 777-200LR'],
+      ['Certified take-off thrust', '115,300 lbf (513 kN)'],
+      ['Record thrust (2002)', '127,900 lbf (569 kN)'],
+      ['Fan', '3.25 m (128 in), 22 swept composite blades'],
+      ['Length', '7.29 m (287 in)'],
+      ['Dry mass', '8,283 kg (18,260 lb)'],
+      ['Bypass ratio', '≈ 7.1–7.2 : 1'],
+      ['Overall pressure ratio', '42 : 1'],
+      ['Stages', 'Fan + 4 booster · 9 HPC · 2 HPT · 6 LPT'],
+      ['Combustor', 'Dual annular (DAC)'],
+      ['100 % N1 / N2', '2,355 / 9,332 rpm'],
+      ['Take-off EGT limit', '1,090 °C'],
+      ['Control', 'Dual-channel FADEC'],
+      ['Entry into service', '2004 (777-300ER)'],
     ],
+    heroStats: [['513', 'kN', 'Take-off thrust'], ['3.25', 'm', 'Fan diameter'], ['42', ': 1', 'Pressure ratio']],
+    sources: 'GE Aerospace GE90 product pages and press releases (stage counts, dual annular combustor, fan); FAA type certificate data sheet E00049EN and EASA TCDS IM.E.002 (thrust rating, N1/N2 speeds, EGT limit); Aircraft Commerce GE90 owner\'s and operator\'s guide, issue 84, 2012 (-115B configuration, bypass ratio); Flight International, GE90-115B development (added booster stage, de-staged HPC); Museum of Modern Art collection, GE90-115B fan blade (length, mass, materials); NASA Energy Efficient Engine combustor reports (dual-annular combustor principle); GE mount patents US 5,277,382 and US 5,452,575 (mount and thrust-link arrangement); Mattingly, Elements of Propulsion (cycle method); SAE ARP755 (station numbering).',
     fleetTag: 'OPR 42',
     root: A.root,
     parts: A.parts,
-    view: { dir: [0.85, 0.42, 1.25], fill: 1.2 },
+    view: { dir: [0.78, 0.4, 1.25], fill: 1.12 },
     displaySize: 9,
     thermalRange: [250, 1900],
     state,
@@ -501,49 +219,49 @@ export function buildTurbofan() {
       if (info.stationTemp) return T[info.stationTemp];
       return info.temp;
     },
-    update(dt, t) {
+    update(dt) {
       const thr = state.throttle;
-      // N1 ≈ 2,400 rpm and N2 ≈ 13,000 rpm at 100 %; shown slowed so blades remain readable
-      const n1 = (0.18 + 0.82 * Math.sqrt(thr)) * 9.0;
-      const n2 = (0.4 + 0.6 * Math.sqrt(thr)) * 16.0;
-      state.a1 += n1 * dt;
-      state.a2 += n2 * dt;
-      for (const g of spinGroups.n1) g.rotation.y = state.a1;
-      for (const g of spinGroups.n2) g.rotation.y = state.a2;
-      burnerMat.emissiveIntensity = 1.0 + thr * 5.2 * ((T['4'] - 900) / 900);
-      if (state.flow) {
-        const speed = 0.4 + thr * 1.2;
-        for (let i = 0; i < FLOW; i++) {
-          const s = seeds[i];
-          let v, r, K;
-          if (s.core) {
-            v = s.y > 0.95 ? 1.4 : s.y > -1.0 ? 0.7 : s.y > -1.6 ? 0.5 : s.y > -2.8 ? 1.6 : 3.0;
-            const [hub, tip] = s.y > 0.95 ? [0.5, 0.82] : coreRadius(s.y);
-            r = hub + (tip - hub) * s.f;
-            K = coreTemp(s.y);
-            if (s.y < -1.0 && s.y > -2.8) s.th += dt * 2.2;
-          } else {
-            v = s.y > 1.6 ? 1.6 : 2.4;
-            if (s.y > 1.6) r = 0.55 + s.f * 0.93;
-            else if (s.y > -0.4) { const hub = 0.86 + Math.min(0.12, Math.max(0, (0.95 - s.y)) * 0.12); r = hub + (1.47 - hub) * s.f; }
-            else r = 1.0 + s.f * 0.42 - (-0.4 - s.y) * 0.04;
-            K = s.y > 1.5 ? T['2'] : T['13'];
-            if (s.y < 1.55 && s.y > 1.25) s.th += dt * 3;
-          }
-          s.y -= v * speed * dt;
-          if (s.y < (s.core ? -5.2 : -4.2)) { s.y = 3.2; s.th = Math.random() * Math.PI * 2; }
-          fPos[i * 3] = Math.sin(s.th) * r;
-          fPos[i * 3 + 1] = s.y;
-          fPos[i * 3 + 2] = Math.cos(s.th) * r;
-          const fade = s.y < -0.5 ? Math.max(0, 1 + (s.y + 0.5) / (s.core ? 4.5 : 3.6)) : Math.min(1, (3.2 - s.y) * 2);
-          const c = tempColor(K);
-          fCol[i * 3] = c.r * fade; fCol[i * 3 + 1] = c.g * fade; fCol[i * 3 + 2] = c.b * fade;
+      // the lab writes N1 / N2 (%) from the cycle; otherwise follow the throttle as the cycle does
+      const n1 = state.fromLab ? state.n1 / 100 : 0.42 + 0.58 * Math.sqrt(thr);
+      const n2 = state.fromLab ? state.n2 / 100 : 0.62 + 0.38 * Math.sqrt(thr);
+      state.a1 += n1 * N1_RPM * (Math.PI / 30) * SHOW * dt;
+      state.a2 += n2 * N2_RPM * (Math.PI / 30) * SHOW * dt;
+      for (const g of spin.n1) g.rotation.y = state.a1;
+      for (const g of spin.n2) g.rotation.y = state.a2;
+      burnerMat.emissiveIntensity = 0.8 + thr * 4.6 * Math.max(0, (T['4'] - 900) / 900);
+      if (!state.flow) return;
+      const speed = 0.35 + thr * 1.1;
+      for (let i = 0; i < FLOW; i++) {
+        const s = seeds[i];
+        let v, r, K;
+        if (s.core) {
+          const y = s.y;
+          v = y > 0 ? 1.3 : y > -1.65 ? 1.0 : y > -3.1 ? 0.6 : y > -3.72 ? 0.45 : y > -5.1 ? 1.4 : 2.6;
+          const [h, t] = coreStream(y);
+          r = h + (t - h) * s.f;
+          K = coreTemp(y);
+          if (y < -3.72 && y > -5.1) s.th += dt * 1.6;
+        } else {
+          const y = s.y;
+          v = y > 0 ? 1.5 : 2.1;
+          const [a, b] = bypassStream(y);
+          r = a + (b - a) * s.f;
+          K = y > 0 ? T['2'] : T['13'];
+          if (y < 0.05 && y > -0.5) s.th += dt * 2.5;
         }
-        fGeo.attributes.position.needsUpdate = true;
-        fGeo.attributes.color.needsUpdate = true;
+        s.y -= v * speed * dt;
+        if (s.y < (s.core ? CORE_END : BY_END)) { s.y = Y0; s.th = Math.random() * Math.PI * 2; }
+        fPos[i * 3] = Math.sin(s.th) * r;
+        fPos[i * 3 + 1] = s.y;
+        fPos[i * 3 + 2] = Math.cos(s.th) * r;
+        const end = s.core ? -5.65 : FAN_NOZZLE_Y;
+        const fade = s.y < end ? Math.max(0, 1 + (s.y - end) / (s.core ? 1.75 : 2.6)) : Math.min(1, (Y0 - s.y) * 2);
+        const c = tempColor(K);
+        fCol[i * 3] = c.r * fade; fCol[i * 3 + 1] = c.g * fade; fCol[i * 3 + 2] = c.b * fade;
       }
+      fGeo.attributes.position.needsUpdate = true;
+      fGeo.attributes.color.needsUpdate = true;
     },
   };
-  void standPart;
   return vehicle;
 }

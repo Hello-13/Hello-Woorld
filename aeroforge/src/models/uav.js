@@ -206,7 +206,7 @@ export function buildUAV() {
   // ============================================================== wings
   const zE = (z) => (z - W_ROOT.le[2]) / (W_TIP.le[2] - W_ROOT.le[2]);
   const FLAP = [0.78, 4.55], AIL = [4.72, 9.3];
-  const TANK = [0.5, 6.2];
+  const TANK = [0.5, 8.4];
   const RIBS = [0.45, 1.1, 1.75, 2.4, 3.05, 3.7, 4.35, 5.0, 5.6, 6.2, 6.8, 7.4, 8.0, 8.6, 9.2, 9.85];
   const STN = [[2.4, 0.92, 0.24, 'inboard'], [4.0, 0.72, 0.2, 'middle'], [5.6, 0.5, 0.15, 'outboard']];
   const surf = { flap: [], ail: [], rv: [], rud: null };
@@ -245,7 +245,7 @@ export function buildUAV() {
     }, L(f(merge(RIBS.map((z) => ribGeo(z, 0.012, 0.72)))), m.primer));
 
     const r0 = wsec(TANK[0]), r1 = wsec(TANK[1]);
-    const tankG = twistGeo(wingPanel({ root: { ...r0, t: r0.t * 0.84 }, tip: { ...r1, t: r1.t * 0.84 }, c0: 0.18, c1: 0.665, stations: 8, twist: twistAt(TANK[1]) - twistAt(TANK[0]), withChord: false }), TANK[0]);
+    const tankG = twistGeo(wingPanel({ root: { ...r0, t: r0.t * 0.9 }, tip: { ...r1, t: r1.t * 0.9 }, c0: 0.165, c1: 0.675, stations: 10, twist: twistAt(TANK[1]) - twistAt(TANK[0]), withChord: false }), TANK[0]);
     P(`Wing fuel tank (${sn})`, {
       system: 'Fuel', material: 'Sealed integral bay / bladder (est.)', mass: 20, explode: [0, -0.45, 1.75 * side],
       desc: 'Fuel in the wing box between the spars, from the root to about 6 m out (≈ 655 L, estimate). Wing fuel sits on the lift, so it relieves wing bending and barely moves the centre of gravity as it burns.',
@@ -275,11 +275,11 @@ export function buildUAV() {
       system: 'Flight controls', material: 'Electromechanical actuators (est.)', mass: 6, count: 2, explode: [-0.3, 0.6, 1.75 * side],
       desc: 'Electric servo actuators behind the rear spar drive the flap and the aileron through short pushrods. The MQ-9 flies by wire with no hydraulic flight controls (actuator type per GA-ASI descriptions; sizes estimated).',
     }, L(f(merge([servo(2.7), horn(2.7), servo(7.0), horn(7.0)])), m.lruOlive));
-    const harnessPts = [[0.45, 0.62], [3.0, 0.63], [6.0, 0.64], [9.2, 0.64], [9.9, 0.3], [9.95, 0.08]].map(([z, cf]) => wpt(z, cf, 0));
+    const harnessPts = [[0.45, 0.705], [3.0, 0.705], [6.0, 0.705], [9.2, 0.705], [9.85, 0.4], [9.95, 0.08]].map(([z, cf]) => wpt(z, cf, 0));
     P(`Wing wiring (${sn})`, {
       system: 'Electrical', material: 'Shielded harness in conduit (est.)', mass: 4, explode: [0, 0.6, 1.75 * side],
       desc: 'Power and signal runs to the wing servos, the wingtip radio antenna and the navigation light, routed along the rear spar outside the fuel bay.',
-    }, L(f(merge([pipe(harnessPts, 0.008, 5, 60), tubeBetween(wpt(2.7, 0.64, 0), wpt(2.7, 0.705, 0), 0.006, 5), tubeBetween(wpt(7.0, 0.64, 0), wpt(7.0, 0.705, 0), 0.006, 5)])), m.harness));
+    }, L(f(merge([pipe(harnessPts, 0.008, 5, 60), tubeBetween(wpt(2.7, 0.705, 0), wpt(2.75, 0.715, 0), 0.006, 5), tubeBetween(wpt(7.0, 0.705, 0), wpt(7.05, 0.715, 0), 0.006, 5)])), m.harness));
     const lens = new THREE.SphereGeometry(0.03, 12, 8).scale(1.4, 0.8, 1).translate(...wpt(10.0, 0.04, 0)).translate(0.02, 0, 0.03);
     P(`Navigation light (${sn})`, {
       system: 'Electrical', material: 'LED position light', mass: 0.5, explode: [0, 1.05, 1.95 * side],
@@ -535,8 +535,8 @@ export function buildUAV() {
   }, L(merge(caps), m.darkMetal));
   const vents = [];
   for (const zs of [1, -1]) {
-    vents.push(pipe([wpt(6.1, 0.62, 1, 0.03), wpt(7.2, 0.62, 0, 0), wpt(7.8, 0.6, -1, 0.02)].map((p) => [p[0], p[1], p[2] * zs]), 0.008, 5, 16));
-    vents.push(box(0.12, 0.012, 0.05, wpt(7.8, 0.6, -1, -0.002).map((v, i) => (i === 2 ? v * zs : v))));
+    vents.push(pipe([wpt(8.3, 0.6, 1, 0.03), wpt(8.8, 0.55, 0, 0), wpt(9.1, 0.5, -1, 0.02)].map((p) => [p[0], p[1], p[2] * zs]), 0.008, 5, 16));
+    vents.push(box(0.12, 0.012, 0.05, wpt(9.1, 0.5, -1, -0.002).map((v, i) => (i === 2 ? v * zs : v))));
   }
   P('Fuel vents', {
     system: 'Fuel', material: 'Vent lines to flush under-wing outlets (est.)', mass: 1, count: 2, explode: [0, -0.2, 2.6],
