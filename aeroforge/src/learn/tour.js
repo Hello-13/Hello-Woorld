@@ -69,6 +69,7 @@ export class TourPlayer {
     applyExplode(v.parts, explode);
     // aim the camera at the focused parts (or the whole vehicle) from the step's direction
     const box = new THREE.Box3();
+    (v.root.parent || v.root).updateMatrixWorld(true);   // the explode lift just moved the root
     for (const p of focus.length ? focus : [v.root]) box.union(solidBounds(p));
     const sph = box.getBoundingSphere(new THREE.Sphere());
     const dir = new THREE.Vector3(...(step.view?.dir || v.view.dir)).normalize();

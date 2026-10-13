@@ -54,7 +54,7 @@ async function start() {
   }
   const modes = new RenderModes(stage);
   // console handle for tinkering: __aeroforge.stage, .modes, .FLEET, .app
-  window.__aeroforge = { stage, modes, FLEET, get app() { return app; } };
+  window.__aeroforge = { stage, modes, FLEET, get app() { try { return app; } catch { return undefined; } } };   // undefined until boot has made it
   const log = new EventLog($('log'));
   // Ultra and 4K paint the large skins and stencils at twice the resolution for 4K close-ups
   setTextureDetail(stage.quality === '4k' || stage.quality === 'ultra' ? 2 : 1);
@@ -661,9 +661,9 @@ async function start() {
     calloutAcc += dt;
     // labels on, or a tour step showing its parts; every frame while the camera flies or the view eases
     if (callouts.visible && (calloutAcc > 0.1 || stage.tween || stage.shifting)) {
-      calloutAcc = 0;
       const box = stage.labels.domElement;
-      callouts.layout(stage.camera, box.clientWidth, box.clientHeight);
+      // a label shown for the first time is measured once it renders: lay out again next frame
+      calloutAcc = callouts.layout(stage.camera, box.clientWidth, box.clientHeight) ? 1 : 0;
     }
     clockAcc += dt;
     if (clockAcc > 0.5) {

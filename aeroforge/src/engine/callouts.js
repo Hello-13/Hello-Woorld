@@ -2,15 +2,17 @@
 //
 // Each callout is a dot on its part with a leader line to a label. layout() places the labels so
 // they do not overlap one another or the interface panels: it tries the label up-right of its dot,
-// then up-left, down-right, down-left, then stacked further up on either side, and keeps a label
-// where it is for as long as that spot stays clear (so labels do not jump while the view moves).
+// then up-left, down-right, down-left, then stacked further up or down on either side, and keeps a
+// label where it is for as long as that spot stays clear (so labels do not jump while the view moves).
+// A label that finds no clear spot at all fades back until the view opens up.
 
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
 const DX = 22, DY = 18, GAP = 4;   // leader length (px) and spacing between stacked labels
 // placement candidates: horizontal side (1 right, -1 left), vertical side (-1 up, 1 down), stack step
-const SLOTS = [[1, -1, 0], [-1, -1, 0], [1, 1, 0], [-1, 1, 0], [1, -1, 1], [-1, -1, 1], [1, -1, 2], [-1, -1, 2], [1, 1, 1], [-1, 1, 1]];
+const SLOTS = [[1, -1, 0], [-1, -1, 0], [1, 1, 0], [-1, 1, 0], [1, -1, 1], [-1, -1, 1], [1, -1, 2], [-1, -1, 2], [1, 1, 1], [-1, 1, 1],
+  [1, 1, 2], [-1, 1, 2], [1, -1, 3], [-1, -1, 3]];
 const v = new THREE.Vector3();
 
 export class Callouts {
@@ -73,16 +75,19 @@ export class Callouts {
   }
 
   /** Lay the visible labels out without overlaps. width / height: the label layer in CSS pixels;
-   *  obstacles(): screen rectangles [x0, y0, x1, y1] of interface panels to keep clear of. */
+   *  obstacles(): screen rectangles [x0, y0, x1, y1] of interface panels to keep clear of.
+   *  Returns true while a label has not been measured yet (call again next frame). */
   layout(camera, width, height) {
     const live = this.objects.filter((o) => o.obj.visible && o.part.visible);
-    if (!live.length) return;
+    if (!live.length) return false;
+    let unmeasured = false;
     const placed = this.obstacles().slice();
     const items = [];
     for (const o of live) {
       o.obj.getWorldPosition(v).project(camera);
       if (v.z > 1) continue;
       if (!o.w && o.text.offsetWidth) { o.w = o.text.offsetWidth; o.h = o.text.offsetHeight; o.slot = -1; }   // measured once shown
+      if (!o.w) unmeasured = true;
       const w = o.w || 120, h = o.h || 20;
       items.push({ o, x: (v.x * 0.5 + 0.5) * width, y: (-v.y * 0.5 + 0.5) * height, w, h });
     }
@@ -117,6 +122,7 @@ export class Callouts {
       }
       const r = rectFor(it, SLOTS[best]);
       placed.push([r[0] - GAP, r[1] - GAP, r[2] + GAP, r[3] + GAP]);
+      it.o.el.classList.toggle('is-crowded', bestCost > 0);
       if (best !== it.o.slot) {
         it.o.slot = best;
         const [sx, sy, k] = SLOTS[best];
@@ -128,5 +134,6 @@ export class Callouts {
         it.o.line.style.transform = `rotate(${Math.atan2(ey, ex)}rad)`;
       }
     }
+    return unmeasured;
   }
 }
