@@ -42,8 +42,7 @@ function canopyGeometry(nu = 84, nv = 56) {
       const pu0 = pt(uu - e, v), pu1 = pt(uu + e, v), pv0 = pt(uu, Math.max(0, v - e)), pv1 = pt(uu, Math.min(1, v + e));
       const du = new THREE.Vector3(pu1[0] - pu0[0], pu1[1] - pu0[1], pu1[2] - pu0[2]);
       const dv = new THREE.Vector3(pv1[0] - pv0[0], pv1[1] - pv0[1], pv1[2] - pv0[2]);
-      const n = dv.cross(du).normalize();
-      if (n.y < 0 && Math.abs(v - 0.5) < 0.45) n.negate();
+      const n = du.cross(dv).normalize();
       nrm.push(n.x, n.y, n.z);
     }
   }
@@ -58,12 +57,13 @@ function canopyGeometry(nu = 84, nv = 56) {
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx);
-  // make the winding agree with the outward normals
-  const P0 = new THREE.Vector3(...pos.slice(idx[0] * 3, idx[0] * 3 + 3));
-  const P1 = new THREE.Vector3(...pos.slice(idx[1] * 3, idx[1] * 3 + 3));
-  const P2 = new THREE.Vector3(...pos.slice(idx[2] * 3, idx[2] * 3 + 3));
+  // make the winding agree with the outward normals (checked on a quad mid-canopy)
+  const k0 = (((nu >> 1) * nv) + (nv >> 1)) * 6;
+  const P0 = new THREE.Vector3(...pos.slice(idx[k0] * 3, idx[k0] * 3 + 3));
+  const P1 = new THREE.Vector3(...pos.slice(idx[k0 + 1] * 3, idx[k0 + 1] * 3 + 3));
+  const P2 = new THREE.Vector3(...pos.slice(idx[k0 + 2] * 3, idx[k0 + 2] * 3 + 3));
   const fn = P1.sub(P0).cross(P2.sub(P0));
-  const n0 = new THREE.Vector3(...nrm.slice(idx[0] * 3, idx[0] * 3 + 3));
+  const n0 = new THREE.Vector3(...nrm.slice(idx[k0] * 3, idx[k0] * 3 + 3));
   if (fn.dot(n0) < 0) { for (let k = 0; k < idx.length; k += 3) { const t = idx[k + 1]; idx[k + 1] = idx[k + 2]; idx[k + 2] = t; } g.setIndex(idx); }
   return g;
 }
