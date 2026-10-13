@@ -13,7 +13,7 @@ export default [
   {
     title: 'Three cores, one rocket',
     body: 'Falcon Heavy is three Falcon 9 first stages side by side — a strengthened centre core and two side boosters with nose cones — under one Falcon 9 second stage. All 27 Merlin 1D engines light on the pad, and the hold-down clamps let go only once every engine is confirmed healthy.',
-    key: '27 × 845 kN = 22,819 kN of liftoff thrust against ≈ 1,421 t: thrust-to-weight ≈ 1.6.',
+    key: '27 × 845 kN ≈ 22,819 kN of liftoff thrust against ≈ 1,421 t (≈ 13,940 kN of weight): thrust-to-weight ≈ 1.6.',
   },
   {
     title: 'Mostly tank',
@@ -33,7 +33,7 @@ export default [
     title: 'The Merlin 1D cycle',
     body: 'Here the centre engine is broken out. A single shaft carries the LOX pump, the RP-1 pump and a turbine. A small gas generator burns a fuel-rich trickle of both propellants to spin the turbine, and its exhaust is dumped overboard through the duct — an "open" gas-generator cycle, simpler than staged combustion at the cost of a few seconds of Isp. The pumped propellants meet at a pintle injector and burn at about 9.7 MPa.',
     key: 'Turbopump ≈ 36,000 rpm and ≈ 10,000 hp; TEA-TEB, which ignites on contact with LOX, lights the engine and allows restarts.',
-    focus: ENGINE, explode: 0.85, view: { dir: [0.9, 0.05, 1.4], fill: 1.15 },
+    focus: ENGINE, explode: 0.85, view: { dir: [0.85, 0.42, 1.4], fill: 1.15 },
   },
   {
     title: 'Octaweb and engine-out',
@@ -44,14 +44,14 @@ export default [
   },
   {
     title: 'Holding three cores together',
-    body: 'The side boosters ride on the centre core, which has thicker tank walls and carries the separation system. Two pneumatic pusher mechanisms tie each booster at the top of the LOX tanks and two more at the engine sections. About 2½ minutes in, the boosters shut down, the latches release and the pushers shove them clear.',
+    body: 'The side boosters ride on the centre core, which has thicker tank walls and carries the separation system. Attach fittings tie each booster to it at two levels — near the top of the LOX tanks and at the engine sections — with pneumatic pushers at each. About 2½ minutes in, the boosters shut down, the latches release and the pushers shove them clear.',
     key: 'Pneumatic separation gives a low-shock push over a long stroke and can be tested on the real flight hardware — explosive bolts cannot.',
     focus: [`${CORE} forward attach & pushers (A)`, `${CORE} aft attach & pushers (A)`, `${CORE} forward attach & pushers (B)`, `${CORE} aft attach & pushers (B)`, 'Side booster A nose cone', 'Side booster B nose cone', 'Side booster A LOX tank', `${CORE} LOX tank`],
     mode: 'systems', view: { dir: [0.2, 0.15, 1.4], fill: 1.0 },
   },
   {
     title: 'Coming home',
-    body: 'Falcon Heavy\'s side boosters normally fly back. After separation, nitrogen cold-gas thrusters flip each booster; a boost-back burn heads it toward the landing zone; the titanium grid fins swing out to steer it through the atmosphere; then the four carbon-fibre legs unfold for a landing burn on the centre engine.',
+    body: 'Falcon Heavy\'s side boosters normally fly back. After separation, nitrogen cold-gas thrusters flip each booster; a boost-back burn heads it toward the landing zone; the titanium grid fins swing out to steer it through the atmosphere; then, in the last seconds of the landing burn, the four carbon-fibre legs swing down.',
     key: 'Recovering the boosters costs payload: 63.8 t to LEO is the fully expendable figure.',
     focus: ['Side booster A grid fins', 'Side booster A grid-fin actuators', 'Side booster A landing legs', 'Side booster A cold-gas thrusters & N₂ tanks', `${CORE} grid fins`, `${CORE} landing legs`, `${CORE} leg deployment pistons`],
     view: { dir: [1.3, 0.1, 0.9], fill: 1.0 },

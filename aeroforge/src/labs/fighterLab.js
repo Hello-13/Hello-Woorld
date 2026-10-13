@@ -23,7 +23,7 @@ function trimAlpha({ altitude, mach }, mass) {
 
 const PRESETS = [
   { label: 'Supercruise · M 1.76', c: { altitude: 12200, mach: FIGHTER.machSupercruise, alpha: 'trim', throttle: 0.8 },
-    note: 'Published supercruise: Mach 1.76 at altitude on military power, with no afterburner.' },
+    note: 'Published supercruise: Mach 1.76 at altitude on military power, with no afterburner. This conceptual model\'s dry thrust falls short there (see the chart note) — slide Mach down to about 1.4 to find where it supercruises.' },
   { label: 'Top speed · M 2.25', c: { altitude: 12200, mach: FIGHTER.machMax, alpha: 'trim', throttle: 1 },
     note: 'Published top speed: Mach 2.25 at altitude in full afterburner.' },
   { label: 'Sea level · M 1.21', c: { altitude: 0, mach: FIGHTER.machSeaLevel, alpha: 'trim', throttle: 1 },

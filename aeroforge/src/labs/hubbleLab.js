@@ -139,7 +139,7 @@ export function mountHubbleLab(root, ctx) {
       el('p', { class: 'lab-note', text: 'Two hyperbolic mirrors cancel both spherical aberration and coma. The primary was polished to the wrong conic because a lens in the reflective null corrector used to test it sat 1.3 mm out of place. COSTAR\'s corrective mirrors (1993) and WFPC2\'s built-in correction fixed the images; every later instrument carries the correction inside, so COSTAR was removed in 2009.' })),
     section('What can Hubble resolve?', tgt.el, roT.el, tgtNote),
     section('Orbit and decay', sH.el, act.el, roO.el, chartO.el,
-      el('p', { class: 'lab-note', text: 'Deployed in April 1990 at about 612 km; servicing missions boosted it until 2002. It was near 540 km after the last visit in 2009 and below 500 km by 2026, sinking faster around solar maximum when the upper atmosphere swells. The drag model uses an exponential thermosphere and an estimated 45 m² mean cross-section; it is a teaching sketch, not a re-entry forecast.' })),
+      el('p', { class: 'lab-note', text: 'Deployed in April 1990 at about 612 km; servicing missions boosted it until 2002. It was near 540 km after the last visit in 2009 and below 500 km by 2026, sinking faster around solar maximum when the upper atmosphere swells; published re-entry forecasts range from the late 2020s (worst case) to the mid-2030s. The drag model uses an exponential thermosphere and an estimated 45 m² mean cross-section; it is a teaching sketch, not a re-entry forecast.' })),
     section('Telescope', el('div', { class: 'btn-row' }, tDoor.el, tDep.el, tRay.el),
       el('p', { class: 'lab-note', text: 'X-ray, Systems and Blueprint always trace the light path while the door is open: entrance rays to the primary, the converging cone to the secondary, then the f/24 beam through the hole in the primary to the focus 1.5 m behind it.' })),
   );
@@ -215,7 +215,7 @@ export function mountHubbleLab(root, ctx) {
     const sel = p.activity < 0.5 ? runs.min : p.activity > 2 ? runs.max : runs.avg;
     roO.set('re', sel.reentry ? `≈ ${Math.round(sel.reentry)}` : 'after 2056', sel.reentry && sel.reentry < 2035 ? 'warn' : '');
     const thin = (pts) => pts.filter((_, i) => i % 4 === 0 || i === pts.length - 1);
-    chartO.setData({ min: thin(runs.min.points), avg: thin(runs.avg.points), max: thin(runs.max.points) }, { xDomain: [y0, y0 + 30], yDomain: [150, Math.max(650, p.h)], markers: [{ x: 2033, label: 'Published forecasts ≈ 2033+' }] });
+    chartO.setData({ min: thin(runs.min.points), avg: thin(runs.avg.points), max: thin(runs.max.points) }, { xDomain: [y0, y0 + 30], yDomain: [150, Math.max(650, p.h)], markers: [{ x: 2033, label: 'Median forecasts ≈ 2033' }] });
   }
 
   return {

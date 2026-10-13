@@ -68,7 +68,7 @@ export default [
     body: 'Behind the forward shell the spacecraft widens to 4.2 m: a ring of twelve trapezoidal slots holding about 90 % of the electronics. Ten are equipment bays, each behind a hinged door that doubles as a radiator; two carry the launch trunnions. Every box is an orbital replacement unit with handles and connectors on its open face. The layout follows the heat: the batteries sit in bays 2 and 3, on the side that faces away from the Sun.',
     key: 'Clockwise from +V3, looking forward: bays 8, 9, 10, trunnion, 1, 2, 3, 4, trunnion, 5, 6, 7.',
     focus: ['Equipment section', 'Data management unit', 'Flight computer (80486)', 'Battery module 1 (bay 2)', 'Battery module 2 (bay 3)', 'Oscillators (bay 2)', 'Power control unit', 'Power distribution units', 'S-band transmitters & transponders', 'Solid-state recorder (bay 5)', 'Reaction wheel assembly 1', 'Reaction wheel assembly 2', 'Mechanism control unit', 'Solar array drive electronics', 'Pointing control electronics', 'Solid-state recorder (bay 8)', 'Reaction wheel assembly 3', 'Reaction wheel assembly 4', 'Science instrument command & data handling unit', 'Gyro electronics control units', 'Data interface units', 'Aft trunnion pins'],
-    mode: 'systems', explode: 0.5, view: { dir: [-1, 0.32, 0.18], fill: 0.9 },
+    mode: 'systems', explode: 0.6, view: { dir: [-0.5, 0.78, 0.55], fill: 1.05 },
   },
   {
     title: 'Keeping the optics stable',

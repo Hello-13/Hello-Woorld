@@ -171,8 +171,12 @@ export const HM = {
     });
     return new THREE.MeshStandardMaterial({ color: 0xffffff, map, roughness: 0.6, metalness: 0.0 });
   }),
-  /** Light-path visualisation: additive, unlit, drawn over the X-ray / Systems views. */
-  ray: () => once('ray', () => new THREE.MeshBasicMaterial({ color: 0xffc56a, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })),
-  beam: () => once('beam', () => new THREE.MeshBasicMaterial({ color: 0xffb648, transparent: true, opacity: 0.06, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false })),
-  focus: () => once('focus', () => new THREE.MeshBasicMaterial({ color: 0xfff1c8, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })),
+  /**
+   * Light-path visualisation: additive, unlit annotation drawn over the X-ray / Systems /
+   * Blueprint views. No depth test, so the beam stays readable through the baffles and the
+   * instruments that surround the focus.
+   */
+  ray: () => once('ray', () => new THREE.MeshBasicMaterial({ color: 0xffc56a, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, toneMapped: false })),
+  beam: () => once('beam', () => new THREE.MeshBasicMaterial({ color: 0xffb648, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide, toneMapped: false })),
+  focus: () => once('focus', () => new THREE.MeshBasicMaterial({ color: 0xfff1c8, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, toneMapped: false })),
 };

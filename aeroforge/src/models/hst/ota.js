@@ -155,7 +155,7 @@ export function buildOTA(P) {
   const mb = [tube(1.3, 4.12, 8.92, { seg: 72 })];
   for (let k = 0; k < 13; k++) mb.push(annulus(1.235, 1.3, 4.3 + k * 0.36, 72, 1));
   P('Main baffle', {
-    system: 'Optics', material: 'Aluminium cylinder with internal stray-light fins, flat black', mass: 70, temp: 290, explode: [0.6, 0, 0],
+    system: 'Optics', skin: true, material: 'Aluminium cylinder with internal stray-light fins, flat black', mass: 70, temp: 290, explode: [0.6, 0, 0],
     desc: 'A 4.8 m aluminium cylinder, 2.7 m across, standing on the front face of the main ring inside the metering truss. Its sharp-edged fins trap light that enters the tube at an angle so it cannot scatter onto the mirror and fog the images.',
   }, mesh(merge(mb), HM.black()));
   // the cone stops where it would start to clip the innermost rays bound for the secondary

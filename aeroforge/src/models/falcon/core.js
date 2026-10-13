@@ -471,12 +471,12 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
       a.push(beam([s * (gap0 + 0.05), 2.3, -0.42], [s * (gap0 + 0.05), 2.3, 0.42], 0.12, 0.2));
       P(`forward attach & pushers (${label})`, {
         system: 'Separation', count: 2, material: 'Titanium fittings, pneumatic pusher mechanisms', mass: 260,
-        desc: `Two pneumatic pusher mechanisms tie the top of side booster ${label} to the top of the centre core's LOX tank. They hold through ascent, then release and push the booster away after its engines shut down.`,
+        desc: `Forward attach fitting with pneumatic pushers tying the top of side booster ${label} to the top of the centre core's LOX tank. It holds through ascent, then releases and pushes the booster away after its engines shut down. Two mechanisms shown; the exact count and layout are not published.`,
         explode: [s * 1.2, 0, 0.8],
       }, mesh(merge(f), FM.aluDark()));
       P(`aft attach & pushers (${label})`, {
         system: 'Separation', count: 2, material: 'Titanium fittings, pneumatic pusher mechanisms', mass: 240,
-        desc: `Two identical pushers at the engine sections shove the base of side booster ${label} sideways so it clears the centre core. Pneumatic devices give a low-shock release over a long stroke.`,
+        desc: `Aft attach fitting at the engine sections; its pushers shove the base of side booster ${label} sideways so it clears the centre core. Pneumatic devices give a low-shock release over a long stroke. Layout simplified.`,
         explode: [s * 1.2, 0, 0.8],
       }, mesh(merge(a), FM.aluDark()));
     }
