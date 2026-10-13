@@ -14,7 +14,7 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { rod, mergeGeometries } from '../../engine/geometry.js';
-import { ST, RAD, az, deg, axial, tube, annulus, shellPatch, patchFrame, ni } from './layout.js';
+import { ST, RAD, az, deg, axial, tube, annulus, shellPatch, patchFrame, ni, cablePath, arcPts, pathLength } from './layout.js';
 import { HM } from './materials.js';
 
 const merge = (list) => mergeGeometries(list.map(ni));
@@ -40,9 +40,12 @@ const SLOTS = [8, 9, 10, 'T', 1, 2, 3, 4, 'T', 5, 6, 7];
 export const BAY_PHI = {};                 // bay number → centre azimuth (rad)
 export const TRUNNION_PHI = [];            // the two unnumbered trunnion-support bays
 SLOTS.forEach((b, i) => { const p = deg(15 + i * 30); if (b === 'T') TRUNNION_PHI.push(p); else BAY_PHI[b] = p; });
-const FACE = RAD.big * Math.cos(deg(15));                // 2.03 m: door plane (dodecagon apothem)
+export const FACE = RAD.big * Math.cos(deg(15));         // 2.03 m: door plane (dodecagon apothem)
 const BAY_EDGE = 2 * RAD.big * Math.sin(deg(15));        // 1.09 m door width
-const X_EQ0 = ST.aftShroud, X_EQ1 = ST.equip, X_EQM = (X_EQ0 + X_EQ1) / 2;
+export const X_EQ0 = ST.aftShroud, X_EQ1 = ST.equip, X_EQM = (X_EQ0 + X_EQ1) / 2;
+const X_AXIS = new THREE.Vector3(1, 0, 0);
+/** Connector points (world) of the boxes in each bay, for the harness drops; filled by oru(). */
+export const CONN = {};
 
 /** Geometry built in a slot's local frame (x axial, y radius, z tangential) rotated to azimuth φ. */
 const atPhi = (phi, g) => g.rotateX(phi);
@@ -55,7 +58,7 @@ const bayBox = (k, sx, sy, sz, x, r, t = 0) => inBay(k, new THREE.BoxGeometry(sx
  * open face — the outer face for boxes on the bay floor, the inner face for boxes bolted to the
  * inside of the door. Returns [body mesh, detail mesh].
  */
-function oru(k, boxes, mat) {
+function oru(k, boxes, mat, { coax = 0 } = {}) {
   const body = [], det = [];
   for (const [sx, sy, sz, x, r, t = 0, onDoor = false] of boxes) {
     body.push(bayBox(k, sx, sy, sz, x, r, t));
@@ -66,6 +69,8 @@ function oru(k, boxes, mat) {
       const tt = t - sz / 2 + ((i + 0.5) * sz) / n;
       det.push(inBay(k, new THREE.CylinderGeometry(0.022, 0.022, 0.05, 10).translate(x + sx * 0.32, top + s * 0.025, tt)));
     }
+    for (let i = 0; i < coax; i++) det.push(inBay(k, new THREE.CylinderGeometry(0.0125, 0.0125, 0.04, 8).translate(x + sx * 0.12, top + s * 0.02, t - 0.06 + i * 0.06)));
+    (CONN[k] || (CONN[k] = [])).push(new THREE.Vector3(x + sx * 0.32, top + s * 0.05, t).applyAxisAngle(X_AXIS, BAY_PHI[k]).toArray());
     const ht = Math.min(0.09, sz / 2 - 0.03);
     for (const dt of [-ht, ht]) det.push(inBay(k, new THREE.BoxGeometry(0.02, 0.05, 0.02).translate(x - sx * 0.3, top + s * 0.025, t + dt)));
     det.push(inBay(k, new THREE.BoxGeometry(0.022, 0.02, 2 * ht + 0.02).translate(x - sx * 0.3, top + s * 0.055, t)));
@@ -74,9 +79,12 @@ function oru(k, boxes, mat) {
 }
 
 export function buildSSM(P) {
-  const out = { sockets: [] };
+  for (const k of Object.keys(CONN)) delete CONN[k];
+  const out = { sockets: [], conn: CONN, railLength: {} };
   const rails = { ls: [], fs: [], eq: [], aft: [] };          // EVA handrail runs by region
-  const rail = (list, p0, p1) => list.push(rod(p0, p1, 0.016, 4));
+  const railLen = { ls: 0, fs: 0, eq: 0, aft: 0 };
+  const listKey = (list) => Object.keys(rails).find((k) => rails[k] === list);
+  const rail = (list, p0, p1) => { list.push(rod(p0, p1, 0.016, 4)); railLen[listKey(list)] += pathLength([p0, p1]); };
   const standoff = (list, phi, r, x, h = 0.07) => list.push(rod(az(phi, r, x), az(phi, r + h, x), 0.012, 4));
 
   // ------------------------------------------------------------------ light shield
@@ -132,9 +140,24 @@ export function buildSSM(P) {
     hl.push(atPhi(deg(p), new THREE.CylinderGeometry(0.025, 0.025, 0.3, 10).rotateX(Math.PI / 2).translate(x - 0.06, RAD.shell + 0.1, 0)));
   }
   P('High-gain antenna launch latches', {
-    system: 'Structure', material: 'Motor-driven hook latches on the HGA and solar-array latch support ring', mass: 12, count: 4, temp: 245, explode: [2.6, 2.4, 0],
-    desc: 'They held the two antenna masts and dishes flat against the light shield for launch; the mechanism control unit released them on the first day in orbit. Positions along the shield approximate.',
+    system: 'Structure', material: 'Hook latches on four-bar linkages, each driven by a stepper-motor rotary drive actuator', mass: 12, count: 4, temp: 245, explode: [2.6, 2.4, 0],
+    desc: 'They held the two antenna masts and dishes flat against the light shield for launch; the mechanism control unit released them on the first day in orbit. Like all nine of Hubble\'s latches they work through a four-bar linkage driven by a rotary drive actuator, with a hex fitting for a spacewalker\'s wrench. Positions along the shield approximate.',
   }, mesh(merge(hl), HM.fitting()));
+  const lr = [];
+  for (const x of [10.0, 10.95]) lr.push(flange(RAD.shell - 0.01, RAD.shell + 0.025, x - 0.025, x + 0.025, 96));
+  P('HGA & SA latch support rings', {
+    system: 'Structure', material: 'Machined rings, 50 mm wide, on the light shield barrel', mass: 16, count: 2, temp: 245, explode: [2.6, 2.4, 0], xrayWeight: 0.4,
+    desc: 'The structural rings the launch latches bolt to: they carried the stowed antennas and the old roll-up arrays through ascent. Ring stations approximate.',
+  }, mesh(merge(lr), HM.al()));
+  const sal = [];
+  for (const p of [90, 270]) for (const x of [10.0, 10.95]) {
+    sal.push(atPhi(deg(p), new THREE.BoxGeometry(0.2, 0.1, 0.25).translate(x, RAD.shell + 0.05, 0.38)));
+    sal.push(atPhi(deg(p), new THREE.BoxGeometry(0.05, 0.12, 0.06).translate(x + 0.05, RAD.shell + 0.14, 0.45)));
+  }
+  P('Solar array launch latches (unused)', {
+    system: 'Structure', material: 'Hook latches on four-bar linkages with rotary drive actuators', mass: 10, count: 4, temp: 245, explode: [2.6, 0, 0],
+    desc: 'Four of Hubble\'s nine latches held the original roll-up solar arrays along the ±V2 sides for launch. The rigid SA3 wings fitted in 2002 never stow, so these have not been used since. Positions approximate.',
+  }, mesh(merge(sal), HM.fitting()));
 
   // scuff plates on the ±V2 sides of the light shield (the aft pair rides on the trunnion bays)
   const scuff = (phi, x, r0, list) => {
@@ -153,12 +176,10 @@ export function buildSSM(P) {
   }, mesh(merge(sp), HM.al()));
 
   // light shield handrails: two rings (open over the antenna latch lines) and four runs along the barrel
-  for (const x of [9.45, 11.75]) {
-    for (let a = 15; a < 345; a += 15) {
-      if (a >= 165 && a < 195) continue;
-      rail(rails.ls, az(deg(a + 1), RAD.shell + 0.09, x), az(deg(a + 14), RAD.shell + 0.09, x));
-      standoff(rails.ls, deg(a + 7.5), RAD.shell, x);
-    }
+  for (const [a0, a1] of [[28, 77], [103, 152], [208, 257], [283, 332]]) {
+    const pts = arcPts(RAD.shell + 0.09, 9.45, a0, a1, 12);
+    for (let i = 0; i < pts.length - 1; i++) rail(rails.ls, pts[i], pts[i + 1]);
+    for (let a = a0 + 4; a < a1; a += 16) standoff(rails.ls, deg(a), RAD.shell, 9.45);
   }
   for (const c of [45, 135, 225, 315]) {
     rail(rails.ls, az(deg(c), RAD.shell + 0.09, 9.25), az(deg(c), RAD.shell + 0.09, 12.3));
