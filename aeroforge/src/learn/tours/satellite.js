@@ -44,13 +44,13 @@ export default [
     body: 'The Mission Data Unit generates the ranging codes and the navigation message. Four transmitters amplify them (L1, L2 and L5 for navigation; L3 for the detection system\'s data), and the output multiplexer filters and combines them onto the antenna. GPS III broadcasts the civil C/A signal, the new L1C (designed to be interoperable with Galileo\'s E1), L2C and the safety-of-life L5, plus the encrypted P(Y) and the jam-resistant military M-code. A receiver using two frequencies can measure and remove the ionosphere\'s delay, which depends on frequency.',
     key: 'Every signal is a multiple of 10.23 MHz: L1 = 154 ×, L2 = 120 ×, L5 = 115 ×, L3 = 135 ×.',
     focus: ['Mission Data Unit', 'L1 transmitter', 'L2 transmitter', 'L5 transmitter', 'L3 transmitter', 'L-band output multiplexer', 'L-band RF cables', 'Frequency synthesiser & distribution unit'],
-    mode: 'xray', explode: 0.45, view: view([0.55, 0.85, 0.35]),
+    mode: 'xray', explode: 0.45, view: view([0.55, 0.85, 0.35], { fill: 1.25 }),
   },
   {
     title: 'Three atomic clocks',
     body: 'GPS is a clock in orbit. Each satellite carries three rubidium atomic frequency standards and a slot for a fourth, experimental one such as a hydrogen maser. Each locks a quartz oscillator to an atomic transition of rubidium-87 at 6.834 GHz and drifts only a few nanoseconds a day. One clock runs the payload while GPS III can run and monitor a second; the Space Force control segment measures the drift and uploads corrections, which the satellite broadcasts so receivers can remove it.',
     key: 'A clock 10 ns off puts a range 3 m off, so the clocks are the heart of the accuracy.',
-    focus: [...CLOCKS, 'Fourth clock slot', 'Clock baseplate', 'Frequency synthesiser & distribution unit'], mode: 'xray', explode: 0.55, view: view([0.75, 0.75, 0.4]),
+    focus: [...CLOCKS, 'Fourth clock slot', 'Clock baseplate', 'Frequency synthesiser & distribution unit'], mode: 'xray', explode: 0.55, view: view([0.75, 0.75, 0.4], { fill: 1.2 }),
   },
   {
     title: 'Relativity: +38.6 µs a day',

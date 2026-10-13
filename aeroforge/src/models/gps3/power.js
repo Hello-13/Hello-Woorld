@@ -51,7 +51,7 @@ export function buildPower(P, body) {
     }
     P(`Frangibolt hold-downs (${tag})`, {
       system: 'Power', material: 'Titanium cups, shape-memory-alloy Frangibolt actuators', mass: 4, count: 4, temp: 285, explode: [0, 1.75, 0],
-      desc: 'Bolts through the folded panel stack clamp the wing to the radiator for launch. To release, a heater warms a shape-memory-alloy sleeve around each notched bolt; the sleeve stretches and snaps the bolt, with no explosive shock. The design papers list frangibolts for every deployable (count and positions estimated).',
+      desc: 'Bolts through the folded panel stack clamp the wing to the radiator for launch and through the apogee burns; they release only once the satellite is on station. To release, a heater warms a shape-memory-alloy sleeve around each notched bolt; the sleeve stretches and snaps the bolt, with no explosive shock. The design papers list frangibolts for every deployable (count and positions estimated).',
     }, mesh(merge(hrm), G.satinTi()), mount);
 
     const drive = new THREE.Group();
@@ -171,8 +171,9 @@ export function buildPower(P, body) {
   for (let k = 0; k <= 48; k++) { const a = (k / 48) * Math.PI * 2; ring.push([Math.cos(a) * ringR, Math.sin(a) * ringR, ringZ]); }
   runs.push(pipeG(ring, 0.017, 8));
   for (const p of HARNESS) {
-    const a = Math.atan2(p[1], p[0]);
-    runs.push(pipeG([[Math.cos(a) * ringR, Math.sin(a) * ringR, ringZ], [p[0], p[1], Math.max(p[2] + 0.02, ringZ - 0.06)], p], 0.009, 6));
+    // down in front of the unit (on the radiators, in front of the deepest box, the batteries), then across to its connector
+    const a = Math.atan2(p[1], p[0]), mx = p[0] * 0.9, my = Math.abs(p[1]) > 0.9 ? Math.sign(p[1]) * 0.9 : p[1] * 0.88, top = Math.max(p[2] + 0.02, ringZ - 0.06);
+    runs.push(pipeG([[Math.cos(a) * ringR, Math.sin(a) * ringR, ringZ], [mx, my, top], [mx, my, p[2]], p], 0.009, 6));
   }
   for (const s of [1, -1]) runs.push(pipeG([[0.08, s * (IY - 0.04), 0], [0.08, s * (IY - 0.04), ringZ - 0.04], [0.15, s * ringR * 0.97, ringZ]], 0.014, 8));
   const trunks = [[0.8, 0.3], [-0.82, -0.2]];
