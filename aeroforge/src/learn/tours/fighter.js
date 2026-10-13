@@ -2,13 +2,20 @@
 // Every focus name matches a part in src/models/f22/ exactly (tests/fighter.test.mjs checks it).
 
 const BOTH = (name) => [`${name} (right)`, `${name} (left)`];
+// the outer mould line: skins, doors, moving surfaces, nozzles and the canopy
+const EXTERIOR = [
+  'Radome', 'Forward fuselage skin', 'Mid-fuselage upper skin', 'Intake trunk & lower fuselage skin', 'Aft fuselage upper skin', 'Aft fuselage lower skin',
+  ...BOTH('Wing skin'), ...BOTH('Leading-edge flap'), ...BOTH('Flaperon'), ...BOTH('Aileron'), ...BOTH('Stabilator'), ...BOTH('Vertical tail'), ...BOTH('Rudder'),
+  ...BOTH('Caret inlet cowl'), ...BOTH('Aft boom'), ...BOTH('Main bay door'), ...BOTH('Side bay door'), ...BOTH('Main gear door'), 'Nose gear doors',
+  ...BOTH('2-D vectoring nozzle'), 'Canopy',
+];
 
 export default [
   {
     title: 'Shaped to beat radar',
     body: 'The F-22A Raptor — built by Lockheed Martin with Boeing, 195 built (187 production jets), in service since 2005 — was shaped first for a tiny radar cross-section. Seen from above, every major edge (wing and stabilator leading and trailing edges, the nose chines, the inlet lips, even the saw-toothed door edges) runs at one of a few shared angles, so their reflections stack into a handful of narrow spikes and the directions in between stay quiet.',
     key: 'Radar detection range scales as σ^¼: a 10,000× smaller cross-section σ only cuts range 10×, so stealth must remove almost all of the echo. Wing edges: 42° leading, −17° trailing.',
-    mode: 'blueprint', view: { dir: [0.05, 1, 0.12], fill: 0.85 },
+    focus: EXTERIOR, mode: 'blueprint', view: { dir: [0.05, 1, 0.12], fill: 0.85 },
   },
   {
     title: 'A titanium and composite airframe',
@@ -18,7 +25,7 @@ export default [
       'Forward fuselage frames & bulkheads', 'Mid-fuselage titanium bulkheads', 'Engine-bay frames', 'Keel & weapons-bay longerons',
       'Upper longerons & canopy rails', ...BOTH('Aft boom'), ...BOTH('Wing box'), ...BOTH('Fin box'), ...BOTH('Stabilator torque box & spindle'),
     ],
-    mode: 'systems', view: { dir: [0.55, 0.85, 1] },
+    mode: 'systems', view: { dir: [0.55, 0.85, 1], fill: 0.8 },
   },
   {
     title: 'The AN/APG-77 radar',
@@ -39,7 +46,7 @@ export default [
     body: 'Each Pratt & Whitney F119-PW-100 is a twin-spool turbofan built for supercruise: a three-stage fan of blisks driven by one LP turbine stage, a six-stage compressor driven by one HP stage, the two spools spinning in opposite directions. The low bypass ratio (0.30) and hot core give high thrust per kilogram of air. A three-zone augmentor injects fuel from curved, radar-absorbent vanes that also hide the turbine.',
     key: 'Thrust ≈ ṁ (V_exit − V_flight): about 116 kN dry and 156 kN with afterburner per engine, from a 2,270 kg engine with an overall pressure ratio near 26.',
     focus: ['F119 fan (right)', 'F119 HP compressor (right)', 'F119 annular combustor (right)', 'F119 HP turbine (right)', 'F119 LP turbine (right)', 'F119 augmentor (right)', '2-D vectoring nozzle (right)', 'Accessory gearbox & AMAD (right)', 'FADEC engine control (right)', 'Engine mounts (right)'],
-    mode: 'systems', explode: 0.8, view: { dir: [0.15, 0.55, 1], fill: 1.45 },
+    mode: 'xray', explode: 0.8, view: { dir: [0.15, 0.55, 1], fill: 1.2 },
   },
   {
     title: 'Thrust vectoring',
@@ -53,7 +60,7 @@ export default [
     body: 'Full-span leading-edge flaps, flaperons, ailerons, all-moving stabilators and rudders on the canted fins are all driven by 4,000 psi hydraulic actuators on command from the vehicle-management computers. The jet is unstable in pitch on purpose for agility, so the computers correct it many times a second; there is no separate airbrake — ailerons up, flaperons down and rudders splayed outward do the job.',
     key: 'Hydraulic force = pressure × piston area: at 4,000 psi (27.6 MPa) a 5 cm piston pushes about 54 kN, a third more than at the usual 3,000 psi.',
     focus: [...BOTH('Leading-edge flap'), ...BOTH('Flaperon'), ...BOTH('Aileron'), ...BOTH('Stabilator'), ...BOTH('Rudder'), ...BOTH('Wing control actuators'), ...BOTH('Stabilator actuator'), 'Vehicle management system computers'],
-    view: { dir: [-0.6, 0.9, 0.8] }, demo: 'surfaces',
+    mode: 'systems', view: { dir: [-0.6, 0.9, 0.8] }, demo: 'surfaces',
   },
   {
     title: 'Fuel is the heat sink',
@@ -66,7 +73,7 @@ export default [
     title: 'Heat is a signature too',
     body: 'Thermal view at Mach 2 and 12 km: the air outside is about −57 °C, yet compression heats the radome and leading edges to around 100–115 °C, and the afterburning nozzles glow far hotter. Infrared search-and-track sensors look for exactly this, which is why the F-22 cruises supersonic without afterburner and why its exhaust is flattened and shielded.',
     key: 'Stagnation temperature T₀ = T (1 + 0.2 M²): at Mach 2 and 217 K that is ≈ 390 K.',
-    mode: 'thermal', view: { dir: [-0.9, 0.5, 1] }, demo: 'mach2',
+    focus: EXTERIOR, mode: 'thermal', view: { dir: [-0.9, 0.5, 1] }, demo: 'mach2',
   },
   {
     title: 'Landing gear',
