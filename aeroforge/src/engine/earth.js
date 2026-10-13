@@ -59,29 +59,39 @@ export function setEarthDetail(on) {
   for (const e of earths) applyMaps(e);
 }
 
-// Fine detail where a map is magnified (texels per pixel < 1, as below a spacecraft at 4K):
-// tiling value-noise fBm at 2–8× the 8K map's resolution, faded out where the map is minified.
+// Fine detail where a map is magnified (an 8K texel spans more than a pixel, as below a spacecraft
+// at 4K): three octaves of 3-D gradient noise on the sphere itself (no grid, seam or polar
+// stretching) at 2–8× the 8K maps' resolution, faded out wherever the maps are minified.
 const detailGLSL = /* glsl */`
-  float dHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
-  float dNoise(vec2 p, float period) {
-    vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
-    vec2 j = vec2(mod(i.x + 1.0, period), i.y); i.x = mod(i.x, period);
-    return mix(mix(dHash(i), dHash(vec2(j.x, i.y)), f.x), mix(dHash(vec2(i.x, i.y + 1.0)), dHash(j + vec2(0.0, 1.0)), f.x), f.y);
+  vec3 dHash(vec3 p) {
+    p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+    p += dot(p, p.yxz + 33.33);
+    return fract((p.xxy + p.yxx) * p.zyx) * 2.0 - 1.0;
   }
-  // returns zero-mean detail in about -0.5..0.5, and how strongly to apply it
-  vec2 mapDetail(vec2 uv, float seed) {
-    float tpp = max(fwidth(uv.x) * 8192.0, fwidth(uv.y) * 4096.0);
+  float dGrad(vec3 p) {
+    vec3 i = floor(p), f = fract(p);
+    vec3 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+    float n000 = dot(dHash(i), f), n100 = dot(dHash(i + vec3(1, 0, 0)), f - vec3(1, 0, 0));
+    float n010 = dot(dHash(i + vec3(0, 1, 0)), f - vec3(0, 1, 0)), n110 = dot(dHash(i + vec3(1, 1, 0)), f - vec3(1, 1, 0));
+    float n001 = dot(dHash(i + vec3(0, 0, 1)), f - vec3(0, 0, 1)), n101 = dot(dHash(i + vec3(1, 0, 1)), f - vec3(1, 0, 1));
+    float n011 = dot(dHash(i + vec3(0, 1, 1)), f - vec3(0, 1, 1)), n111 = dot(dHash(i + vec3(1, 1, 1)), f - vec3(1, 1, 1));
+    return mix(mix(mix(n000, n100, u.x), mix(n010, n110, u.x), u.y), mix(mix(n001, n101, u.x), mix(n011, n111, u.x), u.y), u.z);
+  }
+  // n: unit direction from the planet centre. Returns (detail about -0.5..0.5, strength 0..1).
+  vec2 mapDetail(vec3 n, float seed) {
+    float tpp = length(fwidth(n)) / 7.67e-4;           // 8K texels (2π / 8192 rad) per pixel
     float k = 1.0 - smoothstep(0.35, 1.2, tpp);
     if (k <= 0.0) return vec2(0.0);
-    vec2 p = uv * vec2(16384.0, 8192.0) + seed;
-    float n = dNoise(p, 16384.0) * 0.5 + dNoise(p * 2.0, 32768.0) * 0.3 + dNoise(p * 4.0, 65536.0) * 0.2;
-    return vec2(n - 0.5, k);
+    vec3 p = n * 2600.0 + seed;
+    float v = dGrad(p) * 0.55 + dGrad(p * 2.03) * 0.3 + dGrad(p * 4.07) * 0.15;
+    return vec2(v, k);
   }`;
 
 const surfaceVert = /* glsl */`
-  varying vec2 vUv; varying vec3 vN; varying vec3 vP;
+  varying vec2 vUv; varying vec3 vN; varying vec3 vP; varying vec3 vObj;
   void main() {
     vUv = uv;
+    vObj = position;
     vN = normalize(mat3(modelMatrix) * normal);
     vec4 wp = modelMatrix * vec4(position, 1.0);
     vP = wp.xyz;
@@ -91,7 +101,7 @@ const surfaceVert = /* glsl */`
 const surfaceFrag = /* glsl */`
   uniform sampler2D dayMap, nightMap, waterMap, bumpMap, cloudMap;
   uniform vec3 sunDir; uniform float cloudShift; uniform float bumpScale; uniform float nightGain; uniform float fade;
-  varying vec2 vUv; varying vec3 vN; varying vec3 vP;
+  varying vec2 vUv; varying vec3 vN; varying vec3 vP; varying vec3 vObj;
   ${detailGLSL}
 
   vec3 perturb(vec3 N, float h) {
@@ -115,7 +125,7 @@ const surfaceFrag = /* glsl */`
     float dayMix = smoothstep(-0.10, 0.18, mu);
 
     vec3 albedo = texture2D(dayMap, vUv).rgb;
-    vec2 gd = mapDetail(vUv, 91.0);
+    vec2 gd = mapDetail(normalize(vObj), 91.0);
     albedo *= 1.0 + gd.x * gd.y * 0.22;
     float water = texture2D(waterMap, vUv).r;
     float cloud = texture2D(cloudMap, vUv + vec2(cloudShift, 0.0)).r;
@@ -148,14 +158,17 @@ const surfaceFrag = /* glsl */`
 
 const cloudFrag = /* glsl */`
   uniform sampler2D cloudMap; uniform vec3 sunDir; uniform float cloudShift; uniform float fade;
-  varying vec2 vUv; varying vec3 vN; varying vec3 vP;
+  varying vec2 vUv; varying vec3 vN; varying vec3 vP; varying vec3 vObj;
   ${detailGLSL}
   void main() {
     vec3 N = normalize(vN);
     float mu = dot(N, normalize(sunDir));
     vec2 cuv = vUv + vec2(cloudShift, 0.0);
     float raw = texture2D(cloudMap, cuv).r;
-    vec2 dt = mapDetail(cuv, 0.0);
+    // the cloud map scrolls in longitude: turn the detail with it (SphereGeometry: x = -cos φ, z = sin φ)
+    vec3 n = normalize(vObj);
+    float ca = cos(6.2831853 * cloudShift), sa = sin(6.2831853 * cloudShift);
+    vec2 dt = mapDetail(vec3(n.x * ca + n.z * sa, n.y, n.z * ca - n.x * sa), 0.0);
     raw += dt.x * dt.y * 0.55 * min(raw * 3.0, 1.0);       // break up soft edges, never on clear sky
     float c = smoothstep(0.08, 0.85, raw);
     vec3 sun = mix(vec3(1.0, 0.5, 0.28), vec3(1.0), smoothstep(0.0, 0.3, mu));

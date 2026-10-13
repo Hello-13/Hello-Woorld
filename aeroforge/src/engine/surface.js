@@ -382,7 +382,7 @@ export function floorMarkings(size = 2048, worldSize = 80) {
     ctx.fillText('BAY 07 · KEEP CLEAR', cx, cx + 12 * m);
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 8;
+    t.anisotropy = 16;
     return t;
   });
 }

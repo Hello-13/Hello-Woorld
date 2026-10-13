@@ -118,7 +118,7 @@ function hangarFloor() {
   floor.receiveShadow = true;
   floor.renderOrder = -2;
   const marks = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshStandardMaterial({
-    map: floorMarkings(), transparent: true, roughness: 0.6, alphaMap: radialFade(0.35, 0.8), depthWrite: false,
+    map: floorMarkings(window.matchMedia?.('(pointer: coarse)').matches ? 2048 : 4096), transparent: true, roughness: 0.6, alphaMap: radialFade(0.35, 0.8), depthWrite: false,
     polygonOffset: true, polygonOffsetFactor: -2,
   }));
   marks.rotation.x = -Math.PI / 2;
