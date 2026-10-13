@@ -72,7 +72,7 @@ export default [
   },
   {
     title: 'Structure and propulsion',
-    body: 'A carbon-fibre central cylinder carries the launch loads and holds the two propellant tanks stacked inside it, with hydrazine above and nitrogen tetroxide below. Shear webs and honeycomb panels form the box around it. Helium pushes the propellants to a 450 N-class apogee engine and to twelve small hydrazine thrusters. Hydrazine and NTO ignite on contact, so the engine needs no igniter and restarts reliably for every apogee burn.',
+    body: 'A carbon-fibre central cylinder carries the launch loads and holds the two propellant tanks stacked inside it, with hydrazine above and nitrogen tetroxide below. Shear webs and honeycomb panels form the box around it. Helium pushes the propellants to the apogee engine (450 N-class, an estimate) and to small hydrazine thrusters (twelve are modelled; the real count is not published). Hydrazine and NTO ignite on contact, so the engine needs no igniter and restarts reliably for every apogee burn.',
     key: 'Rocket equation: propellant = m₀ (1 − e^(−Δv / (I_sp g₀))).',
     focus: ['Central cylinder', 'Fuel tank (hydrazine)', 'Oxidiser tank (NTO)', 'Helium pressurant tank', 'Pressurant control panel', 'Propellant lines & valves', 'Liquid apogee engine', ...THRUSTERS, 'Launch-vehicle adapter ring'],
     mode: 'systems', explode: 0.8, view: view([0.65, 0.3, 0.9]),

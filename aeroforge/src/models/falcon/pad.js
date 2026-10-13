@@ -15,6 +15,8 @@ import { FM } from './materials.js';
 const H = PAD.hardstand;
 const W = PAD.trenchHalfWidth;
 const DECK = H + PAD.mountDeck;
+// hardstand top half-extents and slope run (compressed footprint)
+const TX = 23, TZ = 26, RUN = 9;
 
 /** Prism from a top quad and a bottom quad (corners in matching order), flat-shaded, metric UVs. */
 function frustum(top, bot) {
@@ -93,9 +95,9 @@ export function buildPad(A, site, base) {
   // ------------------------------------------------------------------ hardstand and flame trench
   const blocks = [];
   for (const s of [1, -1]) {
-    const T = [[s * W, H, -30], [s * 28, H, -30], [s * 28, H, 30], [s * W, H, 30]];
-    const B = [[s * W, 0, -42.8], [s * 40.8, 0, -42.8], [s * 40.8, 0, 42.8], [s * W, 0, 42.8]];
-    blocks.push(faceAway(frustum(T, B), new THREE.Vector3(s * 24, 4, 0)));
+    const T = [[s * W, H, -TZ], [s * TX, H, -TZ], [s * TX, H, TZ], [s * W, H, TZ]];
+    const B = [[s * W, 0, -TZ - RUN], [s * (TX + RUN), 0, -TZ - RUN], [s * (TX + RUN), 0, TZ + RUN], [s * W, 0, TZ + RUN]];
+    blocks.push(faceAway(frustum(T, B), new THREE.Vector3(s * (W + TX) / 2, 4, 0)));
   }
   G('Pad hardstand', {
     skin: true, material: 'Reinforced concrete on a raised earth-and-fill mound', mass: null,
@@ -104,14 +106,14 @@ export function buildPad(A, site, base) {
 
   const lining = [];
   for (const s of [1, -1]) {
-    const T = [[s * (W - 0.05), H, -30], [s * (W - 0.05), H, 30], [s * (W - 0.05), 0, 42.8], [s * (W - 0.05), 0, -42.8]];
+    const T = [[s * (W - 0.05), H, -TZ], [s * (W - 0.05), H, TZ], [s * (W - 0.05), 0, TZ + RUN], [s * (W - 0.05), 0, -TZ - RUN]];
     const g = new THREE.BufferGeometry();
     const p = [T[0], T[1], T[2], T[0], T[2], T[3]].flat();
     g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0], 2));
     lining.push(faceAway(g, new THREE.Vector3(s * 30, H / 2, 0)));     // face into the trench
   }
-  const floor = new THREE.PlaneGeometry(2 * W, 85.6).rotateX(-Math.PI / 2).translate(0, 0.04, 0);
+  const floor = new THREE.PlaneGeometry(2 * W, 2 * (TZ + RUN)).rotateX(-Math.PI / 2).translate(0, 0.04, 0);
   // inverted-V flame deflector under the vehicle: ridge across the trench, slopes toward both ends
   const defl = new THREE.BufferGeometry();
   {
@@ -213,7 +215,7 @@ export function buildPad(A, site, base) {
   }, mesh(merge(arms), FM.padSteel()));
 
   // ------------------------------------------------------------------ fixed service structure + crew access arm
-  const fx0 = -25.6, fz0 = -18.1, fw = 12.2;
+  const fx0 = -21.8, fz0 = -17.4, fw = 12.2;
   const fl = [H];
   for (let i = 0; i < 12; i++) fl.push(H + 8.23 + i * 6.096);
   const fss = truss(fx0, fz0, fw, fw, fl, { col: 0.62, hor: 0.42, diag: 0.3 });
@@ -243,7 +245,7 @@ export function buildPad(A, site, base) {
   // ------------------------------------------------------------------ water deluge / sound suppression
   const wd = [];
   for (const x of [-BOOSTER_X, 0, BOOSTER_X]) wd.push(hoop(2.25, 0.07, DECK + 0.08, { x, seg: 48, tube: 6 }));
-  for (const [x, z] of [[13, 8], [-13, 8], [13, -9], [-12, -9]]) {
+  for (const [x, z] of [[13, 8], [-13, 8], [13, -9], [-19, 2]]) {
     wd.push(post(x, z, H, H + 3.4, 0.32, 12));
     wd.push(pipe([[x, H + 3.2, z], [x * 0.94, H + 3.9, z * 0.92], [x * 0.86, H + 4.0, z * 0.86]], 0.28, { seg: 10, tubular: 8 }));
     wd.push(pipe([[x, H + 0.3, z], [x, H + 0.3, z + Math.sign(z) * 8], [x * 1.5, H + 0.3, z + Math.sign(z) * 8]], 0.3, { seg: 8, tubular: 16, tension: 0 }));

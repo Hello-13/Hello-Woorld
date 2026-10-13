@@ -28,13 +28,23 @@ export function fairingProfile(inset = 0) {
 }
 
 export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
-  const fairA = new THREE.Group(), fairB = new THREE.Group();
-  parent.add(fairA, fairB);
+  // each fairing half hangs from a pivot on its base hinge line so it can swing open
+  const half = (side) => {
+    const pivot = new THREE.Group();
+    pivot.position.set(side * (R + 0.03), Y.fairingBase, 0);
+    const inner = new THREE.Group();
+    inner.position.set(-side * (R + 0.03), -Y.fairingBase, 0);
+    pivot.add(inner);
+    parent.add(pivot);
+    return { pivot, inner };
+  };
+  const hA = half(1), hB = half(-1);
+  const fairA = hA.inner, fairB = hB.inner;
   const P = (name, info, objs, grp = parent) => {
     const e = info.explode || [0, 0, 0];
     return A.part(name, { ...info, explode: [e[0] + explodeBase[0], e[1] + explodeBase[1], e[2] + explodeBase[2]] }, objs, grp);
   };
-  const out = { fairA, fairB };
+  const out = { fairA: hA.pivot, fairB: hB.pivot };
 
   // ------------------------------------------------------------------ tanks
   const span = [Y.interTop, Y.s2Top];
@@ -76,7 +86,7 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   const copv = P('Second stage helium COPVs', {
     system: 'Fuel', count: 3, material: 'Carbon-overwrapped pressure vessels on struts', mass: 3 * 55,
     desc: 'Three helium bottles submerged in the second-stage LOX tank. A strut holding one of them failed on CRS-7 in 2015, and a COPV liner breach caused the AMOS-6 pad loss in 2016 — both led to redesigned bottles and loading procedures.',
-    callout: true, anchor: [0.9, 54.6, 0.5], explode: [0, 1.2, 2.2],
+    explode: [0, 1.2, 2.2],
   }, [mesh(merge(cg), FM.copv()), mesh(merge(cs), FM.steelLine())]);
   copv.userData.part.thermalRole = 'lox';
   const dTop = domeY(R, Y.s2CommonDome, D, -1, 0), dBot = domeY(R, Y.s2AftSkirt, D, -1, 0);
@@ -103,7 +113,7 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   P('Second stage thrust structure', {
     system: 'Structure', material: 'Aluminium thrust cone and struts', mass: 260,
     desc: 'Carries the Merlin Vacuum\'s ≈ 981 kN from the gimbal into the tank wall.',
-    explode: [0, -1.0, 0],
+    explode: [0, -0.6, 0],
   }, [mesh(ts[0], FM.aluDark()), mesh(merge(ts.slice(1)), FM.aluDark())]);
 
   const kit = mvacKit();
@@ -113,14 +123,14 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   const c1 = V('MVac thrust chamber & injector', {
     material: 'Copper-alloy liner, Inconel jacket, pintle injector', mass: 150,
     desc: 'The same chamber and pintle injector as the sea-level Merlin 1D. MVac throttles to about 39 % and relights for multi-burn missions.',
-    explode: [0, -4.0, 0],
+    explode: [0, -1.4, 0],
   }, ch);
   c1.userData.part.thermalRole = 'engine2';
   const rg = mesh(mvacRegen(56), SKIN.bell()); rg.position.y = ex;
   const c2 = V('MVac regenerative nozzle', {
     material: 'Regeneratively cooled channel-wall nozzle', mass: 80,
     desc: 'Fuel-cooled section from the throat to the extension joint, where the expansion is about 19 : 1.',
-    explode: [0, -4.6, 0],
+    explode: [0, -2.2, 0],
   }, rg);
   c2.userData.part.thermalRole = 'engine2';
   const ext = mesh(mvacExtension(96), FM.niobium()); ext.position.y = ex;
@@ -128,29 +138,29 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   const c3 = V('MVac niobium nozzle extension', {
     material: 'Niobium alloy (C-103) sheet, radiatively cooled', mass: 160,
     desc: 'The large bell expands the exhaust 165 : 1 to a ≈ 3 m exit, lifting Isp to 348 s. Uncooled niobium glows orange-hot in vacuum; at sea level this bell would over-expand and the flow would separate.',
-    callout: true, anchor: [1.45, ex + 0.6, 0.3], explode: [0, -6.4, 0],
+    callout: true, anchor: [1.45, ex + 0.6, 0.3], explode: [0, -3.0, 0],
   }, [ext, flange]);
   c3.userData.part.thermalRole = 'mvacExt';
   V('MVac turbopump', {
     material: 'Single-shaft LOX / RP-1 turbopump', mass: 120,
     desc: 'The same turbopump as the Merlin 1D, feeding the vacuum engine.',
-    explode: [-1.4, -3.6, 0],
+    explode: [-1.2, -1.2, 0],
   }, mesh(merge(at(kit.pump)), FM.pump()));
   const gg = V('MVac gas generator & exhaust manifold', {
     material: 'Inconel gas generator, duct and toroidal manifold', mass: 45,
     desc: 'On MVac the turbine exhaust is not thrown overboard: a duct feeds it into a ring manifold at the top of the extension, where it film-cools the niobium wall and adds a little thrust.',
-    explode: [-1.6, -4.4, 0.8],
+    explode: [-1.4, -1.8, 0.8],
   }, [mesh(merge(at(kit.gg)), FM.inconel()), mesh(merge(at(kit.duct)), FM.inconel())]);
   gg.userData.part.thermalRole = 'engine2';
   V('MVac TVC actuators', {
     system: 'Flight controls', count: 2, material: 'Hydraulic actuators (RP-1 working fluid)', mass: 30,
     desc: 'Gimbal the engine for pitch and yaw during the burns; roll is held by the nitrogen thrusters.',
-    explode: [1.2, -3.4, 0],
+    explode: [1.1, -1.0, 0],
   }, mesh(merge(at(kit.act)), FM.steelLine()));
   V('MVac valves & TEA-TEB igniter', {
     material: 'Valves, igniter lines, TEA-TEB cartridge', mass: 25,
     desc: 'Restart capability rests on the TEA-TEB supply: each relight uses a slug of the pyrophoric fluid, so the stage carries enough for the planned burns.',
-    explode: [1.4, -4.2, 0.8],
+    explode: [1.3, -1.6, 0.8],
   }, [mesh(merge(at(kit.line)), FM.steelLine()), mesh(merge(at(kit.valve)), FM.gold())]);
 
   // ------------------------------------------------------------------ attitude control, avionics, power

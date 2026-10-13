@@ -67,7 +67,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   const lox = P('LOX tank', {
     system: 'Fuel', skin: true, material: 'Aluminium-lithium 2195, friction-stir welded barrel sections', mass: Math.round(4300 * k),
     desc: `Upper tank: about 278 t of liquid oxygen, densified to −207 °C (66 K) so more fits in the same volume. Its forward skirt carries the ${centre ? 'interstage and the forward booster attach fittings' : 'forward section, grid fins and the forward attach fitting'}.`,
-    callout: centre, anchor: [0, 30, R + 0.1], explode: [0, 1.2, -6.5],
+    explode: [0, 1.2, -6.5],
   }, mesh(tankBarrel(Y.commonDome, Y.s1Top), skinMat));
   lox.userData.part.thermalRole = 'lox';
   const rp1 = P('RP-1 tank', {
@@ -241,7 +241,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     desc: centre
       ? 'Eight of the centre core\'s nine engines, each 845 kN at sea level and 914 kN in vacuum. The centre core throttles them back early in flight so it still has propellant when the side boosters separate.'
       : 'Nine Merlin 1D, 845 kN each at sea level (7.6 MN per core). Each has its own turbopump and gas generator; the dark pipe beside each nozzle dumps the turbine exhaust.',
-    callout: !centre && attachSide > 0, anchor: [0.9, 0.4, 1.1], explode: [0, -4.2, 0],
+    explode: [0, -4.2, 0],
   }, [mesh(merge(bells), SKIN.bell()), mesh(merge(pumps), FM.pump()), mesh(merge(lines), FM.steelLine()), mesh(merge(ducts), FM.inconel())]);
   engines.userData.part.thermalRole = centre ? 'engineC' : 'engineB';
   P(centre ? 'outer-engine TVC actuators' : 'TVC actuators', {
@@ -258,40 +258,40 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     const ch = E('Merlin 1D thrust chamber & pintle injector', {
       material: 'Copper-alloy liner, Inconel jacket', mass: 140,
       desc: 'Centre engine. RP-1 and LOX meet at a single pintle injector, which resists combustion instability; they burn at about 9.7 MPa and 3,400 K. Fuel flowing through channels in the chamber wall cools it before injection.',
-      explode: [0, -8.4, 0],
+      explode: [0, -2.3, 4.6],
     }, mesh(merlinChamber(48), FM.copper()));
     ch.userData.part.thermalRole = 'engineC';
     const nz = E('Merlin 1D nozzle', {
       material: 'Regeneratively cooled channel-wall nozzle', mass: 110,
       desc: 'Expands the exhaust 16 : 1 to a ≈ 0.92 m exit. Sized for sea level: a bigger bell would over-expand at liftoff and the flow would separate from the wall.',
-      explode: [0, -9.6, 0],
+      explode: [0, -3.3, 4.6],
     }, mesh(merlinNozzle(56), SKIN.bell()));
     nz.userData.part.thermalRole = 'engineC';
     E('Merlin 1D turbopump', {
       material: 'Single shaft: LOX impeller, RP-1 impeller, turbine', mass: 120,
       desc: 'One shaft carries the LOX pump, the RP-1 pump and the turbine, spinning at about 36,000 rpm and absorbing ≈ 10,000 hp to raise the propellants to injection pressure.',
-      callout: true, anchor: [0.36, 2.2, 0.2], explode: [1.4, -8.0, 0],
+      callout: true, anchor: [0.36, 2.2, 0.2], explode: [1.0, -1.9, 4.6],
     }, [mesh(merge(kit.pump), FM.pump())]);
     E('Merlin 1D gas generator', {
       material: 'Inconel combustor', mass: 18,
       desc: 'Burns a small fuel-rich share of the propellants (≈ 3 %) to drive the turbine. In this open cycle the turbine gas is dumped overboard instead of entering the main chamber — simpler and lighter than staged combustion, at a few seconds of Isp.',
-      explode: [1.6, -8.6, 0.9],
+      explode: [1.3, -2.5, 5.3],
     }, mesh(merge(kit.gg), FM.inconel()));
     const td = E('Merlin 1D turbine exhaust duct', {
       material: 'Inconel', mass: 12,
       desc: 'Carries the sooty, fuel-rich turbine exhaust out through the heat shield — the dark stream visible beside each Merlin plume.',
-      explode: [2.2, -9.0, 0],
+      explode: [1.7, -3.0, 4.6],
     }, mesh(merge(kit.duct), FM.inconel()));
     td.userData.part.thermalRole = 'engineC';
     E('Merlin 1D valves & TEA-TEB igniter', {
       material: 'Valve bodies, stainless lines', mass: 30,
       desc: 'Main oxidiser and fuel valves plus the ignition line. A slug of pyrophoric TEA-TEB, which ignites on contact with LOX, lights the gas generator and the chamber; the dual-redundant system allows restarts for the boost-back and landing burns.',
-      explode: [-1.2, -8.0, 0],
+      explode: [-1.0, -1.9, 4.6],
     }, [mesh(merge(kit.line), FM.steelLine()), mesh(merge(kit.valve), FM.gold())]);
     E('Merlin 1D gimbal & TVC actuators', {
       system: 'Flight controls', count: 2, material: 'Gimbal bearing block, hydraulic actuators (RP-1 working fluid)', mass: 40,
       desc: 'The centre engine gimbals too: it is the one Merlin that relights alone for the landing burn, so it must steer.',
-      explode: [-0.9, -7.2, 0.9],
+      explode: [-0.8, -1.3, 5.3],
     }, mesh(merge(kit.act), FM.steelLine()));
   }
 
@@ -374,14 +374,14 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     const g = legGeo.clone();
     g.rotateY(radialYaw(a));
     const [x, z] = polar(R + 0.01, a);
-    g.translate(x, 0.9, z);
+    g.translate(x, 1.35, z);
     legGeos.push(g);
     const [fx, fz] = polar(R + 0.3, a);
-    footGeos.push(block(fx, 0.9 + legLen - 0.15, fz, 0.6, 0.3, 0.32, radialYaw(a)));
+    footGeos.push(block(fx, 1.35 + legLen - 0.15, fz, 0.6, 0.3, 0.32, radialYaw(a)));
     const [hx, hz] = polar(R + 0.1, a);
-    footGeos.push(block(hx, 0.95, hz, 0.7, 0.3, 0.3, radialYaw(a)));                 // hinge fitting
+    footGeos.push(block(hx, 1.5, hz, 0.7, 0.3, 0.3, radialYaw(a)));                  // hinge fitting
     const [px, pz] = polar(R + 0.13, a);
-    pistonGeos.push(rod([px, 1.3, pz], [px, 7.6, pz], 0.075, 10), rod([px, 7.6, pz], [px, 9.4, pz], 0.05, 8));
+    pistonGeos.push(rod([px, 1.75, pz], [px, 8.0, pz], 0.075, 10), rod([px, 8.0, pz], [px, 9.8, pz], 0.05, 8));
   }
   const legs = P('landing legs', {
     system: 'Recovery', count: 4, material: 'Carbon fibre with aluminium honeycomb', mass: 4 * 520,
@@ -468,7 +468,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
       P(`forward attach & pushers (${label})`, {
         system: 'Separation', count: 2, material: 'Titanium fittings, pneumatic pusher mechanisms', mass: 260,
         desc: `Two pneumatic pusher mechanisms tie the top of side booster ${label} to the top of the centre core's LOX tank. They hold through ascent, then release and push the booster away after its engines shut down.`,
-        callout: s > 0, anchor: [s * (gap0 + 0.3), 40.6, 0.5], explode: [s * 1.2, 0, 0.8],
+        explode: [s * 1.2, 0, 0.8],
       }, mesh(merge(f), FM.aluDark()));
       P(`aft attach & pushers (${label})`, {
         system: 'Separation', count: 2, material: 'Titanium fittings, pneumatic pusher mechanisms', mass: 240,

@@ -248,7 +248,7 @@ export function buildUAV() {
     const tankG = twistGeo(wingPanel({ root: { ...r0, t: r0.t * 0.9 }, tip: { ...r1, t: r1.t * 0.9 }, c0: 0.165, c1: 0.675, stations: 10, twist: twistAt(TANK[1]) - twistAt(TANK[0]), withChord: false }), TANK[0]);
     P(`Wing fuel tank (${sn})`, {
       system: 'Fuel', material: 'Sealed integral bay / bladder (est.)', mass: 20, explode: [0, -0.45, 1.75 * side],
-      desc: 'Fuel in the wing box between the spars, from the root to about 6 m out (≈ 655 L, estimate). Wing fuel sits on the lift, so it relieves wing bending and barely moves the centre of gravity as it burns.',
+      desc: 'Fuel in the wing box between the spars, from the root to about 8.4 m out: ≈ 750 L per wing in this model (the real split is not published). Wing fuel sits where the lift is, so it relieves wing bending and barely moves the centre of gravity as it burns.',
       callout: side > 0, anchor: wpt(3.4, 0.42, 1, -0.04).map((v, i) => (i === 2 ? v * side : v)),
     }, L(f(tankG), m.fuel));
 
@@ -493,13 +493,13 @@ export function buildUAV() {
 
   // ============================================================== fuel system
   const ftRings = [];
-  for (const s of [3.45, 3.5, 3.7, 3.9, 4.1, 4.16, 4.4, 4.7, 4.95, 5.0]) {
-    const yTop = s < 4.13 ? prof(s).top - 0.08 : 1.54;
-    const shrink = s === 3.45 || s === 5.0 ? 0.06 : 0.035;
+  for (const s of [3.4, 3.45, 3.7, 3.9, 4.1, 4.16, 4.4, 4.7, 4.98, 5.03]) {
+    const yTop = s < 4.13 ? prof(s).top - 0.06 : 1.555;
+    const shrink = s === 3.4 || s === 5.03 ? 0.055 : 0.03;
     const rr = [];
     for (let i = 0; i < 32; i++) {
       const p = fusePoint(s, -Math.PI / 2 + (i / 32) * Math.PI * 2, shrink);
-      p[1] = Math.min(p[1], yTop - (shrink - 0.035));
+      p[1] = Math.min(p[1], yTop - (shrink - 0.03));
       rr.push(p);
     }
     ftRings.push(rr);
@@ -507,13 +507,13 @@ export function buildUAV() {
   const ftGeo = loftRings(ftRings, { capStart: true, capEnd: true, uvMode: 'metric' });
   P('Fuselage fuel tank', {
     system: 'Fuel', material: 'Crash-resistant bladder cell (est.)', mass: 28, explode: [0, -0.9, 0],
-    desc: 'The main tank sits at the centre of gravity under and ahead of the wing box (≈ 830 L, estimate). Total internal fuel is about 1,800 kg (4,000 lb, 602 US gal) of JP-8.',
+    desc: 'The main tank sits at the centre of gravity under and ahead of the wing box (≈ 670 L in this model). With the wing bays the modelled tanks hold ≈ 2,200 L, about 1,760 kg of JP-8: GA-ASI quotes 3,900 lb (1,769 kg), the USAF 4,000 lb (602 US gal).',
     callout: true, anchor: [X(3.8), 1.0, 0.36],
   }, L(applyOut(ftGeo), m.fuel));
   const coll = [lru(0.42, 0.2, 0.34, [X(6.55), 1.36, 0], 0.03), cylX(X(6.7), X(6.48), 0.035, 0.035, 1.24, 0.09, 10), cylX(X(6.7), X(6.48), 0.035, 0.035, 1.24, -0.09, 10)];
   P('Collector tank & boost pumps', {
     system: 'Fuel', material: 'Aluminium collector with electric boost pumps (est.)', mass: 9, count: 2, explode: [0, -0.5, 0.35],
-    desc: 'All tanks feed a small collector that is always kept full, so the engine never sees an air bubble when the aircraft banks. Two electric boost pumps push fuel to the engine-driven pump.',
+    desc: 'All tanks feed a small collector (≈ 30 L here) that is kept full, so the engine never draws air when the aircraft banks or the main tanks run low. Two electric boost pumps push fuel to the engine-driven pump (arrangement estimated).',
   }, L(merge(coll), m.alu));
   const lines = [];
   for (const zs of [1, -1]) {
