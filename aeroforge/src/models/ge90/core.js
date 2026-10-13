@@ -285,8 +285,8 @@ export function buildCore(ctx) {
     const arc = keep(Math.PI * 1.75) ? TAU : Math.PI * 1.5;
     const list = [hoop(0.745, -3.84, 0.013, { arc }), hoop(0.745, -3.98, 0.013, { arc })];
     if (keep(0.95)) {
-      list.push(tube([P3(1.0, -3.1, 0.95), P3(0.92, -3.4, 0.95), P3(0.8, -3.7, 0.95), P3(0.745, -3.84, 0.95)], 0.02, { seg: 24 }));
-      list.push(axialCyl(1.0, -3.05, 0.95, 0.04, 0.12, 14));
+      list.push(tube([P3(0.95, -3.1, 0.95), P3(0.9, -3.4, 0.95), P3(0.8, -3.7, 0.95), P3(0.745, -3.84, 0.95)], 0.02, { seg: 24 }));
+      list.push(axialCyl(0.95, -3.05, 0.95, 0.04, 0.12, 14));
       list.push(tube([P3(0.745, -3.84, 0.95), P3(0.76, -3.91, 0.95), P3(0.745, -3.98, 0.95)], 0.013, { seg: 12 }));
     }
     return merge(list);

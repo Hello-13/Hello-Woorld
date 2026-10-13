@@ -133,7 +133,7 @@ export function buildAccessories(ctx) {
   const fuelSupply = [];
   for (let k = 0; k <= 24; k++) { const f = k / 24; fuelSupply.push(P3(1.9, -1.05 + 0.3 * f, UP - (UP - 0.82) * f)); }
   fuelSupply.push(P3(1.87, -0.55, 0.82));
-  const toManifold = [P3(1.87, -0.25, 1.0), P3(1.88, -0.6, 1.25), P3(1.8, -1.2, 1.48), P3(1.6, -1.74, BOTTOM - 0.03), P3(1.1, -1.76, BOTTOM - 0.03), P3(0.85, -1.85, BOTTOM - 0.03), P3(0.7, -2.4, 1.45), P3(0.68, -3.0, 1.4), P3(0.86, -3.25, 1.36)];
+  const toManifold = [P3(1.87, -0.25, 1.0), P3(1.88, -0.6, 1.25), P3(1.8, -1.2, 1.48), P3(1.6, -1.74, BOTTOM - 0.012), P3(1.1, -1.76, BOTTOM - 0.012), P3(0.85, -1.85, BOTTOM - 0.012), P3(0.7, -2.4, 1.45), P3(0.68, -3.0, 1.4), P3(0.86, -3.25, 1.36)];
   P('Fuel supply lines', {
     system: 'Fuel', material: 'Stainless-steel tubing', mass: 25,
     explode: [0.9, 0, 1.05], temp: 300,
@@ -143,7 +143,7 @@ export function buildAccessories(ctx) {
   // ------------------------------------------------------------------ oil lines
   const oil = [
     tube([P3(1.86, -1.08, PHI.tank + 0.16), P3(1.88, -0.9, 0.7), P3(1.89, -0.6, 1.1), P3(1.87, -0.56, 1.2)], 0.014, { seg: 40 }),
-    tube([P3(1.8, -0.95, 1.2), P3(1.75, -1.5, 1.45), P3(1.6, -1.8, BOTTOM + 0.03), P3(0.8, -1.82, BOTTOM + 0.03), P3(0.45, -1.8, BOTTOM + 0.03), P3(0.32, -1.7, BOTTOM + 0.03)], 0.012, { seg: 48 }),
+    tube([P3(1.8, -0.95, 1.2), P3(1.75, -1.5, 1.45), P3(1.6, -1.8, BOTTOM + 0.012), P3(0.8, -1.82, BOTTOM + 0.012), P3(0.45, -1.8, BOTTOM + 0.012), P3(0.32, -1.7, BOTTOM + 0.012)], 0.012, { seg: 48 }),
     tube([P3(0.62, -1.95, BOTTOM + 0.06), P3(0.62, -2.6, 1.7), P3(0.72, -3.5, 1.7), P3(0.8, -4.3, 1.68), P3(0.98, -5.0, 1.65), P3(0.97, -5.3, 1.62), P3(0.45, -5.32, 1.62)], 0.012, { seg: 80 }),
   ];
   P('Oil supply & scavenge lines', {
@@ -165,7 +165,7 @@ export function buildAccessories(ctx) {
     desc: 'Air is tapped from a mid HP-compressor stage and from the compressor exit; a high-stage valve switches to the hotter source at low power. Ducts rise through the upper bifurcation to a precooler in the strut, then to the cabin packs, wing anti-ice and engine starting.',
   }, m(merge(bleed), GM.duct()));
   const nai = [
-    tube([P3(coreAt(-3.0)[1] + 0.02, -3.0, UP - 0.42), P3(0.72, -2.9, UP - 0.4), P3(1.05, -2.5, UP - 0.12), P3(1.5, -2.0, UP - 0.1), P3(1.82, -1.62, UP - 0.12), P3(1.9, -1.2, UP - 0.12), P3(1.9, 0.1, UP - 0.12), P3(1.88, 0.4, UP - 0.12), P3(1.78, 1.2, UP - 0.12), P3(1.72, 1.55, UP - 0.12), P3(1.7, 1.68, UP - 0.12)], 0.035, { seg: 120, radial: 10 }),
+    tube([P3(coreAt(-3.0)[1] + 0.02, -3.0, UP - 0.42), P3(0.72, -2.9, UP - 0.4), P3(1.05, -2.5, UP - 0.035), P3(1.5, -2.0, UP - 0.035), P3(1.82, -1.62, UP - 0.12), P3(1.9, -1.2, UP - 0.12), P3(1.9, 0.1, UP - 0.12), P3(1.88, 0.4, UP - 0.12), P3(1.78, 1.2, UP - 0.12), P3(1.72, 1.55, UP - 0.12), P3(1.7, 1.68, UP - 0.12)], 0.035, { seg: 120, radial: 10 }),
     axialCyl(1.9, -0.9, UP - 0.12, 0.06, 0.16, 18),
     hoop(1.695, 1.69, 0.014, { tubular: 160 }),
   ];
@@ -181,9 +181,9 @@ export function buildAccessories(ctx) {
   loom.push(tube([fa(1.8, -0.56, PHI.fadec), fa(1.79, 0.05, 0.4), fa(1.69, 0.18, 0.4)], 0.016, { seg: 30 }));
   loom.push(tube([fa(1.8, -0.57, PHI.fadec + 0.1), fa(1.8, -1.0, 0.45), fa(1.82, -1.6, PHI.n1), fa(1.79, -1.7, PHI.n1)], 0.016, { seg: 30 }));
   loom.push(tube([fa(1.79, -0.6, PHI.fadec + 0.15), fa(1.8, -0.75, 0.48)], 0.014, { seg: 8 }));
-  loom.push(tube([fa(1.8, -0.58, PHI.fadec + 0.05), fa(1.79, -1.3, 0.3), fa(1.75, -1.62, BOTTOM - 0.06), fa(1.2, -1.6, BOTTOM - 0.06), fa(0.95, -1.62, BOTTOM - 0.06), fa(0.68, -2.0, 1.2), fa(0.66, -2.4, 0.9), fa(0.7, -3.0, 0.7), fa(0.8, -3.6, 0.6), fa(0.82, -4.16, 0.5)], 0.018, { seg: 100 }));
-  loom.push(hoop(0.665, -2.4, 0.014, { tubular: 120, arc: Math.PI * 1.5 }));
-  for (let k = 0; k < 12; k++) { const phi = (k / 12) * Math.PI * 1.5; loom.push(strap(0.665, -2.4, phi)); }
+  loom.push(tube([fa(1.8, -0.58, PHI.fadec + 0.05), fa(1.79, -1.3, 0.3), fa(1.75, -1.66, PHI.n1 + 0.014), fa(1.2, -1.66, PHI.n1 + 0.014), fa(0.95, -1.68, PHI.n1 + 0.014), fa(0.68, -2.0, 0.6), fa(0.665, -2.66, 0.62), fa(0.7, -3.0, 0.7), fa(0.8, -3.6, 0.6), fa(0.82, -4.16, 0.5)], 0.018, { seg: 100 }));
+  loom.push(hoop(0.665, -2.66, 0.014, { tubular: 120, arc: Math.PI * 1.5 }));
+  for (let k = 0; k < 12; k++) { const phi = (k / 12) * Math.PI * 1.5; loom.push(strap(0.665, -2.66, phi)); }
   P('Electrical harnesses', {
     system: 'Electrical', material: 'Shielded, fire-resistant wiring looms in braided sleeves', mass: 60,
     explode: [0.6, -0.2, 1.4], temp: 380,
