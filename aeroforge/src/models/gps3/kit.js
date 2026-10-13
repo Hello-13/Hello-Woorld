@@ -104,15 +104,38 @@ export function octagon(cx, cy, d) {
   });
 }
 
-/** Helical conductor of radius r between z0 and z1, centred on (x, y). */
-export function helixG(x, y, r, z0, z1, turns, wire = 0.0032, phase = 0, r1 = r) {
-  const pts = [];
+/** Helical conductor of radius r (tapering to r1) between z0 and z1, centred on (x, y). Built directly
+ *  as a tube of `radial` sides around the analytic helix (no curve fitting or Frenet frames, which
+ *  made the 64 antenna helices the slowest part of the build). */
+export function helixG(x, y, r, z0, z1, turns, wire = 0.0032, phase = 0, r1 = r, radial = 5) {
   const n = Math.max(8, Math.ceil(turns * 16));
+  const pos = new Float32Array((n + 1) * radial * 3), nor = new Float32Array((n + 1) * radial * 3);
+  const idx = [];
+  const T = new THREE.Vector3(), N = new THREE.Vector3(), B = new THREE.Vector3(), d = new THREE.Vector3();
+  const w = turns * Math.PI * 2, h = z1 - z0;
   for (let i = 0; i <= n; i++) {
-    const t = i / n, a = phase + t * turns * Math.PI * 2, rr = r + (r1 - r) * t;
-    pts.push(new THREE.Vector3(x + Math.cos(a) * rr, y + Math.sin(a) * rr, z0 + (z1 - z0) * t));
+    const t = i / n, a = phase + t * w, rr = r + (r1 - r) * t, c = Math.cos(a), s = Math.sin(a);
+    T.set(-s * rr * w + c * (r1 - r), c * rr * w + s * (r1 - r), h).normalize();   // dP/dt
+    N.set(c, s, 0); N.addScaledVector(T, -N.dot(T)).normalize();                   // outward, square to the wire
+    B.crossVectors(T, N);
+    const px = x + c * rr, py = y + s * rr, pz = z0 + h * t;
+    for (let j = 0; j < radial; j++) {
+      const b = (j / radial) * Math.PI * 2, k = (i * radial + j) * 3;
+      d.copy(N).multiplyScalar(Math.cos(b)).addScaledVector(B, Math.sin(b));
+      pos[k] = px + d.x * wire; pos[k + 1] = py + d.y * wire; pos[k + 2] = pz + d.z * wire;
+      nor[k] = d.x; nor[k + 1] = d.y; nor[k + 2] = d.z;
+    }
   }
-  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n, wire, 5, false);
+  for (let i = 0; i < n; i++) for (let j = 0; j < radial; j++) {
+    const a = i * radial + j, b = i * radial + ((j + 1) % radial), c = a + radial, e = b + radial;
+    idx.push(a, b, c, b, e, c);   // counter-clockwise seen from outside (face normal along N)
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array((n + 1) * radial * 2), 2));
+  g.setIndex(idx);
+  return g;
 }
 
 /** Bolt heads (small hex-ish cylinders) at points, axis along `axis`. */
