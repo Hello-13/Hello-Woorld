@@ -13,6 +13,9 @@ import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { CopyShader } from 'three/addons/shaders/CopyShader.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { Environment } from './environment.js';
+import { installShading } from './shading.js';
+
+installShading();   // specular antialiasing and the highlight clamp, before any material compiles
 
 // dpr: render at the screen's native pixel density up to this cap; minPixels: never draw fewer
 // pixels than this (the 4K preset supersamples a 3840 × 2160 frame onto smaller screens);
