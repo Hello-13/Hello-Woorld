@@ -14,7 +14,7 @@ const P_SL = 101325;
 export function mountRocketLab(root, ctx) {
   const v = ctx.vehicle;
   const stage = ctx.stage;
-  const p = { payload: 15000, kick: 16, target: 200 };
+  const p = { payload: 15000, kick: 14, target: 200 };
   let warp = 5;
   let sim = null;
   let flight = null;     // { t, phaseIdx, logged:Set }
@@ -69,7 +69,7 @@ export function mountRocketLab(root, ctx) {
   });
 
   root.append(
-    el('p', { class: 'lab-intro', text: 'Configure the mission, then launch Falcon Heavy from LC-39A. The ascent is integrated with RK4 over a rotating spherical Earth. Each Merlin\'s thrust falls with back-pressure on its nozzle exit (F = F_vac − p_a·A_e: 914 kN in vacuum, 845 kN at sea level); the centre core throttles to 55 % while the side boosters burn; drag uses the Standard Atmosphere; the second stage flies closed-loop guidance to a circular orbit. The vehicle is modelled fully expendable, the configuration behind the published 63.8 t to LEO.' }),
+    el('p', { class: 'lab-intro', text: 'Configure the mission, then launch Falcon Heavy from LC-39A. The ascent is integrated with RK4 over a rotating spherical Earth. Each Merlin\'s thrust falls with back-pressure on its nozzle exit (F = F_vac − p_a·A_e: 914 kN in vacuum, 845 kN at sea level); about 25 s after liftoff the centre core throttles to ≈ 55 % (both figures are estimates; SpaceX does not publish them) so it is still burning when the side boosters separate; drag uses the Standard Atmosphere. The second stage flies closed-loop guidance and cuts off when the orbit\'s energy matches a circular orbit at the target altitude; the fairing goes 25 s after it lights, once aerodynamic heating has fallen to a low level. The physics is the fully expendable vehicle behind the published 63.8 t to LEO. The 3-D model shows the recovery configuration (legs and grid fins on every core, as on Arabsat-6A); expended cores fly without them, and recovering the boosters costs payload.' }),
     section('Mission', sPay.el, sKick.el, sTgt.el),
     outcome,
     section('Δv budget (Tsiolkovsky)', budget.el),
@@ -88,8 +88,8 @@ export function mountRocketLab(root, ctx) {
       outcome.textContent = `Predicted: orbit ${fmt.n(r.perigee / 1000, 0)} × ${fmt.n(r.apogee / 1000, 0)} km, ${fmt.n(r.upperPropRemaining / 1000, 1)} t of upper-stage propellant left over.`;
       outcome.dataset.state = 'ok';
     } else {
-      outcome.textContent = `Predicted: no orbit. ${sim.events.at(-1)?.code === 'FAILED' ? sim.events.at(-1).label : 'The vehicle runs out of energy'}. Lighten the payload or adjust the pitch-over kick.`;
-      outcome.dataset.state = 'crit';
+      outcome.textContent = `Predicted: ${r.orbit ? '' : 'no orbit. '}${r.label}.`;
+      outcome.dataset.state = r.orbit ? 'warn' : 'crit';
     }
     const V = FALCON_HEAVY;
     const dv = deltaVBudget(V, p.payload);
@@ -117,7 +117,7 @@ export function mountRocketLab(root, ctx) {
   }
 
   function renderEvents(tNow) {
-    events.replaceChildren(...sim.events.map((e) => el('li', { class: `tl-row${e.t <= tNow ? ' is-past' : ''}${e.code === 'FAILED' ? ' is-crit' : ''}` },
+    events.replaceChildren(...sim.events.map((e) => el('li', { class: `tl-row${e.t <= tNow ? ' is-past' : ''}${e.code === 'FAILED' || e.code === 'OFFTARGET' ? ' is-crit' : ''}` },
       el('time', { class: 'tl-time', text: fmt.time(e.t) }), el('span', { text: e.label }))));
   }
 
@@ -127,9 +127,11 @@ export function mountRocketLab(root, ctx) {
     tele.set('phase', t < 0 ? 'Countdown' : phaseNames[s.phase] || s.phase, s.phase === 'FAILED' ? 'crit' : s.phase === 'ORBIT' ? 'ok' : '');
     tele.set('h', fmt.n(s.h / 1000, 1));
     tele.set('v', fmt.n(s.v, 0));
-    tele.set('mach', s.mach.toFixed(2));
-    tele.set('q', fmt.n(s.q / 1000, 1), s.q > 40000 ? 'warn' : '');
-    tele.set('acc', s.accel.toFixed(2), s.accel > 4.5 ? 'warn' : '');
+    // still clamped to the mount before T-0: no airspeed, no dynamic pressure, no thrust yet
+    const pad = t < 0;
+    tele.set('mach', pad ? '0.00' : s.mach.toFixed(2));
+    tele.set('q', pad ? '0.0' : fmt.n(s.q / 1000, 1), !pad && s.q > 40000 ? 'warn' : '');
+    tele.set('acc', pad ? '—' : s.accel.toFixed(2), !pad && s.accel > 4.5 ? 'warn' : '');
     tele.set('dr', fmt.n(s.downrange / 1000, 0));
     tele.set('pitch', fmt.n(s.pitch, 1));
     tele.set('mass', fmt.n(s.mass / 1000, 1));
@@ -150,6 +152,9 @@ export function mountRocketLab(root, ctx) {
     ctx.log(v.designation, `Countdown started · payload ${fmt.n(p.payload / 1000, 1)} t → ${p.target} km`, 'info');
     ctx.setExplode(0);
     ctx.setAutoRotate(false);
+    // an open part card would sit where the chase camera holds the vehicle: close it (the app has
+    // no context call for this, so press the card's own close button)
+    document.querySelector('#part-card:not([hidden]) .pc-head .icon-btn')?.click();
     if (ctx.stage.env.look !== 'pad') ctx.setLook('pad');
     stage.ascending = true;
     prevRocket = null;
@@ -198,13 +203,13 @@ export function mountRocketLab(root, ctx) {
       for (const e of sim.events) {
         if (t >= e.t && !f.logged.has(e.code + e.t)) {
           f.logged.add(e.code + e.t);
-          ctx.log(v.designation, `${fmt.time(e.t)} ${e.label}`, e.code === 'FAILED' ? 'crit' : e.code === 'ORBIT' ? 'ok' : 'info');
+          ctx.log(v.designation, `${fmt.time(e.t)} ${e.label}`, e.code === 'FAILED' ? 'crit' : e.code === 'OFFTARGET' ? 'warn' : e.code === 'ORBIT' ? 'ok' : 'info');
           renderEvents(t);
-          if (e.code === 'ORBIT' || e.code === 'FAILED') {
+          if (e.code === 'ORBIT' || e.code === 'FAILED' || e.code === 'OFFTARGET') {
             outcome.textContent = e.code === 'ORBIT'
               ? `Orbit achieved: ${fmt.n(sim.result.perigee / 1000, 0)} × ${fmt.n(sim.result.apogee / 1000, 0)} km at ${fmt.n(sim.result.velocity, 0)} m/s.`
-              : 'No orbit: the second stage ran out of propellant before reaching orbital velocity.';
-            outcome.dataset.state = e.code === 'ORBIT' ? 'ok' : 'crit';
+              : `${e.code === 'FAILED' ? 'No orbit: ' : ''}${sim.result.label}.`;
+            outcome.dataset.state = e.code === 'ORBIT' ? 'ok' : e.code === 'OFFTARGET' ? 'warn' : 'crit';
           }
         }
       }

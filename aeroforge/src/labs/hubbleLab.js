@@ -28,24 +28,28 @@ const APERTURES = [
 const TARGETS = {
   moon: { label: 'Moon', d: 384400e3, size: 31 * 60, what: 'the Moon at its mean distance' },
   mars: { label: 'Mars', d: 55.76e9, size: 25.1, what: 'Mars at its closest approach in August 2003' },
-  jupiter: { label: 'Jupiter', d: 4.0 * AU, size: 47, what: 'Jupiter at a typical opposition (4.0 AU)' },
+  jupiter: { label: 'Jupiter', d: 4.0 * AU, size: 49, what: 'Jupiter at a typical opposition (4.0 AU)' },
   pluto: { label: 'Pluto', d: 34 * AU, size: 0.1, what: 'Pluto, about 34 AU away in the 2020s' },
   orion: { label: 'Orion Nebula', d: 1344 * LY, size: 65 * 60, what: 'the Orion Nebula, 1,344 light-years away' },
   m31: { label: 'Andromeda', d: 2.54e6 * LY, size: 3.2 * 3600, what: 'the Andromeda Galaxy, 2.5 million light-years away' },
 };
 
+// wavelength coverage (nm) of the instruments aboard since 2009; ACS has had no channel between its
+// Solar Blind Channel and its Wide Field Channel since the High Resolution Channel failed in 2007
 const INSTRUMENTS = [
-  ['COS', 115, 320], ['STIS', 115, 1030], ['ACS', 115, 1100], ['WFC3', 200, 1700], ['NICMOS (dormant)', 800, 2500],
+  ['COS', 115, 320], ['STIS', 115, 1030], ['ACS Solar Blind Channel', 115, 170], ['ACS Wide Field Channel', 350, 1100], ['WFC3', 200, 1700], ['NICMOS (dormant)', 800, 2500],
 ];
 
 const band = (nm) => (nm < 200 ? 'far ultraviolet' : nm < 400 ? 'near ultraviolet' : nm < 700 ? 'visible' : 'near infrared');
 
-/** Length with a sensible unit: m, km, AU or light-years. */
+/** Length with a sensible unit: m, km, AU, light-years or millions of light-years. */
 function length(m) {
   if (m < 1000) return `${fmt.n(m, m < 10 ? 1 : 0)} m`;
   if (m < 1e10) return `${fmt.n(m / 1000, m < 1e4 ? 1 : 0)} km`;
   if (m < 0.05 * LY) return `${fmt.n(m / AU, m < 10 * AU ? 2 : 0)} AU`;
-  return `${fmt.n(m / LY, m < 10 * LY ? 2 : 1)} ly`;
+  const ly = m / LY;
+  if (ly >= 1e6) return `${fmt.n(ly / 1e6, 2)} million ly`;
+  return `${fmt.n(ly, ly < 10 ? 2 : ly < 1000 ? 1 : 0)} ly`;
 }
 const arcsec = (as) => (as >= 60 ? `${fmt.n(as / 60, 1)}′` : as >= 1 ? `${fmt.n(as, 2)}″` : `${fmt.n(as, as < 0.01 ? 4 : 3)}″`);
 
@@ -62,7 +66,7 @@ export function mountHubbleLab(root, ctx) {
   const roD = readouts([
     { key: 'band', label: 'Band' }, { key: 'hst', label: 'Hubble diffraction limit', unit: '″' },
     { key: 'seeing', label: 'Ground seeing at this λ', unit: '″' }, { key: 'gain', label: 'Hubble sharper by' },
-    { key: 'jwst', label: 'JWST limit (6.5 m, ≥ 600 nm)', unit: '″' }, { key: 'airy', label: 'Airy disk at Hubble\'s focus', unit: 'µm' },
+    { key: 'jwst', label: 'JWST limit (6.5 m, ≥ 600 nm)' }, { key: 'airy', label: 'Airy disk at Hubble\'s focus', unit: 'µm' },
   ]);
   const instr = el('p', { class: 'lab-note' });
   const atm = el('p', { class: 'lab-status', role: 'status' });
@@ -75,7 +79,7 @@ export function mountHubbleLab(root, ctx) {
   // ------------------------------------------------------------------ light grasp
   const sAp = slider({ label: 'Aperture diameter', min: Math.log10(0.007), max: Math.log10(40), step: 0.005, value: p.logD, unit: 'm', format: (x) => { const d = 10 ** x; return d < 1 ? d.toFixed(d < 0.1 ? 3 : 2) : d.toFixed(1); }, onInput: (x) => { p.logD = x; mark(); } });
   const roA = readouts([
-    { key: 'area', label: 'Collecting area', unit: 'm²' }, { key: 'eye', label: 'Light gathered vs the eye' },
+    { key: 'area', label: 'Collecting area (unobstructed disc)', unit: 'm²' }, { key: 'eye', label: 'Light gathered vs the eye' },
     { key: 'mag', label: 'Fainter stars than the eye by', unit: 'mag' }, { key: 'theta', label: 'Diffraction limit at λ', unit: '″' },
     { key: 'limit', label: 'On the ground, limited by' },
   ]);
@@ -96,7 +100,8 @@ export function mountHubbleLab(root, ctx) {
   const sK = slider({ label: 'Primary conic constant as polished', min: -1.02, max: -1.0, step: 0.0001, value: p.K, format: (x) => x.toFixed(4), onInput: (x) => { p.K = x; mark(); } });
   const roR = readouts([
     { key: 'm', label: 'Secondary magnification' }, { key: 'b', label: 'Focus behind primary', unit: 'm' },
-    { key: 'k1', label: 'Design primary conic K₁' }, { key: 'k2', label: 'Design secondary conic K₂' },
+    { key: 'k1', label: 'Primary conic K₁ (design)' }, { key: 'k2', label: 'Secondary conic K₂ (design)' },
+    { key: 'k1s', label: 'K₁ solved from the rounded spacings' }, { key: 'k2s', label: 'K₂ solved from the rounded spacings' },
     { key: 'ps', label: 'Plate scale', unit: '″/mm' }, { key: 'fov', label: '1′ at the focal plane', unit: 'mm' },
     { key: 'edge', label: 'Mirror edge error', unit: 'µm' }, { key: 'wf', label: 'Wavefront error at the edge', unit: 'waves' },
   ]);
@@ -134,14 +139,14 @@ export function mountHubbleLab(root, ctx) {
     section('Diffraction limit versus seeing', sNm.el, sSee.el, roD.el, atm, instr, chartD.el,
       el('p', { class: 'lab-note', text: 'θ = 1.22 λ / D is the angle to the first dark ring of a star\'s Airy pattern (Rayleigh criterion). Turbulence blurs ground telescopes to roughly 0.5–1″ whatever their size, unless adaptive optics corrects it, which works best in the infrared.' })),
     section('Light-gathering power', sAp.el, roA.el, bars,
-      el('p', { class: 'lab-note', text: 'Collecting area grows as D². Hubble\'s secondary mirror and baffle block the central 33 % of its diameter, 11 % of its area. Each factor of 2.5 in light is one magnitude fainter.' })),
+      el('p', { class: 'lab-note', text: 'Collecting area grows as D². The slider treats the aperture as a clear disc; the bars use each telescope\'s real area — Hubble\'s secondary mirror and baffle block the central 33 % of its diameter, 11 % of its area, leaving 4.03 m². Each factor of 2.5 in light is one magnitude fainter.' })),
     section('Ritchey–Chrétien design and the 1990 flaw', roR.el, sK.el, flawStatus,
       el('p', { class: 'lab-note', text: 'Two hyperbolic mirrors cancel both spherical aberration and coma. The primary was polished to the wrong conic because a lens in the reflective null corrector used to test it sat 1.3 mm out of place. COSTAR\'s corrective mirrors (1993) and WFPC2\'s built-in correction fixed the images; every later instrument carries the correction inside, so COSTAR was removed in 2009.' })),
     section('What can Hubble resolve?', tgt.el, roT.el, tgtNote),
     section('Orbit and decay', sH.el, act.el, roO.el, chartO.el,
-      el('p', { class: 'lab-note', text: 'Deployed in April 1990 at about 612 km; servicing missions boosted it until 2002. It was near 540 km after the last visit in 2009 and below 500 km by 2026, sinking faster around solar maximum when the upper atmosphere swells; published re-entry forecasts range from the late 2020s (worst case) to the mid-2030s. The drag model uses an exponential thermosphere and an estimated 45 m² mean cross-section; it is a teaching sketch, not a re-entry forecast.' })),
+      el('p', { class: 'lab-note', text: 'Deployed in April 1990 at about 612 km; servicing missions boosted it until 2002. The last visit in 2009 left it near 565 km (562 × 568 km); it was about 540 km by 2022 and below 500 km by 2026, sinking faster around solar maximum when the upper atmosphere swells. Published re-entry forecasts range from the late 2020s (worst case) to the mid-2030s. The drag model uses an exponential thermosphere and an estimated 45 m² mean cross-section; it is a teaching sketch, not a re-entry forecast.' })),
     section('Telescope', el('div', { class: 'btn-row' }, tDoor.el, tDep.el, tRay.el),
-      el('p', { class: 'lab-note', text: 'X-ray, Systems and Blueprint always trace the light path while the door is open: entrance rays to the primary, the converging cone to the secondary, then the f/24 beam through the hole in the primary to the focus 1.5 m behind it.' })),
+      el('p', { class: 'lab-note', text: 'X-ray, Systems and Blueprint always trace the light path while the door is open and the view is not exploded: entrance rays to the primary, the converging cone to the secondary, then the f/24 beam through the hole in the primary to the focus 1.5 m behind it. Stretches hidden behind solid parts show faintly.' })),
   );
 
   function compute() {
@@ -152,7 +157,7 @@ export function mountHubbleLab(root, ctx) {
     roD.set('hst', th.toFixed(3));
     roD.set('seeing', see.toFixed(2));
     roD.set('gain', `${fmt.n(see / th, 0)} ×`, see / th > 1 ? 'ok' : 'warn');
-    roD.set('jwst', lam >= 600 ? thJ.toFixed(3) : '—');
+    roD.set('jwst', lam >= 600 ? `${thJ.toFixed(3)}″` : '—');
     roD.set('airy', fmt.n(airyDiskDiameter(lam * 1e-9, design.N) * 1e6, 1));
     const cover = INSTRUMENTS.filter(([, a, b]) => lam >= a && lam <= b).map(([n]) => n);
     instr.textContent = cover.length ? `Instruments covering ${fmt.n(lam)} nm: ${cover.join(', ')}.` : 'No current Hubble instrument covers this wavelength.';
@@ -170,7 +175,7 @@ export function mountHubbleLab(root, ctx) {
 
     // ---------------- light grasp
     const D = 10 ** p.logD;
-    const area = collectingArea(D, Math.abs(D - 2.4) < 0.01 ? HST_OTA.obscuration : 0);
+    const area = collectingArea(D);
     roA.set('area', area < 0.01 ? area.toExponential(2) : fmt.n(area, 2));
     roA.set('eye', `${fmt.n(area / collectingArea(0.007), 0)} ×`);
     roA.set('mag', fmt.n(magnitudeGain(D, 0.007), 1));
@@ -181,8 +186,10 @@ export function mountHubbleLab(root, ctx) {
     // ---------------- design and flaw
     roR.set('m', design.m.toFixed(2));
     roR.set('b', design.b.toFixed(3));
-    roR.set('k1', design.K1.toFixed(4));
-    roR.set('k2', design.K2.toFixed(4));
+    roR.set('k1', HST_OTA.K1design.toFixed(7));
+    roR.set('k2', HST_OTA.K2design.toFixed(4));
+    roR.set('k1s', design.K1.toFixed(4));
+    roR.set('k2s', design.K2.toFixed(4));
     roR.set('ps', plateScale(HST_OTA.F).toFixed(3));
     roR.set('fov', (60 / plateScale(HST_OTA.F)).toFixed(1));
     const edge = conicError(HST_OTA.D / 2, HST_OTA.R1, design.K1, p.K) * 1e6;

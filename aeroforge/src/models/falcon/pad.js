@@ -1,8 +1,9 @@
 // Launch Complex 39A as configured for Falcon Heavy: the raised hardstand cut by the Apollo-era
-// flame trench (490 ft long, 58 ft wide, 42 ft deep, inverted-V deflector), SpaceX's
-// transporter-erector with its launch mount, hold-down clamps and tail service masts, the fixed
-// service structure (12 levels at 20 ft spacing from 27 ft, 247 ft tall) with the crew access arm
-// at the 217 ft level, water deluge, and site scenery. Pad layout is compressed and simplified;
+// flame trench (490 ft long, 58 ft wide, 42 ft deep, inverted-V deflector), the fixed launch mount
+// built over it in 2015 with its hold-down clamps and tail service masts, SpaceX's
+// transporter-erector, the fixed service structure (12 levels at 20 ft spacing from 27 ft, 247 ft
+// tall) with the crew access arm as it stood for Falcon Heavy flights from 2019 to 2025 (removed in
+// February 2026), water deluge, and site scenery. Pad layout is compressed and simplified;
 // hardware positions on the mount are estimates.
 
 import * as THREE from 'three';
@@ -15,8 +16,8 @@ import { FM } from './materials.js';
 const H = PAD.hardstand;
 const W = PAD.trenchHalfWidth;
 const DECK = H + PAD.mountDeck;
-// hardstand top half-extents and slope run (compressed footprint)
-const TX = 22.5, TZ = 23, RUN = 7.5;
+// hardstand top half-extents, slope run and the chamfered concrete edge (compressed footprint)
+const TX = 22.5, TZ = 23, RUN = 7.5, LIP = 1.4, LIP_DROP = 0.9;
 
 /** Prism from a top quad and a bottom quad (corners in matching order), flat-shaded, metric UVs. */
 function frustum(top, bot) {
@@ -94,27 +95,31 @@ export function buildPad(A, site, base, bed) {
   };
 
   // ------------------------------------------------------------------ hardstand and flame trench
-  const tops = [], slopes = [];
-  for (const s of [1, -1]) {
-    const T = [[s * W, H, -TZ], [s * TX, H, -TZ], [s * TX, H, TZ], [s * W, H, TZ]];
-    const B = [[s * W, 0, -TZ - RUN], [s * (TX + RUN), 0, -TZ - RUN], [s * (TX + RUN), 0, TZ + RUN], [s * W, 0, TZ + RUN]];
-    const g = faceAway(frustum(T, B), new THREE.Vector3(s * (W + TX) / 2, 4, 0));
-    // first two triangles are the top face; the rest are the sloped sides and the trench wall
+  const tops = [], lips = [], slopes = [];
+  const sub = (g, a, b) => {
     const pos = g.attributes.position.array, uv = g.attributes.uv.array;
-    const sub = (a, b) => {
-      const q = new THREE.BufferGeometry();
-      q.setAttribute('position', new THREE.Float32BufferAttribute(pos.slice(a * 9, b * 9), 3));
-      q.setAttribute('uv', new THREE.Float32BufferAttribute(uv.slice(a * 6, b * 6), 2));
-      q.computeVertexNormals();
-      return q;
-    };
-    tops.push(sub(0, 2));
-    slopes.push(sub(2, 10));
+    const q = new THREE.BufferGeometry();
+    q.setAttribute('position', new THREE.Float32BufferAttribute(pos.slice(a * 9, b * 9), 3));
+    q.setAttribute('uv', new THREE.Float32BufferAttribute(uv.slice(a * 6, b * 6), 2));
+    q.computeVertexNormals();
+    return q;
+  };
+  for (const s of [1, -1]) {
+    // two-step edge: a narrow chamfered concrete lip, then the grassed embankment down to grade
+    const T = [[s * W, H, -TZ], [s * TX, H, -TZ], [s * TX, H, TZ], [s * W, H, TZ]];
+    const L = [[s * W, H - LIP_DROP, -TZ - LIP], [s * (TX + LIP), H - LIP_DROP, -TZ - LIP], [s * (TX + LIP), H - LIP_DROP, TZ + LIP], [s * W, H - LIP_DROP, TZ + LIP]];
+    const B = [[s * W, 0, -TZ - RUN], [s * (TX + RUN), 0, -TZ - RUN], [s * (TX + RUN), 0, TZ + RUN], [s * W, 0, TZ + RUN]];
+    const ref = new THREE.Vector3(s * (W + TX) / 2, 4, 0);
+    const g1 = faceAway(frustum(T, L), ref), g2 = faceAway(frustum(L, B), ref);
+    // first two triangles of each are the top face; the rest are the sides and the trench wall
+    tops.push(sub(g1, 0, 2));
+    lips.push(sub(g1, 2, 10));
+    slopes.push(sub(g2, 2, 10));
   }
   G('Pad hardstand', {
-    skin: true, material: 'Reinforced concrete pad on a raised earth-and-fill mound', mass: null,
+    skin: true, material: 'Reinforced concrete pad on a raised, grassed earth-and-fill mound', mass: null,
     desc: 'LC-39A stands on a raised hardstand built for Saturn V. Its surface is about 48 ft above sea level, high enough for the 42 ft-deep flame trench to drain at grade. Footprint compressed here.',
-  }, [mesh(merge(tops), FM.hardstand()), mesh(merge(slopes), FM.embankment())], bed);
+  }, [mesh(merge([...tops, ...lips]), FM.hardstand()), mesh(merge(slopes), FM.embankment())], bed);
 
   const lining = [];
   for (const s of [1, -1]) {
@@ -158,8 +163,8 @@ export function buildPad(A, site, base, bed) {
   }
   for (const x of [-BOOSTER_X, 0, BOOSTER_X]) legs.push(hoop(1.96, 0.18, DECK - 1.7, { x, seg: 40, tube: 6 }));
   G('Launch mount', {
-    material: 'Welded steel deck on four legs straddling the flame trench', mass: null,
-    desc: 'Part of SpaceX\'s transporter-erector: the deck that carries the three cores, with an exhaust opening under each. It straddles the flame trench on the hardstand.',
+    skin: true, material: 'Welded steel deck on four legs straddling the flame trench', mass: null,
+    desc: 'Fixed steel launch mount built on the pad in 2015 over the Apollo / Shuttle flame trench, with an exhaust opening under each core; the transporter-erector sets the vehicle down on it and its hold-downs.',
   }, [mesh(deck, FM.padSteel()), mesh(merge(legs), FM.padSteel())], base);
 
   // hold-down clamps: around each core where the deck allows (simplified count)
@@ -174,7 +179,7 @@ export function buildPad(A, site, base, bed) {
     clamp.push(rod([cx + px, DECK + 0.05, pz], [cx + x, DECK + 0.5, z], 0.08, 8));
   }
   G('Hold-down clamps', {
-    count: stations.length, material: 'Hydraulically released steel clamps', mass: null,
+    skin: true, count: stations.length, material: 'Hydraulically released steel clamps', mass: null,
     desc: 'Clamp the cores to the mount while all 27 engines start and come up to full thrust; the computers check every engine before the clamps release. Eight shown; the exact clamp arrangement on the Falcon Heavy mount is simplified.',
   }, mesh(merge(clamp), FM.aluDark()), base);
 
@@ -187,7 +192,7 @@ export function buildPad(A, site, base, bed) {
     tsm.push(pipe([[x, DECK + 3.6, -0.6], [x - s * 0.6, DECK + 3.0, -0.6], [s * (BOOSTER_X + R + 0.04), DECK + 2.0, -0.55]], 0.11, { seg: 8 }));
   }
   G('Tail service masts', {
-    count: 2, material: 'Steel masts with retracting umbilical plates', mass: null,
+    skin: true, count: 2, material: 'Steel masts with retracting umbilical plates', mass: null,
     desc: 'Feed RP-1, LOX, helium and power into the base of each side booster until T-0, then retract and close a protective hood against the exhaust. The layout of the Falcon Heavy mount\'s side-booster umbilicals is not documented publicly; shown simplified.',
   }, mesh(merge(tsm), FM.teWhite()), base);
 
@@ -251,7 +256,7 @@ export function buildPad(A, site, base, bed) {
   caa.push(block(cx + 0.6, caaY + 1.5, cz + 0.4, 1.2, 4.0, 1.2));                   // slew bearing / hinge
   G('Crew access arm', {
     material: 'Steel truss walkway with an environmental "white room"', mass: null,
-    desc: 'Added by SpaceX in 2018 at the 217 ft level for Crew Dragon; 85 ft long. It stays retracted for uncrewed Falcon Heavy flights and is shown swung back along the tower.',
+    desc: 'Installed in August 2018 on a new level at 217 ft for Crew Dragon; 85 ft long, and retracted for uncrewed Falcon Heavy flights (shown swung back along the tower). SpaceX removed it in February 2026, when crew launches moved to SLC-40 and 39A was refocused on Falcon Heavy and Starship.',
   }, mesh(merge(caa), FM.teWhite()));
 
   // ------------------------------------------------------------------ water deluge / sound suppression
@@ -287,7 +292,8 @@ export function buildPad(A, site, base, bed) {
   const legsW = [];
   for (let k = 0; k < 6; k++) { const [x, z] = polar(10, k * 60); const [x1, z1] = polar(7, k * 60); legsW.push(beam([-110 + x, 0, -150 + z], [-110 + x1, 70, -150 + z1], 0.9, 0.9)); }
   scenery.add(mesh(merge(wt), white), mesh(merge(legsW), steel));
-  for (const [x, z, r] of [[-120, 40, 9.3], [118, -60, 7.5], [100, 64, 4.2]]) {
+  // kept behind the tower, on the right of the default view, so they never sit under the hero text
+  for (const [x, z, r] of [[-30, -160, 9.3], [60, -150, 7.5], [120, -85, 4.2]]) {
     scenery.add(mesh(new THREE.SphereGeometry(r, 40, 24).translate(x, r + 3, z), white));
     const sl = [];
     for (let k = 0; k < 8; k++) { const [a, b] = polar(r * 0.8, k * 45); sl.push(beam([x + a, 0, z + b], [x + a * 1.05, r + 3, z + b * 1.05], 0.5, 0.5)); }

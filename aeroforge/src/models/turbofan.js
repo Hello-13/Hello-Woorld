@@ -1,13 +1,14 @@
-// GE Aerospace GE90-115B — the high-bypass turbofan of the Boeing 777-300ER and 777F, shown as a
-// museum cutaway on a display cradle, inside its Boeing nacelle.
+// GE Aerospace GE90-115B — the high-bypass turbofan of the Boeing 777-300ER, shown as a museum
+// cutaway on a display cradle, inside its Boeing nacelle.
 //
 // Axes: the engine is built in a lathe frame (engine axis +y, intake forward; x = r·sin(phi),
 // z = r·cos(phi); see ge90/layout.js) which is turned so that the engine axis lies along world +x
 // (intake towards +x), world y is up and +z faces the default camera. In that frame +x is world
 // down, so phi = 0 faces the viewer and phi = 3π/2 is the top (pylon).
 // Cutaway: the casings lose the upper quadrant facing the viewer and the nacelle loses its whole
-// viewer half; rotor blades stay whole and turn — N1 (fan, booster, LP turbine) and N2 (HP
-// compressor and turbine) at their own speeds. Axisymmetric rotor drums are drawn cut and still.
+// viewer half. The spools turn — N1 (fan, booster, LP turbine) and N2 (HP compressor and turbine)
+// at their own speeds — and the core blade rows are cut with the casings, blade by blade (see
+// rotorRow in ge90/geom.js); the fan stays whole. Axisymmetric rotor drums are drawn cut and still.
 
 import * as THREE from 'three';
 import { Assembly, mesh } from '../engine/assembly.js';
@@ -15,7 +16,8 @@ import { beam, mergeGeometries } from '../engine/geometry.js';
 import { M } from '../engine/materials.js';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { inferno } from '../engine/effects.js';
-import { setCut, sector } from './ge90/geom.js';
+import { setCut, sector, updateRotor } from './ge90/geom.js';
+import { n1Demand, n2Line } from '../physics/turbofan.js';
 import { STATIONS, NACELLE, coreAt, bypassAt, FAN_NOZZLE_Y, PLUG_TIP } from './ge90/layout.js';
 import { buildNacelle } from './ge90/nacelle.js';
 import { buildFan } from './ge90/fan.js';
@@ -27,7 +29,18 @@ const N1_RPM = 2355, N2_RPM = 9332;    // 100 % speeds (FAA TCDS E00049EN)
 const SHOW = 0.02;                     // spools are shown turning at 1/50 of real speed
 const DRY_MASS = 8761;                 // kg, 19,316 lb (EASA TCDS IM.E.002: includes starter and mounts)
 // Boeing installation hardware and the display cradle, which the engine's dry mass excludes
-const NOT_ENGINE = new Set(['Inlet cowl', 'Fan cowl doors', 'Thrust reverser translating sleeves', 'Thrust reverser cascades', 'Blocker doors & drag links', 'Thrust reverser actuators', 'Core cowl & bifurcations', 'Pylon (strut) stub', 'Display cradle']);
+// Boeing installation hardware, aircraft equipment driven or served by the engine (the 777's
+// generators, hydraulic pump, pneumatic and fire-protection parts) and the display cradle, which
+// the engine's certified dry mass excludes
+const NOT_ENGINE = new Set([
+  'Inlet cowl', 'Fan cowl doors', 'Fan cowl hinges', 'Fan cowl latches', 'Fan cowl hold-open rods',
+  'Thrust reverser translating sleeves', 'Thrust reverser cascades', 'Blocker doors & drag links', 'Thrust reverser actuators',
+  'Thrust reverser hinge & latch beams', 'Thrust reverser control valve module', 'Thrust reverser hydraulic lines', 'Thrust reverser synchronising shafts',
+  'Core cowl & bifurcations', 'Core cowl pressure-relief door', 'Pylon (strut) stub', 'Display cradle',
+  'Integrated drive generator (IDG)', 'Backup generator (VSCF/PMG)', 'Engine-driven hydraulic pump', 'Hydraulic pump lines', 'IDG feeder cables', 'IDG fuel/oil cooler',
+  'Bleed ducts & manifold', 'IP check valve', 'High-pressure shutoff valve', 'Pressure-regulating shutoff valve (PRSOV)', 'Precooler', 'Fan-air valve & duct',
+  'Nacelle anti-ice valve & duct', 'Starter air valve', 'Starter duct', 'Fire-extinguisher discharge lines',
+]);
 
 export function buildTurbofan() {
   const A = new Assembly();
@@ -38,7 +51,7 @@ export function buildTurbofan() {
   const P = (name, info, objs) => A.part(name, info, objs, eng);
 
   // cycle total temperatures pushed in by the lab (ARP755 station id → K); take-off defaults
-  const T = { '2': 288, '13': 339, '25': 375, '3': 926, '4': 1680, '45': 1205, '5': 812, '9': 729, '19': 293 };
+  const T = { '2': 288, '13': 342, '25': 374, '3': 918, '4': 1680, '45': 1212, '5': 805, '9': 723, '19': 293 };
   const lt = (a, b, f) => () => T[a] + (T[b] - T[a]) * f;
   const cutGroups = [];
   const cut = (g) => { cutGroups.push(g); return g; };
@@ -69,9 +82,10 @@ export function buildTurbofan() {
     casters.push(new THREE.CylinderGeometry(0.11, 0.11, 0.09, 18).rotateX(Math.PI / 2).translate(H - 0.11, y, z).toNonIndexed());
   }
   P('Display cradle', {
-    system: 'Ground support', material: 'Painted steel', mass: 1400,
-    explode: [0, 0, 0], temp: 293,
-    desc: 'Museum display cradle: a saddle under the nacelle and a yoke under the core. Shop stands for a bare GE90 instead bolt to the engine\'s own mount pads.',
+    system: 'Ground support', material: 'Painted steel',
+    // in the engine frame +x is world down: this cancels the exploded view's lift, so the stand stays on the floor
+    explode: [0.8, 0, 0], temp: 293,
+    desc: 'Museum display cradle: a saddle under the nacelle and a yoke under the core. It is not part of the exhibit\'s mass; shop stands for a bare GE90 instead bolt to the engine\'s own mount pads.',
   }, [frame, mesh(mergeGeometries(casters), M.rubber())]);
 
   // ------------------------------------------------------------------ flow particles (lathe frame)
@@ -81,7 +95,16 @@ export function buildTurbofan() {
   const fCol = new Float32Array(FLOW * 3);
   fGeo.setAttribute('position', new THREE.BufferAttribute(fPos, 3));
   fGeo.setAttribute('color', new THREE.BufferAttribute(fCol, 3));
-  const flowMat = new THREE.PointsMaterial({ size: 0.05, vertexColors: true, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false });
+  // round, soft-edged points rather than squares
+  const SPR = 32, spr = new Uint8Array(SPR * SPR * 4);
+  for (let j = 0; j < SPR; j++) for (let i = 0; i < SPR; i++) {
+    const d = Math.hypot(i + 0.5 - SPR / 2, j + 0.5 - SPR / 2) / (SPR / 2);
+    const a = Math.max(0, 1 - d) ** 1.6;
+    spr.set([255, 255, 255, Math.round(255 * a)], (j * SPR + i) * 4);
+  }
+  const sprite = new THREE.DataTexture(spr, SPR, SPR, THREE.RGBAFormat);
+  sprite.needsUpdate = true;
+  const flowMat = new THREE.PointsMaterial({ size: 0.04, map: sprite, alphaTest: 0.02, vertexColors: true, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
   const flow = new THREE.Points(fGeo, flowMat);
   flow.userData.fx = true;
   flow.userData.keepInModes = true;
@@ -179,8 +202,14 @@ export function buildTurbofan() {
 
   const state = { throttle: 1, n1: 100, n2: 100, cutaway: true, flow: false, a1: 0, a2: 0, fromLab: false, reverser: 0, reverserTarget: 0 };
   ctx.reverser.set(0);
-  const applyCut = (on) => { state.cutaway = on; cutGroups.forEach((g) => setCut(g, on)); };
+  const turn = () => {
+    for (const s of spin.n1) { if (s.rotor) updateRotor(s.rotor, state.a1, state.cutaway); else s.g.rotation.y = state.a1; }
+    for (const s of spin.n2) { if (s.rotor) updateRotor(s.rotor, state.a2, state.cutaway); else s.g.rotation.y = state.a2; }
+  };
+  const applyCut = (on) => { state.cutaway = on; cutGroups.forEach((g) => setCut(g, on)); turn(); };
   applyCut(true);
+  // the flow particles follow the assembled flow path, so they hide while the parts are pulled apart
+  const fanPart = A.parts.find((p) => p.userData.part.name === 'Fan blades');
   const burnerMat = ctx.burnerMat;
 
   const vehicle = {
@@ -189,10 +218,10 @@ export function buildTurbofan() {
     name: 'GE90',
     role: 'High-bypass turbofan · Boeing 777',
     tagline: '115,540 lbf certified · 3.25 m composite fan · overall pressure ratio 42',
-    summary: 'The world\'s most powerful certified jet engine in service, built for the Boeing 777-300ER and 777F. A 3.25 m fan of 22 swept carbon-fibre blades moves about 1.6 tonnes of air a second at take-off; roughly one kilogram in eight passes through the core, where a 4-stage booster and 9-stage HP compressor squeeze it 42-fold, a dual annular combustor heats it, and 2 HP and 6 LP turbine stages expand it to drive everything upstream. The bypass air makes most of the thrust. Shown as a cutaway in its Boeing nacelle.',
+    summary: 'The world\'s most powerful certified jet engine in service, built for the Boeing 777-300ER. A 3.25 m fan of 22 swept carbon-fibre blades moves about 1.6 tonnes of air a second at take-off; roughly one kilogram in eight passes through the core, where a 4-stage booster and 9-stage HP compressor squeeze it 42-fold, a dual annular combustor heats it, and 2 HP and 6 LP turbine stages expand it to drive everything upstream. The bypass air makes most of the thrust. Shown as a cutaway in its Boeing nacelle.',
     specs: [
       ['Manufacturer', 'GE Aerospace, with Safran, IHI and Avio Aero'],
-      ['Aircraft', 'Boeing 777-300ER, 777F, 777-200LR'],
+      ['Aircraft', 'Boeing 777-300ER (exclusive), some 777-200LR; the 777F uses the same hardware at the -110B1 rating'],
       ['Certified take-off thrust', '115,540 lbf (514 kN), flat-rated to 30 °C'],
       ['GE quoted thrust', '115,300 lbf'],
       ['Record thrust (certification test, 2003)', '127,900 lbf (569 kN)'],
@@ -205,14 +234,16 @@ export function buildTurbofan() {
       ['Overall pressure ratio', '42 : 1'],
       ['Stages', 'Fan + 4 booster · 9 HPC · 2 HPT · 6 LPT'],
       ['Combustor', 'Dual annular (DAC)'],
-      ['100 % N1 / N2', '2,355 / 9,332 rpm'],
-      ['Take-off EGT limit (T49)', '1,090 °C'],
+      ['100 % N1 / N2 (reference speeds)', '2,355 / 9,332 rpm'],
+      ['Max N1 / N2 (take-off and continuous)', '2,602 rpm (110.5 %) / 11,292 rpm (121 %)'],
+      ['EGT limit (T49, LPT inlet)', '1,090 °C take-off · 1,050 °C max continuous'],
+      ['Accessory pads (× N2)', 'IDG 0.7947 · hydraulic pump 0.3783 · VSCF backup generator 2.4126'],
       ['Max continuous thrust', '110,000 lbf (489 kN)'],
       ['Control', 'Dual-channel FADEC'],
       ['Entry into service', '2004 (777-300ER)'],
     ],
     heroStats: [['514', 'kN', 'Take-off thrust'], ['3.25', 'm', 'Fan diameter'], ['42', ': 1', 'Pressure ratio']],
-    sources: 'EASA type-certificate data sheet IM.E.002, issue 05, 2023 (stage counts, length, envelope, dry weight, take-off and maximum-continuous thrust, N1/N2 speeds, T49 EGT limit, bleed limits, Boeing thrust reverser) and FAA TCDS E00049EN; GE Aerospace GE90 product page (stage counts, 135 in engine diameter, 115,300 lbf, OPR 42, inward-opening variable bleed doors) and press releases (dual annular combustor, swept composite fan); Wikipedia, General Electric GE90 (166 in nacelle diameter, fan-blade length and mass after MoMA); Aircraft Commerce GE90 owner\'s and operator\'s guide, issue 84, 2012 (-115B configuration, bypass ratio); Flight International, GE90-115B development (added booster stage, de-staged HPC); Museum of Modern Art collection, GE90-115B fan blade (length, mass, materials); NASA Energy Efficient Engine combustor reports (dual-annular combustor principle); GE mount patents US 5,277,382 and US 5,452,575 (mount and thrust-link arrangement); Mattingly, Elements of Propulsion (cycle method); SAE ARP755 (station numbering).',
+    sources: 'EASA type-certificate data sheet IM.E.002, issue 05, 2023 (stage counts, length, envelope, dry weight, take-off and maximum-continuous thrust, N1/N2 reference speeds and limits, T49 EGT limits, oil-temperature limits, aircraft accessory drive ratios and ratings, fuel heating value, bleed limits, Boeing thrust reverser) and FAA TCDS E00049EN; Flight International, \'GE90 modifications take shape\', 8 April 2003 (temporary Kevlar/fibreglass containment wrap, thicker aluminium case forging); Volvo Aero, GE90 fan case release, 2007 (aluminium fan case, about 3.5 m, 600 kg machined); GE Aerospace GE90 product page (stage counts, 135 in engine diameter, 115,300 lbf, OPR 42, inward-opening variable bleed doors) and press releases (dual annular combustor, swept composite fan); Wikipedia, General Electric GE90 (166 in nacelle diameter, fan-blade length and mass after MoMA); Aircraft Commerce GE90 owner\'s and operator\'s guide, issue 84, 2012 (-115B configuration, bypass ratio); Flight International, GE90-115B development (added booster stage, de-staged HPC); Museum of Modern Art collection, GE90-115B fan blade (length, mass, materials); NASA Energy Efficient Engine combustor reports (dual-annular combustor principle); GE mount patents US 5,277,382 and US 5,452,575 (mount and thrust-link arrangement); Mattingly, Elements of Propulsion (cycle method); SAE ARP755 (station numbering).',
     fleetTag: 'OPR 42',
     root: A.root,
     parts: A.parts,
@@ -238,6 +269,16 @@ export function buildTurbofan() {
       stationGroup.visible = on;
       for (const v of stationViz) v.label.visible = on;
     },
+    /** World-space box round the station planes and their labels (with room for the label text). */
+    stationBounds() {
+      const box = new THREE.Box3();
+      const p = new THREE.Vector3();
+      for (const v of stationViz) {
+        box.expandByPoint(v.label.getWorldPosition(p));
+        box.expandByPoint(p.clone().set(-(NACELLE.maxR + 0.7 + (rowOf[v.id] + 1) * ROW), 0, 0).applyMatrix4(eng.matrixWorld));
+      }
+      return box;
+    },
     setCutaway: applyCut,
     /** Thrust reverser: true deploys (sleeves aft, blocker doors down), false stows. */
     setReverser(on) { state.reverserTarget = on ? 1 : 0; },
@@ -250,13 +291,13 @@ export function buildTurbofan() {
     },
     update(dt) {
       const thr = state.throttle;
-      // the lab writes N1 / N2 (%) from the cycle; otherwise follow the throttle as the cycle does
-      const n1 = state.fromLab ? state.n1 / 100 : 0.42 + 0.58 * Math.sqrt(thr);
-      const n2 = state.fromLab ? state.n2 / 100 : 0.62 + 0.38 * Math.sqrt(thr);
-      state.a1 += n1 * N1_RPM * (Math.PI / 30) * SHOW * dt;
-      state.a2 += n2 * N2_RPM * (Math.PI / 30) * SHOW * dt;
-      for (const g of spin.n1) g.rotation.y = state.a1;
-      for (const g of spin.n2) g.rotation.y = state.a2;
+      // the lab writes N1 / N2 (%) from the cycle; otherwise follow the thrust lever on the ground
+      const n1 = state.fromLab ? state.n1 / 100 : n1Demand(thr);
+      const n2 = state.fromLab ? state.n2 / 100 : n2Line(n1);
+      state.a1 = (state.a1 + n1 * N1_RPM * (Math.PI / 30) * SHOW * dt) % (Math.PI * 2);
+      state.a2 = (state.a2 + n2 * N2_RPM * (Math.PI / 30) * SHOW * dt) % (Math.PI * 2);
+      turn();
+      flow.visible = state.flow && fanPart.position.distanceToSquared(fanPart.userData.base) < 1e-6;
       burnerMat.emissiveIntensity = 0.8 + thr * 4.6 * Math.max(0, (T['4'] - 900) / 900);
       if (state.reverser !== state.reverserTarget) {
         // about 2 s end to end, eased (the real deploy takes roughly that long)
@@ -265,7 +306,7 @@ export function buildTurbofan() {
         const x = state.reverser;
         ctx.reverser.set(x * x * (3 - 2 * x));
       }
-      if (!state.flow) return;
+      if (!flow.visible) return;
       const speed = 0.35 + thr * 1.1;
       for (let i = 0; i < FLOW; i++) {
         const s = seeds[i];

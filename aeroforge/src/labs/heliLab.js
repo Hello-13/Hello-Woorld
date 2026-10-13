@@ -11,7 +11,11 @@ import { ForceArrows, kN } from '../engine/forces.js';
 
 const DEG = Math.PI / 180;
 
-/** Rotor downwash: particles following the actuator-disc streamtube, spreading along the ground. */
+/**
+ * Rotor downwash: particles following the actuator-disc streamtube, spreading along the ground.
+ * In forward flight the wake is swept aft by the skew angle χ, tan χ = V / v (Glauert inflow), so
+ * by cruise speed it streams back under the tail instead of falling straight down.
+ */
 class Downwash {
   constructor(parent, R, hubY, count = 900) {
     this.R = R; this.hubY = hubY;
@@ -33,26 +37,30 @@ class Downwash {
   respawn(i, scatter = false) {
     this.f[i] = Math.sqrt(Math.random()) * 0.98;
     this.az[i] = Math.random() * Math.PI * 2;
-    this.z[i] = scatter ? -this.R * 0.6 + Math.random() * this.R * 2 : -this.R * 0.6;
+    // born just above the disc, so the contraction from the disc down to the far wake reads clearly
+    this.z[i] = scatter ? -this.R * 0.1 + Math.random() * this.R * 2 : -this.R * 0.1;
     this.gr[i] = 0;
   }
-  /** vi: induced velocity at the disc (m/s); k: slow-motion factor; groundY: ground height in the frame. */
-  update(dt, vi, k, groundY) {
+  /** vi: induced velocity at the disc (m/s); V: airspeed (m/s); k: slow-motion factor; groundY: ground height in the frame. */
+  update(dt, vi, k, groundY, V = 0) {
     const pos = this.points.geometry.attributes.position;
     const R = this.R;
+    const skew = V / Math.max(vi, 0.5);                         // tan χ
+    const wall = skew < 1.2;                                    // the wake still reaches the ground near the aircraft
     for (let i = 0; i < this.n; i++) {
       const z = this.z[i];                                    // metres below the disc (negative above)
       const v = vi * (1 + z / Math.sqrt(z * z + R * R));        // actuator-disc axial velocity
       const r = this.f[i] * R * Math.sqrt(vi / Math.max(v, 0.05 * vi));
       let y = this.hubY - z;
       let rr = Math.min(r, 1.6 * R);
-      if (y <= groundY + 0.15) {                                // wall jet along the ground
+      if (y <= groundY + 0.15 && wall) {                        // wall jet along the ground
         y = groundY + 0.15;
         this.gr[i] += v * k * dt;
         rr = Math.max(rr, this.f[i] * R) + this.gr[i];
       } else this.z[i] = z + v * k * dt;
-      if (rr > 2.2 * R || this.z[i] > 3 * R) { this.respawn(i); continue; }
-      pos.setXYZ(i, rr * Math.cos(this.az[i]), y, rr * Math.sin(this.az[i]));
+      const back = Math.max(0, this.hubY - y) * skew;            // aft sweep of the skewed wake
+      if (rr > 2.2 * R || this.z[i] > 3 * R || back > 3 * R || (!wall && y <= groundY + 0.15)) { this.respawn(i); continue; }
+      pos.setXYZ(i, rr * Math.cos(this.az[i]) - back, y, rr * Math.sin(this.az[i]));
     }
     pos.needsUpdate = true;
   }
@@ -66,7 +74,7 @@ export function mountHeliLab(root, ctx) {
   let dirty = true;
   const set = (k) => (x) => { p[k] = x; dirty = true; };
 
-  const sMass = slider({ label: 'Gross mass', min: 5700, max: UH60.mtowExternal, step: 10, value: p.mass, unit: 'kg', onInput: set('mass') });
+  const sMass = slider({ label: 'Gross mass', min: 5700, max: UH60.mtowExternal, step: 1, value: p.mass, unit: 'kg', onInput: set('mass') });
   const sAlt = slider({ label: 'Pressure altitude', min: 0, max: 6000, step: 50, value: p.altitude, unit: 'm', format: (x) => `${fmt.n(x)} (${fmt.n(x * 3.2808)} ft)`, onInput: (x) => { p.altitude = x; dirty = true; sTemp.set(p.isaDev, true); } });
   const sTemp = slider({ label: 'Air temperature', min: -30, max: 35, step: 1, value: p.isaDev, format: (x) => `ISA ${x >= 0 ? '+' : '−'}${Math.abs(x)} °C · OAT ${fmt.n(isaT(p.altitude) + x)} °C`, onInput: set('isaDev') });
   const sSpd = slider({ label: 'True airspeed', min: 0, max: 180, step: 1, value: p.speed, unit: 'kt', format: (x) => `${x} (${fmt.n(x * 1.852)} km/h)`, onInput: set('speed') });
@@ -81,6 +89,7 @@ export function mountHeliLab(root, ctx) {
   const tHover = toggle({ label: 'Hover (10 ft)', value: false, onChange: (on) => { v.setAirborne(on); ctx.log(v.designation, on ? 'Lift-off to a 10 ft hover, in ground effect' : 'Landed', 'info'); } });
   const tRotor = toggle({ label: 'Rotor turning', value: true, onChange: (on) => { v.setRotor(on); ctx.log(v.designation, on ? 'Rotor brake off · engines to 100 % Nr' : 'Engines to idle · rotor brake on', 'info'); } });
   const tDoors = toggle({ label: 'Cabin doors open', value: false, onChange: (on) => v.setDoors(on) });
+  const tHook = toggle({ label: 'Cargo hook down', value: false, onChange: (on) => v.setHook?.(on) });
   const tFlow = toggle({ label: 'Downwash', value: false, onChange: (on) => { flow.points.visible = on; } });
   const forces = v.forces || (v.forces = new ForceArrows(v.air || v.root, { radius: 0.07 }));
   const tForces = toggle({ label: 'Force vectors', value: false, onChange: (on) => { forces.setVisible(on); ctx.muteCallouts?.(on); placeForces(); } });
@@ -98,8 +107,8 @@ export function mountHeliLab(root, ctx) {
     { key: 'p', label: 'Power required', unit: 'shp' }, { key: 'da', label: 'Density altitude', unit: 'm' },
     { key: 'vbe', label: 'Best endurance', unit: 'kt' }, { key: 'vbr', label: 'Best range', unit: 'kt' },
     { key: 'vmax', label: 'Max level speed', unit: 'kt' }, { key: 'mach', label: 'Advancing tip Mach' },
-    { key: 'rod', label: 'Autorotation descent', unit: 'ft/min' }, { key: 'rodMin', label: 'Minimum descent', unit: 'ft/min' },
-    { key: 'glide', label: 'Best glide ratio' }, { key: 'nr', label: 'Rotor energy · time to 80 % Nr', unit: 's' },
+    { key: 'rod', label: 'Autorotation descent', unit: 'ft/min' }, { key: 'rodMin', label: 'Minimum descent' },
+    { key: 'glide', label: 'Best glide ratio' }, { key: 'nr', label: 'Rotor energy · time to 80 % Nr' },
   ]);
   const limitNote = el('p', { class: 'lab-note' });
 
@@ -126,9 +135,9 @@ export function mountHeliLab(root, ctx) {
     status,
     section('Hover', roH.el),
     section('Forward flight & limits', roF.el, limitNote),
-    section('The power bucket', chart.el, el('p', { class: 'lab-note', text: 'Induced power falls as speed grows (the rotor works on more air each second), profile power rises slowly and parasite power with V³. The bottom of the bucket is the best-endurance (and minimum-descent autorotation) speed; the tangent from the origin marks best range.' })),
+    section('The power bucket', chart.el, el('p', { class: 'lab-note', text: 'Induced power falls as speed grows (the rotor works on more air each second), profile power rises slowly and parasite power with V³. The bottom of the bucket is the best-endurance (and minimum-descent autorotation) speed; the tangent from the origin marks best range. Near top speed the rotor itself gets expensive: the inflow grows uneven and the retreating blade nears stall, so this model raises the induced factor with μ² and adds a μ⁴ profile term, calibrated to the brochure\'s 151 kt cruise at 16,800 lb, 4,000 ft / 95 °F on maximum continuous power.' })),
     section('Hover ceiling', ceil.el, el('p', { class: 'lab-note', text: 'Near the ground the rotor wake cannot contract freely, so induced power drops (Cheeseman–Bennett: 1 − (R/4z)²). That cushion lets a heavy helicopter hover in ground effect where it could not out of it.' })),
-    section('Controls', sPitch.el, sRoll.el, sYaw.el, sShow.el, el('div', { class: 'btn-row' }, tRotor.el, tHover.el, tDoors.el, tFlow.el, tForces.el)),
+    section('Controls', sPitch.el, sRoll.el, sYaw.el, sShow.el, el('div', { class: 'btn-row' }, tRotor.el, tHover.el, tDoors.el, tHook.el, tFlow.el, tForces.el)),
   );
 
   const flow = new Downwash(v.air || v.root, UH60.R, UH60.hubHeight);
@@ -161,9 +170,9 @@ export function mountHeliLab(root, ctx) {
     roF.set('vmax', s.vmax > 0 ? fmt.n(s.vmax / KT) : '—', V > s.vmax ? 'crit' : '');
     roF.set('mach', f.advancingTipMach.toFixed(3), f.advancingTipMach > UH60.tipMachLimit ? 'crit' : f.advancingTipMach > UH60.mDrag ? 'warn' : '');
     roF.set('rod', fmt.n(r.auto.at(Math.max(V, 10 * KT)) / FPM));
-    roF.set('rodMin', `${fmt.n(r.auto.minRod / FPM)} @ ${fmt.n(r.auto.vMinRod / KT)} kt`);
+    roF.set('rodMin', `${fmt.n(r.auto.minRod / FPM)} ft/min @ ${fmt.n(r.auto.vMinRod / KT)} kt`);
     roF.set('glide', `${r.auto.glideRatio.toFixed(1)} : 1 @ ${fmt.n(r.auto.vBestGlide / KT)} kt`);
-    roF.set('nr', `${(r.energy.E / 1e6).toFixed(1)} MJ · ${r.energy.seconds.toFixed(1)}`, r.energy.seconds < 1 ? 'warn' : '');
+    roF.set('nr', `${(r.energy.E / 1e6).toFixed(1)} MJ · ${r.energy.seconds.toFixed(1)} s`, r.energy.seconds < 1 ? 'warn' : '');
     limitNote.textContent = s.vmax > 0
       ? `Top speed here is set by ${s.limit}: power ${fmt.n(s.vPower / KT)} kt, tip Mach ${fmt.n(s.vTip / KT)} kt, retreating-blade stall ${fmt.n(s.vStall / KT)} kt.`
       : 'The engines cannot hold level flight at any speed in this condition.';
@@ -222,9 +231,9 @@ export function mountHeliLab(root, ctx) {
     const dir = new THREE.Vector3(Math.sin(tilt), 1, Math.sin(lat)).normalize();
     forces.set('lift', { origin: hub, dir, length: f.Tmr * k, text: kN(f.Tmr), name: 'Rotor thrust' });
     forces.set('weight', { origin: new THREE.Vector3(-0.15, 1.4, 0), dir: new THREE.Vector3(0, -1, 0), length: f.W * k, text: kN(f.W), name: 'Weight' });
-    const trHub = new THREE.Vector3(-9.93, 3.56, 0.25);
+    const trHub = new THREE.Vector3(...(v.trHub || [-9.93, 3.56, -0.085]));     // the tail-rotor hub itself
     const n = new THREE.Vector3(0, Math.sin(20 * DEG), Math.cos(20 * DEG));
-    forces.set('thrust', { origin: trHub, dir: n, length: Math.max(0.3, f.Ttr * k * 6), text: `${kN(f.Ttr)} (×6)`, name: 'Tail-rotor thrust' });
+    forces.set('thrust', { origin: trHub, dir: n, length: Math.max(0.3, f.Ttr * k * 6), text: `${kN(f.Ttr)} (×6)`, name: 'Tail-rotor thrust', labelOffset: new THREE.Vector3(0, -1.4, 0.3) });
     forces.set('drag', { origin: new THREE.Vector3(-0.5, 1.4, 0), dir: new THREE.Vector3(-1, 0, 0), length: f.D * k * 6, text: `${kN(f.D)} (×6)`, name: 'Drag', labelOffset: new THREE.Vector3(0, 0.6, 0) });
   }
 
@@ -249,14 +258,15 @@ export function mountHeliLab(root, ctx) {
       flow.points.visible = on;
     },
     setDoors(open) { tDoors.set(open); },
+    setHook(down) { tHook.set(down); },
   };
 
   return {
     update(dt) {
       if (dirty) { dirty = false; compute(); }
       if (flow.points.visible && last) {
-        // hover inflow at the disc; slowed by the same factor as the rotor so both read together
-        flow.update(Math.min(dt, 0.1), last.hoverOGE.mr.vh, Math.max(0.05, v.state.display * 1.2) * v.state.nr, -v.state.airborne * 3.05);
+        // inflow at the disc for the set airspeed (Glauert), slowed like the rotor so both read together
+        flow.update(Math.min(dt, 0.1), last.fwd.mr.vi, Math.max(0.05, v.state.display * 1.2) * v.state.nr, -v.state.airborne * 3.05, last.fwd.V);
       }
       if (forces.group.visible) placeForces();
     },

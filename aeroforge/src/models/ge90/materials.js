@@ -1,8 +1,9 @@
 // GE90-specific materials. Colours follow what the real hardware looks like on a shop stand or
 // in a museum cutaway: dark composite fan blades with bright titanium leading-edge sheaths,
 // bare titanium booster and front HPC, straw-to-bronze heat tint on the nickel rear stages,
-// off-white thermal-barrier coat on the hot-section airfoils, grey-green painted fan case,
-// yellow Kevlar containment wrap and the Boeing nacelle in white.
+// off-white thermal-barrier coat on the hot-section airfoils, grey-green painted forged-aluminium
+// fan case and the Boeing nacelle in white. (kevlar is kept for the temporary 2003 containment wrap
+// but is not used on the production engine shown.)
 
 import * as THREE from 'three';
 

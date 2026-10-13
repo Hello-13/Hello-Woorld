@@ -1,6 +1,6 @@
 // Optical Telescope Assembly (Perkin-Elmer, now L3Harris): the 2.4 m Ritchey–Chrétien telescope.
-// The mirror shapes are the design conics solved in physics/optics.js (K1 = −1.0023, K2 = −1.4969),
-// the spacings are NASA's (4.906 m between vertices, focus 1.5 m behind the primary). Structure
+// The mirror shapes are the conics solved in physics/optics.js from the rounded published spacings
+// (K1 = −1.0023, K2 = −1.4969; the design prescription is −1.0022985 and −1.4960), the spacings are NASA's (4.906 m between vertices, focus 1.5 m behind the primary). Structure
 // sizes follow the SM3A Media Reference Guide §5.2: titanium main ring 2.9 m across and 38 cm deep,
 // beryllium reaction plate behind the mirror, graphite-epoxy metering truss 4.8 m long and 2.7 m
 // across (48 struts, three rings), main baffle 4.8 m × 2.7 m, central baffle 3 m long.
@@ -34,10 +34,11 @@ export function buildOTA(P) {
   plate.push(plate[0]);
   const bands = [tube(OPT.rPM, xBack + fp, pmSurface(OPT.rPM) - fp, { seg: 96 }), tube(OPT.rHole, xBack + fp, pmSurface(OPT.rHole) - fp, { seg: 48 })];
   out.pm = P('Primary mirror', {
-    system: 'Optics', material: 'Corning ULE (titanium-silicate) glass; 65 nm aluminium + 25 nm MgF₂ coating', mass: 828, massSource: 'NASA (1,825 lb, whole mirror)', temp: 294, explode: [-0.3, 0, 0],
+    system: 'Optics', material: 'Corning ULE (titanium-silicate) glass; 65 nm aluminium + 25 nm MgF₂ coating', mass: 828, massSource: 'NASA (1,825 lb, whole mirror)', temp: 294, explode: [0.7, 0, 0],
     desc: '2.4 m concave hyperboloid, f/2.3, radius of curvature 11.04 m, polished to about 10 nm. In 1990 it proved to be 2.2 µm too flat at the edge — spherical aberration from a mis-spaced test instrument — corrected optically in 1993. The 828 kg includes the core and rear plate.',
     callout: true, anchor: [xPM + 0.05, 0.9, 0.7],
   }, [face, mesh(axial(plate.slice().reverse(), 96), HM.ule()), mesh(merge(bands), HM.ule())]);
+  out.pm.userData.part.tourLabel = true;          // internal: labelled only while a tour focuses it
 
   // lightweighted egg-crate core between the plates (cell pitch simplified to 0.2 m)
   const core = [];
@@ -115,15 +116,21 @@ export function buildOTA(P) {
     system: 'Structure', material: 'Titanium hollow box-section ring, 38 cm deep', mass: 545, massSource: 'NASA SM3A Media Guide (1,200 lb)', temp: 292, explode: [0, 0, 0],
     desc: 'The structural backbone of the telescope, 2.9 m across: the primary mirror, the main baffle, the metering truss and the focal-plane structure all hang from it, and kinematic brackets tie it to the spacecraft.',
   }, mesh(merge(ringParts), HM.ti()));
+  // three bipods (six links) from the main ring's aft face to the equipment section's forward frame
   const links = [];
   for (let k = 0; k < 3; k++) {
     const p = deg(60 + k * 120);
-    links.push(rod(az(p, 1.42, 3.92), az(p, RAD.shell - 0.02, 3.75), 0.045, 10));
-    links.push(new THREE.BoxGeometry(0.25, 0.1, 0.25).translate(...az(p, RAD.shell - 0.06, 3.75)));
+    const apex = az(p, 1.36, 3.7);
+    links.push(new THREE.BoxGeometry(0.06, 0.1, 0.16).rotateX(p).translate(...az(p, 1.36, 3.69)));
+    for (const s of [-1, 1]) {
+      const foot = az(p + s * deg(9), 1.52, 3.6);
+      links.push(rod(apex, foot, 0.022, 8), new THREE.SphereGeometry(0.035, 10, 8).translate(...foot), new THREE.SphereGeometry(0.035, 10, 8).translate(...apex));
+      links.push(new THREE.BoxGeometry(0.1, 0.03, 0.1).rotateX(p + s * deg(9)).translate(...az(p + s * deg(9), 1.535, 3.6)));
+    }
   }
-  P('OTA kinematic links', {
-    system: 'Structure', material: 'Titanium links with spherical bearings', mass: 24, count: 3, temp: 290, explode: [0, 0, 0],
-    desc: 'Three statically determinate links join the main ring to the equipment section, so flexing of the spacecraft cannot bend the optics out of alignment.',
+  P('OTA kinematic mounts', {
+    system: 'Structure', material: 'Titanium links with spherical end bearings, in three bipod pairs', mass: 24, count: 6, temp: 290, explode: [-0.4, 0, 0],
+    desc: 'Six links in three bipod pairs join the main ring to the equipment section, one constraint for each of a rigid body\'s six degrees of freedom. Such a statically determinate (kinematic) mount fixes the telescope without forcing it, so flexing of the spacecraft cannot strain the optics. Link geometry approximate.',
   }, mesh(merge(links), HM.ti()));
 
   // ------------------------------------------------------------------ metering truss
@@ -148,7 +155,6 @@ export function buildOTA(P) {
   out.truss = P('Metering truss', {
     system: 'Structure', material: 'Graphite fibre-reinforced epoxy struts and rings, titanium end fittings; aluminised-Mylar MLI inside', mass: 114, temp: 292, explode: [0, 0, 0],
     desc: 'A cage of 48 struts and three rings, 4.8 m long and 2.7 m across, that holds the secondary mirror 4.906 m in front of the primary to within 2.5 µm. Graphite-epoxy barely expands with temperature, but it slowly sheds absorbed water, so the secondary has been refocused by a few micrometres over the years.',
-    callout: true, anchor: [6.0, 1.42, 0.2],
   }, [mesh(merge(struts), HM.grEp()), mesh(merge(ringsGeo), HM.grEp()), mesh(merge(fittings), HM.fitting())]);
 
   // ------------------------------------------------------------------ baffles
@@ -178,9 +184,10 @@ export function buildOTA(P) {
   const smBody = mesh(tube(OPT.rSM, smSurface(OPT.rSM), OPT.xSM + 0.055, { seg: 48, open: false }), HM.ule());
   out.sm = P('Secondary mirror', {
     system: 'Optics', material: 'Zerodur glass ceramic, Al + MgF₂ coating', mass: 12, temp: 291, explode: [1.3, 0, 0],
-    desc: '0.3 m convex hyperboloid (conic −1.497) facing back down the tube. It multiplies the primary\'s 5.52 m focal length by 10.4 into the 57.6 m, f/24 beam and sends it back through the hole in the primary. Its surface is figured even more accurately than the primary\'s.',
+    desc: '0.3 m convex hyperboloid (design conic −1.4960) facing back down the tube. It multiplies the primary\'s 5.52 m focal length by 10.4 into the 57.6 m, f/24 beam and sends it back through the hole in the primary. Its surface is figured even more accurately than the primary\'s.',
     callout: true, anchor: [OPT.xSM, 0.3, 0.15],
   }, [smFace, smBody]);
+  out.sm.userData.part.tourLabel = true;
 
   const sma = [tube(0.22, OPT.xSM + 0.06, OPT.xSM + 0.36, { seg: 40, open: false })];
   for (let k = 0; k < 6; k++) sma.push(new THREE.BoxGeometry(0.1, 0.05, 0.05).translate(...az(deg(k * 60 + 30), 0.18, OPT.xSM + 0.4)));
@@ -276,19 +283,23 @@ function buildLightPath() {
   };
   for (let i = 0; i < 8; i++) add(1.1, deg(22.5 + i * 45));
   for (let i = 0; i < 4; i++) add(0.62, deg(i * 90 + 45));
-  const rayMesh = mesh(mergeGeometries(rays.map(ni)), HM.ray(), { cast: false, receive: false });
-  // beam envelopes
-  // faint envelopes of the two converging cones (the incoming beam is shown by its rays only)
+  // each element twice: a bright depth-tested pass and a faint ghost that shows through solid parts
+  const rayGeo = mergeGeometries(rays.map(ni));
   const cone1 = axial([[OPT.rPM, pmSurface(OPT.rPM)], [OPT.rPM * k, smSurface(OPT.rPM * k)]], 64);
   const cone2 = axial([[OPT.rPM * k, smSurface(OPT.rPM * k)], [0.002, OPT.xFocus]], 48);
-  const env = mesh(mergeGeometries([cone1, cone2].map(ni)), HM.beam(), { cast: false, receive: false });
-  const focus = mesh(new THREE.SphereGeometry(0.035, 16, 10).translate(OPT.xFocus, 0, 0), HM.focus(), { cast: false, receive: false });
-  const fieldDisc = mesh(new THREE.RingGeometry(0.0, OPT.rField, 48).rotateY(Math.PI / 2).translate(OPT.xFocus, 0, 0), HM.beam(), { cast: false, receive: false });
-  for (const m of [rayMesh, env, focus, fieldDisc]) {
+  const focusGeo = new THREE.SphereGeometry(0.035, 16, 10).translate(OPT.xFocus, 0, 0);
+  const list = [
+    [rayGeo, HM.ray(), 6], [rayGeo, HM.rayGhost(), 5],
+    [mergeGeometries([cone1, cone2].map(ni)), HM.beam(), 5],
+    [focusGeo, HM.focus(), 7], [focusGeo, HM.focusGhost(), 6],
+    [new THREE.RingGeometry(0.0, OPT.rField, 48).rotateY(Math.PI / 2).translate(OPT.xFocus, 0, 0), HM.beam(), 5],
+  ];
+  for (const [geo, mat, order] of list) {
+    const m = mesh(geo, mat, { cast: false, receive: false });
     m.userData.fx = true;
     m.userData.keepInModes = true;
     m.userData.noAO = true;
-    m.renderOrder = 5;
+    m.renderOrder = order;
     m.raycast = () => {};
     g.add(m);
   }

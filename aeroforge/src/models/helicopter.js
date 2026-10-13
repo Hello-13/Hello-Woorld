@@ -8,13 +8,14 @@
 //   gear.js       landing gear, crash-resistant fuel cells, cargo hook
 //   cabin.js      cockpit, cabin, controls, hydraulics, electrical, avionics, antennas, ECS
 // Published figures: 16.36 m rotor, 4 blades, 258 rpm; 3.35 m tail rotor canted 20°; 19.76 m
-// overall, 15.26 m fuselage, 5.13 m high; MTOW 9,979 kg; 2 × 1,994 shp. Masses are estimates
-// unless a part names its source.
+// overall, 15.26 m fuselage, 5.13 m high; MTOW 9,979 kg; 2 × 1,994 shp. Part masses are estimates
+// (except the T700 modules, which add up to GE's published 207 kg per engine); after the build the
+// estimates are scaled together so the whole aircraft sums to the published 5,675 kg empty weight.
 
 import * as THREE from 'three';
 import { Assembly } from '../engine/assembly.js';
 import { decalTexture } from '../engine/surface.js';
-import { DEG } from './uh60/common.js';
+import { DEG, TAIL } from './uh60/common.js';
 import { buildFuselage, surfNormal, stencil } from './uh60/fuselage.js';
 import { buildMainRotor } from './uh60/mainRotor.js';
 import { buildDrive } from './uh60/drive.js';
@@ -49,11 +50,18 @@ export function buildHelicopter() {
   // thermal roles for the Thermal view
   const byName = (n) => A.parts.find((p) => p.name === n);
   const role = (names, r) => { for (const n of names) { const p = byName(n); if (p) p.userData.part.thermalRole = r; } };
-  role(['Main module (main transmission)', 'Input module (right)', 'Input module (left)', 'Accessory module (right)', 'Accessory module (left)', 'Intermediate gearbox (42°)', 'Tail rotor gearbox (90°)'], 'gearbox');
+  role(['Main module (main transmission)', 'Main bevel gear & combining pinions', 'Planetary reduction stage', 'Main transmission lubrication & chip detectors', 'Input module (right)', 'Input module (left)', 'Accessory module (right)', 'Accessory module (left)', 'Intermediate gearbox (42°)', 'Tail rotor gearbox (90°)'], 'gearbox');
   role(['Transmission oil cooler & blower', 'Viscous-damped hanger bearings', 'Rotor brake'], 'warm');
   role(['Engine cowling (right)', 'Engine cowling (left)', 'Inlet particle separator (right)', 'Inlet particle separator (left)'], 'cowl');
-  role(['AC generators', 'Hydraulic pump modules (No. 1 & No. 2)', 'Backup hydraulic pump', 'Primary servos', 'Tail rotor servo'], 'equipment');
-  role(['Flight management & display computers', 'Embedded GPS/INS units', 'Digital AFCS computers', 'Communication radios & IFF', 'Health monitoring & data recorders', 'Power distribution & converters', 'Instrument panel & multifunction displays'], 'avionics');
+  role(['AC generators', 'APU generator', 'No. 1 hydraulic pump module (left)', 'No. 2 hydraulic pump module (right)', 'Backup hydraulic pump', 'Primary servos', 'Tail rotor servo', 'AVCS force generators'], 'equipment');
+  role(['Flight management & display computers', 'Embedded GPS/INS units', 'Digital AFCS computers', 'Communication radios & IFF', 'Health monitoring & data recorders', 'AC/DC converters', 'Power distribution panels', 'Instrument panel & multifunction displays', 'AVCS controller', 'CMWS electronic control unit'], 'avionics');
+
+  // estimated masses scaled together to the published 5,675 kg empty weight (GE's engine figure kept)
+  const fixed = (p) => /^T700 |^Inlet particle separator/.test(p.userData.part.name);
+  const sum = (list) => list.reduce((a, p) => a + (p.userData.part.mass || 0), 0);
+  const est = A.parts.filter((p) => !fixed(p) && p.userData.part.mass);
+  const kMass = (5675 - sum(A.parts.filter(fixed))) / sum(est);
+  for (const p of est) { const m = p.userData.part.mass * kMass; p.userData.part.mass = m >= 3 ? Math.round(m) : Math.max(0.5, Math.round(m * 2) / 2); }
 
   // markings: painted straight onto the tail-cone surface
   const tc = byName('Tail cone skin');
@@ -69,7 +77,7 @@ export function buildHelicopter() {
     stick: { pitch: 0, roll: 0, yaw: 0 }, stickTarget: { pitch: 0, roll: 0, yaw: 0 },
     trimLon: 0, trimLat: -3 * DEG, trPitch: 12 * DEG, cone: 3.5 * DEG,
     airspeed: 0, stab: 40 * DEG, stabTarget: 40 * DEG,
-    doors: 0, doorsTarget: 0, airborne: 0, airTarget: 0,
+    doors: 0, doorsTarget: 0, airborne: 0, airTarget: 0, hook: 0, hookTarget: 0,
     power: 0.75, oatK: 288.15, strobeT: 0, flight: null,
   };
   const approach = (cur, tgt, rate, dt) => cur + Math.sign(tgt - cur) * Math.min(Math.abs(tgt - cur), rate * dt);
@@ -88,24 +96,26 @@ export function buildHelicopter() {
       ['Max take-off', '9,979 kg (10,660 kg with sling load)'], ['Empty', '5,675 kg'],
       ['Engines', '2 × GE T700-GE-701D, 1,994 shp (10 min)'], ['Transmission', '3,400 shp'],
       ['Fuel', '1,360 L (360 US gal) internal'], ['Crew', '2 pilots, 2 crew chiefs / gunners'],
-      ['Cabin', '11 troops or 4 litters'], ['Cargo hook', '4,082 kg (9,000 lb)'], ['Cruise', '151 kt (280 km/h)'],
+      ['Cabin', '11 troops or 4 litters'], ['Cargo hook', '4,082 kg (9,000 lb)'], ['Cruise', '151 kt (280 km/h) at 16,800 lb, 4,000 ft / 95 °F, 100 % MCP'],
     ],
     heroStats: [['16.36', 'm', 'Rotor diameter'], ['2 × 1,994', 'shp', 'T700-701D engines'], ['9,979', 'kg', 'Max take-off']],
     sources: 'Sikorsky/Lockheed Martin UH-60M brochure; US Army aviation fact sheets; GE Aviation T700-GE-701D datasheet; NASA CR-166309 (UH-60A GenHel engineering simulation data); NASA/Army (Yeo) wide-chord-blade reports; SAE 2007-01-3301 (UH-60M rotor ice protection); Sikorsky patents on the canted tail rotor and stabilator; NASA transmission reports (20,900 → 258 rpm); museum placard data; Wikipedia',
     fleetTag: '4,082 kg hook',
     root: A.root,
     air,
+    trHub: TAIL.hub,
     parts: A.parts,
     view: { dir: [1.0, 0.42, 1.15], fill: 1.0 },
     displaySize: 13,
-    thermalRange: [240, 900],
+    thermalRange: [260, 700],
     state,
     setStick(st) { Object.assign(state.stickTarget, st); },
     setCollective(rad) { state.collTarget = rad; },
     setRotor(on) { state.nrTarget = on ? 1 : 0; },
     setRotorDisplay(k) { state.display = k; },
     setDoors(open) { state.doorsTarget = open ? 1 : 0; },
-    setBay(open) { state.doorsTarget = open ? 1 : 0; },        // tour 'bay' demo opens the cabin doors
+    setBay(open) { state.doorsTarget = open ? 1 : 0; state.hookTarget = open ? 1 : 0; },   // tour 'bay' demo: doors open, hook down
+    setHook(down) { state.hookTarget = down ? 1 : 0; },
     setAirborne(v) { state.airTarget = v ? 1 : 0; },
     /** Flight condition from the lab: { airspeedKt, collective, trimLon, trimLat, trPitch, cone, power, oatK }. */
     setFlight(f) {
@@ -123,8 +133,9 @@ export function buildHelicopter() {
       const amb = state.oatK, p = state.power * state.nr;
       switch (info.thermalRole) {
         case 'engine': return amb + (state.nr > 0.05 ? 240 + 360 * p : 30);
-        case 'suppressor': return amb + (state.nr > 0.05 ? 50 + 110 * p : 15);
-        case 'cowl': return amb + 25 + 45 * p;
+        case 'compressor': return amb + (state.nr > 0.05 ? 60 + 140 * p : 12);
+        case 'suppressor': return amb + (state.nr > 0.05 ? 70 + 150 * p : 15);
+        case 'cowl': return amb + 35 + 70 * p;
         case 'apu': return amb + (state.nr < 0.5 ? 220 : 10);
         case 'gearbox': return amb + 30 + 60 * p;
         case 'warm': return amb + 18 + 30 * p;
@@ -141,11 +152,15 @@ export function buildHelicopter() {
       for (const a of ['pitch', 'roll', 'yaw']) s.stick[a] = ease(s.stick[a], s.stickTarget[a], k);
       s.doors = approach(s.doors, s.doorsTarget, 0.6, dt);
       s.airborne = approach(s.airborne, s.airTarget, 0.35, dt);
+      s.hook = approach(s.hook, s.hookTarget, 0.8, dt);
+      gear.setHook(s.hook);
       s.stab = ease(s.stab, s.stabTarget, 1 - Math.exp(-dt * 2));
 
       const w = OMEGA * s.display * s.nr;
       s.psi = (s.psi + w * dt) % (Math.PI * 2);
-      s.phi = (s.phi + w * TR_RATIO * dt) % (Math.PI * 2);
+      // the tail rotor turns 4.6× faster: above ~35° a frame its four blades would seem to run
+      // backwards (wagon-wheel effect), so cap the visible step
+      s.phi = (s.phi + Math.min(w * TR_RATIO * dt, 35 * DEG)) % (Math.PI * 2);
       // blades rest on the droop stops when stopped; cone up with centrifugal stiffening at speed
       const nr2 = s.nr * s.nr;
       const cone = -2.2 * DEG + (s.cone + 2.2 * DEG) * nr2;

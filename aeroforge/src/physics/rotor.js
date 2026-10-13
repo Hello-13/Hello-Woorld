@@ -2,8 +2,12 @@
 //
 //   Hover        momentum (actuator-disc) theory: ideal power T·v_h = T^1.5 / √(2ρA), divided by the
 //                figure of merit FM that the induced-loss factor κ and the blade profile drag produce.
-//   Forward      the classic power polar: induced (Glauert) + profile (1 + 4.65 μ²) + parasite ½ρV³f,
-//                plus an empirical compressibility penalty once the advancing tip passes M ≈ 0.85.
+//   Forward      the classic power polar: induced (Glauert) + profile (1 + 4.65 μ²) + parasite ½ρV³f.
+//                At high advance ratio two empirical terms add what the simple polar misses: the induced
+//                factor grows as κ(1 + kμ·μ²) (strongly non-uniform inflow), and profile power gains a
+//                K4·μ⁴ term (retreating-blade stall and advancing-blade negative lift); both are
+//                calibrated to the brochure's 151 kt cruise at 16,800 lb, 4,000 ft / 95 °F on 100 % MCP.
+//                A compressibility penalty starts once the advancing tip passes M ≈ 0.85.
 //   Anti-torque  the tail rotor balances main-rotor torque Q = P/Ω at its 9.93 m arm; its 20° cant
 //                lets it carry part of the weight, and the cambered pylon unloads it at speed.
 //   Engines      two GE T700-GE-701D ratings with a δ·θ^−k altitude/temperature lapse, capped by the
@@ -26,12 +30,14 @@ export const UH60 = {
   // about 10 % solidity to the 0.527 m UH-60A blade (NASA/Yeo), so ≈ 0.58 m (estimate).
   R: 8.18, blades: 4, chord: 0.58, rpm: 258,
   Cd0: 0.0100,           // mean blade profile-drag coefficient (estimate)
-  kappa: 1.12,           // induced-power factor: non-uniform inflow and tip losses (estimate)
+  kappa: 1.12,           // hover induced-power factor: non-uniform inflow and tip losses (estimate)
+  kappaMu: 3.0,          // forward flight: κ(1 + kappaMu·μ²), ≈ 1.5 at μ = 0.35 (estimate)
+  profileMu4: 68,  // profile power P0h(1 + 4.65μ² + profileMu4·μ⁴) (estimate, calibrated, see header)
   liftSlope: 5.73,       // blade-section lift-curve slope, per radian
   bladeMass: 120,        // kg per blade (estimate) for the rotor's stored energy
   hubHeight: 3.33,       // m, rotor hub above the ground on static oleos (from the 3.76 m rotor-head height)
   // tail rotor: 3.35 m diameter, 4 blades, canted 20° (published); 1,190 rpm and 0.247 m chord (GenHel data)
-  tr: { R: 1.676, blades: 4, chord: 0.247, rpm: 1190, arm: 9.93, cant: 20, Cd0: 0.010, kappa: 1.2 },
+  tr: { R: 1.676, blades: 4, chord: 0.247, rpm: 1190, arm: 9.93, cant: 20, Cd0: 0.010, kappa: 1.2, kappaMu: 0, profileMu4: 0 },
   fin: { area: 3.0, cl: 0.2 },  // cambered pylon: side force that unloads the tail rotor at speed (estimate)
   f: 3.6,                // equivalent flat-plate drag area, m²: fuselage ≈ 35 ft² plus hub, suppressors, antennas (estimate)
   download: 0.05,        // hover download on the fuselage as a fraction of weight (estimate)
@@ -114,17 +120,19 @@ export function rotorPower({ thrust, rho, a = 340.3, V = 0, Vc = 0, groundZ = In
   const mu = V / vtip;
   const vi = V > 0 ? inducedVelocity(vh, V) : climbInducedVelocity(vh, Math.max(0, Vc));
   const kG = groundEffect(rotor.R, groundZ, V, vi);
-  const induced = rotor.kappa * thrust * vi * kG;
+  const kappa = rotor.kappa * (1 + (rotor.kappaMu ?? 0) * mu * mu);
+  const induced = kappa * thrust * vi * kG;
   const P0hover = ((sigma * rotor.Cd0) / 8) * rho * A * vtip ** 3;
   const mAdv = (vtip + V) / a;
-  const profile = P0hover * (1 + 4.65 * mu * mu) + (compress ? compressibilityPower(P0hover, mAdv, rotor) : 0);
+  const mu2 = mu * mu;
+  const profile = P0hover * (1 + 4.65 * mu2 + (rotor.profileMu4 ?? 0) * mu2 * mu2) + (compress ? compressibilityPower(P0hover, mAdv, rotor) : 0);
   const climb = thrust * Math.max(0, Vc);
   const CT = thrust / (rho * A * vtip * vtip);
   // collective at 0.75 R from blade-element/momentum trim: CT = (σa/2)[θ.75(1/3 + μ²/2) − λ/2]
   const lambda = (V * Math.sin(alphaDisc) + vi * kG + Math.max(0, Vc)) / vtip;
   const theta75 = ((2 * CT) / (sigma * (rotor.liftSlope ?? 5.73)) + lambda / 2) / (1 / 3 + (mu * mu) / 2);
   return {
-    A, omega, vtip, sigma, vh, vi, mu, kG, induced, profile, climb, P0hover,
+    A, omega, vtip, sigma, vh, vi, mu, kG, kappa, induced, profile, climb, P0hover,
     total: induced + profile + climb, ideal: thrust * vh, CT, CTs: CT / sigma, lambda, theta75, mAdv, torque: (induced + profile + climb) / omega,
   };
 }

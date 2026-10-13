@@ -2,7 +2,8 @@
 // high-gain antennas on deployable masts, the low-gain antennas, the magnetic torquer bars,
 // magnetometers and coarse sun sensors.
 //
-// SA3 wings (2002): 7.1 × 2.6 m each (NASA), gallium-arsenide cells, about 5 kW together.
+// SA3 wings (2002): 7.1 × 2.6 m and 640 lb (290 kg) each (SM4 Media Guide Fig. 5-25), four
+// Iridium-derived gallium-arsenide panels per wing on an aluminium-lithium frame, 5,270 W together.
 // The arrays sit on the ±V2 sides of the forward shell (−V2 = +z), the high-gain antenna masts on
 // the ±V3 (±y) sides; the four torquer bars ride on the forward shell at 90° intervals and the
 // magnetometers and two of the five coarse sun sensors on the light shield (SM3A Media Guide §5.1).
@@ -56,7 +57,11 @@ export function buildAppendages(P) {
     };
     const mats = [HM.sa3Back(), HM.sa3Back(), HM.sa3Cells(), HM.sa3Back(), HM.sa3Back(), HM.sa3Back()];
     const inner = new THREE.Group();
-    inner.add(mesh(panel(0.04), mats), mesh(merge(frame(0.04)), HM.al()));
+    // root yoke: a hub on the mast tip and a spreader beam carrying the inner panel's root edge
+    const yoke = [new THREE.CylinderGeometry(0.1, 0.1, 0.14, 20).rotateX(Math.PI / 2).translate(0, 0, s * 0.0)];
+    yoke.push(new THREE.BoxGeometry(SA.width - 0.1, 0.06, 0.07).translate(0, 0.03, s * 0.045));
+    for (const x of [-1, 1]) yoke.push(rod([0, 0.02, s * 0.03], [x * (SA.width / 2 - 0.15), 0.03, s * 0.06], 0.025, 6));
+    inner.add(mesh(panel(0.04), mats), mesh(merge(frame(0.04)), HM.al()), mesh(merge(yoke), HM.ti()));
     const hingeG = new THREE.Group();
     hingeG.position.set(0, 0.04, s * (half + 0.02));
     const outer = new THREE.Group();
@@ -68,9 +73,9 @@ export function buildAppendages(P) {
     track.add(inner);
     wingRoot.add(track);
     const wp = P(`Solar array wing (${side})`, {
-      system: 'Power', material: 'Gallium-arsenide cells on rigid aluminium-honeycomb panels (Iridium-derived)', mass: 230, temp: 330,
+      system: 'Power', material: 'Gallium-arsenide cells on four Iridium-derived rigid panels per wing, aluminium-lithium frame', mass: 290, massSource: 'NASA SM4 Media Guide (640 lb per wing)', temp: 330,
       explode: [0, 0, s * 1.6],
-      desc: 'The third set of arrays, fitted in 2002: 7.1 × 2.6 m, rigid instead of the roll-up blankets that flexed and jittered the telescope as they crossed between sunlight and shadow. A third smaller than the old wings yet about 20 % more powerful; together roughly 5 kW. Fold scheme simplified.',
+      desc: 'The third set of arrays (SA3), fitted in 2002: 7.1 × 2.6 m, rigid instead of the roll-up blankets that flexed and jittered the telescope as they crossed between sunlight and shadow. Smaller than the old wings yet about 30 % more powerful: ≈ 5.3 kW together (5,270 W predicted at 6 years). Fold scheme in the deploy demo simplified.',
       callout: s > 0, anchor: [0.3, 0.4, s * 5.0],
     }, track, wingRoot);
     wp.userData.part.thermalRole = 'array';
@@ -78,7 +83,7 @@ export function buildAppendages(P) {
   }
 
   // ------------------------------------------------------------------ high-gain antennas (±y)
-  const dishProfile = Array.from({ length: 14 }, (_, i) => { const r = (i / 13) * HGA.dish; return [r, (r * r) / (4 * 0.42)]; });
+  const dishProfile = Array.from({ length: 24 }, (_, i) => { const r = (i / 23) * HGA.dish; return [r, (r * r) / (4 * 0.42)]; });
   for (const s of [1, -1]) {
     const side = s > 0 ? '+V3' : '−V3';
     const base = [new THREE.BoxGeometry(0.5, 0.12, 0.34).translate(HGA.x, s * (RAD.shell + 0.05), 0)];
@@ -87,7 +92,7 @@ export function buildAppendages(P) {
     pivot.position.set(HGA.x, s * (RAD.shell + 0.14), 0);
     pivot.add(mesh(merge([rod([0, 0, 0], [0, s * HGA.mast, 0], 0.065, 16), new THREE.CylinderGeometry(0.11, 0.11, 0.2, 16).rotateX(Math.PI / 2)]), HM.al()));
     const mp = P(`High-gain antenna mast (${side})`, {
-      system: 'Communications', material: 'Aluminium/graphite boom with root deployment hinge, waveguide and cabling', mass: 30, temp: 255, explode: [0, s * 4.4, 0],
+      system: 'Communications', material: 'Aluminium/graphite boom with root deployment hinge, waveguide and cabling', mass: 30, temp: 255, explode: [2.5, s * 2.0, 0],
       desc: 'Holds its antenna clear of the telescope so the dish can see a TDRS relay over most of the sky. Latched flat along the forward shell and light shield for launch, it was swung out 90° by its hinge drive after release in 1990. Length estimated.',
     }, [mesh(merge(base), HM.al()), pivot]);
     const tip = new THREE.Group();
@@ -100,11 +105,15 @@ export function buildAppendages(P) {
     const dish = lathe(dishProfile, 48);
     if (s < 0) dish.rotateZ(Math.PI);
     dish.translate(0, s * 0.3, 0);
+    // eight ribs following the back of the reflector, 2.5 cm behind its surface
     const back = [];
+    const backY = (r) => s * (0.3 + (r * r) / 1.68 - 0.025);
     for (let k = 0; k < 8; k++) {
       const a = (k / 8) * Math.PI * 2;
-      back.push(rod([0, s * 0.27, 0], [Math.cos(a) * HGA.dish * 0.92, s * (0.3 + (HGA.dish * 0.92) ** 2 / 1.68 - 0.02), Math.sin(a) * HGA.dish * 0.92], 0.012, 5));
+      const rs = [0.05, 0.2, 0.35, 0.48, 0.6];
+      for (let i = 0; i < rs.length - 1; i++) back.push(rod([Math.cos(a) * rs[i], backY(rs[i]), Math.sin(a) * rs[i]], [Math.cos(a) * rs[i + 1], backY(rs[i + 1]), Math.sin(a) * rs[i + 1]], 0.012, 5));
     }
+    back.push(new THREE.CylinderGeometry(0.07, 0.07, 0.06, 16).translate(0, s * 0.25, 0));   // hub on the gimbal
     const feed = [new THREE.CylinderGeometry(0.05, 0.08, 0.16, 16).translate(0, s * (0.3 + 0.38), 0)];
     for (let k = 0; k < 3; k++) {
       const a = (k / 3) * Math.PI * 2 + 0.4;
@@ -185,9 +194,10 @@ export function buildAppendages(P) {
   P('Coarse sun sensors (aft)', {
     system: 'Attitude control', material: 'Silicon photodiode sensors', mass: 3, count: 3, temp: 262, explode: [-1.6, -4.0, 0],
     desc: 'The other three sun sensors, on the aft shroud. Together the five fix the initial attitude after deployment and guide the safe mode that turns the solar arrays toward the Sun when something goes wrong. Positions approximate.',
-  }, mesh(cssGeo([[0.6, RAD.big, 75], [0.6, RAD.big, 180], [0.6, RAD.big, 285]]), HM.box()));
+  }, mesh(cssGeo([[0.85, RAD.big, 20], [0.85, RAD.big, 180], [0.85, RAD.big, 340]]), HM.box()));
 
-  // electrical harness: bundles from the equipment section forward to the light-shield hardware and aft to the instruments
+  // ------------------------------------------------------------------ wiring: data/power trunk, array power, RF
+  // trunk bundles from the equipment section forward to the light-shield hardware and aft to the instruments
   const hz = [];
   for (const c of [62, 118, 242, 298]) {
     hz.push(rod(az(deg(c), 1.485, ST.equip), az(deg(c), 1.485, ST.fwdShell), 0.016, 6), rod(az(deg(c), 1.485, ST.fwdShell), az(deg(c), 1.485, 12.6), 0.012, 6));
@@ -196,11 +206,43 @@ export function buildAppendages(P) {
     hz.push(rod(az(deg(c), 1.96, 3.5), az(deg(c), 1.96, 0.45), 0.022, 6));
     hz.push(rod(az(deg(c), 1.96, 0.45), az(deg(c), 1.15, 0.28), 0.018, 6));
   }
-  for (const s of [1, -1]) hz.push(rod([5.2, 0, s * 1.47], [SA.x, 0, s * 1.5], 0.02, 6), rod([5.2, s * 1.47, 0.1], [HGA.x, s * 1.5, 0.1], 0.02, 6));
   P('Electrical harness', {
-    system: 'Electrical', material: 'Shielded copper wiring bundles, connectors and waveguide', mass: 250, temp: 285, explode: [0, 0, 0],
-    desc: 'Many kilometres of wire tie the equipment bays to the instruments, sensors, drives and antennas through hundreds of connectors — the reason servicing tools were designed to be worked in pressure gloves. Routing simplified.',
+    system: 'Electrical', material: 'Shielded copper wiring bundles and connectors', mass: 150, temp: 285, explode: [0, 0, 0],
+    desc: 'Many kilometres of wire tie the equipment bays to the instruments, sensors and drives through hundreds of connectors — the reason servicing tools were designed to be worked in pressure gloves. Shown as the main trunk runs; routing simplified.',
   }, mesh(merge(hz), new THREE.MeshStandardMaterial({ color: 0x5a5148, roughness: 0.7, metalness: 0.2 })));
+
+  // array power: each wing's drive → along the forward shell → round the equipment section to the
+  // power control unit in bay 4, passing the battery bays 2 and 3
+  const arc = (list, r, x, a0, a1, rr = 0.02, step = 15) => {
+    const n = Math.max(1, Math.round(Math.abs(a1 - a0) / step));
+    for (let i = 0; i < n; i++) list.push(rod(az(deg(a0 + ((a1 - a0) * i) / n), r, x), az(deg(a0 + ((a1 - a0) * (i + 1)) / n), r, x), rr, 6));
+  };
+  const pw = [];
+  for (const c of [90, 270]) {
+    pw.push(rod(az(deg(c), SA.rDrive + 0.03, SA.x), az(deg(c), 1.485, SA.x), 0.024, 6), rod(az(deg(c), 1.485, SA.x), az(deg(c), 1.485, 5.02), 0.024, 6), rod(az(deg(c), 1.485, 5.02), az(deg(c), 1.6, 4.98), 0.024, 6));
+  }
+  arc(pw, 1.6, 4.98, 90, 225, 0.024);
+  arc(pw, 1.6, 4.98, 270, 225, 0.024);
+  pw.push(rod(az(deg(225), 1.6, 4.98), az(deg(225), 1.6, 4.82), 0.024, 6));
+  for (const c of [165, 195]) pw.push(rod(az(deg(c), 1.6, 4.98), az(deg(c), 1.62, 4.9), 0.02, 6));
+  P('Solar array power harness', {
+    system: 'Power', material: 'Heavy-gauge copper power cables', mass: 40, temp: 285, explode: [0, 0, 0],
+    desc: 'Carries each wing\'s current from its drive\'s slip rings along the inside of the forward shell to the power control unit in bay 4, past the battery modules in bays 2 and 3 that it recharges every orbit. Routing simplified.',
+  }, mesh(merge(pw), new THREE.MeshStandardMaterial({ color: 0x7a4b2c, roughness: 0.6, metalness: 0.35 })));
+
+  // RF: the transmitters and transponders in bay 5 → coax to both high-gain antennas and waveguide to the low-gain antennas
+  const rf = [];
+  const B5 = 285;
+  rf.push(rod(az(deg(B5), 1.62, 4.62), az(deg(B5), 1.62, 4.88), 0.016, 6));
+  arc(rf, 1.62, 4.88, B5, 360, 0.016);
+  arc(rf, 1.62, 4.88, B5, 180, 0.016);
+  for (const c of [0, 180]) rf.push(rod(az(deg(c), 1.62, 4.88), az(deg(c), 1.47, 5.05), 0.016, 6), rod(az(deg(c), 1.47, 5.05), az(deg(c), 1.47, HGA.x), 0.016, 6), rod(az(deg(c), 1.47, HGA.x), az(deg(c), RAD.shell + 0.05, HGA.x), 0.016, 6));
+  rf.push(rod(az(deg(200), 1.62, 4.88), az(deg(200), 1.47, 5.05), 0.014, 6), rod(az(deg(200), 1.47, 5.05), az(deg(200), 1.47, ST.front - 0.15), 0.014, 6), rod(az(deg(200), 1.47, ST.front - 0.15), az(deg(200), RAD.shell + 0.1, ST.front - 0.15), 0.014, 6));
+  rf.push(rod(az(deg(297), 1.62, 4.88), az(deg(297), 1.62, 3.62), 0.016, 6), rod(az(deg(297), 1.62, 3.62), az(deg(297), 1.9, 3.5), 0.016, 6), rod(az(deg(297), 1.9, 3.5), az(deg(297), 1.9, 0.3), 0.016, 6), rod(az(deg(297), 1.9, 0.3), az(deg(270), 1.75, 0.08), 0.016, 6));
+  P('RF cables & waveguide', {
+    system: 'Communications', material: 'Low-loss S-band coaxial cable and waveguide, with RF transfer switches', mass: 20, temp: 280, explode: [0, 0, 0],
+    desc: 'Links the transmitters and transponders in bay 5 to the two high-gain antennas (up their masts through the gimbals\' rotary joints) and, by waveguide, to the forward and aft low-gain antennas, so any radio can reach any antenna. Routing simplified.',
+  }, mesh(merge(rf), HM.kapton()));
 
   return out;
 }

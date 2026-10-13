@@ -20,8 +20,10 @@ const PIVOT = 30;                 // stack-frame height of the pitch pivot (≈ 
 const FOLLOW_STACK = 35;          // camera tracks the middle of the stack…
 const FOLLOW_UPPER = 56;          // …then the second stage and payload after staging
 const PAD_TONE = 0.74;            // white finishes under the pad floodlights (see falcon/materials.js)
-const FLOODS_OFF = 600;           // m: altitude at which the pad look's floodlights switch off
 const smooth = (x) => { const k = Math.min(1, Math.max(0, x)); return k * k * (3 - 2 * k); };
+// the pad look's floodlights switch off at 600 m; ramp the paint back to full albedo across that
+// height instead of stepping it in one frame
+const padTone = (h) => PAD_TONE + (1 - PAD_TONE) * smooth((h - 300) / 600);
 
 export function buildRocket() {
   const A = new Assembly();
@@ -50,8 +52,8 @@ export function buildRocket() {
   // transporter-erector; skins pull back toward their original place to bare the internals
   const centre = buildCore(A, coreG, { kind: 'centre', prefix: 'Centre core', explodeBase: [0, 6, 6], paint: { soot: 0.05, streaks: 6, seed: 5 } });
   const boosters = [
-    buildCore(A, boosterG[0], { kind: 'booster', prefix: 'Side booster A', explodeBase: [7.0, 6, 6], paint: { soot: 0.2, streaks: 36, seed: 9 }, attachSide: 1 }),
-    buildCore(A, boosterG[1], { kind: 'booster', prefix: 'Side booster B', explodeBase: [-7.0, 6, 6], paint: { soot: 0.22, streaks: 40, seed: 13 }, attachSide: -1 }),
+    buildCore(A, boosterG[0], { kind: 'booster', prefix: 'Side booster A', explodeBase: [10.0, 6, 6], paint: { soot: 0.2, streaks: 36, seed: 9 }, attachSide: 1 }),
+    buildCore(A, boosterG[1], { kind: 'booster', prefix: 'Side booster B', explodeBase: [-10.0, 6, 6], paint: { soot: 0.22, streaks: 40, seed: 13 }, attachSide: -1 }),
   ];
   const upper = buildUpper(A, upperG, { explodeBase: [0, 16.5, 6] });
   const pad = buildPad(A, site, base, bed);
@@ -69,7 +71,7 @@ export function buildRocket() {
   };
   const plumes = { core: corePlumes(coreG), boosters: boosterG.map(corePlumes) };
   const mvacMat = plumeMaterial({ core: 0xffd9b0, outer: 0xd86a4a, diamonds: 0.0 });
-  const mvacPlume = plumeMesh(1.45, 16, 70, mvacMat, 40);
+  const mvacPlume = plumeMesh(1.6, 16, 70, mvacMat, 40);
   mvacPlume.position.y = Y.mvacExit;
   upperG.add(mvacPlume);
   const allPlumeMats = [plumes.core.jetMat, plumes.core.bigMat, ...plumes.boosters.flatMap((p) => [p.jetMat, p.bigMat]), mvacMat];
@@ -87,16 +89,18 @@ export function buildRocket() {
   A.finalize();
 
   // The pad site is context, not the subject: the towers, TE and deluge show only in the launch-pad
-  // look and only while the TE wears its studio material, so X-ray, Systems, Blueprint and Thermal
-  // (and tour steps that ghost the pad) show the vehicle without them. The hardstand and trench stay
-  // in every mode of the pad look so the vehicle never floats above the ground there. Getters keep
-  // this synchronous with every visibility check (rendering, framing, picking) instead of lagging a
-  // frame behind mode changes.
+  // look, only while the TE wears its studio material and only while the vehicle is assembled, so
+  // X-ray, Systems, Blueprint, Thermal, the exploded view (and tour steps that ghost the pad) show
+  // the vehicle without them. The hardstand and trench stay in every mode of the pad look so the
+  // vehicle never floats above the ground there. Getters keep this synchronous with every
+  // visibility check (rendering, framing, picking) instead of lagging a frame behind mode changes.
   let probe = null;
   A.parts.find((p) => p.userData.part.name === 'Transporter-erector strongback')
     .traverse((o) => { if (!probe && o.isMesh && !o.userData.fx) probe = o; });
   let onPad = true;
-  const siteShown = () => onPad && (!probe || !probe.userData.studio || probe.material === probe.userData.studio);
+  const fairPart = A.parts.find((p) => p.userData.part.name === 'Fairing half A');
+  const exploded = () => fairPart.position.lengthSq() > 0.25;
+  const siteShown = () => onPad && !exploded() && (!probe || !probe.userData.studio || probe.material === probe.userData.studio);
   Object.defineProperty(site, 'visible', { get: siteShown, set() {}, configurable: true });
   Object.defineProperty(bed, 'visible', { get: () => onPad, set() {}, configurable: true });
 
@@ -110,8 +114,6 @@ export function buildRocket() {
     launching: false,
   };
   let followY = FOLLOW_STACK;
-  const fairPart = A.parts.find((p) => p.userData.part.name === 'Fairing half A');
-  const exploded = () => fairPart.position.lengthSq() > 0.25;
 
   const allFins = [...centre.fins, ...boosters.flatMap((b) => b.fins)];
   const setFins = (fins, k) => { for (const m of fins) m.rotation.x = (-Math.PI / 2) * smooth(k); };
@@ -135,11 +137,11 @@ export function buildRocket() {
     specs: [
       ['Height', '70 m'], ['Width', '12.2 m'], ['Core diameter', '3.66 m'], ['Liftoff mass', '1,420,788 kg'],
       ['Liftoff thrust', '22,819 kN (27 × Merlin 1D)'], ['Vacuum thrust', '24,681 kN'], ['Merlin 1D', '845 kN SL · 914 kN vac · Isp 282 / 311 s'],
-      ['Merlin Vacuum', '981 kN · Isp 348 s · 165 : 1'], ['Payload to LEO', '63,800 kg'], ['Payload to GTO', '26,700 kg'], ['Payload to Mars', '16,800 kg'],
+      ['Merlin Vacuum', '981 kN · Isp 348 s · 165 : 1 · 3.3 m exit (SpaceX\'s Falcon Heavy page lists the stage at 934 kN)'], ['Payload to LEO', '63,800 kg'], ['Payload to GTO', '26,700 kg'], ['Payload to Mars', '16,800 kg'],
       ['Fairing', '13.1 m × 5.2 m'], ['Propellants', 'RP-1 / LOX'], ['Pad', 'LC-39A, Kennedy Space Center'],
     ],
     heroStats: [['63.8', 't', 'Payload to LEO'], ['22,819', 'kN', 'Liftoff thrust'], ['27', '', 'Merlin engines at liftoff']],
-    sources: 'SpaceX Falcon Heavy and Falcon 9 vehicle pages and Falcon User\'s Guide; NASA KSC LC-39 fact sheets (FSS, flame trench, lightning protection); NASA Commercial Crew blog (crew access arm); Spaceflight Now Falcon Heavy launch timelines; Wikipedia: Falcon Heavy, Falcon 9, Falcon 9 Full Thrust (stage and tank loads after Espace & Exploration no. 39), SpaceX Merlin, AMOS-6 and CRS-7 investigations.',
+    sources: 'SpaceX Falcon Heavy and Falcon 9 vehicle pages and Falcon User\'s Guide; NASA KSC LC-39 fact sheets (FSS, flame trench, lightning protection); NASA Commercial Crew blog (crew access arm); Spaceflight Now Falcon Heavy launch timelines (Arabsat-6A) and its February 2026 report on the crew-arm removal; NASASpaceflight; Wikipedia: Falcon Heavy (specification table after Espace & Exploration no. 51: per-core 287.4 t LOX, 123.5 t RP-1, 22.2 t dry; fairing 1.7 t), Falcon 9, Falcon 9 Full Thrust, SpaceX Merlin, Kennedy Space Center LC-39A, AMOS-6 and CRS-7 investigations.',
     fleetTag: '63.8 t LEO',
     root: A.root,
     rigPivot, stack, ground,
@@ -153,7 +155,7 @@ export function buildRocket() {
     /** The pad site (hardstand, trench, tower, TE, scenery) belongs to the launch-pad look only. */
     setLook(k) {
       onPad = k === 'pad';
-      setPaintTone(onPad && st.altitudeVis < FLOODS_OFF ? PAD_TONE : 1);
+      setPaintTone(onPad ? padTone(st.altitudeVis) : 1);
       // without the hardstand the launch mount stands on the floor
       world.position.y = onPad ? 0 : -PAD.hardstand;
     },
@@ -204,7 +206,7 @@ export function buildRocket() {
       st.ambient = s.ambientP / 101325;
       st.altitudeVis = s.h;
       st.pitch = s.pitch;
-      setPaintTone(onPad && s.h < FLOODS_OFF ? PAD_TONE : 1);
+      setPaintTone(onPad ? padTone(s.h) : 1);
       rigPivot.rotation.z = -(s.pitch * Math.PI) / 180;
       // after staging the camera hands over from the full stack to the second stage
       const k = sep.core == null ? 0 : smooth(sep.core / 4);

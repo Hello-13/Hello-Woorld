@@ -1,7 +1,8 @@
 // UH-60M landing gear, fuel and external load: fixed main gear (drag beams, two-stage
-// energy-absorbing oleos, wheels and brakes), the castoring tail gear, the two crash-resistant
-// self-sealing fuel cells with their breakaway-valve plumbing and refuelling ports, and the
-// 9,000 lb cargo hook.
+// energy-absorbing oleos, wheels and brakes, brake plumbing, weight-on-wheels switches), the
+// castoring tail gear (strut, yoke, wheel, lock), the two crash-resistant self-sealing fuel cells
+// with their pumps, valves, probes, drains and refuelling ports, and the 9,000 lb cargo hook,
+// which stows in a well in the belly.
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
@@ -46,6 +47,7 @@ function cell(front, rear, n = 24) {
 
 export function buildGear({ A, P }) {
   const oleos = [];
+  const wowAt = [];
   for (const side of [1, -1]) {
     const s = side, zW = AXLE.z * s;
     const R = side > 0 ? '(right)' : '(left)';
@@ -55,6 +57,7 @@ export function buildGear({ A, P }) {
       system: 'Landing gear', material: 'Forged high-strength steel beam', mass: 38, explode: [0.4, -1.0, 0.8 * s],
       desc: 'A trailing beam pivoted on the lower fuselage carries the wheel. In a hard landing it swings up, stroking the oleo; in a crash it can fail in a controlled way rather than punch into the cabin.',
     }, [mesh(merge(beam), MAT.steel())]);
+    wowAt.push(V3(2.22, 1.2, 1.12 * s));
     // two-stage oleo: outer cylinder from the airframe fitting, piston down to the beam
     const top = V3(2.22, 1.26, 1.19 * s), bot = V3(AXLE.x - 0.02, AXLE.y + 0.07, 1.2 * s);
     const holder = new THREE.Group();
@@ -79,15 +82,41 @@ export function buildGear({ A, P }) {
     }, [mesh(wheel[0], MAT.rubber()), mesh(merge(hubG), MAT.casting()), mesh(brake, MAT.steel())]);
   }
 
-  // tail gear
-  const tw = { x: -6.62, y: 0.22 };
-  const tTop = V3(-6.22, 1.3, 0), tBot = V3(-6.5, 0.4, 0);
-  const tg = [tube(tTop, tTop.clone().lerp(tBot, 0.6), 0.075, 16), tube(tTop.clone().lerp(tBot, 0.5), tBot, 0.05, 14), box(0.2, 0.12, 0.2, [tTop.x, tTop.y, 0]), tube(tBot, V3(tw.x, tw.y, 0.1), 0.035, 10), tube(tBot, V3(tw.x, tw.y, -0.1), 0.035, 10), box(0.1, 0.08, 0.26, [tBot.x, tBot.y, 0]), cyl(0.03, 0.03, 0.24, [tw.x, tw.y, 0], 'z', 10)];
-  const ttire = tire(0.22, 0.15).translate(tw.x, tw.y, 0);
-  P('Tail landing gear', {
-    system: 'Landing gear', material: 'Steel yoke and oleo, castoring wheel with lock', mass: 40, explode: [0, -1.0, 0],
-    desc: 'A castoring tail wheel on its own oleo, about 8.8 m behind the main wheels. It keeps the tail rotor clear of the ground on landing and is locked straight for take-off and running landings.',
-  }, [mesh(merge(tg), MAT.steel()), mesh(ttire, MAT.rubber()), mesh(cyl(0.11, 0.11, 0.13, [tw.x, tw.y, 0], 'z', 18), MAT.casting())]);
+  // tail gear: 28.93 ft (8.82 m) behind the main axles (GenHel wheel base)
+  const tw = { x: AXLE.x - 8.82, y: 0.22 };
+  const tTop = V3(-6.12, 1.3, 0), tBot = V3(-6.4, 0.4, 0);
+  P('Tail gear shock strut', {
+    system: 'Landing gear', material: 'Steel cylinder and chromed piston, oil and nitrogen', mass: 18, explode: [0, -0.5, 0.5],
+    desc: 'Its own two-stage oleo, mounted to a fitting in the tail cone. It protects the tail cone and tail rotor in a tail-low landing and strokes in a crash like the main struts.',
+  }, [mesh(merge([tube(tTop, tTop.clone().lerp(tBot, 0.6), 0.075, 16), box(0.2, 0.12, 0.2, [tTop.x, tTop.y, 0])]), MAT.paintDark()), mesh(tube(tTop.clone().lerp(tBot, 0.5), tBot, 0.05, 14), MAT.hydraulic())]);
+  P('Tail wheel yoke & axle', {
+    system: 'Landing gear', material: 'Forged steel fork and axle on a swivel', mass: 10, explode: [0, -0.9, 0],
+    desc: 'The fork swivels a full 360° below the strut so the tail follows the main wheels when taxiing or turning on the spot.',
+  }, [mesh(merge([tube(tBot, V3(tw.x, tw.y, 0.1), 0.035, 10), tube(tBot, V3(tw.x, tw.y, -0.1), 0.035, 10), box(0.1, 0.08, 0.26, [tBot.x, tBot.y, 0]), cyl(0.03, 0.03, 0.24, [tw.x, tw.y, 0], 'z', 10)]), MAT.steel())]);
+  P('Tail wheel & tyre', {
+    system: 'Landing gear', material: 'Aluminium wheel, 15 × 6 class tyre (size approximate)', mass: 10, explode: [0, -1.3, 0],
+    desc: 'A single castoring tail wheel, about 8.8 m behind the main wheels. It keeps the tail rotor clear of the ground on landing.',
+  }, [mesh(tire(0.22, 0.15).translate(tw.x, tw.y, 0), MAT.rubber()), mesh(cyl(0.11, 0.11, 0.13, [tw.x, tw.y, 0], 'z', 18), MAT.casting())]);
+  P('Tail wheel lock actuator', {
+    system: 'Landing gear', material: 'Electrically actuated lock pin at the swivel', mass: 2, explode: [0.3, -0.4, 0.4],
+    desc: 'A cockpit switch drives a pin into the swivel to hold the tail wheel straight for take-off, running landings and parking on slopes; unlocked, the wheel castors freely.',
+  }, [mesh(merge([cyl(0.035, 0.035, 0.14, [tBot.x + 0.12, tBot.y + 0.12, 0.07], 'y', 10), box(0.06, 0.05, 0.05, [tBot.x + 0.1, tBot.y + 0.04, 0.05])]), MAT.casting())]);
+
+  // brake plumbing: master cylinders on the pilots' pedals, lines along the floor and the drag beams
+  const brk = [], mc = [];
+  for (const z of [0.53, -0.53]) for (const dz of [0.12, -0.12]) mc.push(cyl(0.018, 0.018, 0.12, [3.62, 0.74, z + dz], 'x', 8));
+  for (const s of [1, -1]) {
+    brk.push(pipe([[3.58, 0.72, 0.65 * s], [3.2, 0.64, 0.75 * s], [3.0, 0.62, 0.86 * s], [3.05, 0.53, 0.95 * s], [2.7, 0.42, 1.08 * s], [2.36, 0.37, 1.2 * s], [2.3, 0.33, 1.24 * s]], 0.007, 5));
+  }
+  brk.push(box(0.08, 0.05, 0.08, [3.25, 0.66, 0.0]));     // parking-brake valve
+  P('Brake master cylinders & lines', {
+    system: 'Landing gear', material: 'Pedal master cylinders, parking-brake valve, steel and flexible brake lines', mass: 5, explode: [0.6, -0.6, 0.6],
+    desc: 'The toe brakes on each pilot\'s pedals work master cylinders; their lines run under the cockpit floor and down the drag beams to the wheel brakes, with a parking-brake valve to hold the aircraft on the deck.',
+  }, [mesh(merge(mc), MAT.hydraulic()), mesh(merge(brk), MAT.steel())]);
+  P('Weight-on-wheels switches', {
+    system: 'Landing gear', material: 'Sealed proximity switches on the main-gear fittings (location approximate)', mass: 1, count: 2, explode: [0.3, -0.3, 0.9],
+    desc: 'Tell the aircraft systems whether it is on the ground: the AFCS, stabilator, de-ice, countermeasures and other systems change their behaviour at touchdown and lift-off.',
+  }, [mesh(merge(wowAt.map((p) => box(0.05, 0.05, 0.05, [p.x, p.y, p.z]))), MAT.yellow())]);
 
   // ------------------------------------------------------------------ fuel
   for (const side of [1, -1]) {
@@ -99,34 +128,64 @@ export function buildGear({ A, P }) {
     P(side > 0 ? 'Fuel cell (right)' : 'Fuel cell (left)', {
       system: 'Fuel', material: 'Crash-resistant, self-sealing rubberised-fabric bladder', mass: 40, explode: [-0.3, -1.4, 0.9 * s],
       desc: 'One of two cells holding 360 US gal (1,360 L, ≈1,090 kg of JP-8) between them. Each must survive a 20 m (65 ft) drop test full of water without leaking, and the self-sealing layers close up after small-arms penetration. Mass shown is the empty cell.',
-      callout: side > 0, anchor: [-2.75, 0.95, 0.75],
+      callout: side > 0, anchor: [-2.9, 0.9, 0.6],
     }, [mesh(g, MAT.fuelCell()), mesh(merge(fittings), MAT.casting())]);
   }
   const lines = [];
   for (const s of [1, -1]) {
-    lines.push(pipe([[-2.2, 1.5, 0.55 * s], [-2.0, 1.95, 0.6 * s], [-1.8, 2.2, 0.7 * s], [-1.5, 2.42, 0.76 * s]], 0.018));
+    // engine feed: up the transition section, through the roof under the nacelle, forward to the engine-driven boost pump
+    lines.push(pipe([[-2.2, 1.5, 0.55 * s], [-2.05, 1.9, 0.62 * s], [-1.85, 2.12, 0.7 * s], [-1.6, 2.3, 0.74 * s], [-1.2, 2.45, 0.82 * s], [-0.95, 2.58, 0.9 * s], [-0.87, 2.68, 0.93 * s]], 0.016));
     lines.push(pipe([[-2.5, 1.5, 0.3 * s], [-2.3, 1.9, 0.15 * s], [-2.0, 2.3, -0.1 * s], [-2.0, 2.35, -0.19 * s]], 0.012));
   }
   lines.push(tube([-2.4, 1.0, 0.06], [-2.4, 1.0, -0.06], 0.03, 10));
   const valves = [];
-  for (const s of [1, -1]) valves.push(cyl(0.035, 0.035, 0.06, [-2.2, 1.55, 0.55 * s], 'y', 12), cyl(0.035, 0.035, 0.06, [-1.6, 2.4, 0.76 * s], 'x', 12));
+  for (const s of [1, -1]) valves.push(cyl(0.035, 0.035, 0.06, [-2.2, 1.55, 0.55 * s], 'y', 12), cyl(0.03, 0.03, 0.05, [-1.86, 2.11, 0.7 * s], 'y', 10));
   P('Fuel lines & breakaway valves', {
-    system: 'Fuel', material: 'Self-sealing hoses, frangible breakaway valves, suction boost', mass: 22, explode: [-0.6, -0.6, 0],
-    desc: 'The engines draw fuel by suction, so a cut line sucks air instead of spraying fuel. Breakaway valves at every structural joint seal both ends if a line is torn out in a crash — the main reason post-crash fires are rare in H-60s.',
+    system: 'Fuel', material: 'Self-sealing hoses, frangible breakaway valves', mass: 20, explode: [-0.6, -0.6, 0],
+    desc: 'Each cell feeds its own engine, which draws the fuel by suction, so a cut line sucks air instead of spraying fuel. Breakaway valves at every structural joint seal both ends if a line is torn out in a crash — the main reason post-crash fires are rare in H-60s.',
   }, [mesh(merge(lines), MAT.hydraulic()), mesh(merge(valves), MAT.red())]);
+  P('Fuel selector valves', {
+    system: 'Fuel', material: 'Cable-operated two-way valves, crossfeed line', mass: 4, count: 2, explode: [-0.8, 0.9, 0],
+    desc: 'One per engine on the aft deck, worked by the fuel selector levers overhead: each engine can draw directly from its own cell or crossfeed from the other one.',
+  }, [mesh(merge([cyl(0.04, 0.04, 0.09, [-1.5, 2.36, 0.77], 'x', 12), cyl(0.04, 0.04, 0.09, [-1.5, 2.36, -0.77], 'x', 12), pipe([[-1.55, 2.33, 0.74], [-1.82, 2.12, 0.66], [-1.9, 2.12, 0.0], [-1.82, 2.12, -0.66], [-1.55, 2.33, -0.74]], 0.012)]), MAT.red())]);
+  P('Fuel prime/boost pump', {
+    system: 'Fuel', material: 'Electric pump in the left cell (location approximate)', mass: 4, explode: [-0.6, -0.3, -1.1],
+    desc: 'An electric pump primes the engine fuel lines before a start and feeds the APU, which draws from the left cell; in flight the engines\' own pumps do the work.',
+  }, [mesh(merge([cyl(0.06, 0.06, 0.14, [-2.65, 0.95, -0.45], 'y', 14), pipe([[-2.65, 1.02, -0.45], [-2.6, 1.6, -0.35], [-2.4, 2.25, -0.22], [-2.2, 2.4, -0.19]], 0.008)]), MAT.casting())]);
+  const probes = [];
+  for (const s of [1, -1]) probes.push(cyl(0.02, 0.02, 0.86, [-2.3, 1.06, 0.38 * s], 'y', 8), cyl(0.03, 0.03, 0.05, [-2.3, 1.5, 0.38 * s], 'y', 10), cyl(0.018, 0.018, 0.05, [-2.75, 0.9, 0.3 * s], 'x', 8));
+  P('Fuel quantity probes', {
+    system: 'Fuel', material: 'Capacitance probes and low-level sensors', mass: 2, count: 4, explode: [-0.2, -0.9, 0.4],
+    desc: 'A capacitance probe standing in each cell measures the fuel height for the cockpit gauge, and a low-level sensor warns when about 20 minutes of fuel remain (approximate).',
+  }, [mesh(merge(probes), MAT.steel())]);
+  const drains = [];
+  for (const s of [1, -1]) {
+    drains.push(cyl(0.025, 0.025, 0.06, [-2.15, 0.52, 0.45 * s], 'y', 10));
+    drains.push(pipe([[-2.0, 1.52, 0.7 * s], [-1.95, 1.9, 0.8 * s], [-1.9, 2.15, 0.85 * s]], 0.01));
+  }
+  P('Fuel sump drains & vents', {
+    system: 'Fuel', material: 'Drain valves at the low points, vent lines with rollover valves', mass: 2, count: 4, explode: [-0.4, -1.1, 0.8],
+    desc: 'Drain valves at each cell\'s low point let the crew check for water and sediment before flight; vent lines let air in as fuel is used, with valves that close if the aircraft rolls over.',
+  }, [mesh(merge(drains), MAT.casting())]);
   P('Refuelling ports', {
     system: 'Fuel', material: 'Gravity filler caps and a closed-circuit pressure receptacle', mass: 4, count: 3, explode: [-0.3, 0, 1.3],
     desc: 'Gravity filler on each side behind the cabin door, plus a closed-circuit receptacle on the left for rapid "hot" refuelling with the rotor turning.',
   }, [mesh(merge([cyl(0.06, 0.06, 0.03, [-2.4, 1.3, 1.0], 'z', 16), cyl(0.06, 0.06, 0.03, [-2.4, 1.3, -1.0], 'z', 16), cyl(0.05, 0.05, 0.03, [-2.0, 1.0, -1.12], 'z', 16)]), MAT.yellow())]);
 
   // ------------------------------------------------------------------ cargo hook
-  const hook = [box(0.36, 0.12, 0.26, [-0.1, 0.43, 0]), tube([-0.1, 0.38, 0], [-0.1, 0.24, 0], 0.03, 10)];
-  const hk = new THREE.TorusGeometry(0.07, 0.02, 8, 16, Math.PI * 1.4).rotateZ(Math.PI * 0.8).translate(-0.1, 0.2, 0);
-  P('External cargo hook', {
-    system: 'Payload', material: 'Steel hook with electrical, manual and emergency release', mass: 18, explode: [0, -1.3, 0],
-    desc: 'Rated at 9,000 lb (4,082 kg), enough to sling a 105 mm howitzer or a light vehicle under the rotor, close to the centre of gravity so the load barely changes the trim.',
-    callout: true, anchor: [-0.1, 0.2, 0.1],
-  }, [mesh(merge([...hook, hk]), MAT.steel())]);
+  // stowed it lies forward inside a well in the belly; deployed it swings down to hang under the CG
+  const hookPivot = new THREE.Group();
+  hookPivot.position.set(-0.3, 0.55, 0);
+  const hk = new THREE.TorusGeometry(0.06, 0.018, 8, 16, Math.PI * 1.4).rotateZ(Math.PI * 0.8).translate(0, -0.3, 0);
+  hookPivot.add(mesh(merge([box(0.1, 0.12, 0.16, [0, -0.04, 0]), tube([0, -0.08, 0], [0, -0.25, 0], 0.028, 10), cyl(0.03, 0.03, 0.2, [0, 0, 0], 'z', 10), hk]), MAT.steel()));
+  const well = box(0.46, 0.1, 0.7, [-0.08, 0.525, 0]);
+  const hookPart = P('External cargo hook', {
+    system: 'Payload', material: 'Steel hook with electrical, manual and emergency release; recessed belly well', mass: 18, explode: [0, -1.3, 0],
+    desc: 'Rated at 9,000 lb (4,082 kg), enough to sling a 105 mm howitzer or a light vehicle under the rotor, close to the centre of gravity so the load barely changes the trim. When not in use it swings up into a well in the belly (stowage door, if any, not modelled).',
+    callout: true, anchor: [-0.1, 0.42, 0.12],
+  }, [hookPivot, mesh(well, MAT.interior(), { cast: false })]);
+  const setHook = (k) => { hookPivot.rotation.z = (1 - k) * Math.PI / 2; };
+  setHook(0);
 
-  return { oleos };
+  return { oleos, setHook, hookPart };
 }

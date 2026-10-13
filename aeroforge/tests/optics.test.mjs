@@ -59,7 +59,10 @@ test('Hubble two-mirror design reproduces the published geometry', () => {
   close(d.b, 1.5, 0.01, 'focus 1.5 m behind the primary vertex');
   close(d.N, 24, 1e-12, 'f/24');
   close(d.K1, -1.0023, 0.0001, 'design primary conic');
-  close(d.K2, -1.4969, 0.001, 'design secondary conic (≈ −1.496)');
+  close(d.K2, -1.4969, 0.001, 'secondary conic solved from the rounded spacings');
+  // the published prescription (−1.0022985, −1.4960) agrees with the solution to the rounding of f1, F and d
+  close(d.K1, HST_OTA.K1design, 0.0001, 'published design primary conic');
+  close(d.K2, HST_OTA.K2design, 0.0015, 'published design secondary conic');
   close(d.k * HST_OTA.D, 0.267, 0.001, 'beam footprint on the 0.3 m secondary');
   // a classical Cassegrain sanity check: with the focus at the primary vertex (b = 0)
   const c = cassegrain({ f1: 1, F: 4, d: 0.8 });   // d = m f1 / (1 + m)
@@ -74,7 +77,11 @@ test('conic sag and the 1990 mirror flaw', () => {
   close(conicError(0, 11.04, -1.0023, -1.0139), 0, 1e-15, 'no error at the vertex');
 });
 
-test('orbit relations at Hubble\'s altitude', () => {
+test('orbit relations at Hubble\'s altitudes', () => {
+  // 565 km: the orbit the last servicing mission left in May 2009 (562 × 568 km)
+  close(orbitAt(565).T / 60, 95.9, 0.1, 'period at 565 km, min');
+  close(orbitAt(612).T / 60, 96.9, 0.1, 'period at the 1990 deployment altitude, min');
+  // 540 km: a plain check of the circular-orbit relations (Hubble's altitude around 2022)
   const o = orbitAt(540);
   close(o.T / 60, 95.4, 0.1, 'period at 540 km, min');
   close(o.v, 7.59, 0.01, 'speed, km/s');

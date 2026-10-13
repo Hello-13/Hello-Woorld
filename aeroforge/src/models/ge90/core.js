@@ -3,13 +3,12 @@
 // frame, core exhaust nozzle and plug, both spool shafts, the main bearings and their sumps.
 
 import * as THREE from 'three';
-import { mesh } from '../../engine/assembly.js';
 import { lathe } from '../../engine/geometry.js';
 import { M } from '../../engine/materials.js';
 import { GM } from './materials.js';
 import { ROWS, coreAt, PLUG_TIP } from './layout.js';
-import { cutLathe, cutPair, bladeGeometry, ring, boxAt, radialCyl, axialCyl, hoop, kept, merge, P3, tube } from './geom.js';
-import { coreRow } from './fan.js';
+import { cutLathe, cutPair, bladeGeometry, ring, boxAt, radialCyl, axialCyl, hoop, kept, merge, P3, tube, cutTube } from './geom.js';
+import { coreRow, coreRotor } from './fan.js';
 
 const TAU = Math.PI * 2;
 
@@ -56,11 +55,11 @@ export function buildCore(ctx) {
   hpcStatorParts[0].userData.part.stationTemp = '25';
 
   ROWS.hpcRotors.forEach((r, i) => {
-    const m = mesh(coreRow({ ...r, stagger: [36, 54], t: [0.065, 0.045], gap: 0.0025, n: i < 4 ? 5 : 4 }), GM.ti6246(i));
+    const m = coreRotor({ ...r, stagger: [36, 54], t: [0.065, 0.045], gap: 0.0025, n: i < 4 ? 5 : 4 }, GM.ti6246(i));
     m.userData.temp = lt('25', '3', (i + 0.5) / 9);
     const g = new THREE.Group();
     g.add(m);
-    ctx.spin.n2.push(g);
+    ctx.spin.n2.push({ rotor: m });
     P(`HPC rotor ${i + 1}`, {
       system: 'Propulsion', material: i < 5 ? 'Titanium alloy blades' : 'Nickel-alloy blades', mass: Math.round(16 - i * 1.1), count: r.count,
       explode: [0, -0.7, 0],
@@ -101,7 +100,7 @@ export function buildCore(ctx) {
     system: 'Propulsion', material: 'Titanium front disks, nickel-alloy rear disks', mass: 360,
     explode: [0, -0.7, 0], temp: 650,
     desc: 'The rotating drum that carries all nine HPC rotor stages. The HP turbine drives it through the compressor-discharge seal drum at the back; the whole HP spool turns at N2.',
-    callout: true, anchor: [-0.42, -2.5, 0.05],
+    callout: true, anchor: [-0.36, -2.5, 0],
   }, hpcSpool).userData.part.stationTemp = '3';
 
   // HPC casing with stage flanges and the variable-vane trunnion bosses
@@ -158,7 +157,7 @@ export function buildCore(ctx) {
   P('Compressor rear frame', {
     system: 'Structure', material: 'Cast nickel-alloy frame', mass: 380,
     explode: [0, -1.0, 0], temp: 900,
-    desc: 'Combustor casing and structural frame in one: its struts carry the HP rotor\'s mid bearing loads out to the casing, its diffuser slows the compressor delivery air (about Mach 0.3) for the flame, and its outer wall holds the fuel nozzles and igniters.',
+    desc: 'The combustor casing and the structural link between compressor and turbine casings: its diffuser slows the compressor delivery air (to about Mach 0.3) for the flame, its outer wall carries the 4 MPa case load and holds the fuel nozzles, igniters and borescope ports, and its struts duct air and service lines to the inner casing. Whether it also carries a bearing on the -115B is not published.',
   }, [crfRings, crfStruts]).userData.part.stationTemp = '3';
 
   // ====================================================================== dual annular combustor
@@ -175,8 +174,8 @@ export function buildCore(ctx) {
   P('Dual annular combustor', {
     system: 'Propulsion', material: 'Nickel / cobalt-alloy liners with thermal-barrier coating', mass: 160,
     explode: [0, -1.0, 1.25],
-    desc: 'Two rings of burners, one above the other: the outer pilot dome burns alone at idle for low smoke and hydrocarbons, and the inner main dome joins in at high power, keeping the flame lean and short to cut NOx. Gas leaves at about 1,680 K (modelled) — above the roughly 1,600 K at which the turbine alloys melt.',
-    callout: true, anchor: [0.0, -3.5, 0.66],
+    desc: 'Two rings of burners, one above the other: the outer pilot dome burns alone at idle for low smoke and hydrocarbons, and the inner main dome joins in at high power, keeping the flame lean and short to cut NOx. At take-off the gas leaves at about 1,680 K (modelled), already above the roughly 1,600 K at which the turbine alloys melt; in the hottest streaks it is a few hundred kelvin hotter still.',
+    callout: true, anchor: [0.35, -3.5, 0.56],
   }, [liners, flame]).userData.part.stationTemp = '4';
 
   const domes = cut(cutLathe([rect(0.562, 0.668, -3.33, -3.345), rect(0.442, 0.548, -3.33, -3.345),
@@ -246,18 +245,17 @@ export function buildCore(ctx) {
     }, [vanes, bands]).userData.part.stationTemp = i === 0 ? '4' : '45';
   });
   ROWS.hptBlades.forEach((r, i) => {
-    const m = mesh(coreRow({ ...r, stagger: [34, 40], t: [0.2, 0.14], camber: 0.16, gap: 0.002, n: 7 }), GM.tbc());
+    const m = coreRotor({ ...r, stagger: [34, 40], t: [0.2, 0.14], camber: 0.16, gap: 0.002, n: 7 }, GM.tbc());
     m.userData.temp = hptT[i * 2 + 1];
     const g = new THREE.Group();
     g.add(m);
-    ctx.spin.n2.push(g);
+    ctx.spin.n2.push({ rotor: m });
     P(`HPT stage ${i + 1} blades`, {
       system: 'Propulsion', material: 'Single-crystal nickel superalloy, thermal-barrier coated (count estimated)', mass: 30, count: r.count,
       explode: [0, -1.25, 0],
       desc: i === 0
-        ? 'Each blade is cast as a single crystal with no grain boundaries to creep along, coated with ceramic and cooled from inside by compressor air that is itself above 600 °C. The gas around them is hundreds of degrees hotter than the alloy\'s melting point; each blade pulls with tonnes of centrifugal force.'
+        ? 'Each blade is cast as a single crystal with no grain boundaries to creep along, coated with ceramic and cooled from inside by compressor air that is itself above 600 °C. The gas reaching them averages about 1,680 K at take-off (modelled), above the roughly 1,600 K at which the alloy melts, and its hot streaks run hotter; each blade also pulls with tonnes of centrifugal force.'
         : 'Second HPT stage. Between them, the two HPT stages extract the roughly 100 MW the HP compressor absorbs at take-off (modelled).',
-      ...(i === 0 ? { callout: true, anchor: [-0.56, -3.85, 0.05] } : {}),
     }, g);
   });
   const hptDisk = [];
@@ -307,11 +305,11 @@ export function buildCore(ctx) {
     }, vanes).userData.part.stationTemp = '45';
   });
   ROWS.lptBlades.forEach((r, i) => {
-    const m = mesh(coreRow({ ...r, stagger: [32, 40], t: [0.12, 0.06], camber: 0.12, gap: 0.004, stations: 2, n: 5 }), GM.heat(0.2 + i * 0.12));
+    const m = coreRotor({ ...r, stagger: [32, 40], t: [0.12, 0.06], camber: 0.12, gap: 0.004, stations: 2, n: 5 }, GM.heat(0.2 + i * 0.12));
     m.userData.temp = lt('45', '5', (i + 0.6) / 6);
     const g = new THREE.Group();
     g.add(m);
-    ctx.spin.n1.push(g);
+    ctx.spin.n1.push({ rotor: m });
     const tip = coreAt(r.y)[1];
     const shroud = cut(cutLathe(rect(tip - 0.01, tip - 0.003, r.y + r.chord * 0.4, r.y - r.chord * 0.4), GM.heat(0.2 + i * 0.12), { seg: 64 }));
     P(`LPT stage ${i + 1} blades`, {
@@ -344,7 +342,15 @@ export function buildCore(ctx) {
     desc: 'The flared case that holds the six LPT nozzle rows. Its cone angle shows how much the gas expands: the annulus area grows about 2.5-fold from LPT inlet to exit.',
   }, lptC).userData.part.stationTemp = '5';
   const lptAcc = cut(cutPair((keep) => {
-        const list = ROWS.lptBlades.map((r) => hoop(coreAt(r.y)[1] + 0.075, r.y, 0.012, { start: keep.start, arc: keep.arc, tubular: 56, radial: 5 }));
+        // two half-manifolds per stage, fed at 0.3 and 2.4 rad, leaving room at the bottom for the oil lines
+        const GAP0 = 1.35, GAP1 = 2.2;
+        const list = [];
+        for (const r of ROWS.lptBlades) {
+          const rr = coreAt(r.y)[1] + 0.075;
+          const a0 = Math.max(keep.start, GAP1), a1 = keep.start + keep.arc;
+          if (keep.start < GAP0) list.push(hoop(rr, r.y, 0.012, { start: keep.start, arc: Math.min(GAP0, a1) - keep.start, tubular: 24, radial: 5 }));
+          if (a1 > a0) list.push(hoop(rr, r.y, 0.012, { start: a0, arc: a1 - a0, tubular: 40, radial: 5 }));
+        }
     for (const phi of [0.3, 2.4]) {
       if (!keep(phi)) continue;
       const pts = ROWS.lptBlades.map((r) => P3(coreAt(r.y)[1] + 0.105, r.y, phi));
@@ -389,7 +395,7 @@ export function buildCore(ctx) {
   const lpShaft = cut(cutLathe([rect(0.078, 0.102, -0.42, -5.32), [[0.13, -0.3], [0.142, -0.3], [0.112, -0.5], [0.102, -0.5]]], GM.shaft(), { seg: 40 }));
   P('LP shaft', {
     system: 'Drive system', material: 'High-strength steel', mass: 420,
-    explode: [0.85, -0.25, 1.6], temp: 400,
+    explode: [1.1, -0.25, 2.2], temp: 400,
     desc: 'About 5 m long and running inside the HP spool, it carries the LP turbine\'s torque forward to the fan and booster. At take-off it carries more than three times the torque of the HP spool, because it delivers similar power at a quarter of the speed.',
   }, lpShaft);
   const hpShaft = cut(cutLathe([rect(0.15, 0.166, -1.93, -2.12), [[0.166, -2.08], [0.178, -2.08], [0.24, -2.16], [0.226, -2.16]],
@@ -397,7 +403,7 @@ export function buildCore(ctx) {
     rect(0.125, 0.14, -4.06, -4.18), [[0.14, -4.06], [0.18, -4.02], [0.18, -4.04], [0.14, -4.08]]], GM.shaft(), { seg: 48 }));
   P('HP shaft & CDP seal drum', {
     system: 'Drive system', material: 'Nickel-alloy drum, steel stub shafts', mass: 140,
-    explode: [0.55, -0.7, 1.25], temp: 650,
+    explode: [0.9, -0.7, 0.4], temp: 650,
     desc: 'The HP spool\'s backbone: a forward stub shaft into the thrust bearing, the compressor-discharge-pressure seal drum that links compressor to turbine, and an aft stub shaft. It is hollow, so the LP shaft passes straight through.',
   }, hpShaft).userData.part.stationTemp = '3';
 
@@ -438,6 +444,50 @@ export function buildCore(ctx) {
     explode: [0, -1.85, 0], temp: 600,
     desc: 'Oil chamber round the #5 bearing inside the turbine rear frame, with its own scavenge line back to the gearbox.',
   }, aftSump);
+
+  // ====================================================================== secondary air and maintenance access
+  // LPT cooling: mid-stage HPC air piped outside the casings to the first LPT nozzle (stage and
+  // count estimated); the air cools the LPT stage 1 vanes and purges the disk cavities
+  const COOL = [1.05, 2.62, 4.19, 5.76];
+  const coolPath = (phi) => [P3(0.58, -2.68, phi), P3(0.75, -2.85, phi), P3(0.95, -3.1, phi), P3(0.95, -3.8, phi), P3(0.85, -4.0, phi), P3(0.735, -4.19, phi)];
+  P('LPT cooling-air pipes', {
+    system: 'Thermal control', material: 'Stainless pipes with bellows joints (count and source stage estimated)', mass: 16, count: 4,
+    explode: [-0.9, -1.1, 0.55], temp: 640,
+    desc: 'Air bled from the middle of the HP compressor bypasses the combustor through these pipes to the first LP turbine nozzle, which it cools from inside before purging the turbine disk cavities. Using mid-stage air instead of compressor-exit air saves the work of compressing it further.',
+  }, cut(cutPair((keep) => merge(COOL.filter((p) => keep(p)).flatMap((phi) => [tube(coolPath(phi), 0.02, { seg: 30, radial: 8 }), axialCyl(0.58, -2.66, phi, 0.03, 0.06, 12), radialCyl(0.70, 0.735, -4.19, phi, 0.026, 10)])), GM.duct())));
+
+  // borescope ports: plugged holes through which an inspection camera reaches each module
+  const port = (r0, y, phi) => merge([radialCyl(r0, r0 + 0.03, y, phi, 0.011, 10), radialCyl(r0 + 0.03, r0 + 0.042, y, phi, 0.018, 6)]);
+  const PORT_PHI = 0.32;
+  const ports = (list) => cut(cutPair((keep) => merge(list.filter(([, phi]) => keep(phi)).map(([r0, phi, y]) => port(r0, y, phi))), GM.steel()));
+  P('Borescope ports (HP compressor)', {
+    system: 'Structure', material: 'Threaded steel plugs (count estimated)', mass: 2, count: 9,
+    explode: [-0.75, -0.7, 0.2], temp: 500,
+    desc: 'One port per HP-compressor stage. With the plug out and the HP spool turned slowly by hand from the gearbox, a borescope camera checks every blade for nicks from ingested debris without taking the engine apart.',
+  }, ports(ROWS.hpcRotors.map((r) => [coreAt(r.y)[1] + 0.024, PORT_PHI, r.y])));
+  P('Borescope ports (combustor)', {
+    system: 'Structure', material: 'Threaded steel plugs (count estimated)', mass: 1, count: 4,
+    explode: [0.2, -1.0, 0.6], temp: 800,
+    desc: 'Ports through the combustor case let an inspector see the liners, domes and fuel-nozzle tips, where cracking and burn-through show up first.',
+  }, ports([[0.755, PORT_PHI, -3.52], [0.755, PORT_PHI + Math.PI / 2, -3.52], [0.755, PORT_PHI + Math.PI, -3.52], [0.755, PORT_PHI + 1.5 * Math.PI, -3.52]]));
+  P('Borescope ports (HP turbine)', {
+    system: 'Structure', material: 'Threaded high-temperature plugs (count estimated)', mass: 1, count: 2,
+    explode: [-0.75, -1.25, 0.2], temp: 900,
+    desc: 'Give a view of the first-stage nozzle vanes and blades, the parts that set an engine\'s life: inspectors look for coating loss, burning and cracks around the cooling holes.',
+  }, ports(ROWS.hptBlades.map((r) => [0.722, PORT_PHI, r.y])));
+  P('Borescope ports (LP turbine)', {
+    system: 'Structure', material: 'Threaded high-temperature plugs (count estimated)', mass: 2, count: 6,
+    explode: [-0.75, -1.55, 0.2], temp: 750,
+    desc: 'One per LP-turbine stage, between the rows of nozzle vanes.',
+  }, ports(ROWS.lptNozzles.map((r) => [coreAt(r.y)[1] + 0.026, PORT_PHI, r.y])));
+
+  // centre vent tube: the bearing sumps vent their seal air aft through the LP shaft and out of the plug
+  const vent = cut(cutLathe([rect(0.035, 0.045, -0.5, -6.43)], GM.duct(), { seg: 24 }));
+  P('Centre vent tube', {
+    system: 'Drive system', material: 'Thin-walled steel tube inside the LP shaft', mass: 12,
+    explode: [1.1, -0.45, 2.2], temp: 450,
+    desc: 'The bearing sumps are kept at low pressure so their seals leak air inwards, never oil outwards; that air leaves through this tube, which runs the whole length of the LP shaft and out of the tip of the centre plug.',
+  }, vent);
 
   void kept; void lathe;
 }

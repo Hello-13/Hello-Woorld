@@ -95,7 +95,10 @@ export function buildPower(P, body) {
           : i === 1
             ? 'Middle panel. Radiation in the GPS orbit, inside the outer Van Allen belt, slowly damages the cells, so the array is sized for its fifteenth year, not its first.'
             : 'Outboard panel. Spring hinges and a closed cable loop unfold the three panels together, in seconds, once the frangibolts release.',
-        callout: s > 0 && i === 2, anchor: [0.02, PANEL_L * 0.75, PANEL_W / 2],
+        // labelled on the −Y inboard panel near its aft edge (local +z is body −Z on this wing): the array spot
+        // whose label stays on screen and clear of the other labels and the page text in the orbit-look and
+        // Showroom/Hangar framings, and more than a label height from the array-drive label in tour step 7
+        callout: s < 0 && i === 0, anchor: [0.02, PANEL_L / 2, PANEL_W / 2 - 0.15],
       }, panel, pv);
       part.userData.part.thermalRole = 'array';
       hinge(`Panel hinge ${i + 1} (${tag})`, pv, i === 0

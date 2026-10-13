@@ -18,7 +18,8 @@ export const STAGES = { fan: 1, booster: 4, hpc: 9, hpt: 2, lpt: 6 };
 export const FAN = {
   tipR: 1.625,             // 128 in diameter
   hubR: 0.47,              // hub/tip ≈ 0.29
-  caseR: 1.632,            // rub-strip radius (≈ 7 mm tip clearance)
+  caseR: 1.632,            // fan-case inner wall over the blades
+  rubR: 1.628,             // face of the abradable rub strip set into it (blade tips 1.623: 5 mm clearance)
   blades: 22,
   le: 0.0, te: -0.5,       // hub leading / trailing edge stations
   spinnerTip: 0.8,

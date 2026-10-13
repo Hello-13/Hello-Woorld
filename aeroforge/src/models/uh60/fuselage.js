@@ -54,6 +54,25 @@ export function surfNormal(x, a) {
 /** Top of the fuselage (roof/tail-cone crest) at station x. */
 export const roofY = (x) => pchip(K.yT, x);
 
+/** Half-width of the outer surface at station x and height y (0 outside the section). */
+export function halfWidthAt(x, y) {
+  const s = section(x);
+  if (y <= s.yB || y >= s.yT) return 0;
+  let lo = y < s.yW ? -Math.PI / 2 : 0, hi = y < s.yW ? 0 : Math.PI / 2;
+  const rising = true;                       // y(a) increases from −π/2 to π/2 on the right side
+  for (let i = 0; i < 40; i++) {
+    const m = 0.5 * (lo + hi);
+    if ((surfPoint(x, m).y < y) === rising) lo = m; else hi = m;
+  }
+  return surfPoint(x, 0.5 * (lo + hi)).z;
+}
+/** Smallest half-width over stations [x0, x1] at height y (for parts that must stay inside the skin). */
+export function minHalfWidth(x0, x1, y, n = 6) {
+  let w = Infinity;
+  for (let i = 0; i <= n; i++) w = Math.min(w, halfWidthAt(x0 + ((x1 - x0) * i) / n, y));
+  return w;
+}
+
 // --------------------------------------------------------------------------- openings (right side)
 // Each is an (x, a) rectangle; `mirror` adds the left-hand twin at a → π − a.
 const O = {
@@ -64,8 +83,10 @@ const O = {
   ckWindow: { x0: 2.4, x1: 3.28, a0: 0.0, a1: 0.7 },
   gunner: { x0: 1.56, x1: 2.18, a0: 0.05, a1: 0.7 },
   cabDoor: { x0: -0.42, x1: 1.42, a0: -0.72, a1: 0.86 },
-  cabWindow: { x0: 0.18, x1: 1.02, a0: 0.12, a1: 0.66 },
+  cabWindow: { x0: 0.5, x1: 1.12, a0: 0.12, a1: 0.66 },       // forward window of each sliding door
+  cabWindow2: { x0: -0.24, x1: 0.38, a0: 0.12, a1: 0.66 },    // aft window
   avDoor: { x0: 4.22, x1: 4.7, a0: -0.5, a1: 0.75 },
+  hookWell: { x0: -0.31, x1: 0.15, a0: -Math.PI / 2, a1: -Math.PI / 2 + 0.08 },   // cargo-hook well in the belly
 };
 export const OPENINGS = O;
 const both = (r) => [{ ...r, side: 1 }, { ...r, side: -1 }];
@@ -90,7 +111,8 @@ function buildGrid() {
   const as = [];
   const NA = 84;
   for (let j = 0; j <= NA; j++) as.push(-Math.PI / 2 + (2 * Math.PI * j) / NA);
-  const Aa = dedup(as, edgesA, 0.03).filter((a) => a >= -Math.PI / 2 - 1e-9 && a <= 1.5 * Math.PI + 1e-9);
+  // the angles were rounded to 1e-5 in dedup, so the keel rows (−π/2, 3π/2) need a tolerance above that
+  const Aa = dedup(as, edgesA, 0.03).filter((a) => a >= -Math.PI / 2 - 1e-4 && a <= 1.5 * Math.PI + 1e-4);
   const P = [], N = [], U = [];
   for (const x of X) {
     const rowP = [], rowN = [], rowU = [];
@@ -233,7 +255,7 @@ export function buildFuselage({ A, P }) {
   const G = buildGrid();
   const paint = MAT.paint();
   const holesFwd = [...both(O.windshield), ...both(O.quarter), ...both(O.overhead), ...both(O.ckDoor), ...both(O.avDoor)];
-  const holesCab = [...both(O.gunner), ...both(O.cabDoor)];
+  const holesCab = [...both(O.gunner), ...both(O.cabDoor), ...both(O.hookWell)];
 
   // ------------------------------------------------------------------ skins
   const skin = (name, info, range, opts = {}) => {
@@ -283,8 +305,10 @@ export function buildFuselage({ A, P }) {
     const glass = patch(G, { only: [win], off: 0.0 });
     const handle = box(0.12, 0.03, 0.03, [2.55, 1.05, surfPoint(2.55, side > 0 ? -0.1 : Math.PI + 0.1).z + side * 0.02]);
     P(side > 0 ? 'Pilot door (right)' : 'Copilot door (left)', {
-      system: 'Skin & fairings', skin: true, material: 'Aluminium frame, acrylic window, emergency jettison hinges', mass: 22, explode: [0, 0, 1.4 * side],
-      desc: `Hinged at the front edge; the window can be jettisoned with a handle for emergency exit. The pilot in command sits on the right in US Army helicopters.`,
+      system: 'Skin & fairings', skin: true, material: 'Aluminium frame, acrylic window, jettisonable hinge pins', mass: 22, explode: [0, 0, 1.4 * side],
+      desc: side > 0
+        ? 'Hinged at the front edge. For an emergency exit a jettison handle pulls the hinge pins so the whole door falls away. The right seat is the pilot station and the left the copilot station; either can be flown by the pilot in command.'
+        : 'The copilot\'s door, hinged at the front edge like the pilot\'s; its emergency handle pulls the hinge pins so the whole door can be jettisoned.',
     }, [mesh(skinG, paint), liner(skinG), mesh(glass, MAT.glass(), { cast: false }), mesh(merge([outline(win, 0.008, 0.012), handle]), MAT.black())]);
   }
 
@@ -301,14 +325,14 @@ export function buildFuselage({ A, P }) {
   const doors = [];
   for (const side of [1, -1]) {
     const door = { ...O.cabDoor, side };
-    const win = { ...O.cabWindow, side };
-    const skinG = patch(G, { only: [door], holes: [win], off: 0.012 });
-    const glass = patch(G, { only: [win], off: 0.008 });
+    const wins = [{ ...O.cabWindow, side }, { ...O.cabWindow2, side }];
+    const skinG = patch(G, { only: [door], holes: wins, off: 0.012 });
+    const glass = patch(G, { only: wins, off: 0.008 });
     const holder = new THREE.Group();
-    holder.add(mesh(skinG, paint), liner(skinG), mesh(glass, MAT.glass(), { cast: false }), mesh(merge([outline(win, 0.016, 0.013), box(0.16, 0.035, 0.04, [-0.25, 1.25, side * 1.205])]), MAT.black()));
+    holder.add(mesh(skinG, paint), liner(skinG), mesh(glass, MAT.glass(), { cast: false }), mesh(merge([...wins.map((w) => outline(w, 0.016, 0.013)), box(0.16, 0.035, 0.04, [-0.32, 1.25, side * 1.205])]), MAT.black()));
     const part = P(side > 0 ? 'Cabin door (right)' : 'Cabin door (left)', {
-      system: 'Skin & fairings', skin: true, material: 'Aluminium honeycomb panel on roller tracks, acrylic window', mass: 38, explode: [-0.6, 0, 1.5 * side],
-      desc: 'Slides aft on upper and lower tracks to open a 1.75 m-wide doorway. Doors usually fly open or removed on assault missions; the opening also takes litters.',
+      system: 'Skin & fairings', skin: true, material: 'Aluminium honeycomb panel on roller tracks, two acrylic windows', mass: 38, explode: [-0.6, 0, 1.5 * side],
+      desc: 'Slides aft on upper and lower tracks to open a 1.75 m-wide doorway. Each door has two windows that can be jettisoned for an emergency exit. Doors usually fly open or removed on assault missions; the opening also takes litters.',
     }, holder);
     doors.push({ holder, side, part });
   }
@@ -318,7 +342,7 @@ export function buildFuselage({ A, P }) {
     const aTop = side > 0 ? 0.9 : Math.PI - 0.9, aBot = side > 0 ? -0.76 : Math.PI + 0.76;
     for (const a of [aTop, aBot]) {
       const pts = [];
-      for (let i = 0; i <= 8; i++) pts.push(surfPoint(-2.35 + (1.6 * i) / 8 + 0.2, a, 0.02));
+      for (let i = 0; i <= 8; i++) pts.push(surfPoint(-2.35 + (1.6 * i) / 8 + 0.2, a, 0.012));
       tracks.push(pipe(pts, 0.018, 5));
     }
   }
@@ -352,7 +376,7 @@ export function buildFuselage({ A, P }) {
   for (const z of [-0.52, 0.52]) roof.push(bar([-2.6, 2.17, z], [2.6, 2.17, z], 0.1, 0.16));
   for (const x of [-0.5, 0.5]) roof.push(bar([x, 2.17, -0.62], [x, 2.17, 0.62], 0.1, 0.16));
   P('Cabin frames & roof beams', {
-    system: 'Structure', material: 'Aluminium frames, machined roof beams, titanium transmission fittings', mass: 380, explode: [0, 0.8, 0],
+    system: 'Structure', material: 'Aluminium frames, machined roof beams, titanium transmission fittings', mass: 330, explode: [0, 0.8, 0],
     desc: 'Ring frames around the cabin and two deep longitudinal roof beams that carry the main transmission and engines. They are designed to hold the 1-tonne-plus gearbox and rotor head in place in a hard crash rather than let them collapse into the cabin.',
     callout: false,
   }, [mesh(merge([...cabFrames, ...roof]), MAT.primer())]);
@@ -366,7 +390,17 @@ export function buildFuselage({ A, P }) {
   }, [mesh(merge(tcFrames), MAT.primer())]);
 
   // floor and keel (energy-absorbing lower structure)
-  const floor = [box(3.95, 0.04, 2.14, [0.22, 0.6, 0]), box(1.4, 0.04, 1.9, [2.95, 0.66, 0])];
+  // floor panels in 0.2 m strips, each trimmed 2.5 cm inside the local section so nothing shows outside
+  const strips = (x0, x1, y, h, step = 0.2, inset = 0.025) => {
+    const out = [];
+    for (let x = x0; x < x1 - 1e-6; x += step) {
+      const xb = Math.min(x1, x + step);
+      const hw = Math.min(minHalfWidth(x, xb, y - h / 2, 3), minHalfWidth(x, xb, y + h / 2, 3)) - inset;
+      if (hw > 0.05) out.push(box(xb - x, h, 2 * hw, [(x + xb) / 2, y, 0]));
+    }
+    return out;
+  };
+  const floor = [...strips(-1.755, 2.195, 0.6, 0.04), ...strips(2.195, 3.65, 0.66, 0.04, 0.15)];
   const tieDowns = [];
   for (let x = -1.5; x <= 2.0; x += 0.5) for (const z of [-0.85, -0.3, 0.3, 0.85]) tieDowns.push(new THREE.TorusGeometry(0.025, 0.006, 4, 10).rotateX(Math.PI / 2).translate(x, 0.625, z));
   P('Cabin floor', {
@@ -374,14 +408,20 @@ export function buildFuselage({ A, P }) {
     desc: 'Flat floor 0.6 m above the ground for quick loading; tie-down rings rated for cargo restraint. Beneath it the lower fuselage is a crushable structure.',
   }, [mesh(merge(floor), MAT.interiorFront()), mesh(merge(tieDowns), MAT.steel())]);
   const keel = [];
-  for (const z of [-0.42, 0.42]) keel.push(box(5.6, 0.12, 0.06, [0.85, 0.53, z]));
-  for (let x = -1.6; x <= 3.4; x += 0.5) keel.push(box(0.04, 0.1, 1.9, [x, 0.53, 0]));
+  for (const z of [-0.42, 0.42]) keel.push(box(4.8, 0.1, 0.06, [0.8, 0.545, z]));
+  for (let x = -1.5; x <= 3.0 + 1e-6; x += 0.5) {
+    if (x > O.hookWell.x0 - 0.03 && x < O.hookWell.x1 + 0.03) continue;   // the hook well interrupts this one
+    // each cross-member is cut to the rounded lower corner: a narrower lower flange, a wider web above
+    const w0 = minHalfWidth(x - 0.02, x + 0.02, 0.5, 2) - 0.02, w1 = minHalfWidth(x - 0.02, x + 0.02, 0.555, 2) - 0.02;
+    if (w0 > 0.1) keel.push(box(0.04, 0.05, 2 * w0, [x, 0.522, 0]));
+    if (w1 > 0.1) keel.push(box(0.04, 0.05, 2 * w1, [x, 0.572, 0]));
+  }
   P('Keel beams & crushable belly', {
     system: 'Structure', material: 'Aluminium keel beams, crushable sub-floor structure', mass: 170, explode: [0, -1.0, 0],
     desc: 'Two keel beams and a crushable sub-floor. In a survivable crash the gear, the belly and the stroking seats share the work of stopping the occupants — the airframe is built to keep a living space at vertical impacts of about 11.6 m/s (38 ft/s).',
   }, [mesh(merge(keel), MAT.primer())]);
 
   return {
-    G, doors, surfPoint, section, roofY,
+    G, doors, surfPoint, section, roofY, halfWidthAt,
   };
 }

@@ -5,9 +5,10 @@
 
 import { displayDir, DISPLAY } from '../../models/satellite.js';
 
-/** dir: body-frame camera direction; lift / liftOrbit raise the target (subject moves down the frame). */
-const view = (dir, { fill, lift = 0, liftOrbit = lift } = {}) => ({
-  get dir() { return displayDir(dir); },
+/** dir: body-frame camera direction (dirShow, if given, replaces it in the hangar and showroom);
+ *  lift / liftOrbit raise the target (subject moves down the frame). */
+const view = (dir, { fill, lift = 0, liftOrbit = lift, dirShow = dir } = {}) => ({
+  get dir() { return displayDir(DISPLAY.orbit ? dir : dirShow); },
   get lift() { return DISPLAY.orbit ? liftOrbit : lift; },
   fill,
 });
@@ -70,7 +71,7 @@ export default [
     title: 'Power: two wings and two batteries',
     body: 'Two wings, shown here as three panels each, turn sunlight into 4,480 W even at the end of the 15-year design life. Radiation in the GPS orbit slowly degrades the cells, so the arrays are sized for the final year. For launch the panels fold flat against the radiators, and they stay folded through the apogee burns; only on station do the frangibolts release them. Twice a year the orbit passes through the Earth\'s shadow for up to about 56 minutes per orbit, and two batteries (nickel–hydrogen in the design papers) carry the whole satellite through it.',
     key: 'Eclipse: the Earth blocks 27.8° of the 360° orbit, so 7.7 % of 11 h 58 min ≈ 55 min.',
-    focus: [...WINGS, 'Battery 1', 'Battery 2', 'Power regulation unit', 'Array drive electronics'], view: view([1, 0.35, 0.45], { fill: 1.0 }), demo: 'deploy',
+    focus: [...WINGS, 'Battery 1', 'Battery 2', 'Power regulation unit', 'Array drive electronics'], view: view([1, 0.35, 0.45], { fill: 1.0, dirShow: [1, -0.35, 0.45] }), demo: 'deploy',
   },
   {
     title: 'Pointing at the Earth, steering in yaw',

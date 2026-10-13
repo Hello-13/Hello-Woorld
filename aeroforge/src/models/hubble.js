@@ -7,7 +7,9 @@
 // Built from four modules in ./hst/: the Optical Telescope Assembly (mirrors from the
 // Ritchey–Chrétien design solved in physics/optics.js), the Support Systems Module (shells,
 // equipment bays, aft shroud, servicing hardware), the focal-plane instruments, and the
-// deployable appendages. The light-path overlay shows in X-ray, Systems and Blueprint.
+// deployable appendages. The light-path overlay shows in X-ray, Systems and Blueprint while the
+// optics sit at their assembled positions (it is hidden in the exploded view, where the rays would
+// no longer meet the mirrors).
 
 import * as THREE from 'three';
 import { Assembly } from '../engine/assembly.js';
@@ -59,6 +61,11 @@ export function buildHubble() {
 
   const probe = ota.pm.children[0];
   const OVERLAY = new Set(['xray', 'systems', 'blueprint']);
+  // internal parts carry callouts for the guided tour only: outside a tour step that focuses them
+  // their labels would point at parts hidden behind the skins
+  const tourLabels = [];
+  for (const p of A.parts) if (p.userData.part.tourLabel) tourLabels.push(p);
+  const exploded = () => ota.pm.position.distanceToSquared(ota.pm.userData.base) > 1e-6 || ota.sm.position.distanceToSquared(ota.sm.userData.base) > 1e-6;
 
   return {
     id: 'hubble',
@@ -75,8 +82,8 @@ export function buildHubble() {
       ['Optics', 'Ritchey–Chrétien, f/24, 57.6 m focal length'],
       ['Diffraction limit', '0.052″ at 500 nm'],
       ['Pointing stability', '0.007″ over 24 h'],
-      ['Orbit', '28.5° inclination, ≈ 95 min; ≈ 540 km in 2009, below 500 km by 2026'],
-      ['Power', 'Two SA3 wings ≈ 5 kW; six NiH₂ batteries'],
+      ['Orbit', '28.5° inclination, ≈ 95 min; ≈ 565 km in 2009 (562 × 568 km), ≈ 540 km by 2022, below 500 km by 2026'],
+      ['Power', 'Two SA3 wings ≈ 5.3 kW; six NiH₂ batteries'],
       ['Communications', 'S-band through TDRS: 2 high-gain, 2 low-gain antennas'],
       ['Instruments', 'WFC3, ACS, COS, STIS, NICMOS (dormant); 3 FGS'],
       ['Servicing missions', '1993, 1997, 1999, 2002, 2009'],
@@ -142,7 +149,12 @@ export function buildHubble() {
       const analysis = mode ? OVERLAY.has(mode) : probe.material !== probe.userData.studio && !!probe.userData.studio;
       let optics = true;
       if (modes?.focus) { optics = false; for (const p of modes.focus) if (p.userData.part?.system === 'Optics') { optics = true; break; } }
-      ota.lightPath.visible = state.door > 0.6 && (state.lightPath || (analysis && optics));
+      ota.lightPath.visible = state.door > 0.6 && !exploded() && (state.lightPath || (analysis && optics));
+      const touring = !!globalThis.document?.body?.classList?.contains('is-touring');
+      for (const p of tourLabels) {
+        if (touring && modes?.focus?.has(p)) continue;
+        for (const c of p.children) if (c.isCSS2DObject) c.visible = false;
+      }
     },
   };
 }

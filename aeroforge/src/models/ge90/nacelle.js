@@ -1,14 +1,16 @@
-// Boeing 777 nacelle and installation hardware: inlet, fan cowl doors, cascade thrust reverser
-// (translating sleeves, cascades, blocker doors and drag links, hydraulic actuators), core cowl
-// with its bifurcations, the pylon (strut) stub and the forward and aft engine mounts. GE builds
-// the bare engine; Boeing designs and supplies the nacelle, reverser and strut.
+// Boeing 777 nacelle and installation hardware: inlet, fan cowl doors with their hinges, latches
+// and hold-open rods, cascade thrust reverser (translating sleeves, cascades, blocker doors and drag
+// links, hinge and latch beams, hydraulic actuators with their control valves, lines and
+// synchronising shafts), core cowl with its bifurcations and pressure-relief door, the pylon
+// (strut) stub and the forward and aft engine mounts and thrust links. GE builds the bare engine;
+// Boeing designs and supplies the nacelle, reverser and strut.
 
 import * as THREE from 'three';
 import { SKIN } from '../../engine/materials.js';
 import { lathe } from '../../engine/geometry.js';
 import { GM } from './materials.js';
 import { NACELLE, FAN, bypassAt, FAN_NOZZLE_Y } from './layout.js';
-import { cutLathe, cutPair, wall, sector, boxAt, axialCyl, merge, P3, kept, tube } from './geom.js';
+import { cutLathe, cutPair, wall, sector, boxAt, axialCyl, radialCyl, merge, P3, kept, tube, arc, cutTube } from './geom.js';
 
 const TAU = Math.PI * 2;
 const UP = Math.PI * 1.5;          // phi of the pylon (world up)
@@ -38,7 +40,7 @@ export function buildNacelle(ctx) {
   const inletLiner = cut(cutLathe(barrel, SKIN.liner(), N));
   P('Inlet cowl', {
     system: 'Skin & fairings', skin: true, material: 'Aluminium lip, composite outer barrel, acoustic honeycomb inner barrel', mass: 380,
-    explode: [0, 2.4, 0], temp: 288,
+    explode: [0, 3.05, 0], temp: 288,
     desc: 'Boeing-supplied inlet, about 1.5 m long, that slows the air to roughly Mach 0.6 at the fan face with no separation even in crosswinds. Its lip is a D-shaped duct heated by engine bleed air for anti-icing; the inner barrel is a perforated honeycomb that absorbs fan noise.',
   }, [inletShell, inletLiner]).userData.part.stationTemp = '2';
 
@@ -47,9 +49,28 @@ export function buildNacelle(ctx) {
   for (const y of [-0.15, -0.75, -1.3]) fanCowl.push([[1.9 + DR, y + 0.01], [1.96 + DR, y + 0.01], [1.96 + DR, y - 0.01], [1.9 + DR, y - 0.01]]);
   P('Fan cowl doors', {
     system: 'Skin & fairings', skin: true, material: 'Carbon-fibre composite sandwich', mass: 260, count: 2,
-    explode: [-0.9, 0.1, -1.1], temp: 300,
+    explode: [-0.45, 0.1, -1.5], temp: 300,
     desc: 'Two large doors hinged from the strut that swing up to give mechanics access to the fan-case accessories — the gearbox, FADEC, oil tank and pumps. On this cutaway the half facing you is removed.',
   }, cut(cutLathe(fanCowl, nac, N)));
+  const R_COWL = NACELLE.maxR;
+  P('Fan cowl hinges', {
+    system: 'Structure', material: 'Machined aluminium hinge fittings on the strut (Boeing)', mass: 12, count: 6,
+    explode: [-0.55, 0.1, -1.0], temp: 300,
+    desc: 'Three hinges along the top of each fan cowl door tie it to the strut, so a mechanic can swing the 130 kg door up like a gull wing.',
+  }, cut(cutPair((keep) => merge([-0.6, -0.95, -1.3].flatMap((y) => [UP - 0.14, UP + 0.14].filter((p) => keep(p)).map((phi) => boxAt(2.05, y, phi, [0.06, 0.12, 0.06])))), GM.steel(), 'nacelle')));
+  P('Fan cowl latches', {
+    system: 'Structure', material: 'Hook latches with flush handles (count estimated)', mass: 4, count: 4,
+    explode: [0.15, 0.1, -0.9], temp: 300,
+    desc: 'Four hook latches join the two doors along the bottom of the nacelle. Their handles sit flush and are painted bright so an unlatched cowl stands out on the walk-round: a cowl that is not latched can tear off on take-off.',
+  }, mesh0(merge([0.0, -0.4, -0.8, -1.2].map((y) => boxAt(R_COWL + 0.008, y, DOWN + 0.02, [0.025, 0.14, 0.05]))), GM.red()));
+  P('Fan cowl hold-open rods', {
+    system: 'Structure', material: 'Telescopic aluminium rods, stowed on clips inside each door', mass: 6, count: 4,
+    explode: [-0.45, 0.1, -1.4], temp: 300,
+    desc: 'Two per door. Swung out, they prop the open door against the strut so it cannot fall on the mechanic; stowed, they clip along the inside of the door.',
+  }, cut(cutPair((keep) => merge([[Math.PI + 0.45, -0.25], [Math.PI + 0.45, -0.9], [-0.45, -0.25], [-0.45, -0.9]].filter(([phi]) => keep(phi)).map(([phi, y]) => {
+    const a = P3(2.05, y, phi - 0.28), b = P3(2.05, y, phi + 0.28);
+    return new THREE.CylinderGeometry(0.014, 0.014, 1, 8).applyMatrix4(linkMatrix(a, b));
+  })), GM.aluminium(), 'nacelle')));
 
   // ------------------------------------------------------------------ thrust reverser
   const sleeveFwd = NACELLE.sleeveFwdY, cavityAft = -2.42;
@@ -65,7 +86,7 @@ export function buildNacelle(ctx) {
   const sleeveGrp = cut(cutLathe(sleeve, nac, N));
   P('Thrust reverser translating sleeves', {
     system: 'Skin & fairings', skin: true, material: 'Composite outer skin, acoustic inner skin', mass: 620, count: 2,
-    explode: [-0.6, -1.0, -1.2], temp: 300,
+    explode: [-0.45, -1.0, -1.35], temp: 300,
     desc: 'The aft nacelle. For reverse thrust the two sleeves slide aft (0.6 m here; the real stroke is not published), uncovering the cascades while blocker doors fold into the duct. Its trailing edge is the fan nozzle, the exit for the bypass air.',
   }, sleeveGrp);
 
@@ -157,6 +178,34 @@ export function buildNacelle(ctx) {
     desc: 'Three hydraulic actuators per reverser half drive the sleeve. Locks hold the reverser stowed in flight; the FADEC and aircraft both have to agree before it can deploy, and only on the ground.',
   }, [cylinders, rods]);
 
+  P('Thrust reverser hinge & latch beams', {
+    system: 'Structure', material: 'Machined aluminium / titanium beams with slider tracks (Boeing)', mass: 90, count: 4,
+    explode: [-0.45, -0.9, -1.2], temp: 300,
+    desc: 'Each reverser half (C-duct) hangs from a hinge beam along the strut and latches to its partner along a latch beam at the bottom; tracks on the beams guide the translating sleeve. Unlatched, each half swings open like a clamshell to expose the core.',
+  }, cut(cutPair((keep) => merge([[UP - 0.12, 1.84], [UP + 0.12, 1.84], [DOWN + 0.1, 1.84], [DOWN - 0.1, 1.84]].filter(([phi]) => keep(phi)).flatMap(([phi, r]) => [boxAt(r, -2.3, phi, [0.12, 1.16, 0.06]), boxAt(r - 0.07, -2.3, phi, [0.03, 1.16, 0.09])])), GM.casingDark(), 'nacelle')));
+  P('Thrust reverser control valve module', {
+    system: 'Hydraulics', material: 'Isolation and directional-control valves in one block (Boeing)', mass: 12,
+    explode: [-0.9, -0.3, -0.6], temp: 300,
+    desc: 'Two independent valves stand between the 777\'s hydraulic system and the reverser: the isolation valve only opens on the ground with the thrust lever at idle, and the directional valve then sends pressure to the deploy or stow side. Three independent locks keep a fault from deploying it in flight.',
+  }, mesh0(merge([boxAt(1.98, -1.3, UP - 0.14, [0.1, 0.16, 0.12]), radialCyl(2.03, 2.08, -1.3, UP - 0.14, 0.02, 8)]), GM.blue()));
+  const TR_PHI = [-0.95, 0, 0.95, Math.PI - 0.95, Math.PI, Math.PI + 0.95];
+  P('Thrust reverser hydraulic lines', {
+    system: 'Hydraulics', material: 'Stainless deploy and stow pressure lines (Boeing)', mass: 10, count: 2,
+    explode: [-0.55, -0.6, -1.05], temp: 300,
+    desc: 'Deploy and stow lines run from the control valves round each reverser half to all three actuators, so the three push together; the stow side stays pressurised in flight to hold the sleeves shut.',
+  }, cut(cutPair((keep) => merge([
+    cutTube([P3(2.02, -1.3, UP - 0.14), P3(2.02, -1.6, UP - 0.12), ...arc(2.02, -1.82, UP - 0.12, Math.PI - 0.98, 0.08)], 0.011, keep),
+    cutTube([P3(2.05, -1.3, UP - 0.12), P3(2.05, -1.62, UP - 0.1), ...arc(2.05, -1.86, UP - 0.1, Math.PI - 1.0, 0.08)], 0.011, keep),
+    cutTube([...arc(2.02, -1.82, UP + 0.12, TAU + 0.98, 0.08)], 0.011, keep),
+    cutTube([...arc(2.05, -1.86, UP + 0.1, TAU + 1.0, 0.08)], 0.011, keep),
+    ...TR_PHI.filter((p) => keep(p)).map((phi) => radialCyl(1.93, 2.06, -1.84, phi, 0.01, 8)),
+  ]), GM.steel(), 'nacelle')));
+  P('Thrust reverser synchronising shafts', {
+    system: 'Hydraulics', material: 'Flexible steel drive shafts in sheaths (Boeing)', mass: 6, count: 4,
+    explode: [-0.5, -0.55, -1.1], temp: 300,
+    desc: 'Flexible shafts gear the three actuators of each half together, so the sleeve cannot skew and jam if one actuator runs ahead of the others. They also drive the position sensors that tell the FADEC where the sleeve is.',
+  }, cut(cutPair((keep) => merge([[-0.95, 0], [0, 0.95], [Math.PI - 0.95, Math.PI], [Math.PI, Math.PI + 0.95]].filter(([a, b]) => keep((a + b) / 2)).map(([a, b]) => tube(arc(1.97, -1.76, a, b, 0.06), 0.009, { seg: 24, radial: 6 }))), GM.steel(), 'nacelle')));
+
   // deploy the reverser: 0 stowed … 1 deployed
   ctx.reverser = {
     set(d) {
@@ -190,6 +239,11 @@ export function buildNacelle(ctx) {
     explode: [0, -0.4, -1.6], temp: 380,
     desc: 'The inner wall of the bypass duct and the fireproof box round the core. The upper and lower bifurcations are walls across the duct that carry the strut, pipes and wiring between core and nacelle.',
   }, [cut(cutLathe(ifs, GM.coreCowl(), N)), bif]);
+  P('Core cowl pressure-relief door', {
+    system: 'Skin & fairings', skin: true, material: 'Spring-loaded composite door (Boeing)', mass: 3,
+    explode: [0, -0.4, -1.75], temp: 380,
+    desc: 'If a bleed duct bursts inside the core compartment, this door blows open to vent the pressure before it can damage the cowls; it stays open and shows the crew on the walk-round that something let go.',
+  }, cut(cutPair((keep) => (keep(Math.PI + 0.6) ? merge([sector(1.06, 1.072, -3.05, -3.4, Math.PI + 0.48, Math.PI + 0.72, 8)]) : new THREE.BufferGeometry()), GM.red(), 'nacelle')));
 
   // ------------------------------------------------------------------ pylon (strut) stub
   // side profile (y, r) of the strut stub, extruded across its 0.42 m width at 12 o'clock
@@ -198,9 +252,9 @@ export function buildNacelle(ctx) {
   const pylon = new THREE.ExtrudeGeometry(shape, { depth: 0.42, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 2, curveSegments: 4 });
   pylon.translate(0, 0, -0.21);
   P('Pylon (strut) stub', {
-    system: 'Structure', material: 'Titanium and steel box beam (Boeing)', mass: 900,
-    explode: [-1.3, -0.2, 0], temp: 300,
-    desc: 'The forward end of the 777\'s engine strut, cut off where it would join the wing. It carries thrust, weight and gust loads into the wing box, and houses the precooler and the fuel, bleed and electrical connections.',
+    system: 'Structure', skin: true, material: 'Titanium and steel box beam under aluminium fairings (Boeing)', mass: 900,
+    explode: [-0.8, -0.2, 0], temp: 300,
+    desc: 'The forward end of the 777\'s engine strut, cut off where it would join the wing. It carries thrust, weight and gust loads into the wing box, and houses the precooler and the fuel, bleed, hydraulic and electrical connections (drawn see-through in X-ray and Systems so they show). Boeing hardware, outside the engine\'s dry weight.',
   }, mesh0(pylon, GM.painted()));
 
   // ------------------------------------------------------------------ mounts and thrust links
@@ -214,15 +268,20 @@ export function buildNacelle(ctx) {
   for (const s of [-1, 1]) {
     const a = P3(0.96, -2.04, UP + s * 0.32), b = P3(1.02, -5.16, UP + s * 0.11);
     links.push(new THREE.CylinderGeometry(0.03, 0.03, 1, 10).applyMatrix4(linkMatrix(a, b)));
+    links.push(boxAt(0.96, -2.04, UP + s * 0.32, [0.07, 0.08, 0.07]));
   }
-  links.push(boxAt(1.0, -5.27, UP, [0.1, 0.16, 0.5]), boxAt(1.07, -5.27, UP, [0.06, 0.1, 0.18]));
-  P('Aft engine mount & thrust links', {
-    system: 'Structure', material: 'Forged steel / titanium (arrangement typical of GE wide-body engines)', mass: 120,
-    explode: [-0.8, -0.95, 0], temp: 600,
-    desc: 'The aft mount on the turbine rear frame takes vertical, side and roll loads; a pair of thrust links runs forward to the fan hub frame and carries the engine\'s 514 kN of take-off thrust into the strut. GE does not publish GE90 mount drawings, so the layout follows GE\'s patents for this class of engine.',
+  P('Thrust links', {
+    system: 'Structure', material: 'Forged steel links with spherical bearings (arrangement typical of GE wide-body engines)', mass: 50, count: 2,
+    explode: [-0.8, -0.6, 0], temp: 450,
+    desc: 'A pair of links from the fan hub frame back to the aft mount\'s evener beam carries the engine\'s 514 kN of take-off thrust into the strut, so the forward mount does not have to. Each link alone can carry it if the other fails.',
   }, mesh0(merge(links), GM.steel()));
+  P('Aft engine mount', {
+    system: 'Structure', material: 'Forged steel / titanium yoke and links (arrangement typical of GE wide-body engines)', mass: 70,
+    explode: [-0.8, -0.95, 0], temp: 600,
+    desc: 'The aft mount on the turbine rear frame takes vertical, side and roll loads. GE does not publish GE90 mount drawings, so the layout follows GE\'s patents for this class of engine.',
+  }, mesh0(merge([boxAt(1.0, -5.27, UP, [0.1, 0.16, 0.5]), boxAt(1.07, -5.27, UP, [0.06, 0.1, 0.18]), ...[-0.2, 0.2].map((d) => boxAt(1.01, -5.2, UP + d, [0.05, 0.06, 0.05]))]), GM.steel()));
 
-  void kept; void lathe; void tube; void ctx;
+  void kept; void lathe; void tube; void ctx; void FAN;
 }
 
 /** Matrix that stretches a unit Y-axis cylinder between points a and b. */

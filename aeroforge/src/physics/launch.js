@@ -2,7 +2,8 @@
 // spherical Earth with ISA drag. All 27 Merlin 1D engines light at liftoff; the centre core
 // throttles down so it is still burning after the side boosters separate; stage 1 flies a
 // pitch-kick + gravity turn; the second stage (one Merlin Vacuum) runs a closed-loop
-// altitude/vertical-rate guidance law until orbital insertion.
+// altitude/vertical-rate guidance law and cuts off when the orbit's energy (semi-major axis)
+// reaches that of a circular orbit at the target altitude.
 //
 // Engine model: each engine has a fixed mass flow ṁ = F_vac / (g0 · Isp_vac) at full throttle and
 // a thrust that falls with ambient pressure, F = F_vac − p_a · A_e. The nozzle exit area A_e is the
@@ -17,28 +18,37 @@ export const R_EARTH = 6371000;           // m (mean)
 const OMEGA_EARTH = 7.2921159e-5;         // rad/s
 
 const MERLIN_1D = { thrustSL: 845e3, thrustVac: 914e3, ispSL: 282, ispVac: 311 };
-const MERLIN_VAC = { thrustSL: 0, thrustVac: 981e3, ispSL: 0, ispVac: 348, exitArea: 7.07 };
+// Merlin Vacuum: 981 kN (Falcon 9 page; SpaceX's Falcon Heavy page lists the stage at 934 kN),
+// 3.3 m exit → 8.55 m² (only matters in the thin air at second-engine start)
+const MERLIN_VAC = { thrustSL: 0, thrustVac: 981e3, ispSL: 0, ispVac: 348, exitArea: 8.55 };
+
+/** Free-molecular heating limit for fairing jettison (Falcon User's Guide criterion), W/m². */
+export const FAIRING_HEATING_LIMIT = 1135;
 
 /**
- * Falcon Heavy (Block 5) in its fully expendable configuration. Propellant loads follow the
- * Falcon 9 figures in public references (first stage 395.7 t; second stage 107.5 t = 75.2 t LOX +
- * 32.3 t RP-1, gross 111.5 t); dry masses are estimates (SpaceX does not publish them; the centre
- * core is taken heavier than a side booster for its thicker walls and separation hardware).
- * With these numbers the liftoff mass without payload is 1,379.7 t; SpaceX's published
- * 1,420,788 kg corresponds to a payload of about 41 t.
+ * Falcon Heavy (Block 5) in its fully expendable configuration. Stage loads follow the Falcon
+ * Heavy specification table (Espace & Exploration no. 51, as tabulated on Wikipedia): each core
+ * holds 287.4 t of LOX and 123.5 t of RP-1 (410.9 t) on a 22.2 t dry structure (433.1 t fuelled);
+ * the second stage holds 75.2 t LOX + 32.3 t RP-1 on 4.0 t (111.5 t fuelled); the fairing is
+ * 1.7 t. Those figures give 1,412.5 t, against SpaceX's published 1,420,788 kg for the vehicle
+ * without payload; the ≈ 8 t gap is taken here as the strengthened centre core, so its dry mass
+ * (30 t) is an estimate. The centre-core throttle setting and timing are estimates too.
  */
 export const FALCON_HEAVY = {
   name: 'Falcon Heavy',
   launchLatitude: 28.608,                 // deg, LC-39A
-  booster: { count: 2, prop: 395700, dry: 25600, engines: 9, ...MERLIN_1D },
-  core: { prop: 395700, dry: 28000, engines: 9, ...MERLIN_1D },
+  booster: { count: 2, prop: 410900, dry: 22200, engines: 9, ...MERLIN_1D },
+  core: { prop: 410900, dry: 30500, engines: 9, ...MERLIN_1D },
   upper: { prop: 107500, dry: 4000, engines: 1, ...MERLIN_VAC },
-  fairing: 1900,
+  fairing: 1700,
   coreThrottleDown: 0.55,                 // centre-core throttle setting during the booster phase (estimate)
-  coreThrottleTime: 40,                   // s after liftoff (SpaceX: "shortly after liftoff")
+  coreThrottleTime: 25,                   // s after liftoff (SpaceX: "shortly after liftoff"; estimate)
   sepDelay: 3,                            // MECO → stage separation, s
   sesDelay: 10,                           // MECO → second-engine start, s
   boosterSepDelay: 3,                     // BECO → side-booster separation, s
+  fairingDelay: 25,                       // earliest fairing jettison after second-engine start, s (Arabsat-6A: 25 s)
+  kickStart: 10,                          // s: vertical rise clear of the tower, then the pitch-over
+  kickDuration: 10,                       // s
 };
 
 /** Nozzle exit area that turns a stage's vacuum thrust into its sea-level thrust (m², per engine). */
@@ -109,6 +119,67 @@ export function planarElements(r, vr, vt) {
 }
 
 /**
+ * Ideal (loss-free) Δv this model needs for a circular orbit at altitude h (m), calibrated on its
+ * best-kick capability at 180–600 km: about 8.7 km/s for 200 km plus ≈ 1.9 m/s per extra km.
+ * Below it no pitch programme reaches the orbit, so a failure is the payload's fault.
+ */
+export function deltaVNeeded(h) {
+  return 8350 + 1.9 * (h / 1000);
+}
+
+/** Second-engine-start altitude (m) that suits a target orbit altitude (m) in this model. */
+export function idealSESAltitude(target) {
+  return 60e3 + 0.32 * target;
+}
+
+/** How far (m) perigee and apogee may sit from the target altitude for "orbit achieved". */
+export const ORBIT_TOLERANCE = 50e3;
+const MIN_PERIGEE = 120e3;             // below this the orbit decays within hours: suborbital
+
+/**
+ * Judge the state at second-engine cutoff. Returns the result object with success (the target
+ * orbit within ORBIT_TOLERANCE), orbit (any bound orbit with perigee ≥ 120 km), cause and the
+ * event label naming what went wrong.
+ */
+function judgeOrbit(el, { energyReached, hSES, targetAltitude, t, upperProp, v, tooHeavy }) {
+  const hp = el.rp - R_EARTH;
+  const ha = Number.isFinite(el.ra) && el.e < 1 ? el.ra - R_EARTH : Infinity;
+  const base = { perigee: hp, apogee: ha, time: t, upperPropRemaining: upperProp, velocity: v };
+  const km = (x) => Math.round(x / 1e3);
+  if (!Number.isFinite(ha)) {
+    return { ...base, success: false, orbit: false, cause: 'escape', event: 'FAILED', label: 'Escape trajectory: the stage overshot orbital energy' };
+  }
+  // where the trajectory went wrong: the first stage left the second too high (lofted, too steep)
+  // or too low (too flat) compared with what this target needs
+  const lofted = hSES > idealSESAltitude(targetAltitude);
+  const shape = lofted
+    ? 'the trajectory was too lofted; raise the pitch-over kick'
+    : 'the trajectory was too flat; lower the pitch-over kick';
+  if (!energyReached) {
+    if (hp < MIN_PERIGEE) {
+      // out of propellant: blame the mass if no pitch programme could have made it, else the path
+      if (!tooHeavy) {
+        return { ...base, success: false, orbit: false, cause: lofted ? 'lofted' : 'flat', event: 'FAILED',
+          label: `Suborbital: propellant ran out short of orbital speed; ${shape}` };
+      }
+      return { ...base, success: false, orbit: false, cause: 'heavy', event: 'FAILED',
+        label: 'Suborbital: propellant ran out short of orbital speed. The payload is too heavy for this mission; lighten it or lower the target' };
+    }
+    return { ...base, success: false, orbit: true, cause: 'short', event: 'OFFTARGET',
+      label: `Propellant ran out in a lower ${km(hp)} × ${km(ha)} km orbit, short of the target. Lighten the payload` };
+  }
+  if (hp < MIN_PERIGEE) {
+    return { ...base, success: false, orbit: false, cause: lofted ? 'lofted' : 'flat', event: 'FAILED',
+      label: `Suborbital: orbital energy reached on a ${km(hp)} × ${km(ha)} km path; ${shape}` };
+  }
+  if (Math.abs(hp - targetAltitude) > ORBIT_TOLERANCE || Math.abs(ha - targetAltitude) > ORBIT_TOLERANCE) {
+    return { ...base, success: false, orbit: true, cause: lofted ? 'lofted' : 'flat', event: 'OFFTARGET',
+      label: `Off-target orbit ${km(hp)} × ${km(ha)} km; ${shape}` };
+  }
+  return { ...base, success: true, orbit: true, cause: null, event: 'ORBIT', label: `Orbit insertion · ${km(hp)} × ${km(ha)} km` };
+}
+
+/**
  * Run the full ascent. Returns { samples, events, result }.
  * samples are taken every `sampleDt` seconds of mission time for playback and charts.
  */
@@ -122,6 +193,7 @@ export function simulateAscent({
   maxTime = 900,
 } = {}) {
   const B = vehicle.booster, C = vehicle.core, U = vehicle.upper;
+  const tooHeavy = deltaVBudget(vehicle, payload).total < deltaVNeeded(targetAltitude);
   const lat = (vehicle.launchLatitude * Math.PI) / 180;
   const wEff = OMEGA_EARTH * Math.cos(lat);   // eastward launch: planar co-rotation rate
 
@@ -130,7 +202,7 @@ export function simulateAscent({
   let upperProp = U.prop;
   let boostersAttached = true, coreAttached = true, fairingAttached = true;
   let phase = 'BOOST';                     // BOOST → CORE → COAST → UPPER → ORBIT | FAILED
-  let coastUntil = 0, upperIgnition = Infinity, boosterSepAt = Infinity;
+  let coastUntil = 0, upperIgnition = Infinity, boosterSepAt = Infinity, hSES = 0;
 
   const mass = () =>
     (boostersAttached ? B.count * B.dry + boosterProp : 0) +
@@ -192,12 +264,12 @@ export function simulateAscent({
       const B = (-12 * (dh - (vr * tGo) / 2)) / (tGo ** 3);
       const A = -vr / tGo - (B * tGo) / 2;
       const need = A + g - (vt * vt) / r;
-      const s = Math.max(-0.4, Math.min(0.9, need / aT));      // never more than ≈ 24° nose-down
+      const s = Math.max(-0.75, Math.min(0.97, need / aT));    // never more than ≈ 49° nose-down
       pitch = Math.PI / 2 - Math.asin(s);
-    } else if (t < 7) {
+    } else if (t < vehicle.kickStart) {
       pitch = 0;
-    } else if (t < 17) {
-      pitch = ((kickAngle * Math.PI) / 180) * ((t - 7) / 10);
+    } else if (t < vehicle.kickStart + vehicle.kickDuration) {
+      pitch = ((kickAngle * Math.PI) / 180) * ((t - vehicle.kickStart) / vehicle.kickDuration);
     } else {
       const flightPath = Math.atan2(vtAir, vr);     // angle of air-relative velocity from vertical
       pitch = Math.max(flightPath, (kickAngle * Math.PI) / 180);
@@ -271,36 +343,37 @@ export function simulateAscent({
       upperIgnition = t + vehicle.sesDelay;
     } else if (phase === 'COAST' && coreAttached && t >= coastUntil) {
       coreAttached = false;
-      ev('SEP', 'Stage separation (interstage pusher)');
+      ev('SEP', 'Stage separation (collets release, pneumatic pusher)');
     } else if (phase === 'COAST' && !coreAttached && t >= upperIgnition) {
       phase = 'UPPER';
+      hSES = r - R_EARTH;
       ev('SES', 'Second-engine start (SES-1), Merlin Vacuum');
     } else if (phase === 'UPPER') {
-      if (fairingAttached && h > 110e3 && t > upperIgnition + 4) {
+      // the fairing goes once the second stage is established and free-molecular heating
+      // (½ρv³) has fallen below the payload's limit
+      const heating = 0.5 * atm.rho * vAir * vAir * vAir;
+      if (fairingAttached && t >= upperIgnition + vehicle.fairingDelay && heating < FAIRING_HEATING_LIMIT) {
         fairingAttached = false;
         ev('FAIRING', 'Payload fairing separation');
       }
       const el = planarElements(r, vr, vt);
-      if (el.rp - R_EARTH >= targetAltitude - 8e3 || upperProp <= 0) {
-        phase = el.rp - R_EARTH > 120e3 ? 'ORBIT' : 'FAILED';
-        ev('SECO', upperProp <= 0 ? 'Second stage propellant depleted (SECO-1)' : 'Second-engine cutoff (SECO-1)');
-        result = {
-          success: phase === 'ORBIT',
-          perigee: el.rp - R_EARTH,
-          apogee: el.ra - R_EARTH,
-          time: t,
-          upperPropRemaining: upperProp,
-          velocity: Math.hypot(vr, vt),
-        };
-        if (phase === 'ORBIT') ev('ORBIT', `Orbit insertion · ${Math.round(result.perigee / 1e3)} × ${Math.round(result.apogee / 1e3)} km`);
-        else ev('FAILED', 'Suborbital: payload exceeds vehicle capability');
+      const aTarget = R_EARTH + targetAltitude;
+      const energyReached = el.energy >= -MU_EARTH / (2 * aTarget);
+      if (energyReached || upperProp <= 0) {
+        ev('SECO', upperProp <= 0 && !energyReached ? 'Second stage propellant depleted (SECO-1)' : 'Second-engine cutoff (SECO-1)');
+        result = judgeOrbit(el, { energyReached, hSES, targetAltitude, t, upperProp, v: Math.hypot(vr, vt), tooHeavy });
+        phase = result.success ? 'ORBIT' : result.orbit ? 'ORBIT' : 'FAILED';
+        ev(result.event, result.label);
         break;
       }
     }
     if (h < -10) {
       phase = 'FAILED';
-      result = { success: false, perigee: 0, apogee: 0, time: t, upperPropRemaining: upperProp, velocity: 0 };
-      ev('FAILED', 'Vehicle lost: ground impact');
+      result = { success: false, orbit: false, cause: tooHeavy ? 'heavy' : 'flat', perigee: 0, apogee: 0, time: t, upperPropRemaining: upperProp, velocity: 0,
+        label: tooHeavy
+          ? 'Vehicle lost: too heavy to climb out of the atmosphere; lighten the payload'
+          : 'Vehicle lost: the trajectory was too flat and fell back to the ground; lower the pitch-over kick' };
+      ev('FAILED', result.label);
       break;
     }
   }
@@ -318,7 +391,10 @@ export function simulateAscent({
 
   events.push({ t: maxQ.t, code: 'MAXQ', label: `Max-Q · ${(maxQ.q / 1000).toFixed(1)} kPa` });
   events.sort((a, b) => a.t - b.t);
-  if (!result) result = { success: false, perigee: 0, apogee: 0, time: t, upperPropRemaining: upperProp, velocity: 0 };
+  if (!result) {
+    result = { success: false, orbit: false, cause: 'timeout', perigee: 0, apogee: 0, time: t, upperPropRemaining: upperProp, velocity: 0, label: 'No orbit within the simulated time.' };
+    ev('FAILED', result.label);
+  }
   result.maxQ = maxQ;
   return { samples, events, result };
 

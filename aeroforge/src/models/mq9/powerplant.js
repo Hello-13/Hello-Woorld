@@ -129,9 +129,9 @@ export function screenGeo() {
 export function gearboxGeo() {
   const x0 = XS(STATIONS.gear1), x1 = XS(STATIONS.inlet1);
   const len = x1 - x0;
-  const body = lru(len, 0.33, 0.4, [x0 + len / 2, ENGINE_Y + 0.055, 0], 0.08);
-  const nose = cylX(x0 - 0.06, x0 + 0.02, 0.07, 0.1, SHAFT_Y, 0, 20);
-  const pads = [cylX(x0 - 0.02, x0 + 0.01, 0.09, 0.09, 1.6, 0.12, 16), cylX(x0 - 0.02, x0 + 0.01, 0.075, 0.075, 1.6, -0.12, 16)];
+  const body = lru(len, 0.3, 0.4, [x0 + len / 2, ENGINE_Y + 0.035, 0], 0.08);
+  const nose = cylX(x0 - 0.06, x0 + 0.02, 0.065, 0.085, SHAFT_Y, 0, 20);
+  const pads = [cylX(x0 - 0.02, x0 + 0.01, 0.09, 0.09, 1.58, 0.135, 16), cylX(x0 - 0.02, x0 + 0.01, 0.075, 0.075, 1.58, -0.135, 16)];
   return merge([body, nose, ...pads]);
 }
 
@@ -140,7 +140,7 @@ export function shaftGeo() {
   const x0 = XS(STATIONS.gear1) - 0.06, x1 = X(10.42);
   return merge([
     cylX(x1, x0, 0.036, 0.036, SHAFT_Y, 0, 14),
-    cylX(x0 - 0.04, x0, 0.07, 0.07, SHAFT_Y, 0, 18), cylX(x1, x1 + 0.04, 0.07, 0.07, SHAFT_Y, 0, 18),
+    cylX(x0 - 0.04, x0, 0.058, 0.058, SHAFT_Y, 0, 18), cylX(x1, x1 + 0.04, 0.07, 0.07, SHAFT_Y, 0, 18),
   ]);
 }
 

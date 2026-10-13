@@ -25,6 +25,8 @@ export const HST_OTA = {
   R1: 11.04,           // primary radius of curvature (m): f1 = 5.52 m, f/2.3
   d: 4.906,            // primary–secondary vertex separation (m)
   K1asBuilt: -1.0139,  // primary conic as polished (the 1990 flaw)
+  K1design: -1.0022985, // published design conics (prescription used for the backup mirrors' tests)
+  K2design: -1.4960,
 };
 
 /** Rayleigh diffraction limit (rad) for wavelength λ (m) and aperture D (m). */

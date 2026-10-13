@@ -152,15 +152,33 @@ test('the power bucket: best endurance and best range speeds', () => {
   close(p2.parasite / p1.parasite, 8, 1e-9, 'parasite ∝ V³');
 });
 
+test('cruise at 100 % MCP matches the brochure: 151 kt at 16,800 lb, 4,000 ft / 95 °F', () => {
+  const lb = 0.45359237;
+  const cond = { mass: 16800 * lb, pressureAltitude: 1219, isaDev: 35 - (15 - 0.0065 * 1219) };
+  const s = speedSchedule(cond, { rating: 'mcp' });
+  close(s.vmax / KT, 151, 3, 'MCP level speed (Lockheed Martin UH-60M brochure 151 kt; Sikorsky Archives 153 kt)');
+  assert.equal(s.limit, 'power available');
+  // at 151 kt the power required equals 100 % MCP available
+  const req = powerRequired({ ...cond, V: 151 * KT }).total, mcp = powerAvailable({ ...cond, rating: 'mcp' }).W;
+  close(req / mcp, 1, 0.03, 'power required / MCP at 151 kt');
+  // the forward-flight terms leave the hover untouched and grow with advance ratio
+  const h = rotorPower({ thrust: 90e3, rho: 1.225 });
+  close(h.kappa, UH60.kappa, 1e-12, 'hover induced factor');
+  const f = rotorPower({ thrust: 90e3, rho: 1.225, V: 0.35 * 221, compress: false });
+  close(f.kappa, UH60.kappa * (1 + UH60.kappaMu * 0.35 ** 2), 1e-3, 'κ(μ)');
+  close(f.profile, f.P0hover * (1 + 4.65 * 0.1225 + UH60.profileMu4 * 0.1225 ** 2), 1e-3 * f.profile, 'profile polar without the compressibility term');
+});
+
 test('top speed and its limits', () => {
   const s = speedSchedule({ mass: UH60.mtow, pressureAltitude: 0, isaDev: 0 });
-  between(s.vmax / KT, 145, 180, 'max level speed at MCP, MTOW, SL (published ≈ 159 kt)');
+  between(s.vmax / KT, 145, 165, 'max level speed at MCP, MTOW, SL (published "maximum speed" 159 kt, condition not stated)');
+  assert.ok(speedSchedule({ mass: 7620, pressureAltitude: 0, isaDev: 0 }).vmax > s.vmax, 'lighter is faster');
   // tip-Mach boundary: (ΩR + V)/a = M_lim
   const a = airData(0, 0).a;
   close((rotorGeometry().vtip + s.vTip) / a, UH60.tipMachLimit, 1e-6, 'advancing-tip Mach limit');
   // a cold day lowers the tip-Mach speed; a hot, high, heavy day brings in retreating-blade stall
   assert.ok(speedSchedule({ mass: 8000, pressureAltitude: 0, isaDev: -30 }).vTip < s.vTip);
-  const hot = speedSchedule({ mass: UH60.mtow, pressureAltitude: 1500, isaDev: 20 });
+  const hot = speedSchedule({ mass: UH60.mtow, pressureAltitude: 2000, isaDev: 20 });
   assert.equal(hot.limit, 'retreating-blade stall');
 });
 

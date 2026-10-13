@@ -83,7 +83,7 @@ export function buildPropulsion(P) {
     P(`Helium tank (${tag})`, {
       system: 'Fuel', material: 'Carbon-overwrapped titanium-lined pressure vessel (Orbital ATK)', mass: 12, temp: 293, explode: [c[0] * 0.6, c[1] * 0.6, -0.3],
       desc: tag === 'A'
-        ? 'One of two helium pressurant tanks, about 58 L each at around 300 bar (estimates). Together they hold enough gas to push the whole propellant load, about 1.1 m³, out of the tanks at the regulated pressure; sized here to that load.'
+        ? 'One of two helium pressurant tanks, about 58 L each at around 300 bar (estimates). Together they hold enough gas to push the whole propellant load, about 1.3 m³ (900 kg of hydrazine ≈ 0.90 m³ plus 620 kg of nitrogen tetroxide ≈ 0.43 m³), out of the tanks at the regulated pressure; sized here to that load.'
         : 'The second helium tank, on the opposite side of the cylinder to balance the spacecraft. Tank count and size are estimates.',
     }, [mesh(new THREE.SphereGeometry(HE.r, 32, 20).translate(...c), G.copv()), mesh(merge(straps), G.aluminium())]);
   }

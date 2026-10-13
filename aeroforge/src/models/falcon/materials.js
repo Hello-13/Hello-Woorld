@@ -132,6 +132,17 @@ export const FM = {
     const c = carbonSet(3, 14);
     return new THREE.MeshPhysicalMaterial({ color: 0x9a9da2, map: c.map, normalMap: c.normalMap, roughness: 0.55, metalness: 0.2, clearcoat: 0.4, clearcoatRoughness: 0.4 });
   }),
+  /** Falcon Heavy centre-core interstage: the black thermal layer painted over in white-grey. */
+  interstageWhite: () => once('interWhite', () => {
+    const c = carbonSet(40, 12);
+    return paint(new THREE.MeshStandardMaterial({ color: 0xc9cccf, normalMap: c.normalMap, normalScale: new THREE.Vector2(0.15, 0.15), roughness: 0.64, metalness: 0.03 }));
+  }),
+  parafoil: () => once('parafoil', () => new THREE.MeshStandardMaterial({ color: 0x3d4a5c, roughness: 0.85, metalness: 0.0 })),
+  cable: () => once('cable', () => new THREE.MeshStandardMaterial({ color: 0x2b2d30, roughness: 0.75, metalness: 0.1 })),
+  safety: () => once('safety', () => new THREE.MeshStandardMaterial({ color: 0x7a3b2e, roughness: 0.55, metalness: 0.4 })),
+  battery: () => once('battery', () => new THREE.MeshStandardMaterial({ color: 0x4a5a4c, roughness: 0.55, metalness: 0.4 })),
+  /** Grey mission-extension-kit band over the second-stage RP-1 tank (absorbs sunlight on long coasts). */
+  mekGrey: () => once('mekGrey', () => new THREE.MeshStandardMaterial({ color: 0x6b6e70, roughness: 0.7, metalness: 0.05 })),
   titanium: () => once('ti', () => new THREE.MeshStandardMaterial({ color: 0x8b8580, roughness: 0.5, metalness: 0.95 })),
   whiteComposite: () => once('whiteComp', () => paint(new THREE.MeshStandardMaterial({ color: 0xd6d8da, roughness: 0.62, metalness: 0.02 }))),
   fairing: () => once('fairing', () => paint(new THREE.MeshStandardMaterial({ color: 0xd8dadb, roughness: 0.6, metalness: 0.02, side: THREE.DoubleSide }))),
@@ -159,8 +170,8 @@ export const FM = {
   padSteel: () => once('padSteel', () => new THREE.MeshStandardMaterial({ color: 0x6c7176, roughness: 0.6, metalness: 0.55 })),
   fssSteel: () => once('fssSteel', () => new THREE.MeshStandardMaterial({ color: 0x8a8d8f, roughness: 0.6, metalness: 0.45 })),
   teWhite: () => once('teWhite', () => new THREE.MeshStandardMaterial({ color: 0xc4c6c7, roughness: 0.6, metalness: 0.3 })),
-  refractory: () => once('refractory', () => new THREE.MeshStandardMaterial({ color: 0x5a554f, roughness: 0.95, metalness: 0.02 })),
-  deflector: () => once('deflector', () => new THREE.MeshStandardMaterial({ color: 0x8f8a83, roughness: 0.9, metalness: 0.1 })),
+  refractory: () => once('refractory', () => new THREE.MeshStandardMaterial({ color: 0x66645f, roughness: 0.95, metalness: 0.02 })),
+  deflector: () => once('deflector', () => new THREE.MeshStandardMaterial({ color: 0x84837f, roughness: 0.9, metalness: 0.1 })),
   water: () => once('waterPipe', () => new THREE.MeshStandardMaterial({ color: 0xb7b9b2, roughness: 0.5, metalness: 0.6 })),
   hardstand: () => once('hardstand', () => {
     const c = concrete({ seed: 11 });           // same tile as the pad floor (cached)
@@ -172,6 +183,6 @@ export const FM = {
   embankment: () => once('embankment', () => {
     const c = concrete({ seed: 11 });
     const n = c.normalMap.clone(); n.repeat.set(1 / 9, 1 / 9); n.needsUpdate = true;
-    return new THREE.MeshStandardMaterial({ color: 0x6f7550, normalMap: n, normalScale: new THREE.Vector2(1.5, 1.5), roughness: 1, metalness: 0 });
+    return new THREE.MeshStandardMaterial({ color: 0x7b7f6c, normalMap: n, normalScale: new THREE.Vector2(1.5, 1.5), roughness: 1, metalness: 0 });
   }),
 };

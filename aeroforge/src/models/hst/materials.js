@@ -28,57 +28,83 @@ function canvasTex(w, h, draw, { repeat = [1, 1], srgb = true } = {}) {
   return t;
 }
 
-/** Silvered-Teflon blanket: crinkle streaks, stitched quilting and the odd darker patch. */
-function mliAlbedo(seed, { base = [196, 200, 205], seams = 4, patches = 3 } = {}) {
+/**
+ * Silvered-Teflon blanket over one large tile: crinkle streaks, blanket seams at irregular real
+ * spacing (panels roughly 1–1.5 m across), tie-down stitching along the seams and weathered patches.
+ * The tile repeats only about twice around each half-shell, so no brickwork grid appears.
+ */
+function mliAlbedo(seed, { base = [196, 200, 205], seamsU = [0.21, 0.58, 0.86], seamsV = [0.37], patches = 5 } = {}) {
   return (ctx, w, h) => {
     const r = rng(seed);
     ctx.fillStyle = `rgb(${base.join(',')})`;
     ctx.fillRect(0, 0, w, h);
-    for (let i = 0; i < 900; i++) {
-      const x = r() * w, y = r() * h, l = 6 + r() * 46, a = r() * Math.PI;
+    // broad, soft brightness variation between blanket panels
+    const cols = [0, ...seamsU, 1], rows = [0, ...seamsV, 1];
+    for (let i = 0; i < cols.length - 1; i++) for (let j = 0; j < rows.length - 1; j++) {
+      const k = (r() - 0.5) * 22;
+      ctx.fillStyle = k > 0 ? `rgba(255,255,255,${k / 120})` : `rgba(40,44,50,${-k / 120})`;
+      ctx.fillRect(cols[i] * w, rows[j] * h, (cols[i + 1] - cols[i]) * w, (rows[j + 1] - rows[j]) * h);
+    }
+    for (let i = 0; i < 3200; i++) {
+      const x = r() * w, y = r() * h, l = 6 + r() * 60, a = r() * Math.PI;
       const v = r();
-      ctx.strokeStyle = v > 0.55 ? `rgba(250,252,255,${0.12 + r() * 0.3})` : `rgba(70,76,84,${0.08 + r() * 0.22})`;
-      ctx.lineWidth = 0.8 + r() * 2.2;
+      ctx.strokeStyle = v > 0.55 ? `rgba(250,252,255,${0.1 + r() * 0.28})` : `rgba(70,76,84,${0.07 + r() * 0.2})`;
+      ctx.lineWidth = 0.8 + r() * 2.4;
       ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); ctx.stroke();
     }
-    // blanket seams and tie-down stitching
+    // blanket seams (slightly wavy) with tie-down buttons along them
     ctx.strokeStyle = 'rgba(60,64,70,0.55)';
     ctx.lineWidth = 3;
-    for (let k = 0; k <= seams; k++) {
-      const x = (k / seams) * w;
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
-    }
-    ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
     ctx.fillStyle = 'rgba(80,84,90,0.6)';
-    for (let k = 0; k < seams; k++) for (let j = 0; j < 8; j++) {
-      ctx.beginPath(); ctx.arc(((k + 0.5) / seams) * w, ((j + 0.5) / 8) * h, 2.2, 0, Math.PI * 2); ctx.fill();
+    for (const u of seamsU) {
+      const x0 = u * w;
+      ctx.beginPath(); ctx.moveTo(x0, 0);
+      for (let y = 0; y <= h; y += h / 16) ctx.lineTo(x0 + Math.sin(y * 0.02 + u * 9) * 3, y);
+      ctx.stroke();
+      for (let y = h / 24; y < h; y += h / 12) { ctx.beginPath(); ctx.arc(x0 + 9, y, 2.4, 0, Math.PI * 2); ctx.fill(); }
+    }
+    for (const v of seamsV) {
+      const y0 = v * h;
+      ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(w, y0 + 4); ctx.stroke();
+      for (let x = w / 24; x < w; x += w / 12) { ctx.beginPath(); ctx.arc(x, y0 + 9, 2.4, 0, Math.PI * 2); ctx.fill(); }
     }
     // weathered / patched areas (the original outer layer cracked after years of UV and atomic oxygen)
     for (let k = 0; k < patches; k++) {
-      const x = r() * w, y = r() * h, pw = 30 + r() * 90, ph = 20 + r() * 60;
-      ctx.fillStyle = `rgba(${r() > 0.5 ? '150,146,132' : '220,224,228'},0.35)`;
+      const x = r() * w, y = r() * h, pw = 40 + r() * 160, ph = 30 + r() * 110;
+      ctx.fillStyle = `rgba(${r() > 0.5 ? '150,146,132' : '220,224,228'},0.3)`;
       ctx.fillRect(x, y, pw, ph);
     }
   };
 }
 
+/** A material that shares `base`'s textures but shifts its albedo map, so neighbouring shells differ. */
+function variant(base, key, offset) {
+  return once(key, () => {
+    const m = base.clone();
+    m.map = base.map.clone();
+    m.map.offset.set(...offset);
+    m.map.needsUpdate = true;
+    return m;
+  });
+}
+
 export const HM = {
   /** Silvered Teflon MLI on the light shield, forward shell and aft shroud. */
-  mli: () => once('mli', () => {
+  mli: (v = 0) => (v ? variant(HM.mli(), `mli${v}`, [0.37 * v, 0.23 * v]) : once('mli', () => {
     const n = mliSurface({ seed: 41 });
-    const map = canvasTex(512, 512, mliAlbedo(5), { repeat: [6, 2] });
+    const map = canvasTex(1024, 1024, mliAlbedo(5), { repeat: [2, 1] });
     const normalMap = n.normalMap.clone(); normalMap.repeat.set(14, 4); normalMap.needsUpdate = true;
     const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(9, 3); roughnessMap.needsUpdate = true;
     return new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.22, 0.22), roughness: 0.6, metalness: 0.55, side: THREE.DoubleSide });
-  }),
+  })),
   /** Light shield blanket: panel seams run lengthwise, more weathering toward the aperture. */
-  mliShield: () => once('mliShield', () => {
+  mliShield: (v = 0) => (v ? variant(HM.mliShield(), `mliShield${v}`, [0.41 * v, 0.17 * v]) : once('mliShield', () => {
     const n = mliSurface({ seed: 41 });
-    const map = canvasTex(512, 512, mliAlbedo(9, { base: [190, 194, 199], seams: 3, patches: 6 }), { repeat: [8, 2] });
+    const map = canvasTex(1024, 1024, mliAlbedo(9, { base: [190, 194, 199], seamsU: [0.14, 0.47, 0.79], seamsV: [0.62], patches: 8 }), { repeat: [2, 1] });
     const normalMap = n.normalMap.clone(); normalMap.repeat.set(16, 4); normalMap.needsUpdate = true;
     const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(10, 3); roughnessMap.needsUpdate = true;
     return new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.25, 0.25), roughness: 0.62, metalness: 0.55, side: THREE.DoubleSide });
-  }),
+  })),
   /** New Outer Blanket Layer: stainless-framed white covers fitted over bay doors (2002, 2009). */
   nobl: () => once('nobl', () => {
     const map = canvasTex(256, 256, (ctx, w, h) => {
@@ -172,11 +198,14 @@ export const HM = {
     return new THREE.MeshStandardMaterial({ color: 0xffffff, map, roughness: 0.6, metalness: 0.0 });
   }),
   /**
-   * Light-path visualisation: additive, unlit annotation drawn over the X-ray / Systems /
-   * Blueprint views. No depth test, so the beam stays readable through the baffles and the
-   * instruments that surround the focus.
+   * Light-path visualisation: additive, unlit annotation drawn in two passes. The bright pass is
+   * depth-tested (no depth write), so solid parts in front of the beam hide it and the depth cue
+   * survives; the faint ghost pass ignores depth, so hidden stretches still read as lying behind.
+   * X-ray, Blueprint and the ghosted skins write no depth, so there the bright pass shows in full.
    */
-  ray: () => once('ray', () => new THREE.MeshBasicMaterial({ color: 0xffc56a, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, toneMapped: false })),
-  beam: () => once('beam', () => new THREE.MeshBasicMaterial({ color: 0xffb648, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, side: THREE.DoubleSide, toneMapped: false })),
-  focus: () => once('focus', () => new THREE.MeshBasicMaterial({ color: 0xfff1c8, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, toneMapped: false })),
+  ray: () => once('ray', () => new THREE.MeshBasicMaterial({ color: 0xffc56a, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, toneMapped: false })),
+  rayGhost: () => once('rayGhost', () => new THREE.MeshBasicMaterial({ color: 0xffc56a, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, toneMapped: false })),
+  beam: () => once('beam', () => new THREE.MeshBasicMaterial({ color: 0xffb648, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, side: THREE.DoubleSide, toneMapped: false })),
+  focus: () => once('focus', () => new THREE.MeshBasicMaterial({ color: 0xfff1c8, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, toneMapped: false })),
+  focusGhost: () => once('focusGhost', () => new THREE.MeshBasicMaterial({ color: 0xfff1c8, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, toneMapped: false })),
 };

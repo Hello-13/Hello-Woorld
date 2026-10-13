@@ -1,11 +1,14 @@
 // Geometry helpers for the GE90-115B model, all in the lathe frame (see layout.js): engine axis
 // +y, x = r·sin(phi), z = r·cos(phi). Static pieces are built as two sectors, the one a cutaway
-// keeps and the one it removes, so the cutaway can be switched off. Rotor blades always stay whole
-// because they turn; everything axisymmetric (disks, drums, shafts) is cut like the casings.
+// keeps and the one it removes, so the cutaway can be switched off. Turning blade rows in the core
+// are cut too, blade by blade (rotorRow): they turn through less than one blade pitch and then
+// start again, which looks exactly like continuous turning because the blades are identical, so
+// the blades inside the removed sector stay a fixed, contiguous block that is simply not drawn.
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
-import { lathe, loftRings, airfoilLoop, orientOutward, mergeGeometries } from '../../engine/geometry.js';
+import { lathe, loftRings, orientOutward, mergeGeometries } from '../../engine/geometry.js';
+import { bladeRings } from './blade.js';
 import { M } from '../../engine/materials.js';
 
 const TAU = Math.PI * 2;
@@ -118,32 +121,12 @@ export function wall(line, t) {
 
 /**
  * One airfoil lofted from hub to tip. Local frame: engine axis +y, blade radial along +x,
- * tangential +z. Every spanwise quantity can be a number (constant), a [hub, tip] pair
- * (linear) or a function of span fraction f.
+ * tangential +z; each section is wrapped onto its own cylinder (see blade.js). Every spanwise
+ * quantity can be a number (constant), a [hub, tip] pair (linear) or a function of span fraction f.
  */
 export function bladeGeometry(o) {
-  const v = (q, f, d = 0) => (q == null ? d : typeof q === 'function' ? q(f) : Array.isArray(q) ? q[0] + (q[1] - q[0]) * f : q);
-  const stations = o.stations ?? 4, n = o.n ?? 8;
-  const rings = [];
-  for (let k = 0; k <= stations; k++) {
-    const f = k / stations;
-    const r = o.rHub + (o.rTip - o.rHub) * f;
-    const chord = v(o.chord, f);
-    const st = (v(o.stagger, f) * Math.PI) / 180;
-    const t = v(o.t, f, 0.08);
-    const loop = airfoilLoop(t, n, o.c0 ?? 0, o.c1 ?? 1, v(o.camber, f, 0.04));
-    const ca = -Math.cos(st), ct = Math.sin(st);
-    const na = Math.sin(st), nt = Math.cos(st);
-    const ax0 = (o.y ?? 0) + v(o.sweep, f, 0);
-    const tg0 = v(o.lean, f, 0);
-    const scale = o.scale ?? 1;
-    rings.push(loop.map(([xc, yt]) => {
-      const c = (xc - 0.5) * chord, h = yt * chord * scale;
-      return [r, ax0 + c * ca + h * na, tg0 + c * ct + h * nt];
-    }));
-  }
   const caps = o.caps ?? true;
-  return orientOutward(loftRings(rings, { capStart: caps, capEnd: caps }));
+  return orientOutward(loftRings(bladeRings(o), { capStart: caps, capEnd: caps }));
 }
 
 /**
@@ -236,8 +219,10 @@ export function flipFaces(g) {
 
 /** Merge geometries after making them all non-indexed (mixed sources). */
 export function merge(list) {
-  if (!list.filter(Boolean).length) return new THREE.BufferGeometry();
-  const geos = list.filter(Boolean).map((g) => (g.index ? g.toNonIndexed() : g));
+  // empty pieces (a cut run with nothing in it) are skipped
+  const live = list.filter((g) => g && g.attributes.position && g.attributes.position.count);
+  if (!live.length) return new THREE.BufferGeometry();
+  const geos = live.map((g) => (g.index ? g.toNonIndexed() : g));
   for (const g of geos) {
     if (!g.attributes.normal) g.computeVertexNormals();
     if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
@@ -246,4 +231,73 @@ export function merge(list) {
   const names = Object.keys(geos[0].attributes).filter((k) => geos.every((g) => g.attributes[k]));
   for (const g of geos) for (const k of Object.keys(g.attributes)) if (!names.includes(k)) g.deleteAttribute(k);
   return mergeGeometries(geos);
+}
+
+/**
+ * A turning blade row that the cutaway can cut: count copies of a blade template merged into one
+ * mesh, numbered so that blade 0 sits in the middle of the removed sector. updateRotor() spins it
+ * and sets the geometry's draw range to the blades outside the removed sector, so they are neither
+ * drawn, nor shadowed, nor picked. Blueprint edges are built per blade so they cut the same way.
+ */
+export function rotorRow(template, count, material, cut = 'engine') {
+  const c = CUTS[cut];
+  const phase = c.start + c.length + (TAU - c.length) / 2 - Math.PI / 2;
+  const m = mesh(ring(template, count, { phase }), material);
+  const edgeT = new THREE.EdgesGeometry(template, 24);
+  const edges = new THREE.LineSegments(ring(edgeT, count, { phase }), new THREE.LineBasicMaterial({ color: 0xffffff }));
+  edges.userData.fx = true;
+  edges.userData.edges = true;
+  edges.visible = false;
+  edges.raycast = () => {};
+  m.add(edges);
+  m.userData.edges = edges;
+  m.userData.rotor = {
+    count, phase, cut, pitch: TAU / count,
+    unit: template.index ? template.index.count : template.attributes.position.count,
+    edgeUnit: edgeT.attributes.position.count,
+  };
+  return m;
+}
+
+/** Turn a rotorRow to angle a (rad) and draw only the blades the cutaway keeps (all if cutOn is false). */
+export function updateRotor(m, a, cutOn) {
+  const R = m.userData.rotor;
+  const rot = ((a % R.pitch) + R.pitch) % R.pitch;
+  m.rotation.y = rot;
+  let lo = 0, hi = R.count;
+  if (cutOn) {
+    const c = CUTS[R.cut], margin = 0.6 * R.pitch;
+    lo = -1; hi = -1;
+    for (let i = 0; i < R.count; i++) {
+      const p = ((((Math.PI / 2 + R.phase + i * R.pitch + rot) - c.start) % TAU) + TAU) % TAU;
+      if (p >= margin && p <= c.length - margin) { if (lo < 0) lo = i; hi = i + 1; }
+    }
+    if (lo < 0) { lo = 0; hi = 0; }
+  }
+  m.geometry.setDrawRange(lo * R.unit, (hi - lo) * R.unit);
+  m.userData.edges.geometry.setDrawRange(lo * R.edgeUnit, (hi - lo) * R.edgeUnit);
+}
+
+/** Angle phi of a lathe-frame point (x = r·sin phi, z = r·cos phi), in [0, 2π). */
+export const phiOf = (p) => ((Math.atan2(p.x, p.z) % TAU) + TAU) % TAU;
+
+/** Points along a circumferential arc at radius r and station y, from phi0 to phi1 (either direction). */
+export function arc(r, y, phi0, phi1, step = 0.08) {
+  const n = Math.max(2, Math.ceil(Math.abs(phi1 - phi0) / step));
+  return Array.from({ length: n + 1 }, (_, i) => P3(r, y, phi0 + ((phi1 - phi0) * i) / n));
+}
+
+/**
+ * A pipe or cable through points, split by a cutPair selector: only the runs of points whose angle
+ * sel accepts are built, so a line that crosses the removed sector is cut like everything else.
+ */
+export function cutTube(points, radius, sel, { radial = 8, perPoint = 3 } = {}) {
+  const runs = [];
+  let run = [];
+  for (const p of points) {
+    if (sel(phiOf(p))) run.push(p);
+    else { if (run.length > 1) runs.push(run); run = []; }
+  }
+  if (run.length > 1) runs.push(run);
+  return merge(runs.map((r) => tube(r, radius, { seg: Math.max(4, r.length * perPoint), radial })));
 }

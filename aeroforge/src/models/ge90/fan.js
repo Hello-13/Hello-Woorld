@@ -1,6 +1,6 @@
 // Fan module and LP compressor (booster): spinner, 22 swept composite fan blades, fan disk,
-// Kevlar-wrapped containment case, outlet guide vanes, fan hub frame, 4-stage booster and its
-// variable bleed valves.
+// forged-aluminium containment case with its rub strip and acoustic liners, outlet guide vanes,
+// fan hub frame, 4-stage booster and its variable bleed valves and their actuators.
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
@@ -8,25 +8,11 @@ import { lathe } from '../../engine/geometry.js';
 import { M, SKIN } from '../../engine/materials.js';
 import { GM } from './materials.js';
 import { FAN, ROWS, coreAt, bypassAt } from './layout.js';
-import { cutLathe, cutPair, bladeGeometry, ring, wall, boxAt, kept, merge, ccw, flipFaces } from './geom.js';
-
-const D2R = Math.PI / 180;
+import { fanBladeSpec } from './blade.js';
+import { cutLathe, cutPair, bladeGeometry, ring, boxAt, axialCyl, merge, ccw, flipFaces, rotorRow, P3, tube } from './geom.js';
 
 /** Fan blade: swept wide-chord composite; with sheath = true, the titanium leading-edge strip. */
-function fanBlade(sheath = false) {
-  const chord = (f) => 0.5 + 0.17 * Math.sin(Math.min(1, f * 1.4) * (Math.PI / 2));
-  const stagger = (f) => 24 + 38 * Math.pow(f, 0.85);
-  // leading edge: swept forward over the inner span, then back at the tip (the -115B's swept fan)
-  const le = (f) => 0.085 * Math.sin(Math.PI * 0.9 * f) - 0.1 * f * f * f;
-  return bladeGeometry({
-    rHub: FAN.hubR - 0.004, rTip: FAN.tipR - 0.004,
-    chord, stagger, t: (f) => 0.11 - 0.08 * f, camber: (f) => 0.09 - 0.065 * f,
-    sweep: (f) => le(f) - 0.5 * chord(f) * Math.cos(stagger(f) * D2R),
-    lean: (f) => 0.05 * f * f,
-    stations: 10, n: sheath ? 5 : 14,
-    ...(sheath ? { c0: 0, c1: 0.1, scale: 1.18 } : {}),
-  });
-}
+const fanBlade = (sheath = false) => bladeGeometry(fanBladeSpec(sheath));
 
 /** A closed [r, y] section swept between angles p0 and p1, with end faces (a tilted sector). */
 function slab(loop, p0, p1, seg = 6) {
@@ -35,12 +21,21 @@ function slab(loop, p0, p1, seg = 6) {
   return merge([lathe(l.concat([l[0]]), seg, p0, p1 - p0), new THREE.ShapeGeometry(shape).rotateY(p0 - Math.PI / 2), flipFaces(new THREE.ShapeGeometry(shape)).rotateY(p1 - Math.PI / 2)]);
 }
 
-/** A blade row sized to the core annulus at y. Rotors leave a tip gap, stators a hub gap. */
-export function coreRow({ y, chord, count, rotor = true, stagger = rotor ? [38, 56] : [-24, -32], t = [0.07, 0.05], camber = rotor ? 0.05 : -0.05, stations = 2, n = 5, ann = coreAt, gap = 0.003, phase = 0 }, keep) {
+/** One airfoil sized to the core annulus at y. Rotors leave a tip gap, stators a hub gap. */
+export function coreBlade({ y, chord, count, rotor = true, stagger = rotor ? [38, 56] : [-24, -32], t = [0.07, 0.05], camber = rotor ? 0.05 : -0.05, stations = 2, n = 5, ann = coreAt, gap = 0.003 }) {
   const [hub, tip] = ann(y);
   // hub and tip ends sit against platforms and casings, so small airfoils are left open there
-  const g = bladeGeometry({ rHub: rotor ? hub : hub + gap, rTip: rotor ? tip - gap : tip, chord, stagger, t, camber, y, stations, n, caps: count < 40 });
-  return ring(g, count, { keep, phase });
+  return bladeGeometry({ rHub: rotor ? hub : hub + gap, rTip: rotor ? tip - gap : tip, chord, stagger, t, camber, y, stations, n, caps: count < 40 });
+}
+
+/** A stator row (static, cut by the cutaway through keep). */
+export function coreRow(o, keep) {
+  return ring(coreBlade(o), o.count, { keep, phase: o.phase ?? 0 });
+}
+
+/** A rotor row that turns and is cut blade by blade (see rotorRow in geom.js). */
+export function coreRotor(o, material) {
+  return rotorRow(coreBlade(o), o.count, material);
 }
 
 export function buildFan(ctx) {
@@ -51,10 +46,10 @@ export function buildFan(ctx) {
   const spinner = mesh(spinnerGeo, M.spinner());
   const spinSpinner = new THREE.Group();
   spinSpinner.add(spinner);
-  ctx.spin.n1.push(spinSpinner);
+  ctx.spin.n1.push({ g: spinSpinner });
   P('Spinner', {
     system: 'Propulsion', material: 'Composite cone, painted spiral', mass: 45,
-    explode: [0, 3.0, 0], temp: 288,
+    explode: [0, 2.45, 0], temp: 288,
     desc: 'A long cone that turns the incoming air smoothly onto the fan hub. The white spiral lets ground crew see at a glance whether the fan is turning.',
   }, spinSpinner).userData.part.stationTemp = '2';
 
@@ -64,11 +59,11 @@ export function buildFan(ctx) {
   blades.userData.temp = lt('2', '13', 0.5);
   const spinFan = new THREE.Group();
   spinFan.add(blades, sheaths);
-  ctx.spin.n1.push(spinFan);
+  ctx.spin.n1.push({ g: spinFan });
   P('Fan blades', {
     system: 'Propulsion', material: 'Carbon-fibre / toughened-epoxy composite, titanium leading-edge sheath', mass: 480, count: 22,
     explode: [0, 2.3, 0],
-    desc: '22 wide-chord swept composite blades, each about 1.2 m long and under 23 kg; the fan is 3.25 m (128 in) across. At take-off the tips run supersonic, and the fan alone makes roughly four fifths of the thrust. A titanium sheath protects each leading edge from birds, hail and erosion.',
+    desc: '22 wide-chord swept composite blades, each about 1.2 m long and under 23 kg; the fan is 3.25 m (128 in) across, with about 5 mm between the blade tips and the rub strip. At take-off the tips run supersonic, and the bypass air the fan pushes makes about four fifths of the thrust. A titanium sheath protects each leading edge from birds, hail and erosion.',
     callout: true, anchor: [-1.2, -0.05, 0.3],
   }, spinFan).userData.part.stationTemp = '13';
 
@@ -85,25 +80,30 @@ export function buildFan(ctx) {
   }, disk);
 
   // ------------------------------------------------------------------ fan containment case
+  // a hardwall case: one thick forged and machined aluminium ring, thickest over the blade tips
   const yF = 0.3, yMid = -0.72, yAft = -1.45;
   const caseShell = [
-    // forward flange (A-flange) and containment barrel
-    [[FAN.caseR, yF], [1.77, yF], [1.77, yF - 0.03], [1.668, yF - 0.03], [1.668, yMid + 0.03], [1.77, yMid + 0.03], [1.77, yMid], [FAN.caseR, yMid]],
+    // forward flange (A-flange), the thick containment zone over the blades, and the mid flange
+    [[FAN.caseR, yF], [1.77, yF], [1.77, yF - 0.03], [1.67, yF - 0.03], [1.67, 0.2], [1.705, 0.17], [1.705, -0.6], [1.67, -0.64], [1.67, yMid + 0.03], [1.77, yMid + 0.03], [1.77, yMid], [FAN.caseR, yMid]],
     // aft fan case with the OGV ring and its aft flange
     [[FAN.caseR, yMid - 0.01], [1.73, yMid - 0.01], [1.69, yMid - 0.06], [1.69, yAft + 0.03], [1.77, yAft + 0.03], [1.77, yAft], [FAN.caseR, yAft]],
   ];
   const caseGrp = cut(cutLathe(caseShell, GM.fanCase(), { seg: 96 }));
-  const kevlar = cut(cutLathe([[1.668, 0.18], [1.738, 0.16], [1.738, -0.62], [1.668, -0.64]], GM.kevlar(), { seg: 96 }));
-  // stiffening ribs and abradable rub strip over the blade tips
-  const ribs = cut(cutLathe([0.05, -0.2, -0.45].map((y) => [[1.738, y + 0.012], [1.758, y + 0.012], [1.758, y - 0.012], [1.738, y - 0.012]]), GM.fanCase(), { seg: 96 }));
-  const rub = cut(cutLathe([[FAN.caseR - 0.012, 0.12], [FAN.caseR, 0.12], [FAN.caseR, -0.5], [FAN.caseR - 0.012, -0.5]], GM.rubStrip(), { seg: 96 }));
-  const acoustic = cut(cutLathe([[[FAN.caseR - 0.006, yF], [FAN.caseR, yF], [FAN.caseR, 0.13], [FAN.caseR - 0.006, 0.13]], [[FAN.caseR - 0.006, -0.52], [FAN.caseR, -0.52], [FAN.caseR, yMid], [FAN.caseR - 0.006, yMid]]], GM.acoustic(), { seg: 96 }));
+  // machined stiffening ribs round the containment zone
+  const ribs = cut(cutLathe([0.12, -0.08, -0.28, -0.48].map((y) => [[1.705, y + 0.012], [1.73, y + 0.012], [1.73, y - 0.012], [1.705, y - 0.012]]), GM.fanCase(), { seg: 96 }));
   P('Fan containment case', {
-    system: 'Structure', material: 'Aluminium case wrapped in Kevlar fabric, abradable rub strip', mass: 1150,
+    system: 'Structure', material: 'Forged and machined aluminium ring (hardwall containment)', mass: 1150,
     explode: [0, 1.15, 0], temp: 290,
-    desc: 'If a blade ever breaks off at full power, the many layers of Kevlar wound round the case stretch and catch it — certification requires a deliberate blade-off test at take-off speed. The case also carries the fan cowls, the accessory gearbox, FADEC and oil tank.',
+    desc: 'If a blade ever breaks off at full power, this thick aluminium ring has to stop it; certification requires a deliberate blade-off test at take-off speed. A Kevlar/fibreglass wrap was added only as a temporary fix while the 777-300ER was certified in 2003; the production answer was a thicker aluminium forging. The case also carries the fan cowls, the accessory gearbox, FADEC and oil tank.',
     callout: true, anchor: [0.9, 0.0, 1.5],
-  }, [caseGrp, kevlar, ribs, rub, acoustic]);
+  }, [caseGrp, ribs]);
+  const rub = cut(cutLathe([[FAN.rubR, 0.12], [FAN.caseR, 0.12], [FAN.caseR, -0.5], [FAN.rubR, -0.5]], GM.rubStrip(), { seg: 96 }));
+  const acoustic = cut(cutLathe([[[FAN.caseR - 0.006, yF], [FAN.caseR, yF], [FAN.caseR, 0.13], [FAN.caseR - 0.006, 0.13]], [[FAN.caseR - 0.006, -0.52], [FAN.caseR, -0.52], [FAN.caseR, yMid], [FAN.caseR - 0.006, yMid]]], GM.acoustic(), { seg: 96 }));
+  P('Fan case rub strip & acoustic liners', {
+    system: 'Structure', material: 'Abradable filled-epoxy rub strip, perforated honeycomb liners', mass: 60,
+    explode: [0, 1.15, 0], temp: 290,
+    desc: 'The blade tips run about 5 mm inside a soft abradable strip: if the fan rubs, the strip wears instead of the blades, and the gap stays small for efficiency. Perforated honeycomb panels in front of and behind the fan absorb its tone.',
+  }, [rub, acoustic]);
 
   // ------------------------------------------------------------------ outlet guide vanes
   const ogvY = -1.12;
@@ -140,17 +140,17 @@ export function buildFan(ctx) {
 
   const boosterSpin = [];
   ROWS.boosterRotors.forEach((r, i) => {
-    const m = mesh(coreRow({ ...r, stagger: [42, 58], t: [0.07, 0.045] }), GM.titanium());
+    const m = coreRotor({ ...r, stagger: [42, 58], t: [0.07, 0.045] }, GM.titanium());
     m.userData.temp = lt('2', '25', 0.15 + i * 0.25);
     const g = new THREE.Group();
     g.add(m);
-    ctx.spin.n1.push(g);
+    ctx.spin.n1.push({ rotor: m });
     boosterSpin.push(g);
     P(`Booster rotor ${i + 1}`, {
       system: 'Propulsion', material: 'Titanium blades (count estimated)', mass: 28 - i * 3, count: r.count,
       explode: [0, 0.9, 0],
       desc: i === 0
-        ? 'First of four booster stages on the fan shaft (the -115B added the fourth stage to supercharge its larger core). Each turns at fan speed, N1, so the blades sit at large radius to get useful blade speed.'
+        ? 'First of four booster stages on the fan shaft. The -115B added the fourth stage, and dropped one HP-compressor stage, to push more air through a core of the same size as the earlier GE90s\'. Each turns at fan speed, N1, so the blades sit at large radius to get useful blade speed.'
         : i === 3
           ? 'Last booster stage. Together the fan hub and four booster stages raise core pressure about 2.3-fold before the HP compressor (modelled value; GE does not publish it).'
           : `Booster stage ${i + 1} rotor: each stage adds a pressure ratio of about 1.2.`,
@@ -236,8 +236,25 @@ export function buildFan(ctx) {
     system: 'Propulsion', material: 'Steel doors, unison ring and fuel-powered actuators (count estimated)', mass: 70, count: 12,
     explode: [-0.4, 0.25, 0.35], temp: 330,
     desc: 'Doors in the duct between booster and HP compressor. At low power and during rapid throttle changes the booster pumps more air than the core can swallow; the FADEC opens these doors to dump the excess into the bypass and keep the booster from stalling. The GE90 introduced doors that open inward into the flow, so they also scoop out sand, hail and ice flung to the outer wall — GE calls it a FOD-free core.',
-    callout: true, anchor: [0.02, -1.7, 0.77],
+    callout: true, anchor: [0.19, -1.7, 0.71],
   }, vbvGrp).userData.part.stationTemp = '25';
 
-  void kept; void SKIN; void wall;
+  // two fuel-powered actuators on the frame that turn the unison ring through bellcranks
+  const vbvAct = cutPair((keep) => {
+    const list = [];
+    for (const phi of [0.75, 0.75 + Math.PI]) {
+      if (!keep(phi)) continue;
+      list.push(axialCyl(0.86, -1.43, phi, 0.028, 0.26, 16), axialCyl(0.86, -1.27, phi, 0.018, 0.06, 12));
+      list.push(tube([P3(0.86, -1.56, phi), P3(0.84, -1.6, phi + 0.02), P3(0.81, -1.63, phi + 0.04)], 0.009, { seg: 8 }));
+      list.push(boxAt(0.81, -1.625, phi + 0.04, [0.05, 0.03, 0.04]));
+    }
+    return merge(list);
+  }, GM.steel());
+  P('VBV actuators', {
+    system: 'Propulsion', material: 'Fuel-powered hydraulic actuators with bellcranks (count and position estimated)', mass: 14, count: 2,
+    explode: [-0.4, 0.25, 0.75], temp: 330,
+    desc: 'High-pressure fuel from the HMU, used as hydraulic fluid, drives these two rams; through bellcranks they rotate the unison ring that opens and closes all the bleed doors together. A position sensor in each tells the FADEC where the doors are.',
+  }, cut(vbvAct));
+
+  void SKIN;
 }

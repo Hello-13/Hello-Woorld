@@ -55,3 +55,49 @@ test('maximum level speed at 7,600 m is near the published 444–482 km/h', () =
   const kmh = vmax * 3.6;
   assert.ok(kmh > 420 && kmh < 490, `max speed ${kmh.toFixed(0)} km/h`);
 });
+
+// ---- model checks that need no three.js: read the model source directly
+import { readFileSync } from 'node:fs';
+import TOUR from '../src/learn/tours/uav.js';
+
+const modelSrc = readFileSync(new URL('../src/models/uav.js', import.meta.url), 'utf8');
+const plantSrc = readFileSync(new URL('../src/models/mq9/powerplant.js', import.meta.url), 'utf8');
+
+/** Part names declared in uav.js: P('Name', …) and P(`Name (${side})`, …) expanded to both sides. */
+function partNames() {
+  const names = new Set();
+  // the wing-station labels used in `${label} pylon (${sn})`
+  const labels = [...modelSrc.matchAll(/\[\s*[\d.]+,\s*[\d.]+,\s*[\d.]+,\s*'(\w+)'/g)].map((m) => m[1]);
+  for (const m of modelSrc.matchAll(/P\((['`])([^'`]+)\1/g)) {
+    const n = m[2];
+    if (!n.includes('${')) { names.add(n); continue; }
+    for (const side of ['starboard', 'port']) {
+      const s1 = n.replace(/\$\{(sn|sd|SN\([^)]*\)|sn\([^)]*\))\}/g, side);
+      if (s1.includes('${label}')) for (const l of labels) names.add(s1.replace('${label}', l));
+      else names.add(s1);
+    }
+  }
+  return names;
+}
+
+test('every tour focus name is a part of the model', () => {
+  const names = partNames();
+  assert.ok(names.size >= 150, `model declares ${names.size} parts (target 150+)`);
+  const missing = [];
+  for (const step of TOUR) for (const n of step.focus || []) if (!names.has(n)) missing.push(`${step.title}: ${n}`);
+  assert.deepEqual(missing, [], 'tour names that match no part');
+  assert.ok(TOUR.length >= 8 && TOUR.length <= 12, `${TOUR.length} tour steps`);
+});
+
+test('TPE331-10 installation is the published 1.09 m long', () => {
+  const st = Object.fromEntries([...plantSrc.match(/STATIONS = \{([^}]+)\}/)[1].matchAll(/(\w+): ([\d.]+)/g)].map((m) => [m[1], +m[2]]));
+  const len = st.gear1 - st.exhaust;
+  assert.ok(len > 1.05 && len < 1.15, `engine length ${len.toFixed(3)} m (TPE331-10: 1.088 m)`);
+  assert.ok(st.exhaust < st.turbine0 && st.turbine0 < st.turbine1 && st.turbine1 < st.comp1 && st.comp1 < st.inlet1 && st.inlet1 < st.gear1, 'modules in flow order');
+});
+
+test('stores fits use the published store and M310 launcher masses', () => {
+  assert.equal(LOADOUTS.hellfire.mass, 4 * 49 + 2 * 43);
+  assert.equal(LOADOUTS.strike.mass, 2 * 230 + 4 * 49 + 2 * 43);
+  assert.ok(LOADOUTS.strike.mass < MQ9.maxExternal);
+});

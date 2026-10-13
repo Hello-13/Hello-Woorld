@@ -97,8 +97,21 @@ export function buildMainRotor({ A, parent }) {
   head.add(swash);
   const swashSpin = new THREE.Group();
   swash.add(swashSpin);
-  const UPX = 2.1;                                // exploded view: the whole head rises this far
+  // Exploded view: everything lifts along the shaft in assembly order, so the stack reads bottom to
+  // top: servos and guide → stationary → rotating swashplate → scissors and rods → horns, spindles,
+  // bearings → hub → bifilar → slip ring (the main module below rises only 0.3 m).
+  const UPX = 2.1;
   const P = (name, info, objs, par = spin) => A.part(name, { system: 'Rotor system', ...info }, objs, par);
+  // parts that turn with the rotor but whose callout should stay put: the part group sits in the
+  // non-rotating head frame and a child group turns with the hub every frame
+  const spinKids = [];
+  const staticPart = (name, info) => {
+    const part = P(name, info, [], head);
+    const k = new THREE.Group();
+    part.add(k);
+    spinKids.push(k);
+    return { part, k };
+  };
   const blades = [0, 1, 2, 3];
   const chains = [];                              // per part: four replicated blade chains
   const makeChains = (partGroup) => blades.map((i) => {
@@ -118,9 +131,11 @@ export function buildMainRotor({ A, parent }) {
   for (const i of blades) {
     const holder = new THREE.Group();
     P(`Main rotor blade ${i + 1}`, {
-      material: 'Composite (graphite/glass) spar, Nomex core, nickel erosion strip, heater mats', mass: 120, explode: [1.4, UPX + 0.4, 0],
+      material: 'Composite (graphite/glass) spar, Nomex core, nickel erosion strip, heater mats', mass: 110,
+      // each blade moves straight out along its own azimuth (the holder sits in the spinning frame)
+      explode: [1.4 * Math.cos((i * Math.PI) / 2), UPX + 0.4, -1.4 * Math.sin((i * Math.PI) / 2)],
       desc: i === 0
-        ? 'Wide-chord blade of the M model: new high-lift airfoils and a swept, tapered tip with anhedral that lift about 230 kg more than the UH-60L blade. 7.8 m long with −18° of twist; heater mats in the leading edge de-ice it. (Spar material per NASA test reports: graphite/glass composite; earlier UH-60A/L blades used a titanium spar.)'
+        ? 'Wide-chord blade of the M model: its chord is 1.74 in (4.4 cm) wider than the original blade, and new high-lift airfoils with a swept, tapered tip and anhedral add about 470 lb (213 kg) of lift. 7.8 m long with −18° of twist; heater mats in the leading edge de-ice it. (Spar material per NASA test reports: graphite/glass composite; earlier UH-60A/L blades used a titanium spar.)'
         : `One of four identical blades, 90° apart. At 258 rpm the tip moves at 221 m/s — Mach 0.65 in the hover and about Mach 0.88 on the advancing side at 150 kt.`,
     }, holder);
     const az = new THREE.Group(); az.rotation.y = (i * Math.PI) / 2;
@@ -164,9 +179,8 @@ export function buildMainRotor({ A, parent }) {
     for (const g of parts) { g.rotateY(a); hubParts.push(g); }
   }
   P('Main rotor hub', {
-    material: 'One-piece forged titanium hub', mass: 270, explode: [0, UPX + 0.5, 0],
+    material: 'One-piece forged titanium hub', mass: 240, explode: [0, UPX + 0.5, 0],
     desc: 'A single titanium forging with four box-section arms. Each arm holds one elastomeric bearing, so the hub has no flapping or lagging hinge pins to lubricate — far fewer parts than a conventional fully articulated head.',
-    callout: true, anchor: [0, -0.05, 0],
   }, [mesh(merge(hubParts), MAT.hubTi())]);
 
   const rubber = [], steel = [];
@@ -176,10 +190,12 @@ export function buildMainRotor({ A, parent }) {
     for (const g of [...r, ...s]) g.rotateY((i * Math.PI) / 2);
     rubber.push(...r); steel.push(...s);
   }
-  P('Elastomeric bearings', {
+  const brg = staticPart('Elastomeric bearings', {
     material: 'Laminated natural rubber and steel shims', mass: 18, count: 4, explode: [0, UPX + 0.15, 0],
     desc: 'Each bearing is a stack of thin rubber layers bonded between curved steel shims. The rubber shears to let the blade flap, lead-lag and change pitch about one focal point 0.381 m from the shaft, while the stack carries the blade\'s centrifugal pull — about 360 kN (≈ 37 tonnes-force) at 258 rpm — in compression.',
-  }, [mesh(merge(rubber), MAT.elastomer()), mesh(merge(steel), MAT.steel())]);
+    callout: true, anchor: [0, -0.04, 0.44],      // fixed point on the starboard side, where the bearings pass
+  });
+  brg.k.add(mesh(merge(rubber), MAT.elastomer()), mesh(merge(steel), MAT.steel()));
 
   // spindles & cuffs (move with the blade)
   const spindleParts = [
@@ -192,7 +208,7 @@ export function buildMainRotor({ A, parent }) {
   ];
   const spindleG = merge(spindleParts);
   const spindlePart = P('Blade spindles & cuffs', {
-    material: 'Titanium spindles, steel blade-retention pins', mass: 22, count: 4, explode: [0, UPX - 0.15, 0],
+    material: 'Titanium spindles, steel blade-retention pins', mass: 22, count: 4, explode: [0, UPX - 0.1, 0],
     desc: 'The spindle runs from the inner race of the elastomeric bearing out through the hub arm to the cuff that clamps the blade root with two pins; pulling one pin lets the blade fold back for shipping.',
   }, []);
   for (const c of makeChains(spindlePart)) c.feather.add(mesh(spindleG, MAT.titanium()));
@@ -203,7 +219,7 @@ export function buildMainRotor({ A, parent }) {
     box(0.1, 0.09, 0.14, [0.6 - E, 0, -0.07]),
   ]);
   const hornPart = P('Pitch horns', {
-    material: 'Forged steel horns', mass: 4, count: 4, explode: [0, UPX - 0.35, 0],
+    material: 'Forged steel horns', mass: 4, count: 4, explode: [0, UPX - 0.3, 0],
     desc: 'A lever on each spindle, ahead of the blade. Pushing its ball end up raises the leading edge: more pitch, more lift for that blade.',
   }, []);
   for (const c of makeChains(hornPart)) c.feather.add(mesh(hornG, MAT.steel()));
@@ -215,15 +231,15 @@ export function buildMainRotor({ A, parent }) {
     for (const g of [box(0.12, 0.05, 0.1, [0.62, -0.12, 0]), box(0.1, 0.04, 0.09, [0.62, 0.115, 0]), cyl(0.024, 0.024, 0.12, [0.33, -0.2, 0], 'x', 8)]) { g.rotateY((i * Math.PI) / 2); stops.push(g); }
   }
   P('Droop stops & flap restrainers', {
-    material: 'Steel stops with centrifugal-weight latches', mass: 8, count: 4, explode: [0, UPX + 0.05, 0.0],
-    desc: 'At low rotor speed spring-loaded stops hold the blades from drooping onto the tail cone or flapping up in gusts; above about 50 % rpm centrifugal weights swing them clear so the blades fly freely.',
+    material: 'Steel stops with centrifugal-weight latches', mass: 8, count: 4, explode: [0, UPX + 0.3, 0.0],
+    desc: 'At low rotor speed spring-loaded stops hold the blades from drooping onto the tail cone or flapping up in gusts. Centrifugal weights pull the flap restrainers clear at about 35 % Nr and the droop stops at about 70 %; on shutdown the droop stops re-seat at about 50 % (approximate H-60 figures).',
   }, [mesh(merge(stops), MAT.steel())]);
 
   // lead-lag dampers (hub lug → spindle), rebuilt every frame
-  const damperPart = P('Lead-lag dampers', {
+  const damperPart = staticPart('Lead-lag dampers', {
     material: 'Hydraulic dampers with integral reservoirs', mass: 9, count: 4, explode: [0, UPX - 0.05, 0],
     desc: 'One hydraulic damper per blade restrains the lead-lag motion. Without them the in-plane blade motion could couple with the fuselage rocking on its gear in the destructive instability called ground resonance.',
-  }, []);
+  }).k;
   const dampers = blades.map((i) => {
     const body = mesh(unitRod(16), MAT.hydraulic());
     const rod = mesh(unitRod(10), MAT.steel());
@@ -237,9 +253,9 @@ export function buildMainRotor({ A, parent }) {
   const bifBase = [cyl(0.21, 0.19, 0.08, [0, 0.21, 0], 'y', 28), cyl(0.12, 0.12, 0.1, [0, 0.29, 0], 'y', 24)];
   const bifMasses = [];
   const bifPart = P('Bifilar vibration absorber', {
-    material: 'Steel arms and tuned tungsten-alloy masses on bifilar pins', mass: 110, explode: [0, UPX + 1.2, 0],
-    desc: 'Four tuned masses hang from the arms on two pins each (hence "bifilar"), free to swing in the plane of the rotor. Tuned to three cycles per revolution in the rotating hub, they cancel the dominant four-per-rev vibration before it reaches the fuselage.',
-    callout: true, anchor: [0, 0.46, 0],
+    material: 'Steel arms and tuned tungsten-alloy masses on bifilar pins', mass: 100, explode: [0, UPX + 1.2, 0],
+    desc: 'Four tuned masses hang from the arms on two pins each (hence "bifilar"), free to swing in the plane of the rotor. Tuned to three cycles per revolution in the rotating hub (described as 3/rev in the literature), they cancel the in-plane rotating loads that would reach the fuselage as four-per-rev; the UH-60M\'s active vibration control cancels what remains in the cabin.',
+    callout: true, anchor: [0, 0.47, 0],
   }, []);
   for (const i of blades) {
     const a = (i * Math.PI) / 2 + Math.PI / 4;
@@ -256,12 +272,12 @@ export function buildMainRotor({ A, parent }) {
   bifPart.add(mesh(merge(bifBase), MAT.steel()));
 
   P('Blade de-ice slip ring & distributor', {
-    system: 'Electrical', material: 'Slip-ring assembly and timer-distributor', mass: 14, explode: [0, UPX + 1.7, 0],
+    system: 'Electrical', material: 'Slip-ring assembly and timer-distributor', mass: 14, explode: [0, UPX + 1.75, 0],
     desc: 'Carries de-ice power from the airframe into the turning rotor and switches it through the blade heater mats in sequence, shedding ice in small pieces. Main and tail rotor de-ice are standard on the UH-60M.',
   }, [mesh(merge([cyl(0.09, 0.1, 0.07, [0, 0.375, 0], 'y', 22), cyl(0.05, 0.08, 0.04, [0, 0.43, 0], 'y', 20)]), MAT.casting())]);
 
   P('Main rotor shaft', {
-    system: 'Drive system', material: 'Steel shaft splined to the transmission output', mass: 90, explode: [0, UPX - 0.9, 0],
+    system: 'Drive system', material: 'Steel shaft splined to the transmission output', mass: 85, explode: [0, 0.9, 0],
     desc: 'Driven at 258 rpm by the main module\'s planetary stage. It carries the rotor\'s full lift — about 100 kN at maximum weight — down into the transmission and the roof beams.',
   }, [mesh(merge([cyl(0.095, 0.095, 0.82, [0, -0.32, 0], 'y', 24), cyl(0.13, 0.13, 0.05, [0, -0.08, 0], 'y', 24)]), MAT.steel())]);
 
@@ -273,7 +289,7 @@ export function buildMainRotor({ A, parent }) {
     sc.push(tube(p0, knee, 0.02, 8), tube(knee, p1, 0.02, 8), cyl(0.026, 0.026, 0.05, [knee.x, knee.y, knee.z], 'y', 8));
   }
   P('Rotating scissors', {
-    material: 'Steel scissor links with spherical bearings', mass: 6, count: 2, explode: [0, UPX - 0.6, 0],
+    material: 'Steel scissor links with spherical bearings', mass: 6, count: 2, explode: [0, 1.45, 0],
     desc: 'Hinged links that make the rotating swashplate turn with the shaft while still letting it slide up and down and tilt.',
   }, [mesh(merge(sc), MAT.steel())]);
 
@@ -285,7 +301,7 @@ export function buildMainRotor({ A, parent }) {
     const cl = cyl(0.028, 0.028, 0.07, [RS, 0, 0], 'y', 10); cl.rotateY(a); rotRing.push(cl);
   }
   A.part('Rotating swashplate', {
-    system: 'Rotor system', material: 'Aluminium-alloy ring on a duplex bearing', mass: 32, explode: [0, UPX - 1.3, 0],
+    system: 'Rotor system', material: 'Aluminium-alloy ring on a duplex bearing', mass: 32, explode: [0, 1.25, 0],
     desc: 'Turns with the rotor. Its four arms carry the pitch control rods, so wherever the swashplate is high, the blade passing over it takes more pitch.',
   }, [mesh(merge(rotRing), MAT.casting())], swashSpin);
   const statRing = [cyl(0.33, 0.33, 0.06, [0, -0.08, 0], 'y', 32), place(new THREE.SphereGeometry(0.13, 18, 12), [0, -0.04, 0])];
@@ -294,26 +310,25 @@ export function buildMainRotor({ A, parent }) {
   }
   const g = box(0.12, 0.05, 0.08, [0.36, -0.09, 0]); g.rotateY(-Math.PI / 2); statRing.push(g);
   A.part('Stationary swashplate', {
-    system: 'Flight controls', material: 'Aluminium-alloy ring on a uniball', mass: 28, explode: [0, UPX - 1.6, 0],
+    system: 'Flight controls', material: 'Aluminium-alloy ring on a uniball', mass: 28, explode: [0, 0.95, 0],
     desc: 'Does not turn. The three primary servos raise it together for collective and tilt it for cyclic; the uniball at its centre lets it tilt in any direction while sliding along the guide.',
-    callout: true, anchor: [0, -0.06, -0.38],
   }, [mesh(merge(statRing), MAT.casting())], swash);
 
   // pitch control rods (rotating swashplate → horn), rebuilt every frame
   const rodPart = P('Pitch control rods', {
-    material: 'Steel tubes with rod-end bearings and turnbuckles', mass: 3, count: 4, explode: [0, UPX - 0.95, 0],
+    material: 'Steel tubes with rod-end bearings and turnbuckles', mass: 3, count: 4, explode: [0, 1.6, 0],
     desc: 'Fixed-length rods: every movement of the swashplate reaches a blade through one of them. Adjusting their length at the turnbuckle is how the blades are tracked to fly in one plane.',
   }, []);
   const rods = blades.map((i) => { const m = mesh(unitRod(10), MAT.steel()); rodPart.add(m); return { i, m }; });
 
   // stationary scissors / swashplate guide (anti-rotation) and primary servos (head frame, not spinning)
   A.part('Swashplate guide & stationary scissors', {
-    system: 'Flight controls', material: 'Steel guide tube and anti-rotation links', mass: 12, explode: [0, UPX - 1.9, 0],
+    system: 'Flight controls', material: 'Steel guide tube and anti-rotation links', mass: 12, explode: [0, 0.7, 0],
     desc: 'A fixed tube around the shaft guides the uniball, and a scissor link on the right holds the stationary swashplate from turning while it moves.',
   }, [mesh(merge([cyl(0.12, 0.12, 0.42, [0, -0.78, 0], 'y', 20), tube([0.02, -0.98, 0.35], [0.03, -0.75, 0.42], 0.018), tube([0.03, -0.75, 0.42], [0.0, -0.6, 0.36], 0.018)]), MAT.steel())], head);
   const servoPart = A.part('Primary servos', {
-    system: 'Flight controls', material: 'Dual-stage hydraulic actuators (No. 1 and No. 2 systems)', mass: 54, count: 3, explode: [0, UPX - 2.2, 0],
-    desc: 'Forward, aft and lateral servos, each with two independent stages fed by separate hydraulic systems, so a single failure still leaves full control. Together they push against the whole rotor\'s control loads.',
+    system: 'Flight controls', material: 'Dual-stage hydraulic actuators (No. 1 and No. 2 systems)', mass: 54, count: 3, explode: [0, 0.55, 0],
+    desc: 'Forward, aft and lateral servos, each with two independent stages: the first stage on the No. 1 hydraulic system and the second on No. 2, so a single failure still leaves full control (the backup pump can take over either). Together they push against the whole rotor\'s control loads.',
   }, [], head);
   const servos = SERVO_AZ.map((a) => {
     const body = mesh(unitRod(14), MAT.hydraulic());
@@ -337,6 +352,7 @@ export function buildMainRotor({ A, parent }) {
   function update({ psi, coll, lon, lat, cone, lag }) {
     Object.assign(st, { psi, coll, lon, lat, cone, lag });
     spin.rotation.y = psi;
+    for (const k of spinKids) k.rotation.y = psi;
     // swashplate: collective height and the tilt that produces the cyclic below (horn lead PHI_H)
     const s = LH * Math.sin(coll);
     const gx = (LH * (lat * Math.cos(PHI_H) - lon * Math.sin(PHI_H))) / RS;

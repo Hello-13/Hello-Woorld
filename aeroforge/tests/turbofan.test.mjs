@@ -1,9 +1,12 @@
 // Turbofan regression tests: `npm test` (node --test).
 // Reference: GE Aerospace GE90-115B — certified take-off thrust 51,395 daN (115,540 lbf),
-// take-off EGT (T49) limit 1,090 °C, 100 % N1 = 2,355 rpm, 100 % N2 = 9,332 rpm, length 7,281 mm
-// (286.7 in) (EASA TCDS IM.E.002 issue 05); overall pressure ratio 42, fan 3.25 m (128 in) with
+// take-off EGT (T49) limit 1,090 °C (1,050 °C maximum continuous), 100 % N1 = 2,355 rpm, 100 % N2 =
+// 9,332 rpm, N1 / N2 limits 2,602 / 11,292 rpm, length 7,281 mm (286.7 in), fuel heating value
+// 42,798 kJ/kg (EASA TCDS IM.E.002 issue 05); overall pressure ratio 42, fan 3.25 m (128 in) with
 // 22 blades, 1 + 4 + 9 compressor and 2 + 6 turbine stages (GE Aerospace); bypass ratio 7.2
-// (Aircraft Commerce no. 84, 2012).
+// (Aircraft Commerce no. 84, 2012). Cruise: earlier GE90s are quoted at 0.52–0.545 lb/lbf/h
+// (14.7–15.4 g/(kN·s)); the -115B figure is not published, and the model runs about 10 % above
+// those, so the cruise window below is wide on the high side.
 //
 // The model's geometry is checked through its three.js-free layout module; the tour is checked
 // against the part names declared in the model source, so a renamed part cannot silently drop
@@ -12,8 +15,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { solveTurbofan, DEFAULT_CYCLE, GE90 } from '../src/physics/turbofan.js';
+import { solveTurbofan, DEFAULT_CYCLE, GE90, OPERATING_POINTS, SCHEDULE } from '../src/physics/turbofan.js';
 import { STAGES, FAN, ROWS, CORE, coreAt, bypassAt, STATIONS, PLUG_TIP, FAN_NOZZLE_Y, NACELLE } from '../src/models/ge90/layout.js';
+import { bladeRings, fanBladeSpec, FAN_BLADE_TIP_R } from '../src/models/ge90/blade.js';
 import TOUR from '../src/learn/tours/turbofan.js';
 
 const close = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ''} expected ${b} ± ${tol}, got ${a}`);
@@ -31,6 +35,9 @@ test('GE90-115B design point matches the published rating', () => {
   // EGT is measured at the LPT inlet (T49 ≈ station 45): a new engine on a standard day has margin
   assert.ok(to.egt < GE90.egtLimitK && to.egtMargin > 50, `EGT ${to.egt} K vs limit ${GE90.egtLimitK} K`);
   close(to.n1Rpm, 2355, 1, 'N1 at 100 %');
+  assert.ok(to.n1Rpm < GE90.n1RpmMax && to.n2Rpm < GE90.n2RpmMax, '100 % is a reference speed, below the TCDS limits');
+  assert.equal(GE90.n1RpmMax, 2602);
+  assert.equal(GE90.n2RpmMax, 11292);
   // the core makes a hotter, faster jet; the fan stream carries most of the momentum
   assert.ok(to.V9 > to.V19, 'core jet faster than the fan jet');
   const fanShare = (DEFAULT_CYCLE.bpr * to.V19) / ((1 + to.f) * to.V9 + DEFAULT_CYCLE.bpr * to.V19);
@@ -48,18 +55,49 @@ test('station temperatures and pressures follow the Brayton cycle', () => {
   assert.ok(T['3'] > 850 && T['3'] < 1000, `T3 ${T['3']} K`);
 });
 
-test('cruise at FL350, Mach 0.84 and part-power behaviour', () => {
-  const cr = solveTurbofan({ altitude: 10668, mach: 0.84 });
-  assert.ok(cr.valid);
-  assert.ok(cr.tsfc * 1e6 > 14 && cr.tsfc * 1e6 < 19, `cruise TSFC ${cr.tsfc * 1e6}`);
+test('cruise at FL350, Mach 0.84: a cruise power setting, not take-off throttle', () => {
+  const cr = solveTurbofan(OPERATING_POINTS.cruise);
+  assert.ok(cr.valid && !cr.fanLimited);
+  // a 777-300ER early in the cruise needs about 75–85 kN from each engine
+  assert.ok(cr.thrust > 72e3 && cr.thrust < 88e3, `cruise thrust ${cr.thrust / 1e3} kN`);
+  assert.ok(cr.tsfc * 1e6 > 15.5 && cr.tsfc * 1e6 < 17.5, `cruise TSFC ${cr.tsfc * 1e6} g/(kN·s)`);
+  assert.ok(cr.n1 > 82 && cr.n1 < 95, `cruise N1 ${cr.n1} %`);
+  assert.ok(cr.Tt4 > 1250 && cr.Tt4 < 1550, `cruise burner exit ${cr.Tt4} K`);
   assert.ok(cr.etaTh > 0.42 && cr.etaTh < 0.6, `thermal efficiency ${cr.etaTh}`);
-  assert.ok(cr.etaP > 0.55 && cr.etaP < 0.85, `propulsive efficiency ${cr.etaP}`);
-  assert.ok(cr.thrust < solveTurbofan({}).thrust * 0.4, 'thin air: cruise thrust well below take-off');
+  assert.ok(cr.etaP > 0.7 && cr.etaP < 0.85, `propulsive efficiency ${cr.etaP}`);
+  // full thrust lever at FL350 is held by the corrected-speed limit: maximum climb, about a fifth of take-off
+  const mcl = solveTurbofan({ ...OPERATING_POINTS.cruise, throttle: 1 });
+  assert.ok(mcl.speedLimited && mcl.thrust > 90e3 && mcl.thrust < 125e3, `max climb thrust at FL350 ${mcl.thrust / 1e3} kN`);
+  assert.ok(mcl.thrust > cr.thrust && mcl.tsfc < cr.tsfc + 1e-9, 'more lever, more thrust, at no worse TSFC');
+  // at the same corrected fan speed the temperature ratios match the design point's (to within the
+  // small change in fuel–air ratio) and the pressure ratios exactly
+  const to = solveTurbofan({});
+  const sim = solveTurbofan({ ...OPERATING_POINTS.cruise, throttle: (Math.sqrt(cr.byStation['2'].T / 288.15) - SCHEDULE.n1Idle) / (1 - SCHEDULE.n1Idle) });
+  close(sim.n1c, 1, 1e-6, 'corrected fan speed');
+  close(sim.Tt4 / sim.byStation['2'].T, to.Tt4 / 288.15, 0.06, 'Tt4/Tt2 similarity');
+  close(sim.opr, 42, 0.01, 'same pressure ratio at the same corrected speed');
+});
+
+test('part power on the ground: matched, monotonic, idle where a big fan idles', () => {
+  const to = solveTurbofan({});
+  let prev = null;
+  for (let t = 0; t <= 1.0001; t += 0.02) {
+    const r = solveTurbofan({ throttle: t });
+    assert.ok(r.valid && !r.fanLimited, `thrust lever ${t}: matched, not work-limited`);
+    if (prev) {
+      assert.ok(r.thrust > prev.thrust && r.egt > prev.egt && r.fuelFlow > prev.fuelFlow && r.n2 > prev.n2, `thrust, EGT, fuel flow and N2 rise with the lever at ${t}`);
+    }
+    prev = r;
+  }
   const idle = solveTurbofan({ throttle: 0 });
-  assert.ok(idle.valid && idle.thrust < 0.12 * solveTurbofan({}).thrust, 'idle thrust is a small fraction of take-off');
-  assert.ok(idle.n2 > idle.n1, 'the HP spool holds a higher percentage speed at idle');
-  const lowTit = solveTurbofan({ tit: 1300 });
-  assert.ok(lowTit.fanLimited, 'low TIT forces the fan to be work-limited');
+  close(idle.n1, 22, 0.5, 'ground-idle N1 %');
+  assert.ok(idle.n2 > 58 && idle.n2 < 68, `ground-idle N2 ${idle.n2} %`);
+  assert.ok(idle.thrust > 0.02 * to.thrust && idle.thrust < 0.06 * to.thrust, `idle thrust ${idle.thrust / 1e3} kN`);
+  const egtC = idle.egt - 273.15;
+  assert.ok(egtC > 250 && egtC < 500, `idle EGT ${egtC} °C`);
+  // the work-limit warning belongs to cycle-design changes only
+  assert.ok(solveTurbofan({ tit: 1300 }).fanLimited, 'a design TIT of 1,300 K cannot drive the design fan');
+  assert.ok(!solveTurbofan({ ...OPERATING_POINTS.climb }).fanLimited, 'the climb preset is matched');
 });
 
 test('model layout: GE90-115B stage counts and main dimensions', () => {
@@ -75,8 +113,24 @@ test('model layout: GE90-115B stage counts and main dimensions', () => {
   assert.equal(FAN.blades, 22);
   close(2 * FAN.tipR, 3.25, 1e-9, 'fan diameter m');
   close(FAN.spinnerTip - PLUG_TIP, 7.281, 1e-9, 'spinner tip to plug tip m (TCDS 7,281 mm)');
-  assert.ok(FAN.caseR > FAN.tipR && FAN.caseR - FAN.tipR < 0.015, 'fan tip clearance under 15 mm');
+  assert.ok(FAN.caseR > FAN.tipR && FAN.caseR - FAN.tipR < 0.015, 'fan case within 15 mm of the fan diameter');
   close(2 * NACELLE.maxR / 0.0254, 166, 0.5, 'Boeing nacelle maximum diameter in');
+});
+
+test('fan blades: sections wrapped onto their cylinders stay inside the rub strip', () => {
+  for (const sheath of [false, true]) {
+    const rings = bladeRings(fanBladeSpec(sheath));
+    let rMax = 0;
+    for (const ring of rings) for (const [x, , z] of ring) rMax = Math.max(rMax, Math.hypot(x, z));
+    close(rMax, FAN_BLADE_TIP_R, 1e-9, `${sheath ? 'sheath' : 'blade'} tip radius`);
+    // a 0.67 m tip chord laid out flat instead would reach about 3 cm further out, into the case
+    const flatTip = rings[rings.length - 1].reduce((m, [x, , z]) => Math.max(m, Math.hypot(FAN_BLADE_TIP_R, FAN_BLADE_TIP_R * Math.atan2(z, x))), 0);
+    if (!sheath) assert.ok(flatTip > FAN.caseR, 'the unwrapped section would have cut the case');
+  }
+  const clearance = FAN.rubR - FAN_BLADE_TIP_R;
+  assert.ok(clearance > 0.003 && clearance < 0.008, `fan tip clearance ${clearance * 1000} mm`);
+  assert.ok(FAN.rubR < FAN.caseR, 'rub strip set into the case wall');
+  close(2 * FAN_BLADE_TIP_R, 3.25, 0.005, 'swept fan diameter m');
 });
 
 test('model layout: blade rows alternate rotor/stator in order down the core', () => {

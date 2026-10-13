@@ -5,7 +5,9 @@
 // regeneratively cooled chamber and nozzle, 16 : 1 expansion. Exit ≈ 0.92 m. Internal lengths and
 // the placement of the turbopump, gas generator and lines are estimates sized from photographs.
 // Merlin Vacuum: same powerhead, 165 : 1 expansion with a radiatively cooled niobium-alloy
-// extension; its turbine exhaust is dumped into a manifold at the top of the extension.
+// extension to a 3.3 m exit (the published 3.3 m and 165 : 1 do not quite fit the sea-level
+// engine's throat; the exit size is kept); its turbine exhaust is dumped into a manifold at the top
+// of the extension. Nozzle length (≈ 2.6 m throat to exit) is an estimate.
 
 import * as THREE from 'three';
 import { lathe, rod } from '../../engine/geometry.js';
@@ -113,7 +115,7 @@ export function placeAll(list, x, y0, z, yaw) {
 }
 
 // ---------------------------------------------------------------------- Merlin Vacuum
-export const MVAC = { exitR: 1.5, jointR: 0.5, jointY: 3.25, throatR: 0.115, throatY: 3.95, chamberTop: 4.37, domeTop: 4.61, gimbalTop: 4.78 };
+export const MVAC = { exitR: 1.65, jointR: 0.5, jointY: 2.05, throatR: 0.115, throatY: 2.58, chamberTop: 3.0, domeTop: 3.24, gimbalTop: 3.4 };
 
 export function mvacChamber(seg = 48) {
   const k = { ...M1D, throatY: MVAC.throatY, chamberTop: MVAC.chamberTop, domeTop: MVAC.domeTop };
@@ -122,12 +124,12 @@ export function mvacChamber(seg = 48) {
 
 /** Regeneratively cooled section from the throat to the extension joint (≈ 19 : 1). */
 export function mvacRegen(seg = 56) {
-  return lathe(bellPoints(MVAC.throatR, MVAC.throatY, MVAC.jointR, MVAC.jointY, 34, 18, 14), seg);
+  return lathe(bellPoints(MVAC.throatR, MVAC.throatY, MVAC.jointR, MVAC.jointY, 50, 30, 14), seg);
 }
 
 /** Niobium-alloy extension from the joint to the 165 : 1 exit. */
 export function mvacExtension(seg = 96) {
-  return lathe(bellPoints(MVAC.jointR, MVAC.jointY, MVAC.exitR, 0, 18, 5, 26), seg);
+  return lathe(bellPoints(MVAC.jointR, MVAC.jointY, MVAC.exitR, 0, 38, 18, 26), seg);
 }
 
 /** MVac powerhead kit (same layout as Merlin 1D, raised to the MVac chamber). */
@@ -139,7 +141,7 @@ export function mvacKit() {
   for (const key of Object.keys(k)) out[key] = lift(k[key]);
   // the MVac turbine exhausts into the extension manifold instead of overboard
   out.duct = [
-    pipe([[0.36, 1.52 + dy, 0], [0.5, 1.2 + dy, 0.05], [0.58, 3.45, 0.06], [0.56, MVAC.jointY + 0.08, 0.05]], 0.07, { seg: 14, tubular: 18 }),
+    pipe([[0.36, 1.52 + dy, 0], [0.5, 1.2 + dy, 0.05], [0.58, MVAC.jointY + 0.4, 0.06], [0.56, MVAC.jointY + 0.08, 0.05]], 0.07, { seg: 14, tubular: 18 }),
     hoop(MVAC.jointR + 0.07, 0.06, MVAC.jointY + 0.02, { seg: 64, tube: 10 }),
   ];
   return out;

@@ -16,7 +16,7 @@ export const MQ9 = {
   massEmpty: 2223,         // kg, published (4,900 lb)
   maxFuel: 1800,           // kg, published (4,000 lb)
   maxInternal: 386,        // kg, published internal payload (850 lb)
-  maxExternal: 1361,       // kg, published external stores (3,000 lb)
+  maxExternal: 1361,       // kg, external stores: 3,000 lb on older GA-ASI sheets (the Block 5 sheet gives 3,750 lb)
   mtow: 4760,              // kg, published (10,500 lb)
   powerSL: 671,            // kW shaft, TPE331-10GD 900 shp, published
   lapse: 0.5,              // P_avail = P_SL · σ^lapse, calibrated to the 15,240 m ceiling
@@ -27,12 +27,12 @@ export const MQ9 = {
   marginV: 1.2,            // operating floor: 1.2 × stall speed
 };
 
-// Stores fits. Masses: GBU-12 ≈ 230 kg and AGM-114 ≈ 49 kg are published; the two-rail launcher
-// (≈ 35 kg) and every drag area (f = ΔCD0 · S) are estimates.
+// Stores fits. Masses: GBU-12 ≈ 230 kg, AGM-114 ≈ 49 kg and the M310 two-rail launcher ≈ 43 kg
+// (42 kg / 92 lb empty, Lockheed Martin) are published; every drag area (f = ΔCD0 · S) is an estimate.
 export const LOADOUTS = {
   clean: { label: 'Clean', detail: 'sensors only', mass: 0, dragArea: 0 },
-  hellfire: { label: '4 × Hellfire', detail: '4 × AGM-114 on two launchers', mass: 4 * 49 + 2 * 35, dragArea: 2 * 0.035 },
-  strike: { label: '+ 2 × GBU-12', detail: '2 × GBU-12 + 4 × AGM-114', mass: 2 * 230 + 4 * 49 + 2 * 35, dragArea: 2 * 0.026 + 2 * 0.035 },
+  hellfire: { label: '4 × Hellfire', detail: '4 × AGM-114 on two M310 launchers', mass: 4 * 49 + 2 * 43, dragArea: 2 * 0.035 },
+  strike: { label: '+ 2 × GBU-12', detail: '2 × GBU-12 + 4 × AGM-114', mass: 2 * 230 + 4 * 49 + 2 * 43, dragArea: 2 * 0.026 + 2 * 0.035 },
 };
 
 const AR = (MQ9.span ** 2) / MQ9.wingArea;

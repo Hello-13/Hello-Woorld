@@ -82,32 +82,36 @@ export function buildTail({ A, P, air, roofY }) {
 
   // ------------------------------------------------------------------ upper fairings
   const shaftX = -0.03;
-  const trans = fairing([[-0.9, 0.38, 2.66], [-0.4, 0.44, 2.72], [0.0, 0.62, 2.74], [0.4, 0.72, 2.74], [1.0, 0.73, 2.71], [1.6, 0.7, 2.63], [2.2, 0.58, 2.49], [2.6, 0.35, 2.31]], roofY, {
-    nu: 64, nv: 40, skip: (c) => c.y > 2.55 && Math.hypot(c.x - shaftX, c.z) < 0.48,
+  // wide over the input and accessory modules, narrowing quickly aft so the engine inlets stay open
+  const trans = fairing([[-0.9, 0.38, 2.66], [-0.45, 0.45, 2.73], [-0.15, 0.66, 2.77], [0.2, 0.8, 2.79], [0.7, 0.84, 2.78], [1.2, 0.8, 2.72], [1.7, 0.7, 2.62], [2.2, 0.57, 2.49], [2.6, 0.35, 2.31]], roofY, {
+    e: 3.0, nu: 64, nv: 40, skip: (c) => c.y > 2.6 && Math.hypot(c.x - shaftX, c.z) < 0.48,
   });
-  const well = cyl(0.48, 0.48, 0.2, [shaftX, 2.645, 0], 'y', 40, true);
-  const wellLip = new THREE.TorusGeometry(0.48, 0.018, 6, 40).rotateX(Math.PI / 2).translate(shaftX, 2.745, 0);
+  const well = cyl(0.48, 0.48, 0.22, [shaftX, 2.68, 0], 'y', 40, true);
+  const wellLip = new THREE.TorusGeometry(0.48, 0.018, 6, 40).rotateX(Math.PI / 2).translate(shaftX, 2.79, 0);
   P('Transmission fairing', {
-    system: 'Skin & fairings', skin: true, material: 'Kevlar/graphite composite cowls on quick-release hinges', mass: 55, explode: [0.3, 2.1, 0],
-    desc: 'Streamlines the forward upper deck, the flight-control closet and the main gearbox. Its panels open as walkways for daily inspection of the rotor head.',
+    system: 'Skin & fairings', skin: true, material: 'Kevlar/graphite composite cowls on quick-release hinges', mass: 55, explode: [2.4, 1.0, 0],
+    desc: 'Streamlines the forward upper deck, the flight-control closet, the main gearbox and its input and accessory modules. Its panels open as walkways for daily inspection of the rotor head.',
   }, [mesh(merge([trans, well, wellLip]), paint), mesh(well.clone(), MAT.interior())]);
   const aftF = fairing([[-3.6, 0.16, roofY(-3.6) + 0.12], [-3.0, 0.28, 2.45], [-2.4, 0.35, 2.6], [-1.5, 0.37, 2.66], [-0.9, 0.38, 2.67]], roofY, { nu: 30, nv: 28 });
   const grille = [];
   for (let k = 0; k < 7; k++) grille.push(box(0.025, 0.012, 0.42, [-1.48 + k * 0.05, 2.668, 0]));
   P('Aft deck fairing', {
-    system: 'Skin & fairings', skin: true, material: 'Composite fairing with oil-cooler grille', mass: 22, explode: [-0.6, 2.1, 0],
+    system: 'Skin & fairings', skin: true, material: 'Composite fairing with oil-cooler grille', mass: 22, explode: [-1.4, 1.2, 0],
     desc: 'Covers the oil cooler, APU and the start of the tail drive shaft between the engine nacelles; the grille on top lets the oil-cooler blower breathe.',
   }, [mesh(aftF, paint), mesh(merge(grille), MAT.black())]);
-  const cover = fairing([[-8.45, 0.12, roofY(-8.45) + 0.12], [-6.0, 0.13, roofY(-6.0) + 0.15], [-3.6, 0.16, roofY(-3.6) + 0.12]], roofY, { nu: 50, nv: 16 });
+  const cover = fairing([[-8.45, 0.13, roofY(-8.45) + 0.18], [-6.0, 0.15, roofY(-6.0) + 0.2], [-3.6, 0.17, roofY(-3.6) + 0.18]], roofY, { nu: 50, nv: 16 });
   const igbFair = new THREE.SphereGeometry(1, 20, 14).scale(0.36, 0.2, 0.2).translate(TAIL.igb[0] + 0.05, TAIL.igb[1] + 0.02, 0);
   P('Tail drive shaft cover', {
-    system: 'Skin & fairings', skin: true, material: 'Hinged aluminium/composite cover', mass: 14, explode: [-2.4, 1.0, 0],
+    system: 'Skin & fairings', skin: true, material: 'Hinged aluminium/composite cover', mass: 14, explode: [-2.4, 1.8, 0],
     desc: 'A hinged cover over the tail drive shaft along the top of the tail cone, ending in the fairing over the 42° intermediate gearbox.',
   }, [mesh(merge([cover, igbFair]), paint)]);
 
   // ------------------------------------------------------------------ pylon
-  const root = { le: [-8.05, 0, 1.62], chord: 2.0, t: 0.18 };
-  const tip = { le: [-9.55, 0, 4.02], chord: 0.95, t: 0.15 };
+  // GenHel (NASA CR-166309) planform: root chord 6 ft (1.83 m), tip 2.83 ft (0.86 m), quarter-chord
+  // sweep 41° (≈ 44° at the leading edge, ≈ 30° at the trailing edge), NACA 0021 (mod) section. The
+  // root sits inside the tail cone; the tip trailing edge is the aft end of the 15.26 m fuselage.
+  const root = { le: [-7.32, 0, 1.62], chord: 1.83, t: 0.2 };
+  const tip = { le: [-9.65, 0, 4.02], chord: 0.86, t: 0.17 };
   const pyl = wingPanel({ root, tip, stations: 10, camber: -0.03, n: 22, withChord: false });
   pyl.rotateX(-Math.PI / 2);                     // span z → y, camber toward +z (side force to starboard)
   const lean = (g) => {
@@ -120,9 +124,9 @@ export function buildTail({ A, P, air, roofY }) {
   lean(pyl);
   const tgbBulge = new THREE.SphereGeometry(1, 20, 14).scale(0.42, 0.26, 0.17).translate(TAIL.tgb[0] + 0.02, TAIL.tgb[1] + 0.02, TAIL.tgb[2] + 0.06);
   P('Tail pylon', {
-    system: 'Skin & fairings', skin: true, material: 'Aluminium skins, cambered section, Kevlar leading edge', mass: 70, explode: [-2.9, 0.5, 0],
-    desc: 'The swept vertical fin is cambered so that in forward flight it makes a side force that unloads the tail rotor. Above the tail cone it leans 20° to port, which tilts the tail-rotor shaft and lets the tail rotor help lift the tail.',
-    callout: true, anchor: [-9.2, 3.0, pylonLean(3.0) - 0.12],
+    system: 'Skin & fairings', skin: true, material: 'Aluminium skins, cambered NACA 0021 (mod) section, Kevlar leading edge', mass: 70, explode: [-2.9, 0.5, 0],
+    desc: 'The swept vertical fin (41° at the quarter chord) is cambered so that in forward flight it makes a side force that unloads the tail rotor. Above the tail cone it leans 20° to port, which tilts the tail-rotor shaft and lets the tail rotor help lift the tail.',
+    callout: true, anchor: [-8.5, 2.45, pylonLean(2.45) - 0.12],
   }, [mesh(merge([pyl, tgbBulge]), paint)]);
 
   const spar = [];
@@ -141,21 +145,22 @@ export function buildTail({ A, P, air, roofY }) {
 
   // ------------------------------------------------------------------ stabilator
   const sPivot = new THREE.Group();
-  sPivot.position.set(-9.55, 1.66, 0);
-  const sRoot = { le: [-9.24 + 9.55, 0, 0.14], chord: 1.05, t: 0.12 };
-  const sTip = { le: [-9.32 + 9.55, 0, 2.19], chord: 0.8, t: 0.11 };
+  sPivot.position.set(-9.4, 1.66, 0);            // pivot inside the end of the tail cone, under the pylon trailing edge
+  // GenHel: span 14.38 ft (4.38 m), root chord 3.67 ft (1.12 m), tip 2.54 ft (0.77 m), NACA 0014
+  const sRoot = { le: [0.35, 0, 0.14], chord: 1.12, t: 0.14 };
+  const sTip = { le: [0.25, 0, 2.19], chord: 0.77, t: 0.14 };
   const half = wingPanel({ root: sRoot, tip: sTip, stations: 4, camber: -0.02, n: 18, withChord: false });
   const stab = merge([half, mirrorZ(half), cyl(0.05, 0.05, 0.3, [0, 0, 0], 'z', 12)]);
   sPivot.add(mesh(stab, paint));
   P('Stabilator', {
     system: 'Flight controls', material: 'Aluminium/composite all-moving surface, 4.38 m span', mass: 50, explode: [-3.2, -0.6, 0],
-    desc: 'An all-moving tailplane whose incidence is scheduled by computer: about 40° trailing edge down in the hover so the rotor downwash does not pitch the nose up, flattening out as airspeed builds. It also adds pitch stability in cruise.',
-    callout: true, anchor: [-9.75, 1.72, 1.9],
+    desc: 'An all-moving tailplane whose incidence is scheduled by computer: about 40° trailing edge down in the hover so the rotor downwash does not pitch the nose up, flattening out as airspeed builds. It also adds pitch stability in cruise. On the M it folds for air transport (a brochure feature), so the aircraft fits a C-17 or C-5 with less disassembly.',
+    callout: true, anchor: [-9.6, 1.72, 1.9],
   }, sPivot);
   P('Stabilator actuators', {
     system: 'Flight controls', material: 'Dual electromechanical jackscrew actuators', mass: 12, count: 2, explode: [-3.0, -0.2, 0.4],
-    desc: 'Two electric actuators in series, each driven by its own stabilator amplifier; a fault in one is caught by the other and the pilot gets an aural warning.',
-  }, [mesh(merge([tube([-9.15, 1.86, 0.08], [-9.48, 1.72, 0.1], 0.035, 10), tube([-9.15, 1.86, -0.08], [-9.48, 1.72, -0.1], 0.035, 10)]), MAT.hydraulic())]);
+    desc: 'Two electromechanical actuators in series, each commanded by one of the two digital flight control computers — on the M those computers replaced the A/L\'s separate stabilator amplifiers. A fault in one is caught by the other and the pilot gets an aural warning.',
+  }, [mesh(merge([tube([-9.0, 1.84, 0.07], [-9.32, 1.72, 0.09], 0.035, 10), tube([-9.0, 1.84, -0.07], [-9.32, 1.72, -0.09], 0.035, 10)]), MAT.hydraulic())]);
 
   // ------------------------------------------------------------------ gearboxes and pylon shaft
   const igb = V3(...TAIL.igb), tgb = V3(...TAIL.tgb), hub = V3(...TAIL.hub);
@@ -175,8 +180,8 @@ export function buildTail({ A, P, air, roofY }) {
   }, [mesh(merge([tube(tgb.clone().addScaledVector(n, -0.08), tgb.clone().addScaledVector(n, 0.2), 0.15, 18), tube(tgb, tgb.clone().addScaledVector(pyDir, -0.24), 0.1, 14)]), MAT.casting())]);
   P('Tail rotor servo', {
     system: 'Flight controls', material: 'Dual-stage hydraulic actuator', mass: 9, explode: [-3.0, 0.4, -0.5],
-    desc: 'Driven by cables from the pedals, it moves the pitch-change shaft through the tail gearbox. Two stages: No. 2 hydraulic system normally, the backup pump if that fails.',
-  }, [mesh(merge([tube([-9.72, 2.95, pylonLean(2.95)], [-9.82, 3.28, pylonLean(3.28)], 0.04, 12)]), MAT.hydraulic())]);
+    desc: 'Driven by cables from the pedals, it moves the pitch-change shaft through the tail gearbox. Two stages: the first on the No. 1 hydraulic system, the second on the backup pump.',
+  }, [mesh(merge([tube([-9.38, 2.95, pylonLean(2.95)], [-9.55, 3.28, pylonLean(3.28)], 0.04, 12), tube([-9.55, 3.28, pylonLean(3.28)], [-9.85, 3.4, pylonLean(3.4)], 0.012, 8)]), MAT.hydraulic())]);
 
   // ------------------------------------------------------------------ tail rotor (non-rotating frame, spinning children)
   const trFrame = new THREE.Group();
@@ -224,17 +229,23 @@ export function buildTail({ A, P, air, roofY }) {
     for (let i = 0; i < 4; i++) { const m = mesh(unitRod(8), MAT.steel()); s.add(m); links.push({ i, m }); }
   });
 
-  // ------------------------------------------------------------------ lights on the tail
+  // ------------------------------------------------------------------ exterior lights
   const strobe = strobeMat();
-  P('Anti-collision & position lights', {
-    system: 'Electrical', material: 'LED anti-collision beacons, position and formation lights', mass: 6, explode: [-2.0, 1.6, 0],
-    desc: 'Red anti-collision beacons on the pylon tip and belly, red and green position lights on the cabin sides, a white tail light, and low-intensity green formation strips for flying in close formation at night.',
-  }, [mesh(new THREE.SphereGeometry(0.05, 12, 8).translate(tip.le[0] - 0.45, 4.05, pylonLean(4.05)), strobe, { cast: false }),
-    mesh(new THREE.SphereGeometry(0.035, 10, 8).translate(-10.02, 2.2, pylonLean(2.2)), MAT.navWhite(), { cast: false }),
-    mesh(new THREE.SphereGeometry(0.045, 12, 8).translate(-0.8, 0.45, 0), strobe, { cast: false }),
+  P('Anti-collision beacons', {
+    system: 'Electrical', material: 'Red LED anti-collision beacons', mass: 2, count: 2, explode: [-2.0, 1.6, 0],
+    desc: 'A red beacon on the pylon tip and one under the belly flash about once a second so other aircraft see the helicopter from any direction; they can be dimmed or switched to infrared for night-vision operations.',
+  }, [mesh(new THREE.SphereGeometry(0.05, 12, 8).translate(tip.le[0] - 0.3, 4.05, pylonLean(4.05)), strobe, { cast: false }),
+    mesh(new THREE.SphereGeometry(0.045, 12, 8).translate(-0.8, 0.45, 0), strobe, { cast: false })]);
+  P('Position lights', {
+    system: 'Electrical', material: 'Red, green and white navigation lights', mass: 1.5, count: 3, explode: [-1.0, 1.4, 1.2],
+    desc: 'Red on the left, green on the right on the upper cabin sides, white at the aft tip of the pylon: other pilots can tell which way the helicopter is pointing at night.',
+  }, [mesh(new THREE.SphereGeometry(0.035, 10, 8).translate(tip.le[0] - tip.chord + 0.04, 3.97, pylonLean(3.97)), MAT.navWhite(), { cast: false }),
     mesh(new THREE.SphereGeometry(0.04, 10, 8).translate(-1.05, 2.12, 1.12), MAT.navGreen(), { cast: false }),
-    mesh(new THREE.SphereGeometry(0.04, 10, 8).translate(-1.05, 2.12, -1.12), MAT.navRed(), { cast: false }),
-    mesh(merge([box(0.5, 0.05, 0.012, [-6.0, 1.75, 0.395]), box(0.5, 0.05, 0.012, [-6.0, 1.75, -0.395]), box(0.6, 0.012, 0.06, [-9.5, 3.4, pylonLean(3.4) + 0.09])]), MAT.formation(), { cast: false })]);
+    mesh(new THREE.SphereGeometry(0.04, 10, 8).translate(-1.05, 2.12, -1.12), MAT.navRed(), { cast: false })]);
+  P('Formation lights', {
+    system: 'Electrical', material: 'Low-intensity electroluminescent strips (NVG compatible)', mass: 1, count: 3, explode: [-2.4, 0.8, 0.6],
+    desc: 'Dim green strips on the tail cone sides and the pylon let pilots on night-vision goggles hold position in close formation without the glare of the navigation lights.',
+  }, [mesh(merge([box(0.5, 0.05, 0.012, [-6.0, 1.75, 0.395]), box(0.5, 0.05, 0.012, [-6.0, 1.75, -0.395]), box(0.6, 0.06, 0.012, [-9.5, 3.4, pylonLean(3.4) + 0.1])]), MAT.formation(), { cast: false })]);
 
   const trSt = { phi: 0, pitch: 12 * DEG };
   const lead = 0.35;
