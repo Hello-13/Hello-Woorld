@@ -67,17 +67,17 @@ export const HM = {
   mli: () => once('mli', () => {
     const n = mliSurface({ seed: 41 });
     const map = canvasTex(512, 512, mliAlbedo(5), { repeat: [6, 2] });
-    const normalMap = n.normalMap.clone(); normalMap.repeat.set(6, 2); normalMap.needsUpdate = true;
-    const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(6, 2); roughnessMap.needsUpdate = true;
-    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.55, 0.55), roughness: 0.62, metalness: 0.55, side: THREE.DoubleSide });
+    const normalMap = n.normalMap.clone(); normalMap.repeat.set(14, 4); normalMap.needsUpdate = true;
+    const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(9, 3); roughnessMap.needsUpdate = true;
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.22, 0.22), roughness: 0.6, metalness: 0.55, side: THREE.DoubleSide });
   }),
   /** Light shield blanket: panel seams run lengthwise, more weathering toward the aperture. */
   mliShield: () => once('mliShield', () => {
     const n = mliSurface({ seed: 43 });
     const map = canvasTex(512, 512, mliAlbedo(9, { base: [190, 194, 199], seams: 3, patches: 6 }), { repeat: [8, 2] });
-    const normalMap = n.normalMap.clone(); normalMap.repeat.set(8, 2); normalMap.needsUpdate = true;
-    const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(8, 2); roughnessMap.needsUpdate = true;
-    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.64, metalness: 0.55, side: THREE.DoubleSide });
+    const normalMap = n.normalMap.clone(); normalMap.repeat.set(16, 4); normalMap.needsUpdate = true;
+    const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(10, 3); roughnessMap.needsUpdate = true;
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.25, 0.25), roughness: 0.62, metalness: 0.55, side: THREE.DoubleSide });
   }),
   /** New Outer Blanket Layer: stainless-framed white covers fitted over bay doors (2002, 2009). */
   nobl: () => once('nobl', () => {

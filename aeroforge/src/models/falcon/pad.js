@@ -16,7 +16,7 @@ const H = PAD.hardstand;
 const W = PAD.trenchHalfWidth;
 const DECK = H + PAD.mountDeck;
 // hardstand top half-extents and slope run (compressed footprint)
-const TX = 23, TZ = 26, RUN = 9;
+const TX = 22.5, TZ = 23, RUN = 7.5;
 
 /** Prism from a top quad and a bottom quad (corners in matching order), flat-shaded, metric UVs. */
 function frustum(top, bot) {
@@ -93,16 +93,27 @@ export function buildPad(A, site, base) {
   };
 
   // ------------------------------------------------------------------ hardstand and flame trench
-  const blocks = [];
+  const tops = [], slopes = [];
   for (const s of [1, -1]) {
     const T = [[s * W, H, -TZ], [s * TX, H, -TZ], [s * TX, H, TZ], [s * W, H, TZ]];
     const B = [[s * W, 0, -TZ - RUN], [s * (TX + RUN), 0, -TZ - RUN], [s * (TX + RUN), 0, TZ + RUN], [s * W, 0, TZ + RUN]];
-    blocks.push(faceAway(frustum(T, B), new THREE.Vector3(s * (W + TX) / 2, 4, 0)));
+    const g = faceAway(frustum(T, B), new THREE.Vector3(s * (W + TX) / 2, 4, 0));
+    // first two triangles are the top face; the rest are the sloped sides and the trench wall
+    const pos = g.attributes.position.array, uv = g.attributes.uv.array;
+    const sub = (a, b) => {
+      const q = new THREE.BufferGeometry();
+      q.setAttribute('position', new THREE.Float32BufferAttribute(pos.slice(a * 9, b * 9), 3));
+      q.setAttribute('uv', new THREE.Float32BufferAttribute(uv.slice(a * 6, b * 6), 2));
+      q.computeVertexNormals();
+      return q;
+    };
+    tops.push(sub(0, 2));
+    slopes.push(sub(2, 10));
   }
   G('Pad hardstand', {
-    skin: true, material: 'Reinforced concrete on a raised earth-and-fill mound', mass: null,
+    skin: true, material: 'Reinforced concrete pad on a raised earth-and-fill mound', mass: null,
     desc: 'LC-39A stands on a raised hardstand built for Saturn V. Its surface is about 48 ft above sea level, high enough for the 42 ft-deep flame trench to drain at grade. Footprint compressed here.',
-  }, mesh(merge(blocks), FM.hardstand()));
+  }, [mesh(merge(tops), FM.hardstand()), mesh(merge(slopes), FM.embankment())]);
 
   const lining = [];
   for (const s of [1, -1]) {

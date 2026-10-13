@@ -27,7 +27,7 @@ function canvasTex(w, h, draw, { srgb = true } = {}) {
  * soot: fraction of the stage (from the base) darkened by re-entry and landing-burn soot.
  * word: { text, v0, v1, u } a vertical wordmark reading bottom-to-top.
  */
-export function stagePaint(key, { seams = [], soot = 0, streaks = 0, word = null, seed = 3, base = '#eef0f1' } = {}) {
+export function stagePaint(key, { seams = [], soot = 0, streaks = 0, word = null, seed = 3, base = '#e2e5e7' } = {}) {
   return once(`paint.${key}`, () => {
     const map = canvasTex(512, 2048, (ctx, w, h) => {
       ctx.fillStyle = base;
@@ -115,8 +115,8 @@ export const FM = {
     return new THREE.MeshPhysicalMaterial({ color: 0x9a9da2, map: c.map, normalMap: c.normalMap, roughness: 0.55, metalness: 0.2, clearcoat: 0.4, clearcoatRoughness: 0.4 });
   }),
   titanium: () => once('ti', () => new THREE.MeshStandardMaterial({ color: 0x8b8580, roughness: 0.5, metalness: 0.95 })),
-  whiteComposite: () => once('whiteComp', () => new THREE.MeshPhysicalMaterial({ color: 0xf1f2f3, roughness: 0.55, metalness: 0.02, clearcoat: 0.25, clearcoatRoughness: 0.4 })),
-  fairing: () => once('fairing', () => new THREE.MeshPhysicalMaterial({ color: 0xf3f4f5, roughness: 0.5, metalness: 0.02, clearcoat: 0.25, clearcoatRoughness: 0.4, side: THREE.DoubleSide })),
+  whiteComposite: () => once('whiteComp', () => new THREE.MeshPhysicalMaterial({ color: 0xe3e5e7, roughness: 0.55, metalness: 0.02, clearcoat: 0.25, clearcoatRoughness: 0.4 })),
+  fairing: () => once('fairing', () => new THREE.MeshPhysicalMaterial({ color: 0xe5e7e8, roughness: 0.5, metalness: 0.02, clearcoat: 0.25, clearcoatRoughness: 0.4, side: THREE.DoubleSide })),
   heatShield: () => once('heatShield', () => new THREE.MeshStandardMaterial({ color: 0x2a2826, roughness: 0.9, metalness: 0.05 })),
   boot: () => once('boot', () => new THREE.MeshStandardMaterial({ color: 0xb9b6b0, roughness: 0.95, metalness: 0.0, side: THREE.DoubleSide })),
   raceway: () => once('raceway', () => new THREE.MeshStandardMaterial({ color: 0xe6e8ea, roughness: 0.6, metalness: 0.05 })),
@@ -149,5 +149,11 @@ export const FM = {
     const out = {};
     for (const k of ['map', 'normalMap', 'roughnessMap']) { const t = c[k].clone(); t.repeat.set(1 / 12, 1 / 12); t.needsUpdate = true; out[k] = t; }
     return new THREE.MeshStandardMaterial({ color: 0xb4b0a8, ...out, roughness: 1, metalness: 0 });
+  }),
+  /** Grassed earth embankment of the pad mound. */
+  embankment: () => once('embankment', () => {
+    const c = concrete({ seed: 11 });
+    const n = c.normalMap.clone(); n.repeat.set(1 / 9, 1 / 9); n.needsUpdate = true;
+    return new THREE.MeshStandardMaterial({ color: 0x6f7550, normalMap: n, normalScale: new THREE.Vector2(1.5, 1.5), roughness: 1, metalness: 0 });
   }),
 };

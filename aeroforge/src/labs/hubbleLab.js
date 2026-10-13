@@ -190,7 +190,7 @@ export function mountHubbleLab(root, ctx) {
     const waves = (2 * Math.abs(edge)) / 0.6328;
     roR.set('edge', edge.toFixed(2), Math.abs(edge) > 0.1 ? 'crit' : 'ok');
     roR.set('wf', waves.toFixed(1), waves > 0.25 ? 'crit' : 'ok');
-    if (Math.abs(p.K - HST_OTA.K1asBuilt) < 0.0003) { flawStatus.textContent = 'As built: the edge sits 2.2 µm low, about 1/50 of a hair\'s width. Only about 15 % of a star\'s light landed in the sharp core instead of the planned 70 %, smearing the rest into a halo.'; flawStatus.dataset.state = 'crit'; }
+    if (Math.abs(p.K - HST_OTA.K1asBuilt) < 0.0003) { flawStatus.textContent = 'As built: the edge sits 2.2 µm too low — about 1/50 of the thickness of a sheet of paper. Only about 15 % of a star\'s light fell within 0.1″ of its centre, against roughly 70–80 % by design; the rest spread into a halo.'; flawStatus.dataset.state = 'crit'; }
     else if (waves < 0.25) { flawStatus.textContent = 'Within a quarter wave (He-Ne, 633 nm) of the design: the classic criterion for a diffraction-limited mirror.'; flawStatus.dataset.state = 'ok'; }
     else { flawStatus.textContent = `${waves.toFixed(1)} waves of reflected-wavefront error at the edge (before refocusing): visibly blurred, spherical aberration.`; flawStatus.dataset.state = 'warn'; }
 
@@ -216,7 +216,7 @@ export function mountHubbleLab(root, ctx) {
     const sel = p.activity < 0.5 ? runs.min : p.activity > 2 ? runs.max : runs.avg;
     roO.set('re', sel.reentry ? `≈ ${Math.round(sel.reentry)}` : 'after 2056', sel.reentry && sel.reentry < 2035 ? 'warn' : '');
     const thin = (pts) => pts.filter((_, i) => i % 4 === 0 || i === pts.length - 1);
-    chartO.setData({ min: thin(runs.min.points), avg: thin(runs.avg.points), max: thin(runs.max.points) }, { xDomain: [y0, y0 + 30], yDomain: [150, Math.max(650, p.h)], markers: [{ x: 2033, label: 'STScI median 2033' }] });
+    chartO.setData({ min: thin(runs.min.points), avg: thin(runs.avg.points), max: thin(runs.max.points) }, { xDomain: [y0, y0 + 30], yDomain: [150, Math.max(650, p.h)], markers: [{ x: 2033, label: 'Published forecasts ≈ 2033+' }] });
   }
 
   return {
