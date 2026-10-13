@@ -27,6 +27,12 @@ const Q_ORBIT = new THREE.Quaternion().setFromAxisAngle(V(0, 0, 1), Math.PI).mul
 const VIEW_SHOW = [0.42, 0.5, 1.0];
 const VIEW_ORBIT = [0.55, 0.17, 1.0];
 
+/** Current display orientation, read by the guided tour to aim its camera at the same side. */
+export const DISPLAY = { orbit: false };
+/** A camera direction written for the hangar orientation, mapped to the current one (the 'orbit'
+ *  look turns the body 180° about world Z; the camera keeps its elevation above the horizon). */
+export const viewDir = (d) => (DISPLAY.orbit ? [-d[0], d[1], d[2]] : d.slice());
+
 export function buildSatellite({ compact = false } = {}) {
   const A = new Assembly();
   const body = new THREE.Group();
@@ -85,6 +91,7 @@ export function buildSatellite({ compact = false } = {}) {
     /** 'orbit' look: nadir down toward the Earth backdrop; otherwise nadir up, as on the launch adapter. */
     setLook(k) {
       state.orbitLook = k === 'orbit';
+      DISPLAY.orbit = state.orbitLook;
       view.dir = (state.orbitLook ? VIEW_ORBIT : VIEW_SHOW).slice();
       body.quaternion.copy(state.orbitLook ? Q_ORBIT : Q_SHOW);
     },
