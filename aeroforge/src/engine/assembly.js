@@ -19,7 +19,15 @@ export class Assembly {
 
   /**
    * Register a part.
-   * info: { system, material, mass (kg), temp (K), desc, explode: [x,y,z] (m), callout, anchor: [x,y,z] }
+   * info: {
+   *   system     one of the names in engine/systems.js (drives the Systems view colour)
+   *   material, desc
+   *   mass       kg; shown as an estimate unless massSource names a public figure
+   *   massSource where the mass comes from, e.g. 'GE Aviation type certificate data'
+   *   count      how many identical items the part represents (e.g. 22 fan blades)
+   *   skin       true for exterior skins / fairings: ghosted in the Systems view, faint in X-ray
+   *   temp (K), explode: [x,y,z] (m), callout, anchor: [x,y,z]
+   * }
    */
   part(name, info, objects = [], parent = this.root) {
     const g = new THREE.Group();
@@ -30,6 +38,9 @@ export class Assembly {
       system: info.system || 'Structure',
       material: info.material || '—',
       mass: info.mass ?? null,
+      massSource: info.massSource || null,
+      count: info.count ?? null,
+      skin: !!info.skin,
       temp: info.temp ?? 288,
       desc: info.desc || '',
       callout: !!info.callout,

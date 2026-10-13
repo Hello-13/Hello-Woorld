@@ -1,11 +1,13 @@
-// Render modes: STUDIO (PBR), X-RAY (fresnel hologram), BLUEPRINT (edges on drafting blue),
-// THERMAL (per-part temperature on an inferno scale) and PRESSURE (live pressure coefficient on
-// lifting surfaces). A ghost overlay fades every part except the ones a guided-tour step teaches.
+// Render modes: STUDIO (PBR), X-RAY (fresnel hologram; skins faint so the interior reads),
+// BLUEPRINT (edges on drafting blue), SYSTEMS (cutaway-poster colours by subsystem, skins
+// ghosted), THERMAL (per-part temperature on an inferno scale) and PRESSURE (live pressure
+// coefficient on lifting surfaces). A ghost overlay fades every part except the ones in focus.
 
 import * as THREE from 'three';
 import { xrayMaterial, inferno } from './effects.js';
+import { systemColor } from './systems.js';
 
-export const MODES = ['studio', 'xray', 'blueprint', 'thermal', 'pressure'];
+export const MODES = ['studio', 'xray', 'blueprint', 'systems', 'thermal', 'pressure'];
 
 function partOf(obj) {
   for (let o = obj; o; o = o.parent) if (o.userData.part) return o;
@@ -79,7 +81,11 @@ export class RenderModes {
     this.stage = stage;
     this.mode = 'studio';
     this.focus = null;
-    this.xray = xrayMaterial(0x5fd4ff, 2.2, 0.03);
+    this.xray = xrayMaterial(0x5fd4ff, 1.8, 0.06);
+    this.xraySkin = xrayMaterial(0x5fd4ff, 3.2, 0.006);
+    this.sysSkin = xrayMaterial(0x9fc3e6, 2.6, 0.008);
+    this.sysMats = new Map();
+    this.sysSel = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.6, roughness: 0.5 });
     this.xraySel = xrayMaterial(0xffb000, 1.5, 0.1);
     this.ghostMat = xrayMaterial(0x8fb6d8, 2.6, 0.012);
     this.bpFill = new THREE.MeshBasicMaterial({ color: 0x0f3d6e, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
@@ -122,6 +128,15 @@ export class RenderModes {
     return this.thermalMats.get(key);
   }
 
+  systemMaterial(system) {
+    const c = systemColor(system);
+    if (!this.sysMats.has(c)) {
+      const col = new THREE.Color(c);
+      this.sysMats.set(c, new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.22, roughness: 0.55, metalness: 0.08 }));
+    }
+    return this.sysMats.get(c);
+  }
+
   temperature(vehicle, mesh) {
     if (typeof mesh.userData.temp === 'function') return mesh.userData.temp();
     if (typeof mesh.userData.temp === 'number') return mesh.userData.temp;
@@ -159,7 +174,12 @@ export class RenderModes {
         if (edges) edges.visible = false;
         m.castShadow = true;
       } else if (mode === 'xray') {
-        m.material = inSel(m) ? this.xraySel : this.xray;
+        m.material = inSel(m) ? this.xraySel : partOf(m)?.userData.part.skin ? this.xraySkin : this.xray;
+        if (edges) edges.visible = false;
+        m.castShadow = false;
+      } else if (mode === 'systems') {
+        const info = partOf(m)?.userData.part;
+        m.material = inSel(m) ? this.sysSel : info?.skin ? this.sysSkin : this.systemMaterial(info?.system);
         if (edges) edges.visible = false;
         m.castShadow = false;
       } else if (mode === 'blueprint') {
@@ -190,7 +210,7 @@ export class RenderModes {
       fx.material.visible = mode !== 'blueprint';
     }
     const env = this.stage.env;
-    const overlay = mode === 'blueprint' ? 'blueprint' : mode === 'xray' ? 'xray' : null;
+    const overlay = mode === 'blueprint' ? 'blueprint' : mode === 'xray' || mode === 'systems' ? 'xray' : null;
     if (!env.space && env.overlay !== overlay && !this.stage.ascending) env.setOverlay(overlay);
     this.stage.lights.key.castShadow = !overlay;
     if (this.stage.ao) this.stage.ao.enabled = !overlay;

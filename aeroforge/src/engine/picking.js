@@ -5,8 +5,10 @@ import * as THREE from 'three';
 import { partOf } from './modes.js';
 
 export class Picker {
-  constructor(stage, { getRoot, onHover, onSelect, enabled = () => true }) {
+  /** accept(part): false skips the part so the ray carries on (ghosted skins, unfocused parts). */
+  constructor(stage, { getRoot, onHover, onSelect, enabled = () => true, accept = () => true }) {
     this.stage = stage;
+    this.accept = accept;
     this.getRoot = getRoot;
     this.onHover = onHover;
     this.onSelect = onSelect;
@@ -17,7 +19,7 @@ export class Picker {
     this.pending = null;
     this.down = null;
     const el = stage.renderer.domElement;
-    el.addEventListener('pointermove', (e) => { this.pending = e; });
+    el.addEventListener('pointermove', (e) => { this.pending = e; this.last = e; });
     el.addEventListener('pointerdown', (e) => { this.down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
     el.addEventListener('pointerup', (e) => {
       if (!this.down) return;
@@ -50,7 +52,7 @@ export class Picker {
       for (let p = o; p; p = p.parent) if (!p.visible) { vis = false; break; }
       if (!vis) continue;
       const part = partOf(o);
-      if (part) return part;
+      if (part && this.accept(part)) return part;
     }
     return null;
   }

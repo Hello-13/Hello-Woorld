@@ -11,36 +11,15 @@ import { triangleCount } from './engine/geometry.js';
 import { INFERNO_CSS } from './engine/effects.js';
 import { LOOKS } from './engine/environment.js';
 import { TourPlayer } from './learn/tour.js';
+import { SYSTEMS, systemColor } from './engine/systems.js';
 import { QUALITY } from './engine/stage.js';
 import { setTextureDetail } from './engine/surface.js';
 import { EventLog } from './ui/log.js';
 import { el, fmt } from './ui/dom.js';
-import { buildFighter } from './models/fighter.js';
-import { buildRocket } from './models/rocket.js';
-import { buildTurbofan } from './models/turbofan.js';
-import { buildSatellite } from './models/satellite.js';
-import { buildUAV } from './models/uav.js';
-import { mountFighterLab } from './labs/fighterLab.js';
-import { mountRocketLab } from './labs/rocketLab.js';
-import { mountEngineLab } from './labs/engineLab.js';
-import { mountOrbitLab } from './labs/orbitLab.js';
-import { mountUavLab } from './labs/uavLab.js';
+import { FLEET } from './fleet.js';
 
-// stats: the three headline figures shown under each vehicle's name (from its spec sheet)
-const FLEET = [
-  { id: 'fighter', key: '1', build: buildFighter, lab: mountFighterLab, labName: 'Flight envelope', lift: 1.4, looks: ['showroom', 'hangar'],
-    stats: [['2.25', 'Mach', 'Top speed'], ['19.8', 'km', 'Service ceiling'], ['+9', 'g', 'Load limit']] },
-  { id: 'rocket', key: '2', build: buildRocket, lab: mountRocketLab, labName: 'Launch simulator', lift: 5.5, looks: ['pad', 'showroom', 'hangar'],
-    stats: [['60', 't', 'Payload to LEO'], ['22.8', 'MN', 'Liftoff thrust'], ['27', '', 'Engines at liftoff']] },
-  { id: 'turbofan', key: '3', build: buildTurbofan, lab: mountEngineLab, labName: 'Brayton cycle', lift: 0.8, looks: ['showroom', 'hangar'],
-    stats: [['400', 'kN', 'Take-off thrust'], ['9.5', ': 1', 'Bypass ratio'], ['42', ': 1', 'Pressure ratio']] },
-  { id: 'satellite', key: '4', build: buildSatellite, lab: mountOrbitLab, labName: 'Orbital transfer', lift: 0, looks: ['orbit', 'showroom', 'hangar'],
-    stats: [['0.30', 'm', 'Ground resolution'], ['9.8', 'kW', 'Array power'], ['19.3', 'm', 'Array span']] },
-  { id: 'uav', key: '5', build: buildUAV, lab: mountUavLab, labName: 'Mission endurance', lift: 1.2, looks: ['showroom', 'hangar'],
-    stats: [['27', 'h', 'Endurance'], ['15.2', 'km', 'Ceiling'], ['16.8', '', 'Wing aspect ratio']] },
-];
-const MODE_LABEL = { studio: 'Studio', xray: 'X-ray', blueprint: 'Blueprint', thermal: 'Thermal', pressure: 'Pressure' };
-const SYSTEM_HUES = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9', '#e66767', '#7f93a8'];
+const MODE_LABEL = { studio: 'Studio', xray: 'X-ray', blueprint: 'Blueprint', systems: 'Systems', thermal: 'Thermal', pressure: 'Pressure' };
+const SEE_THROUGH = new Set(['xray', 'blueprint', 'systems']);   // modes where clicks pass through skins
 
 const $ = (id) => document.getElementById(id);
 const boot = $('boot');
@@ -107,6 +86,7 @@ async function start() {
   const orbitNote = $('orbit-note');
 
   // ------------------------------------------------------------------ fleet rail
+  fleetList.style.setProperty('--fleet-n', FLEET.length);
   for (const f of FLEET) {
     const v = f.vehicle;
     const b = el('button', { type: 'button', class: 'fleet-item', 'aria-pressed': 'false', 'data-id': f.id, 'aria-keyshortcuts': f.key },
@@ -130,13 +110,25 @@ async function start() {
     app.mode = m;
     for (const b of modeGroup.children) b.setAttribute('aria-checked', String(b.dataset.mode === m));
     modes.apply(app.current, m, app.selected);
-    legend.hidden = m !== 'thermal' && m !== 'pressure';
+    legend.hidden = m !== 'thermal' && m !== 'pressure' && m !== 'systems';
     updateLegend();
     if (!quiet) log.push('VIEW', `${MODE_LABEL[m]} render mode`);
   }
   function updateLegend() {
     const v = app.current;
     if (!v) return;
+    legend.classList.toggle('is-systems', app.mode === 'systems');
+    if (app.mode === 'systems') {
+      $('legend-title').textContent = 'Systems';
+      const list = $('legend-systems');
+      list.replaceChildren(...systemsOf(v).filter((x) => !x.skinOnly).map(({ name, parts }) => {
+        const b = el('button', { type: 'button', class: 'legend-sys', 'aria-pressed': String(app.sysFocus === name), title: SYSTEMS[name]?.blurb || name },
+          el('span', { class: 'sys-dot', style: `background:${systemColor(name)}` }), el('span', { text: name }), el('span', { class: 'legend-n', text: parts.length }));
+        b.addEventListener('click', () => focusSystem(app.sysFocus === name ? null : name));
+        return el('li', {}, b);
+      }));
+      return;
+    }
     if (app.mode === 'pressure') {
       $('legend-title').textContent = 'Pressure coefficient Cp';
       $('legend-bar').style.background = 'linear-gradient(90deg, #0a1f6b, #2a5fdc 38%, #c7c9cc 64%, #dc3d29)';
@@ -276,10 +268,31 @@ async function start() {
 
   // ------------------------------------------------------------------ picking & callouts
   const callouts = new Callouts((part) => selectPart(part));
-  new Picker(stage, {
+  const hoverTip = el('div', { class: 'hover-tip', role: 'tooltip', hidden: true });
+  document.body.append(hoverTip);
+  const placeTip = (e) => {
+    if (hoverTip.hidden || !e) return;
+    const x = Math.min(e.clientX + 16, window.innerWidth - hoverTip.offsetWidth - 8);
+    hoverTip.style.transform = `translate(${x}px, ${e.clientY + 18}px)`;
+  };
+  function showHoverTip(part) {
+    const ev = picker?.last;
+    if (!part || app.orbit || !ev || ev.pointerType === 'touch') { hoverTip.hidden = true; return; }
+    const info = part.userData.part;
+    hoverTip.replaceChildren(
+      el('span', { class: 'sys-dot', style: `background:${systemColor(info.system)}` }),
+      el('span', { class: 'ht-name', text: info.count > 1 ? `${info.name} ×${info.count}` : info.name }),
+      el('span', { class: 'ht-sys', text: info.system }));
+    hoverTip.hidden = false;
+    placeTip(ev);
+  }
+  stage.renderer.domElement.addEventListener('pointermove', placeTip);
+  stage.renderer.domElement.addEventListener('pointerdown', () => { hoverTip.hidden = true; });
+  const picker = new Picker(stage, {
     getRoot: () => (app.orbit ? null : app.current?.root),
     enabled: () => !app.orbit,
-    onHover: (part) => { app.hovered = part; refreshOutline(); },
+    onHover: (part) => { app.hovered = part; refreshOutline(); showHoverTip(part); },
+    accept: (part) => !(SEE_THROUGH.has(app.mode) && part.userData.part.skin) && (!modes.focus || modes.focus.has(part)),
     onSelect: (part) => selectPart(part),
   });
   function refreshOutline() {
@@ -309,13 +322,14 @@ async function start() {
     const T = partTemp(part);
     partCard.replaceChildren(
       el('div', { class: 'pc-head' },
-        el('span', { class: 'pc-sys', text: info.system }),
+        el('span', { class: 'pc-sys' }, el('span', { class: 'sys-dot', style: `background:${systemColor(info.system)}` }), el('span', { text: info.system })),
         el('button', { type: 'button', class: 'icon-btn', 'aria-label': 'Close part details', onclick: () => { isolate(false); selectPart(null); } }, '×')),
       el('h3', { class: 'pc-name', text: info.name }),
       el('p', { class: 'pc-desc', text: info.desc }),
       el('dl', { class: 'pc-facts' },
         el('div', {}, el('dt', { text: 'Material' }), el('dd', { text: info.material })),
-        el('div', {}, el('dt', { text: 'Mass' }), el('dd', { text: info.mass ? `${fmt.n(info.mass)} kg` : '—' })),
+        el('div', {}, el('dt', { text: 'Mass' }), el('dd', { text: massText(info), title: info.massSource || 'Estimated from public dimensions, materials and comparable components' })),
+        info.count ? el('div', {}, el('dt', { text: 'Quantity' }), el('dd', { text: fmt.n(info.count) })) : null,
         el('div', {}, el('dt', { text: app.mode === 'thermal' ? 'Temperature (live)' : 'Temperature' }), el('dd', { text: `${fmt.n(T)} K · ${fmt.n(T - 273.15)} °C` }))),
       el('div', { class: 'btn-row' },
         el('button', { type: 'button', class: 'btn btn-secondary', onclick: () => focusPart(part), text: 'Focus' }),
@@ -349,6 +363,7 @@ async function start() {
     log: (src, msg, level) => log.push(src, msg, level),
     onStart: () => {
       selectPart(null); setAutoRotate(false); document.body.classList.add('is-touring');
+      app.sysFocus = null;
       callouts.setVisible(true);
       tourBtn.textContent = 'Exit tour';
       updateViewShift();
@@ -362,27 +377,88 @@ async function start() {
   tourBtn.addEventListener('click', () => (tour.active ? tour.stop() : tour.start(app.entry.id)));
 
   // ------------------------------------------------------------------ inspector: specs & parts
+  const massText = (info) => (info.mass == null ? '—' : info.massSource ? `${fmt.n(info.mass)} kg` : `≈ ${fmt.n(info.mass)} kg (estimate)`);
+
+  /** Systems present on a vehicle, largest first, with their parts. */
+  function systemsOf(v) {
+    const map = new Map();
+    for (const p of v.parts) {
+      const sys = p.userData.part.system;
+      if (!map.has(sys)) map.set(sys, []);
+      map.get(sys).push(p);
+    }
+    return [...map].map(([name, parts]) => ({ name, parts, skinOnly: parts.every((p) => p.userData.part.skin) }))
+      .sort((a, b) => b.parts.length - a.parts.length);
+  }
+
+  /** Spotlight one subsystem: everything else is ghosted and the camera frames what is left. */
+  function focusSystem(name) {
+    const v = app.current;
+    if (!v || tour.active) return;
+    app.sysFocus = name;
+    const parts = name ? v.parts.filter((p) => p.userData.part.system === name) : null;
+    modes.setFocus(v, parts);
+    callouts.setFilter(parts ? new Set(parts) : null);
+    for (const b of specsRoot.querySelectorAll('.sys-chip')) b.setAttribute('aria-pressed', String((b.dataset.sys || null) === (name || null)));
+    updateLegend();
+    if (parts) {
+      const box = new THREE.Box3();
+      for (const p of parts) box.union(solidBounds(p));
+      if (!box.isEmpty()) {
+        const sph = box.getBoundingSphere(new THREE.Sphere());
+        const dir = stage.camera.position.clone().sub(stage.controls.target).normalize();
+        const { tanV, tanH } = stage.frameTan();
+        const dist = Math.max(2.5, (sph.radius / Math.min(tanV, tanH)) * 1.05);
+        stage.flyTo(sph.center.clone().addScaledVector(dir, dist), sph.center, 1.1);
+      }
+      log.push(v.designation, `Spotlight: ${name} · ${parts.length} parts`);
+    } else stage.frameVehicle(v);
+  }
+
   function renderSpecs(v) {
-    const systems = [...new Set(v.parts.map((p) => p.userData.part.system))];
-    const hue = Object.fromEntries(systems.map((s, i) => [s, SYSTEM_HUES[i % SYSTEM_HUES.length]]));
+    const groups = systemsOf(v);
     const totalMass = v.parts.reduce((a, p) => a + (p.userData.part.mass || 0), 0);
-    specsRoot.replaceChildren(
+    const chip = (name, n) => {
+      const b = el('button', { type: 'button', class: 'sys-chip', 'aria-pressed': String((app.sysFocus || null) === (name || null)), 'data-sys': name || '', title: name ? SYSTEMS[name]?.blurb || name : 'Show every system' },
+        name ? el('span', { class: 'sys-dot', style: `background:${systemColor(name)}` }) : null,
+        el('span', { text: name || 'All systems' }), el('span', { class: 'chip-n', text: n }));
+      if (!name) b.removeAttribute('data-sys');
+      b.addEventListener('click', () => focusSystem(name && app.sysFocus !== name ? name : null));
+      return b;
+    };
+    const search = el('input', { type: 'search', id: 'part-search', class: 'part-search', placeholder: 'Find a part, system or material', 'aria-label': 'Find a part' });
+    const list = el('div', { class: 'part-list' }, groups.map(({ name, parts }) => el('details', { class: 'part-group', open: groups.length <= 6 ? true : null },
+      el('summary', { class: 'part-sys' }, el('span', { class: 'sys-dot', style: `background:${systemColor(name)}` }), el('span', { text: name }), el('span', { class: 'pg-count', text: parts.length })),
+      el('ul', {}, parts.map((p) => {
+        const info = p.userData.part;
+        const b = el('button', { type: 'button', class: 'part-row', 'data-pid': info.id, 'aria-current': 'false' },
+          el('span', { class: 'pr-name', text: info.count > 1 ? `${info.name} ×${info.count}` : info.name }),
+          el('span', { class: 'pr-mass', text: info.mass ? `${info.massSource ? '' : '≈ '}${fmt.n(info.mass)} kg` : '' }));
+        b.addEventListener('click', () => { selectPart(p); focusPart(p); });
+        b.addEventListener('pointerenter', () => { app.hovered = p; refreshOutline(); });
+        b.addEventListener('pointerleave', () => { app.hovered = null; refreshOutline(); });
+        return el('li', { 'data-q': `${info.name} ${info.system} ${info.material}`.toLowerCase() }, b);
+      })))));
+    search.addEventListener('input', () => {
+      const q = search.value.trim().toLowerCase();
+      for (const g of list.children) {
+        let any = false;
+        for (const li of g.querySelectorAll('li')) { const hit = !q || li.dataset.q.includes(q); li.hidden = !hit; any ||= hit; }
+        g.hidden = !any;
+        if (q && any) g.open = true;
+      }
+    });
+    specsRoot.replaceChildren(...[
       el('p', { class: 'spec-tagline', text: v.tagline }),
       el('p', { class: 'spec-summary', text: v.summary }),
+      v.sources ? el('p', { class: 'spec-sources', text: `Sources: ${v.sources}` }) : null,
       el('dl', { class: 'spec-grid' }, v.specs.map(([k, val]) => el('div', {}, el('dt', { text: k }), el('dd', { text: val })))),
-      el('h3', { class: 'lab-h', text: `Components · ${v.parts.length} parts · ${fmt.n(totalMass)} kg listed` }),
-      el('ul', { class: 'part-list' }, systems.map((sys) => el('li', { class: 'part-group' },
-        el('span', { class: 'part-sys' }, el('span', { class: 'sys-dot', style: `background:${hue[sys]}` }), el('span', { text: sys })),
-        el('ul', {}, v.parts.filter((p) => p.userData.part.system === sys).map((p) => {
-          const info = p.userData.part;
-          const b = el('button', { type: 'button', class: 'part-row', 'data-pid': info.id, 'aria-current': 'false' },
-            el('span', { class: 'pr-name', text: info.name }), el('span', { class: 'pr-mass', text: info.mass ? `${fmt.n(info.mass)} kg` : '' }));
-          b.addEventListener('click', () => { selectPart(p); focusPart(p); });
-          b.addEventListener('pointerenter', () => { app.hovered = p; refreshOutline(); });
-          b.addEventListener('pointerleave', () => { app.hovered = null; refreshOutline(); });
-          return el('li', {}, b);
-        }))))),
-    );
+      el('h3', { class: 'lab-h', text: `Components · ${v.parts.length} parts in ${groups.length} systems · ≈ ${fmt.n(totalMass)} kg listed` }),
+      el('div', { class: 'sys-chips', role: 'group', 'aria-label': 'Spotlight a system' }, chip(null, v.parts.length), groups.map(({ name, parts }) => chip(name, parts.length))),
+      search,
+      list,
+      el('p', { class: 'lab-note', text: 'Masses marked ≈ are engineering estimates from published dimensions and materials; manufacturers do not publish component masses.' }),
+    ].filter(Boolean));
   }
 
   // ------------------------------------------------------------------ orbit mode (satellite lab)
@@ -429,6 +505,7 @@ async function start() {
     if (app.orbit) setOrbitMode(false);
     if (app.current) { isolate(false); for (const p of app.current.parts) p.visible = true; }
     app.selected = null; app.hovered = null; refreshOutline(); partCard.hidden = true;
+    app.sysFocus = null; modes.setFocus(app.current, null); callouts.setFilter(null);
     app.entry = f;
     const v = f.vehicle;
     app.current = v;
@@ -450,7 +527,7 @@ async function start() {
     hudName.textContent = v.name;
     hudRole.textContent = v.role;
     heroTagline.textContent = v.tagline;
-    heroStats.replaceChildren(...f.stats.map(([val, unit, label]) => el('div', { class: 'hero-stat' },
+    heroStats.replaceChildren(...(v.heroStats || f.stats || []).map(([val, unit, label]) => el('div', { class: 'hero-stat' },
       el('dt', { text: label }), el('dd', {}, val, unit ? el('span', { class: 'stat-unit', text: unit }) : null))));
     $('dossier-desig').textContent = `${v.designation} · ${f.labName}`;
     $('dossier-name').textContent = v.name;
