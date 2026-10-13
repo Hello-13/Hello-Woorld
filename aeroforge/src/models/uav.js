@@ -26,7 +26,11 @@ const mirror = (g) => applyMat(g.clone(), new THREE.Matrix4().makeScale(1, 1, -1
 
 function materials() {
   const std = (o) => new THREE.MeshStandardMaterial(o);
-  const skin = SKIN.uav();
+  // MQ-9s wear a flat grey paint: keep the shared skin's panel maps but only a faint, rough clearcoat,
+  // so small curved fairings never throw sharp sun glints
+  const skin = SKIN.uav().clone();
+  skin.clearcoat = 0.12;
+  skin.clearcoatRoughness = 0.45;
   const skin2 = skin.clone();
   skin2.side = THREE.DoubleSide;
   return {
