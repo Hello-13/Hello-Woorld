@@ -142,7 +142,8 @@ export function bladeGeometry(o) {
       return [r, ax0 + c * ca + h * na, tg0 + c * ct + h * nt];
     }));
   }
-  return orientOutward(loftRings(rings, { capStart: true, capEnd: true }));
+  const caps = o.caps ?? true;
+  return orientOutward(loftRings(rings, { capStart: caps, capEnd: caps }));
 }
 
 /**

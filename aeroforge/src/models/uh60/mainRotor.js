@@ -79,10 +79,10 @@ function bladeMaterial() {
 function bearing(rubber, steel) {
   for (let k = 0; k < 11; k++) {
     const x = 0.336 + k * 0.009;
-    const r = 0.088 - Math.abs(k - 5) * 0.003;
+    const r = 0.074 - Math.abs(k - 5) * 0.0025;
     (k % 2 ? steel : rubber).push(cyl(r, r, 0.009, [x, 0, 0], 'x', 20));
   }
-  steel.push(cyl(0.1, 0.1, 0.014, [0.33, 0, 0], 'x', 20), cyl(0.1, 0.1, 0.014, [0.44, 0, 0], 'x', 20));
+  steel.push(cyl(0.078, 0.078, 0.014, [0.33, 0, 0], 'x', 20), cyl(0.078, 0.078, 0.014, [0.44, 0, 0], 'x', 20));
 }
 
 export function buildMainRotor({ A, parent }) {
@@ -116,14 +116,12 @@ export function buildMainRotor({ A, parent }) {
   const bladeChains = [];
   for (const i of blades) {
     const holder = new THREE.Group();
-    const part = P(`Main rotor blade ${i + 1}`, {
+    P(`Main rotor blade ${i + 1}`, {
       material: 'Composite (graphite/glass) spar, Nomex core, nickel erosion strip, heater mats', mass: 120, explode: [2.0, UPX + 0.4, 0],
       desc: i === 0
         ? 'Wide-chord blade of the M model: new high-lift airfoils and a swept, tapered tip with anhedral that lift about 230 kg more than the UH-60L blade. 7.8 m long with −18° of twist; heater mats in the leading edge de-ice it. (Spar material per NASA test reports: graphite/glass composite; earlier UH-60A/L blades used a titanium spar.)'
         : `One of four identical blades, 90° apart. At 258 rpm the tip moves at 221 m/s — Mach 0.65 in the hover and about Mach 0.88 on the advancing side at 150 kt.`,
     }, holder);
-    void part;
-    holder.position.set(0, 0, 0);
     const az = new THREE.Group(); az.rotation.y = (i * Math.PI) / 2;
     const hinge = new THREE.Group(); hinge.position.x = E;
     const lag = new THREE.Group(), flap = new THREE.Group(), feather = new THREE.Group();
@@ -139,7 +137,6 @@ export function buildMainRotor({ A, parent }) {
   const plate = (() => {
     const s = new THREE.Shape();
     const arm = 0.15, core = 0.2, tipR = 0.5;
-    s.moveTo(core, -arm);
     const pts = [];
     for (let k = 0; k < 4; k++) {
       const a = (k * Math.PI) / 2;
@@ -161,11 +158,11 @@ export function buildMainRotor({ A, parent }) {
     g.rotateX(-Math.PI / 2);   // shape x → x, shape y → −z
     return g;
   })();
-  const hubParts = [place(plate.clone(), [0, 0.07, 0]), place(plate.clone(), [0, -0.112, 0])];
+  const hubParts = [place(plate.clone(), [0, 0.085, 0]), place(plate.clone(), [0, -0.127, 0])];
   hubParts.push(cyl(0.18, 0.18, 0.2, [0, 0, 0], 'y', 28));
   for (const i of blades) {
     const a = (i * Math.PI) / 2;
-    const bridge = box(0.05, 0.2, 0.3, [0.475, 0, 0]);
+    const bridge = box(0.05, 0.24, 0.3, [0.475, 0, 0]);
     bridge.rotateY(a);
     hubParts.push(bridge);
     // damper lug on the leading side of each arm
@@ -187,7 +184,6 @@ export function buildMainRotor({ A, parent }) {
   P('Elastomeric bearings', {
     material: 'Laminated natural rubber and steel shims', mass: 18, count: 4, explode: [0, UPX + 0.15, 0],
     desc: 'Each bearing is a stack of thin rubber layers bonded between curved steel shims. The rubber shears to let the blade flap, lead-lag and change pitch about one focal point 0.381 m from the shaft, while the stack carries the blade\'s ~30-tonne centrifugal pull in compression.',
-    callout: true, anchor: [0.39, 0.15, 0],
   }, [mesh(merge(rubber), MAT.elastomer()), mesh(merge(steel), MAT.steel())]);
 
   // spindles & cuffs (move with the blade)
@@ -290,11 +286,10 @@ export function buildMainRotor({ A, parent }) {
     const arm = box(RS - 0.22, 0.045, 0.08, [(RS + 0.22) / 2, 0, 0]); arm.rotateY(a); rotRing.push(arm);
     const cl = cyl(0.028, 0.028, 0.07, [RS, 0, 0], 'y', 10); cl.rotateY(a); rotRing.push(cl);
   }
-  const rotSw = A.part('Rotating swashplate', {
+  A.part('Rotating swashplate', {
     system: 'Rotor system', material: 'Aluminium-alloy ring on a duplex bearing', mass: 32, explode: [0, UPX - 1.3, 0],
     desc: 'Turns with the rotor. Its four arms carry the pitch control rods, so wherever the swashplate is high, the blade passing over it takes more pitch.',
   }, [mesh(merge(rotRing), MAT.casting())], swashSpin);
-  void rotSw;
   const statRing = [cyl(0.33, 0.33, 0.06, [0, -0.08, 0], 'y', 32), place(new THREE.SphereGeometry(0.13, 18, 12), [0, -0.04, 0])];
   for (const a of SERVO_AZ) {
     const lug = box(0.12, 0.05, 0.09, [RV - 0.03, -0.09, 0]); lug.rotateY(a); statRing.push(lug);
@@ -314,11 +309,10 @@ export function buildMainRotor({ A, parent }) {
   const rods = blades.map((i) => { const m = mesh(unitRod(10), MAT.steel()); rodPart.add(m); return { i, m }; });
 
   // stationary scissors / swashplate guide (anti-rotation) and primary servos (head frame, not spinning)
-  const guide = A.part('Swashplate guide & stationary scissors', {
+  A.part('Swashplate guide & stationary scissors', {
     system: 'Flight controls', material: 'Steel guide tube and anti-rotation links', mass: 12, explode: [0, UPX - 1.9, 0],
     desc: 'A fixed tube around the shaft guides the uniball, and a scissor link on the right holds the stationary swashplate from turning while it moves.',
   }, [mesh(merge([cyl(0.12, 0.12, 0.42, [0, -0.78, 0], 'y', 20), tube([0.02, -0.98, 0.35], [0.03, -0.75, 0.42], 0.018), tube([0.03, -0.75, 0.42], [0.0, -0.6, 0.36], 0.018)]), MAT.steel())], head);
-  void guide;
   const servoPart = A.part('Primary servos', {
     system: 'Flight controls', material: 'Dual-stage hydraulic actuators (No. 1 and No. 2 systems)', mass: 54, count: 3, explode: [0, UPX - 2.2, 0],
     desc: 'Forward, aft and lateral servos, each with two independent stages fed by separate hydraulic systems, so a single failure still leaves full control. Together they push against the whole rotor\'s control loads.',
@@ -375,9 +369,7 @@ export function buildMainRotor({ A, parent }) {
     for (const d of dampers) {
       const c = bladeChains[d.i];
       toSpin(c, d.local, tmp2);
-      const dir = tmp.subVectors(tmp2, d.hubEnd);
-      const len = dir.length();
-      const mid = d.hubEnd.clone().addScaledVector(dir, 0.62 / Math.max(len, 1e-3) * Math.min(len, 0.62) / 1);
+      const mid = tmp.copy(d.hubEnd).lerp(tmp2, 0.6);
       aimRod(d.body, d.hubEnd, mid, 0.042);
       aimRod(d.rod, mid, tmp2, 0.016);
     }
@@ -388,9 +380,9 @@ export function buildMainRotor({ A, parent }) {
       aimRod(sv.body, sv.anchor, top, 0.05);
       aimRod(sv.ram, top, lug, 0.022);
     }
-    const k = Math.sin(3 * psi);
-    for (let i = 0; i < bifMasses.length; i++) bifMasses[i].rotation.z = 0.0;
-    for (let i = 0; i < bifMasses.length; i++) bifMasses[i].children[0].rotation.y = 0.08 * k;
+    // bifilar masses swing in the rotor plane, three cycles per revolution (exaggerated amplitude)
+    const k = 0.08 * Math.sin(3 * psi);
+    for (const m of bifMasses) m.children[0].rotation.y = k;
   }
   update(st);
   return { head, spin, update, R, E };

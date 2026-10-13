@@ -31,7 +31,8 @@ function fanBlade(sheath = false) {
 /** A blade row sized to the core annulus at y. Rotors leave a tip gap, stators a hub gap. */
 export function coreRow({ y, chord, count, rotor = true, stagger = rotor ? [38, 56] : [-24, -32], t = [0.07, 0.05], camber = rotor ? 0.05 : -0.05, stations = 2, n = 5, ann = coreAt, gap = 0.003, phase = 0 }, keep) {
   const [hub, tip] = ann(y);
-  const g = bladeGeometry({ rHub: rotor ? hub : hub + gap, rTip: rotor ? tip - gap : tip, chord, stagger, t, camber, y, stations, n });
+  // hub and tip ends sit against platforms and casings, so small airfoils are left open there
+  const g = bladeGeometry({ rHub: rotor ? hub : hub + gap, rTip: rotor ? tip - gap : tip, chord, stagger, t, camber, y, stations, n, caps: count < 40 });
   return ring(g, count, { keep, phase });
 }
 
@@ -187,7 +188,7 @@ export function buildFan(ctx) {
   frame.push([[0.76, -1.62], [bypassAt(-1.62)[0], -1.62], [bypassAt(-2.02)[0], -2.02], [0.6, -2.02], [0.6, -1.95], [0.74, -1.9]]);
   // outer frame ring at the fan case aft flange
   frame.push([[FAN.caseR, -1.45], [1.72, -1.45], [1.72, -1.95], [1.62, -1.95]]);
-  const frameRings = cut(cutLathe(frame, GM.casingDark(), { seg: 80 }));
+  const frameRings = cut(cutLathe(frame, GM.casingDark(), { seg: 64 }));
   // struts: 12 through the bypass duct (one carries the radial drive shaft), and 12 in the core duct
   const strutBy = (keep) => {
     const [a] = bypassAt(-1.78);

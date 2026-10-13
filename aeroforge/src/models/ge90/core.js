@@ -56,7 +56,7 @@ export function buildCore(ctx) {
   hpcStatorParts[0].userData.part.stationTemp = '25';
 
   ROWS.hpcRotors.forEach((r, i) => {
-    const m = mesh(coreRow({ ...r, stagger: [36, 54], t: [0.065, 0.045], gap: 0.0025 }), GM.ti6246(i));
+    const m = mesh(coreRow({ ...r, stagger: [36, 54], t: [0.065, 0.045], gap: 0.0025, n: i < 4 ? 5 : 4 }), GM.ti6246(i));
     m.userData.temp = lt('25', '3', (i + 0.5) / 9);
     const g = new THREE.Group();
     g.add(m);
@@ -72,7 +72,7 @@ export function buildCore(ctx) {
     }, g);
   });
   ROWS.hpcStators.forEach((r, i) => {
-    const s = cut(cutPair((keep) => coreRow({ ...r, rotor: false, gap: 0.0025 }, keep), r.variable ? GM.titanium() : GM.ti6246(i + 1)));
+    const s = cut(cutPair((keep) => coreRow({ ...r, rotor: false, gap: 0.0025, n: 4 }, keep), r.variable ? GM.titanium() : GM.ti6246(i + 1)));
     const p = P(r.variable ? `HPC variable stator ${i + 1}` : `HPC stator ${i + 1}`, {
       system: 'Propulsion', material: r.variable ? 'Titanium vanes on trunnions (count estimated)' : 'Nickel-alloy vanes (count estimated)', mass: 8, count: r.count,
       explode: [-0.6, -0.7, 0],
@@ -83,7 +83,7 @@ export function buildCore(ctx) {
     p.userData.part.stationTemp = '3';
     hpcStatorParts.push(p);
   });
-  const ogv = cut(cutPair((keep) => coreRow({ ...ROWS.hpcOGV, rotor: false, stagger: [-4, -6], camber: -0.04 }, keep), GM.ti6246(8)));
+  const ogv = cut(cutPair((keep) => coreRow({ ...ROWS.hpcOGV, rotor: false, stagger: [-4, -6], camber: -0.04, n: 4 }, keep), GM.ti6246(8)));
   P('HPC outlet guide vanes', {
     system: 'Propulsion', material: 'Nickel-alloy vanes (count estimated)', mass: 9, count: ROWS.hpcOGV.count,
     explode: [-0.6, -0.7, 0],
@@ -110,7 +110,7 @@ export function buildCore(ctx) {
   for (const r of [ROWS.hpcIGV, ...ROWS.hpcStators.filter((s) => s.variable)]) { const t = coreAt(r.y)[1]; hpcCase.push(rect(t + 0.022, t + 0.042, r.y + 0.02, r.y - 0.02)); }
   // outer bleed-manifold wall over the rear stages
   hpcCase.push([[0.56, -2.58], [0.575, -2.58], [0.575, -3.1], [0.5, -3.12], [0.5, -3.1], [0.56, -3.08]]);
-  const casing = cut(cutLathe(hpcCase, GM.casing(), { seg: 72 }));
+  const casing = cut(cutLathe(hpcCase, GM.casing(), { seg: 56 }));
   P('HPC casing', {
     system: 'Structure', material: 'Steel front casing, nickel-alloy rear casing', mass: 310,
     explode: [-0.6, -0.7, 0], temp: 600,
@@ -338,7 +338,7 @@ export function buildCore(ctx) {
   }, lptRotor).userData.part.stationTemp = '5';
   const lptCase = [lineWall(-4.12, -5.13, 0.006, 0.026, 1)];
   for (const y of [-4.12, -4.52, -4.85, -5.13]) { const t = coreAt(y)[1]; lptCase.push(rect(t + 0.02, t + 0.065, y + 0.012, y - 0.012)); }
-  const lptC = cut(cutLathe(lptCase, GM.casing(), { seg: 72 }));
+  const lptC = cut(cutLathe(lptCase, GM.casing(), { seg: 64 }));
   P('LPT casing', {
     system: 'Structure', material: 'Nickel-alloy conical case', mass: 420,
     explode: [-0.6, -1.55, 0], temp: 750,
