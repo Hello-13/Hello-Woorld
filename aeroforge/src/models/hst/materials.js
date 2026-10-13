@@ -171,6 +171,6 @@ export const HM = {
   }),
   /** Light-path visualisation: additive, unlit, drawn over the X-ray / Systems views. */
   ray: () => once('ray', () => new THREE.MeshBasicMaterial({ color: 0xffc56a, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })),
-  beam: () => once('beam', () => new THREE.MeshBasicMaterial({ color: 0xffb648, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false })),
+  beam: () => once('beam', () => new THREE.MeshBasicMaterial({ color: 0xffb648, transparent: true, opacity: 0.06, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false })),
   focus: () => once('focus', () => new THREE.MeshBasicMaterial({ color: 0xfff1c8, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })),
 };

@@ -210,3 +210,14 @@ export const MAT = {
 
 /** A fresh anti-collision strobe material (each light animates its own intensity). */
 export const strobeMat = () => new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xff2010, emissiveIntensity: 0 });
+
+/** Tail-drive layout shared by the drive and tail modules (world metres). */
+export const TAIL = {
+  cant: 20 * DEG,                 // tail-rotor shaft canted 20° up from horizontal (pylon leans to port)
+  shearY0: 2.3,                   // the pylon starts leaning above this height
+  igb: [-8.33, 2.05, 0],          // 42° intermediate gearbox at the base of the pylon leading edge
+  tgb: [-9.93, 3.44, -0.415],     // 90° tail gearbox at the top of the pylon
+  hub: [-9.93, 3.56, -0.085],     // tail-rotor hub, right of the pylon
+};
+/** Lateral lean of the pylon mid-plane at height y. */
+export const pylonLean = (y) => -Math.max(0, y - TAIL.shearY0) * Math.tan(TAIL.cant);

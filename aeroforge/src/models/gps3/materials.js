@@ -58,7 +58,7 @@ export const G = {
     const s = mliSurface({ seed: 61 });
     return new THREE.MeshStandardMaterial({
       color: 0x2a2c31, normalMap: tile(s.normalMap, r), roughnessMap: tile(s.roughnessMap, r),
-      normalScale: new THREE.Vector2(0.32, 0.32), roughness: 0.5, metalness: 0.3,
+      normalScale: new THREE.Vector2(0.22, 0.22), roughness: 0.5, metalness: 0.3,
     });
   }),
   /** Gold (aluminised Kapton, amber side out) blanket for the propulsion end. */

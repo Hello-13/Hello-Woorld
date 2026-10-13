@@ -1,13 +1,15 @@
-// Launch simulator: runs the full ascent physics up front, then plays it back in the bay
-// with countdown, staging, fairing jettison and an ascent sky.
+// Falcon Heavy launch simulator: runs the full ascent physics up front, then plays it back on
+// LC-39A with countdown, 27-engine ignition, side-booster and centre-core separation, fairing
+// separation, the Merlin Vacuum burn and an ascent sky.
 
 import * as THREE from 'three';
-import { simulateAscent, sampleAt, tsiolkovsky, HELIOS } from '../physics/launch.js';
+import { simulateAscent, sampleAt, deltaVBudget, engineThrust, liftoffMass, FALCON_HEAVY } from '../physics/launch.js';
 import { el, slider, readouts, section, button, segmented, toggle, fmt } from '../ui/dom.js';
 import { ForceArrows, kN } from '../engine/forces.js';
 import { LineChart } from '../ui/chart.js';
 
-const SHORT = { BECO: 'BECO', MECO: 'MECO', SES: 'SES', SECO: 'SECO', MAXQ: 'Max-Q', FAIRING: 'Fairing' };
+const SHORT = { BECO: 'BECO', MECO: 'MECO', SES: 'SES-1', SECO: 'SECO-1', MAXQ: 'Max-Q', FAIRING: 'Fairing' };
+const P_SL = 101325;
 
 export function mountRocketLab(root, ctx) {
   const v = ctx.vehicle;
@@ -17,7 +19,7 @@ export function mountRocketLab(root, ctx) {
   let sim = null;
   let flight = null;     // { t, phaseIdx, logged:Set }
 
-  const sPay = slider({ label: 'Payload mass', min: 1, max: 70, step: 0.5, value: p.payload / 1000, unit: 't', format: (x) => x.toFixed(1), onInput: (x) => { p.payload = x * 1000; rerun(); } });
+  const sPay = slider({ label: 'Payload mass', min: 1, max: 75, step: 0.5, value: p.payload / 1000, unit: 't', format: (x) => x.toFixed(1), onInput: (x) => { p.payload = x * 1000; rerun(); } });
   const sKick = slider({ label: 'Pitch-over kick', min: 6, max: 18, step: 0.25, value: p.kick, unit: '°', format: (x) => x.toFixed(2), onInput: (x) => { p.kick = x; rerun(); } });
   const sTgt = slider({ label: 'Target orbit altitude', min: 180, max: 600, step: 5, value: p.target, unit: 'km', onInput: (x) => { p.target = x; rerun(); } });
   const warpCtl = segmented({ label: 'Time warp', value: '5', options: [['1', '1×'], ['5', '5×'], ['20', '20×'], ['50', '50×']], onChange: (x) => { warp = +x; } });
@@ -43,7 +45,8 @@ export function mountRocketLab(root, ctx) {
 
   const outcome = el('p', { class: 'lab-status', role: 'status' });
   const budget = readouts([
-    { key: 'dvB', label: 'Ideal Δv, boost phase', unit: 'm/s' }, { key: 'dvU', label: 'Ideal Δv, upper stage', unit: 'm/s' },
+    { key: 'dvB', label: 'Ideal Δv, 27-engine boost', unit: 'm/s' }, { key: 'dvC', label: 'Ideal Δv, centre core alone', unit: 'm/s' },
+    { key: 'dvU', label: 'Ideal Δv, second stage', unit: 'm/s' }, { key: 'dvT', label: 'Ideal Δv, total', unit: 'm/s' },
     { key: 'tw', label: 'Liftoff thrust / weight' }, { key: 'm0', label: 'Liftoff mass', unit: 't' },
   ]);
   const tele = readouts([
@@ -66,7 +69,7 @@ export function mountRocketLab(root, ctx) {
   });
 
   root.append(
-    el('p', { class: 'lab-intro', text: 'Configure the mission, then launch. The ascent is integrated with RK4 over a rotating spherical Earth: Isp varies with back-pressure, drag uses the Standard Atmosphere, and the upper stage flies closed-loop guidance to orbit.' }),
+    el('p', { class: 'lab-intro', text: 'Configure the mission, then launch Falcon Heavy from LC-39A. The ascent is integrated with RK4 over a rotating spherical Earth. Each Merlin\'s thrust falls with back-pressure on its nozzle exit (F = F_vac − p_a·A_e: 914 kN in vacuum, 845 kN at sea level); the centre core throttles to 55 % while the side boosters burn; drag uses the Standard Atmosphere; the second stage flies closed-loop guidance to a circular orbit. The vehicle is modelled fully expendable, the configuration behind the published 63.8 t to LEO.' }),
     section('Mission', sPay.el, sKick.el, sTgt.el),
     outcome,
     section('Δv budget (Tsiolkovsky)', budget.el),
@@ -88,14 +91,15 @@ export function mountRocketLab(root, ctx) {
       outcome.textContent = `Predicted: no orbit. ${sim.events.at(-1)?.code === 'FAILED' ? sim.events.at(-1).label : 'The vehicle runs out of energy'}. Lighten the payload or adjust the pitch-over kick.`;
       outcome.dataset.state = 'crit';
     }
-    const B = HELIOS.booster, C = HELIOS.core, U = HELIOS.upper;
-    const upperFull = U.dry + U.prop + HELIOS.fairing + p.payload;
-    const m0 = B.count * (B.dry + B.prop) + C.dry + C.prop + upperFull;
-    const dvB = tsiolkovsky((B.ispSL + B.ispVac) / 2, m0, m0 - B.count * B.prop - C.prop);
-    const dvU = tsiolkovsky(U.ispVac, upperFull - HELIOS.fairing, upperFull - HELIOS.fairing - U.prop);
-    budget.set('dvB', fmt.n(dvB, 0));
-    budget.set('dvU', fmt.n(dvU, 0));
-    budget.set('tw', ((B.count * B.engines + C.engines) * 845e3 / (m0 * 9.80665)).toFixed(2));
+    const V = FALCON_HEAVY;
+    const dv = deltaVBudget(V, p.payload);
+    const m0 = liftoffMass(V, p.payload);
+    const f0 = engineThrust(V.booster, P_SL).thrust * V.booster.count + engineThrust(V.core, P_SL).thrust;
+    budget.set('dvB', fmt.n(dv.boost, 0));
+    budget.set('dvC', fmt.n(dv.core, 0));
+    budget.set('dvU', fmt.n(dv.upper, 0));
+    budget.set('dvT', fmt.n(dv.total, 0));
+    budget.set('tw', (f0 / (m0 * 9.80665)).toFixed(2));
     budget.set('m0', fmt.n(m0 / 1000, 0));
     drawCharts(null);
     renderEvents(-Infinity);
@@ -119,7 +123,7 @@ export function mountRocketLab(root, ctx) {
 
   function showSample(s, t) {
     tele.set('t', fmt.time(t));
-    const phaseNames = { BOOST: 'Boost (27 engines)', CORE: 'Core alone', COAST: 'Staging coast', UPPER: 'Upper-stage burn', ORBIT: 'In orbit', FAILED: 'Suborbital' };
+    const phaseNames = { BOOST: 'Boost (27 Merlins)', CORE: 'Centre core', COAST: 'Stage separation', UPPER: 'Second-stage burn', ORBIT: 'In orbit', FAILED: 'Suborbital' };
     tele.set('phase', t < 0 ? 'Countdown' : phaseNames[s.phase] || s.phase, s.phase === 'FAILED' ? 'crit' : s.phase === 'ORBIT' ? 'ok' : '');
     tele.set('h', fmt.n(s.h / 1000, 1));
     tele.set('v', fmt.n(s.v, 0));
@@ -133,6 +137,7 @@ export function mountRocketLab(root, ctx) {
 
   // ------------------------------------------------------------------ flight playback
   const camDelta = new THREE.Vector3();
+  const lastShake = { x: 0, y: 0 };
   const rocketWorld = new THREE.Vector3();
   let prevRocket = null;
 
@@ -148,6 +153,7 @@ export function mountRocketLab(root, ctx) {
     if (ctx.stage.env.look !== 'pad') ctx.setLook('pad');
     stage.ascending = true;
     prevRocket = null;
+    lastShake.x = lastShake.y = 0;
   }
 
   function reset() {
@@ -180,7 +186,7 @@ export function mountRocketLab(root, ctx) {
       const t = f.t;
       // countdown + ignition ramp
       v.state.ignition = t < -3 ? 0 : t < 0 ? Math.min(1, (t + 3) / 2.5) : 0;
-      if (t >= -3 && !f.logged.has('IGN')) { f.logged.add('IGN'); ctx.log(v.designation, 'Ignition sequence start · 27 engines', 'warn'); }
+      if (t >= -3 && !f.logged.has('IGN')) { f.logged.add('IGN'); ctx.log(v.designation, 'Ignition sequence start · 27 Merlin 1D, TEA-TEB', 'warn'); }
       const s = sampleAt(sim.samples, Math.max(0, t));
       if (t >= 0) {
         const st = sepTimes();
@@ -197,7 +203,7 @@ export function mountRocketLab(root, ctx) {
           if (e.code === 'ORBIT' || e.code === 'FAILED') {
             outcome.textContent = e.code === 'ORBIT'
               ? `Orbit achieved: ${fmt.n(sim.result.perigee / 1000, 0)} × ${fmt.n(sim.result.apogee / 1000, 0)} km at ${fmt.n(sim.result.velocity, 0)} m/s.`
-              : 'No orbit: the upper stage ran out of propellant before reaching orbital velocity.';
+              : 'No orbit: the second stage ran out of propellant before reaching orbital velocity.';
             outcome.dataset.state = e.code === 'ORBIT' ? 'ok' : 'crit';
           }
         }
@@ -206,7 +212,7 @@ export function mountRocketLab(root, ctx) {
       // visual altitude: real for the first 350 m, then the world scrolls away beneath
       const h = t >= 0 ? s.h : 0;
       const hVis = Math.min(h, 350);
-      v.rigPivot.position.y = 3.2 + 32 + hVis;
+      v.rigPivot.position.y = v.pivotY + hVis;
       const scroll = Math.max(0, h - 350);
       v.ground.position.y = -scroll;
       stage.hangar.position.y = -scroll * v._fitScale;
@@ -218,11 +224,15 @@ export function mountRocketLab(root, ctx) {
         stage.shiftView(camDelta.subVectors(rocketWorld, prevRocket));
       }
       prevRocket = (prevRocket || new THREE.Vector3()).copy(rocketWorld);
-      if (!stage.reducedMotion && t > -2 && t < 20 && h < 2000) {
-        const shake = (1 - Math.min(1, Math.max(0, t) / 20)) * 0.04;
-        stage.camera.position.x += (Math.random() - 0.5) * shake;
-        stage.camera.position.y += (Math.random() - 0.5) * shake;
-      }
+      // smooth low-frequency rumble (sums of sines) that fades out by T+20 s and leaves the camera
+      // where it was — no per-frame random jitter
+      const shake = !stage.reducedMotion && t > -2 && t < 20 && h < 2000 ? (1 - Math.min(1, Math.max(0, t) / 20)) * 0.03 : 0;
+      const w = time * 6.3;
+      const ox = shake * (Math.sin(w * 1.7) + 0.5 * Math.sin(w * 3.1 + 1.3));
+      const oy = shake * (Math.sin(w * 2.3 + 0.7) + 0.5 * Math.sin(w * 2.9 + 2.1));
+      stage.camera.position.x += ox - lastShake.x;
+      stage.camera.position.y += oy - lastShake.y;
+      lastShake.x = ox; lastShake.y = oy;
 
       stage.env.setAscent(h, t >= 0 ? s.downrange / 6371000 : 0);
 

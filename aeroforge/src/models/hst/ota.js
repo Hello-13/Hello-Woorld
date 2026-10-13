@@ -249,7 +249,7 @@ function buildLightPath() {
   const k = OPT.design.k;                  // ray height ratio at the secondary
   const rays = [];
   const add = (r, phi) => {
-    const p0 = az(phi, r, 14.4);
+    const p0 = az(phi, r, 15.2);
     const p1 = az(phi, r, pmSurface(r));
     const r2 = r * k;
     const p2 = az(phi, r2, smSurface(r2));
@@ -260,11 +260,10 @@ function buildLightPath() {
   for (let i = 0; i < 4; i++) add(0.62, deg(i * 90 + 45));
   const rayMesh = mesh(mergeGeometries(rays.map(ni)), HM.ray(), { cast: false, receive: false });
   // beam envelopes
-  const envIn = tube(OPT.rPM, pmSurface(OPT.rPM), 14.4, { seg: 64 });
-  const envIn2 = tube(OPT.rObsc, pmSurface(OPT.rObsc), 9.0, { seg: 48 });
+  // faint envelopes of the two converging cones (the incoming beam is shown by its rays only)
   const cone1 = axial([[OPT.rPM, pmSurface(OPT.rPM)], [OPT.rPM * k, smSurface(OPT.rPM * k)]], 64);
   const cone2 = axial([[OPT.rPM * k, smSurface(OPT.rPM * k)], [0.002, OPT.xFocus]], 48);
-  const env = mesh(mergeGeometries([envIn, envIn2, cone1, cone2].map(ni)), HM.beam(), { cast: false, receive: false });
+  const env = mesh(mergeGeometries([cone1, cone2].map(ni)), HM.beam(), { cast: false, receive: false });
   const focus = mesh(new THREE.SphereGeometry(0.035, 16, 10).translate(OPT.xFocus, 0, 0), HM.focus(), { cast: false, receive: false });
   const fieldDisc = mesh(new THREE.RingGeometry(0.0, OPT.rField, 48).rotateY(Math.PI / 2).translate(OPT.xFocus, 0, 0), HM.beam(), { cast: false, receive: false });
   for (const m of [rayMesh, env, focus, fieldDisc]) {
