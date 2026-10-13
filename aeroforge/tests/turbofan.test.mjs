@@ -17,7 +17,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { solveTurbofan, DEFAULT_CYCLE, GE90, OPERATING_POINTS, SCHEDULE } from '../src/physics/turbofan.js';
-import { STAGES, FAN, ROWS, CORE, coreAt, bypassAt, STATIONS, PLUG_TIP, FAN_NOZZLE_Y, NACELLE } from '../src/models/ge90/layout.js';
+import { STAGES, FAN, ROWS, CORE, coreAt, bypassAt, STATIONS, PLUG_TIP, FAN_NOZZLE_Y, NACELLE, TCF, AGB, AGB_PADS, agbTrain } from '../src/models/ge90/layout.js';
 import { bladeRings, fanBladeSpec, FAN_BLADE_TIP_R } from '../src/models/ge90/blade.js';
 import TOUR from '../src/learn/tours/turbofan.js';
 
@@ -212,6 +212,35 @@ test('station planes cover every cycle station and run front to back', () => {
   assert.deepEqual(STATIONS.map((s) => s[0]).sort(), ids.slice().sort());
   const core = ['2', '25', '3', '4', '45', '5', '9'].map((id) => STATIONS.find((s) => s[0] === id)[1]);
   for (let i = 1; i < core.length; i++) assert.ok(core[i] < core[i - 1], `core station order at ${i}`);
+});
+
+test('turbine center frame sits between the HP and LP turbines, with the EGT plane at its aft edge', () => {
+  const hpt2 = ROWS.hptBlades[1], lpn1 = ROWS.lptNozzles[0];
+  // GE patent EP 1 149 987: the GE90's TCF has twelve struts
+  assert.equal(TCF.struts, 12);
+  assert.ok(TCF.y0 <= hpt2.y - hpt2.chord / 2 + 0.002, 'frame starts behind the HPT stage 2 blades');
+  assert.ok(TCF.y1 >= lpn1.y - lpn1.chord / 2 - 0.02 && TCF.y1 < lpn1.y + lpn1.chord / 2 + 0.02, 'frame ends at the LPT stage 1 nozzle');
+  assert.ok(TCF.ym < TCF.y0 && TCF.ym > TCF.y1 && TCF.bearingY < TCF.y0 && TCF.bearingY > TCF.y1, 'struts and #4 bearing inside the frame');
+  const egt = STATIONS.find((st) => st[0] === '45')[1];
+  assert.ok(egt <= TCF.y0 && egt >= TCF.y1 - 0.01, `station 45 (EGT, T49) at the frame: ${egt}`);
+});
+
+test('accessory gearbox: one meshing spur train, pad gears sized by the published pad ratios', () => {
+  const train = agbTrain(AGB.R, AGB_PADS);
+  // neighbouring pitch circles touch (or overlap by less than a tooth), and every gear fits inside the housing
+  for (let i = 1; i < train.length; i++) {
+    const d = AGB.R * (train[i].phi - train[i - 1].phi);
+    const gap = d - train[i].r - train[i - 1].r;
+    assert.ok(gap < 0.0085 && gap > -0.004, `gears ${i - 1}/${i} (${train[i - 1].name} → ${train[i].name}) gap ${gap}`);
+  }
+  for (const g of train) assert.ok(g.r >= 0.0099 && AGB.R + g.r + 0.0035 <= AGB.interior[1] + 0.008 && AGB.R - g.r - 0.0035 >= AGB.interior[0] - 0.008, `${g.name} gear r ${g.r} fits`);
+  // in a train of meshing gears speed × pitch radius is the same for every gear, so the slow
+  // hydraulic-pump pad (0.3783 × N2, EASA TCDS) needs about 2.1 times the generator gear's radius (0.7947 × N2)
+  const by = (name) => train.find((g) => g.name === name);
+  const idg = by('IDG'), edp = by('hydraulic pump');
+  close(edp.r / idg.r, idg.ratio / edp.ratio, 0.05, 'hydraulic-pump / generator gear size');
+  assert.ok(by('VSCF backup generator').r < idg.r, 'the fastest pad (VSCF, 2.4126 × N2) has the smallest gear');
+  assert.equal(train.filter((g) => g.kind !== 'idler').length, AGB_PADS.length);
 });
 
 test('every guided-tour focus names a part declared in the model', () => {

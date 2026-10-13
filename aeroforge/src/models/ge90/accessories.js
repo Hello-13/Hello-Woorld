@@ -15,7 +15,7 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { GM } from './materials.js';
-import { coreAt } from './layout.js';
+import { coreAt, AGB_PADS } from './layout.js';
 import { cutLathe, cutPair, sector, boxAt, axialCyl, radialCyl, tangentCyl, hoop, merge, P3, tube, arc, cutTube, bladeGeometry, atPhi } from './geom.js';
 import { toothedGear, axialGear, agbTrain } from './gears.js';
 
@@ -138,13 +138,7 @@ export function buildAccessories(ctx) {
 
   // gear train: pad gears sized from the published pad ratios where they fit (the hydraulic pump,
   // slowest at 0.3783 × N2, gets about 2.1 times the generator gear's diameter at 0.7947 × N2)
-  const TRAIN = agbTrain(R_AGB, [
-    { phi: 0.5, r: 0.02, kind: 'pad', name: 'VSCF backup generator' }, { phi: 0.62, r: 0.05, kind: 'pad', name: 'starter' },
-    { phi: 0.7, r: 0.028, kind: 'pad', name: 'IDG' }, { phi: 0.82, r: 0.04, kind: 'pad', name: 'fuel pump' },
-    { phi: 0.95, r: 0.059, kind: 'pad', name: 'hydraulic pump' }, { phi: 1.0, r: null, kind: 'pad', name: 'HMU drive' },
-    { phi: PHI.radial, r: null, kind: 'input', name: 'input' }, { phi: 1.205, r: 0.035, kind: 'pad', name: 'lubrication unit / PMA' },
-    { phi: 1.305, r: 0.03, kind: 'pad', name: 'deoiler / hand crank' },
-  ]);
+  const TRAIN = agbTrain(R_AGB, AGB_PADS);
   const GY = (Y_AGB_F + Y_AGB_A) / 2;
   const gears = [], shafts = [];
   for (const g of TRAIN) {
@@ -211,6 +205,7 @@ export function buildAccessories(ctx) {
     system: 'Drive system', material: 'Techspace Aero unit: aluminium housings, gerotor elements on one shaft', mass: 18,
     explode: [0.37, 0.35, 1.74], temp: 360,
     desc: 'On the -115B the oil pumps are one Techspace Aero lubrication unit: a pressure element (nearest the gearbox) that feeds the bearings and gears, and scavenge elements on the same shaft that suck the oil back out of the sumps. The type certificate\'s minimum oil pressure is 69 kPa differential.',
+    callout: true, anchor: [1.79, -0.45, 0.7],
   }, m(merge([...lu, tangentCyl(1.83, -0.52, 1.24, 0.016, 0.03, 10), tangentCyl(1.845, -0.42, 1.24, 0.018, 0.03, 10), boxAt(1.92, -0.545, 1.185, [0.02, 0.04, 0.04])]), GM.oil()));
   P('Oil pressurizing valve', {
     system: 'Drive system', material: 'Spring-loaded poppet valve (Techspace Aero)', mass: 1,

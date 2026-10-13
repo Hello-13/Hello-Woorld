@@ -78,6 +78,8 @@ function oru(k, boxes, mat, { coax = 0 } = {}) {
   return [mesh(merge(body), mat), mesh(merge(det), HM.box())];
 }
 
+const addConn = (k, x, r, t = 0) => (CONN[k] || (CONN[k] = [])).push(new THREE.Vector3(x, r, t).applyAxisAngle(X_AXIS, BAY_PHI[k]).toArray());
+
 export function buildSSM(P) {
   for (const k of Object.keys(CONN)) delete CONN[k];
   const out = { sockets: [], conn: CONN, railLength: {} };
@@ -86,6 +88,12 @@ export function buildSSM(P) {
   const listKey = (list) => Object.keys(rails).find((k) => rails[k] === list);
   const rail = (list, p0, p1) => { list.push(rod(p0, p1, 0.016, 4)); railLen[listKey(list)] += pathLength([p0, p1]); };
   const standoff = (list, phi, r, x, h = 0.07) => list.push(rod(az(phi, r, x), az(phi, r + h, x), 0.012, 4));
+  // portable-foot-restraint socket: a 10 cm square receptacle on a doubler plate, base at radius r
+  const socket = (x, r, phi) => {
+    const g = [new THREE.BoxGeometry(0.16, 0.012, 0.16).translate(x, r + 0.006, 0)];
+    for (const s of [-1, 1]) g.push(new THREE.BoxGeometry(0.1, 0.05, 0.012).translate(x, r + 0.037, s * 0.044), new THREE.BoxGeometry(0.012, 0.05, 0.076).translate(x + s * 0.044, r + 0.037, 0));
+    for (const m of g) out.sockets.push(m.rotateX(phi));
+  };
 
   // ------------------------------------------------------------------ light shield
   const ls = sunShadowShell(RAD.shell, ST.fwdShell, ST.front, [HM.mliShield(), HM.mliShield(1)], 315, 190, { seg: 48, hs: 4 });
@@ -198,9 +206,17 @@ export function buildSSM(P) {
   const fsr = [flange(RAD.shell - 0.02, RAD.shell + 0.03, ST.equip, ST.equip + 0.1)];
   for (const x of [6.0, 7.08, 8.2]) fsr.push(flange(RAD.shell - 0.005, RAD.shell + 0.03, x - 0.035, x + 0.035));
   P('Forward shell reinforcing rings', {
-    system: 'Structure', material: 'Machined aluminium rings outside the skin', mass: 80, count: 4, temp: 262, explode: [0, 3.9, 0],
+    system: 'Structure', material: 'Machined aluminium rings outside the skin', mass: 80, count: 4, temp: 262, explode: [0, 3.9, 0], xrayWeight: 0.3,
     desc: 'The forward shell is stiffened from the outside so the main baffle and secondary mirror inside have full clearance. The aft ring bolts the shell to the equipment section. Ring stations approximate.',
   }, mesh(merge(fsr), HM.al()));
+
+  // patches over cracked outer blanket layers (1997 servicing); positions illustrative
+  const pt = [];
+  for (const [r, x0, x1, a0, a1] of [[RAD.shell + 0.006, 10.3, 11.0, -30, -8], [RAD.shell + 0.006, 11.6, 12.3, 18, 42], [RAD.shell + 0.006, 9.6, 10.1, 300, 318], [RAD.shell + 0.006, 7.5, 8.3, 25, 40]]) pt.push(shellPatch(r, x0, x1, deg(a0), deg(a1), { nphi: 4, nx: 1 }));
+  P('MLI repair patches', {
+    system: 'Thermal control', skin: true, material: 'Teflon patches over torn outer blanket layers', mass: 2, count: 4, temp: 300, explode: [0, 4.4, 0],
+    desc: 'By 1997 the outer Teflon layer of the blankets was cracking and peeling after years of ultraviolet light and atomic oxygen; spacewalkers patched the worst tears, and later crews fitted the stainless-steel NOBL covers over the bay doors. Patch positions illustrative.',
+  }, mesh(merge(pt), HM.mli(9)));
 
   // ------------------------------------------------------------------ OTA equipment section (on the forward shell)
   // nine bays A–H, J over the +V3 half; lettering runs from +V2 over the top to −V2 (assumed)
@@ -210,7 +226,7 @@ export function buildSSM(P) {
   const oes = [flange(RAD.shell, rO, O0, O0 + 0.02, 40, -Math.PI, Math.PI), flange(RAD.shell, rO, O1 - 0.02, O1, 40, -Math.PI, Math.PI)];
   for (let i = 0; i <= 9; i++) oes.push(atPhi(OPHI(i), new THREE.BoxGeometry(O1 - O0, rO - RAD.shell, 0.02).translate(OM, (rO + RAD.shell) / 2, 0)));
   const oHw = [];
-  for (let i = 0; i < 9; i++) for (const x of [O0 + 0.12, O1 - 0.12]) oHw.push(atPhi(OMID(i), new THREE.CylinderGeometry(0.018, 0.018, 0.03, 8).translate(x, rO + 0.025, 0)));    // J-hook fasteners
+  for (let i = 0; i < 9; i++) for (const x of [O0 + 0.1, OM, O1 - 0.1]) oHw.push(atPhi(OMID(i), new THREE.CylinderGeometry(0.018, 0.018, 0.03, 8).translate(x, rO + 0.025, 0)));    // three J-hooks per door
   P('OTA equipment section', {
     system: 'Structure', material: 'Semicircular aluminium compartment ring: two flanges and ten bay walls', mass: 70, temp: 270, explode: [0, 5.6, 0],
     desc: 'A half-ring of nine small bays outside the forward shell, seven for the telescope\'s own electronics and two for support, separate from the spacecraft\'s. NASA\'s text puts it on the +V3 side, but its own figure drawn looking forward shows it on the −V3 half, so the side is uncertain; bay depth estimated.',
@@ -219,23 +235,26 @@ export function buildSSM(P) {
   for (let i = 0; i < 9; i++) oDoors.push(shellPatch(rO + 0.01, O0 + 0.02, O1 - 0.02, OPHI(i) + deg(0.7), OPHI(i + 1) - deg(0.7), { nphi: 4, nx: 1 }));
   P('OTA equipment section doors', {
     system: 'Skin & fairings', skin: true, material: 'Nine outward-opening doors under MLI, with heaters and insulation behind', mass: 25, count: 9, temp: 268, explode: [0, 6.3, 0],
-    desc: 'Every OTA bay has its own outward-opening door with J-hook fasteners, so spacewalkers could reach the boxes: the optical control electronics were upgraded through them in 1999 and 2009.',
+    desc: 'Every OTA bay has its own outward-opening door held by three J-hooks, so spacewalkers could reach the boxes: in 1999 one opened the bay C door this way to plug an enhancement-kit harness into the optical control electronics.',
   }, mesh(merge(oDoors), HM.mli()));
   const oBox = (i, sx, sy, sz, r = 1.72) => atPhi(OMID(i), new THREE.BoxGeometry(sx, sy, sz).translate(OM, r, 0));
-  const OTA_BOX = (name, info, bays, dims = [0.5, 0.24, 0.36], mat = HM.iridite()) => P(name, { explode: [0, 5.9, 0], temp: 294, ...info }, mesh(merge(bays.map((i) => oBox(i, ...dims))), mat));
-  // bays A (0) and J (8) taken as the two support bays; the rest by the side each sensor serves (approximate)
+  const OTA_BOX = (name, info, bays, dims = [0.5, 0.24, 0.36], mat = HM.iridite()) => P(name, { explode: [0, 5.9, 0], temp: 294, xrayWeight: 0.5, ...info }, mesh(merge(bays.map((i) => oBox(i, ...dims))), mat));
+  // bays A–H, J are indices 0–8. The OCE is in bay C (the 1999 spacewalk opened bay C to reach its
+  // J11 connector), the DIU beside it and the EP/TCE on the far side (SM3A Fig. 5-25); A and J are
+  // taken as the two support bays and the rest are assigned approximately
+  out.oes = { phi: OMID, phiDeg: (i) => -80 + i * 20, r: 1.72, x: OM, bays: { oce: 2, diu: 3, ace: 5, eptce: 6, fge: [1, 4, 7] } };
   OTA_BOX('OTA electrical power & thermal control electronics', {
     system: 'Power', material: 'EP/TCE: power switching and heater controllers', mass: 30,
-    desc: 'Distributes power from the spacecraft to the telescope\'s electronics and runs the heaters that hold the primary and secondary near 21 °C, so the optics keep their shape and spacing. Bay assignment approximate.',
-  }, [2]);
+    desc: 'Distributes power from the spacecraft to the telescope\'s electronics and runs the thermostat-controlled heaters that hold the primary and secondary near 21 °C, so the optics keep their shape and spacing. Drawn on the far side of the section from the OCE (SM3A Fig. 5-25); bay G assumed.',
+  }, [6]);
   OTA_BOX('Actuator control electronics', {
     system: 'Optics', material: 'ACE: stepper-motor drivers for the mirror actuators', mass: 15,
-    desc: 'Drives the 24 figure-control actuators behind the primary and the six actuators that tilt, decenter and refocus the secondary — the hardware behind every focus adjustment made since 1990. Bay assignment approximate.',
-  }, [3], [0.46, 0.22, 0.34]);
+    desc: 'Picks which of the 24 primary-mirror and 6 secondary-mirror actuators to move and checks each one\'s response — the hardware behind every focus adjustment made since 1990. Bay assignment approximate.',
+  }, [5], [0.46, 0.22, 0.34]);
   OTA_BOX('Optical control electronics', {
     system: 'Optics', material: 'OCE: wavefront-sensor electronics, upgraded with an enhancement kit in 1999 and 2009', mass: 25,
-    desc: 'Runs the optical control sensors — small wavefront sensors inside the Fine Guidance Sensors — that measure the telescope\'s focus and alignment. Its 2009 enhancement kit also lets FGS-2R2 realign its own optics in orbit. Bay assignment approximate.',
-  }, [5]);
+    desc: 'Bay C. Runs the optical control sensors — small wavefront sensors inside the Fine Guidance Sensors — that measure the telescope\'s focus and alignment. In 1999 a spacewalker opened the bay C door by its three J-hooks and plugged the enhancement kit\'s harness into its J11 connector; the 2009 kit lets FGS-2R2 realign its own optics in orbit.',
+  }, [2]);
   OTA_BOX('Fine guidance electronics', {
     system: 'Attitude control', material: 'One electronics assembly per Fine Guidance Sensor', mass: 60, count: 3,
     desc: 'Each Fine Guidance Sensor has its own electronics box here: it powers and commands the sensor, does its computations and passes the guide-star error signals to the pointing system. Bays assigned by the side of each sensor, approximate.',
@@ -256,15 +275,22 @@ export function buildSSM(P) {
   for (let k = 0; k < 12; k++) for (const x of [X_EQ0 + 0.02, X_EQ1 - 0.02]) frame.push(atPhi(deg(k * 30 + 15), new THREE.BoxGeometry(0.04, 0.05, BAY_EDGE - 0.06).translate(x, FACE - 0.03, 0)));
   const eqMat = new THREE.MeshStandardMaterial({ color: 0x9aa1a8, roughness: 0.5, metalness: 0.7, side: THREE.DoubleSide });
   out.equip = P('Equipment section', {
-    system: 'Structure', material: 'Machined, stiffened aluminium frame panels and door sills', mass: 540, temp: 278, explode: [0, 0, 0],
+    system: 'Structure', material: 'Machined, stiffened aluminium frame panels and door sills', mass: 540, temp: 278, explode: [0, 0, 0], xrayWeight: 0.25,
     desc: 'A doughnut-shaped ring of twelve trapezoidal bays, 4.2 m across, holding about 90 % of the spacecraft electronics: ten equipment bays behind hinged doors, so spacewalkers can swap boxes as orbital replacement units, and two that carry the aft trunnion pins and scuff plates.',
   }, mesh(merge(frame), eqMat));
   const barrel = [plateGeo(X_EQ0 + 0.01), plateGeo(X_EQ1 - 0.01), tube(RAD.shell, X_EQ0, X_EQ1, { seg: 64 })];
   for (const p of TRUNNION_PHI) barrel.push(atPhi(p, new THREE.BoxGeometry(X_EQ1 - X_EQ0 - 0.07, 0.03, BAY_EDGE - 0.05).translate(X_EQM, FACE + 0.015, 0)));   // trunnion-bay close-outs
   P('Equipment section barrel & bulkheads', {
-    system: 'Structure', skin: true, material: 'Inner aluminium barrel, forward frame panel and aft bulkhead; trunnion-bay close-out panels', mass: 350, temp: 278, explode: [0, 0, 0],
+    system: 'Structure', skin: true, material: 'Inner aluminium barrel, forward frame panel and aft bulkhead; trunnion-bay close-out panels', mass: 350, temp: 278, explode: [0, 0, 0], xrayWeight: 0.2,
     desc: 'The inner barrel the bays are built on, closed by a forward frame panel and an aft bulkhead; six mounts on the inside of the bulkhead hold the telescope. Shown ghosted in X-ray and Systems so the primary mirror and the bay contents can be seen and picked.',
   }, mesh(merge(barrel), eqMat));
+
+  const wb = [];
+  for (let k = 0; k < 12; k++) for (const s of [-1, 1]) wb.push(atPhi(deg(k * 30), new THREE.BoxGeometry(X_EQ1 - X_EQ0 - 0.12, RAD.big - RAD.shell - 0.12, 0.006).translate(X_EQM, (RAD.big + RAD.shell) / 2 - 0.03, s * 0.017)));
+  P('Bay wall blankets', {
+    system: 'Thermal control', skin: true, material: 'Multi-layer insulation blankets on both faces of the twelve radial bay walls', mass: 18, count: 24, temp: 285, explode: [0, 0, 0], xrayWeight: 0.25,
+    desc: 'Blankets on the walls between bays keep each bay\'s thermal balance separate, so a hot box in one bay does not cook its neighbour; the heat-dissipating boxes are put in bays that are mostly in orbit shadow. Shown ghosted.',
+  }, mesh(merge(wb), HM.mli(4)));
 
   // bay doors (radiators)
   const doorNames = {
@@ -275,24 +301,31 @@ export function buildSSM(P) {
   for (let k = 1; k <= 10; k++) {
     const g = bayBox(k, X_EQ1 - X_EQ0 - 0.07, 0.03, BAY_EDGE - 0.05, X_EQM, FACE + 0.015);
     for (const t of [-0.36, 0.36]) {
-      rails.eq.push(inBay(k, rod([X_EQ0 + 0.15, FACE + 0.09, t], [X_EQ1 - 0.15, FACE + 0.09, t], 0.016, 4)));
-      for (const x of [X_EQ0 + 0.2, X_EQM, X_EQ1 - 0.2]) rails.eq.push(inBay(k, rod([x, FACE + 0.03, t], [x, FACE + 0.09, t], 0.012, 4)));
+      rails.eq.push(inBay(k, rod([X_EQ0 + 0.25, FACE + 0.09, t], [X_EQ1 - 0.25, FACE + 0.09, t], 0.016, 4)));
+      railLen.eq += X_EQ1 - X_EQ0 - 0.5;
+      for (const x of [X_EQ0 + 0.28, X_EQM, X_EQ1 - 0.28]) rails.eq.push(inBay(k, rod([x, FACE + 0.03, t], [x, FACE + 0.09, t], 0.012, 4)));
     }
-    out.sockets.push(bayBox(k, 0.1, 0.05, 0.1, X_EQ1 - 0.22, FACE + 0.05, 0));
+    socket(X_EQ1 - 0.22, FACE + 0.015, BAY_PHI[k]);
     const hw = [];
     for (const t of [-0.38, 0, 0.38]) hw.push(inBay(k, new THREE.CylinderGeometry(0.025, 0.025, 0.16, 10).rotateX(Math.PI / 2).translate(X_EQ0 + 0.05, FACE + 0.035, t)));
     for (const [x, t] of [[X_EQ1 - 0.07, -0.47], [X_EQ1 - 0.07, 0.47], [X_EQM, -0.49], [X_EQM, 0.49], [X_EQ0 + 0.12, -0.47], [X_EQ0 + 0.12, 0.47]]) {
       hw.push(inBay(k, new THREE.CylinderGeometry(0.018, 0.018, 0.03, 8).translate(x, FACE + 0.03, t)));      // six J-hooks
     }
     hw.push(inBay(k, new THREE.BoxGeometry(0.06, 0.04, 0.16).translate(X_EQ1 - 0.08, FACE + 0.04, 0.26)));
+    // integral door stay, folded flat against the inside of the door, on a pivot bracket by the hinge
+    hw.push(inBay(k, rod([X_EQ0 + 0.1, FACE - 0.035, 0.43], [X_EQ1 - 0.3, FACE - 0.035, 0.43], 0.012, 6)), inBay(k, new THREE.BoxGeometry(0.06, 0.04, 0.06).translate(X_EQ0 + 0.1, FACE - 0.035, 0.43)));
     const wheels = k === 6 || k === 9;
+    if (wheels) {                                   // door handle and door stop (the 1999 NOBLs were clipped to them)
+      hw.push(...cablePath([[X_EQ1 - 0.12, FACE + 0.015, -0.12], [X_EQ1 - 0.12, FACE + 0.07, -0.12], [X_EQ1 - 0.12, FACE + 0.07, 0.12], [X_EQ1 - 0.12, FACE + 0.015, 0.12]], 0.012, 6).map((g) => g.rotateX(BAY_PHI[k])));
+      hw.push(inBay(k, new THREE.BoxGeometry(0.08, 0.06, 0.05).translate(X_EQ0 + 0.06, FACE + 0.045, 0.5)));
+    }
     const p = P(`Bay ${k} door (${doorNames[k]})`, {
       system: 'Thermal control', skin: true, material: wheels ? 'Thermally stiffened panel door' : 'Flat honeycomb aluminium door, silvered FOSR tape and MLI pattern', mass: 22, temp: Math.round(250 + 35 * Math.cos(BAY_PHI[k])),
       explode: az(BAY_PHI[k], 1.3), desc: k === 10
         ? 'Bay 10\'s door carries the Science Instrument Command and Data Handling unit on its inner face. Like the other honeycomb doors it is a radiator: electronics bolted to it dump their heat to space.'
         : wheels
           ? `Bay ${k} door. The two reaction-wheel bays have thermally stiffened panel doors rather than the flat honeycomb equipment doors; spacewalkers open each by releasing six J-hooks.`
-          : `Hinged access door and radiator for bay ${k}. Its outer face sheds the heat of the ${doorNames[k]} equipment to deep space; spacewalkers open it by releasing six J-hooks.`,
+          : `Hinged access door and radiator for bay ${k}. Its outer face sheds the heat of the ${doorNames[k]} equipment to deep space; spacewalkers open it by releasing six J-hooks, and an integral stay props it open while they work.`,
     }, [mesh(g, HM.bayDoor()), mesh(merge(hw), HM.al())]);
     p.userData.part.thermalRole = 'radiator';
     out.bayDoors.push(p);
@@ -303,14 +336,18 @@ export function buildSSM(P) {
     const g = [bayBox(k, X_EQ1 - X_EQ0 - 0.18, 0.02, BAY_EDGE - 0.16, X_EQM, FACE + 0.045)];
     for (const t of [-0.44, 0.44]) g.push(bayBox(k, X_EQ1 - X_EQ0 - 0.16, 0.025, 0.025, X_EQM, FACE + 0.045, t));
     for (const x of [X_EQ0 + 0.13, X_EQ1 - 0.13]) g.push(bayBox(k, 0.025, 0.025, BAY_EDGE - 0.14, x, FACE + 0.045));
+    const plugs = [];
+    for (const [x, t] of [[X_EQ0 + 0.2, -0.36], [X_EQ0 + 0.2, 0.36], [X_EQ1 - 0.2, -0.36], [X_EQ1 - 0.2, 0.36]]) plugs.push(inBay(k, new THREE.CylinderGeometry(0.02, 0.024, 0.03, 10).translate(x, FACE + 0.065, t)));
+    plugs.push(inBay(k, new THREE.CylinderGeometry(0.015, 0.015, 0.04, 8).translate(X_EQ1 - 0.07, FACE + 0.06, 0.47)), inBay(k, rod([X_EQ1 - 0.07, FACE + 0.06, 0.47], [X_EQ1 - 0.16, FACE + 0.06, 0.4], 0.006, 4)));
     P(`New outer blanket layer (bay ${k})`, {
       system: 'Thermal control', skin: true, material: 'Silicon-dioxide-coated stainless-steel foil on a steel picture frame, expanding vent plugs', mass: 10, temp: 250, explode: az(BAY_PHI[k], 2.0),
-      desc: `Fitted over the bay ${k} door on ${when}. The original Teflon outer layers cracked and peeled after years of ultraviolet light and atomic oxygen; these coated stainless-steel covers, life-tested for ten years, keep the electronics behind them cool. Plugs in the door vent holes hold each one on.`,
-    }, mesh(merge(g), HM.nobl()));
+      desc: `Fitted over the bay ${k} door on ${when}. The original Teflon outer layers cracked and peeled after years of ultraviolet light and atomic oxygen; these coated stainless-steel covers, life-tested for ten years, keep the electronics behind them cool. Four expanding plugs pushed into the door's vent holes hold each one on, and a ground cap connects it to a door J-bolt.${when.startsWith('SM4') ? ' The 2009 covers were rolled flat into place with a roller tool.' : ''}`,
+    }, [mesh(merge(g), HM.nobl()), mesh(merge(plugs), HM.al())]);
   }
 
   // ------------------------------------------------------------------ bay contents
-  const B = (k, name, info, objs, parent) => P(name, { explode: az(BAY_PHI[k], 0.75), ...info }, objs, parent);
+  // bay boxes sit four or five deep along every line of sight, so X-ray draws them at 40 %
+  const B = (k, name, info, objs, parent) => P(name, { explode: az(BAY_PHI[k], 0.75), xrayWeight: 0.4, ...info }, objs, parent);
   const DOOR_IN = FACE - 0.005;                     // inner face of the bay doors
   const DIU = (k, where, x, r, t = 0) => B(k, `Data interface unit (${where})`, {
     system: 'Avionics', material: 'Dual-redundant command/data interface box, 38 × 41 × 18 cm', mass: 16, massSource: 'NASA SM3A Media Guide (35 lb)', temp: 296,
@@ -342,17 +379,34 @@ export function buildSSM(P) {
       handles.push(inBay(k, rod([xm - 0.44, RAD.shell + 0.08, t], [xm - 0.44, RAD.shell + 0.43, t], 0.014, 6)), inBay(k, rod([xm + 0.44, RAD.shell + 0.08, t], [xm + 0.44, RAD.shell + 0.43, t], 0.014, 6)));
       handles.push(inBay(k, rod([xm - 0.44, RAD.shell + 0.43, t], [xm + 0.44, RAD.shell + 0.43, t], 0.018, 8)));
     }
-    return [mesh(merge(frm), HM.iridite()), mesh(merge(cells), HM.cell()), mesh(merge(handles), HM.handrail())];
+    // the 14 bolts that hold the module plate to the bay floor
+    const bolts = [];
+    for (let i = 0; i < 5; i++) for (const t of [-0.39, 0.39]) bolts.push(inBay(k, new THREE.CylinderGeometry(0.013, 0.013, 0.02, 6).translate(xm - 0.42 + i * 0.21, RAD.shell + 0.082, t)));
+    for (const x of [xm - 0.44, xm + 0.44]) for (const t of [-0.13, 0.13]) bolts.push(inBay(k, new THREE.CylinderGeometry(0.013, 0.013, 0.02, 6).translate(x, RAD.shell + 0.082, t)));
+    // per battery: an isolation switch and a harness connector in the gaps of the middle cell row
+    for (let b = 0; b < 3; b++) {
+      const x = xm - 0.3 + b * 0.3;
+      batSw.push(inBay(k, new THREE.BoxGeometry(0.07, 0.1, 0.06).translate(x, RAD.shell + 0.25, 0.3325)), inBay(k, rod([x, RAD.shell + 0.3, 0.3325], [x + 0.04, RAD.shell + 0.36, 0.3325], 0.008, 6)));
+      batConn.push(inBay(k, new THREE.CylinderGeometry(0.03, 0.03, 0.12, 14).translate(x, RAD.shell + 0.26, -0.3325)), inBay(k, new THREE.CylinderGeometry(0.036, 0.036, 0.02, 14).translate(x, RAD.shell + 0.32, -0.3325)));
+      addConn(k, x, RAD.shell + 0.33, -0.3325);
+    }
+    return [mesh(merge(frm), HM.iridite()), mesh(merge(cells), HM.cell()), mesh(merge(handles), HM.handrail()), mesh(merge(bolts), HM.al())];
   };
+  const batSw = [], batConn = [];
   for (const [k, n] of [[2, 1], [3, 2]]) {
     const p = B(k, `Battery module ${n} (bay ${k})`, {
       system: 'Power', material: 'Three 22-cell nickel–hydrogen batteries on a common plate, 91 × 81 × 28 cm', mass: 209, massSource: 'NASA SM4 battery fact sheet (460 lb)', count: 3, temp: 274,
-      desc: `Bay ${k}. Three batteries of 22 NiH₂ pressure-vessel cells in series; with the other module they carry Hubble through the ~36 minutes of shadow on every orbit. Each holds more than 75 Ah charged and has its own charge current controller. This set was installed in 2009.`,
+      desc: `Bay ${k}. Three batteries of 22 NiH₂ pressure-vessel cells in series; with the other module they carry Hubble through the ~36 minutes of shadow on every orbit. Each started with about 88 Ah and is charged to about 75 Ah in orbit, with its own charge current controller. This set went in during 2009; a spacewalker frees a module by releasing 14 bolts.`,
+      xrayWeight: 0.3,
     }, module(k));
     p.userData.part.thermalRole = 'battery';
   }
+  P('Battery isolation switches & connectors', {
+    system: 'Power', material: 'One isolation switch and one harness connector per battery, six of each', mass: 3, count: 12, temp: 280, explode: [0, -1.4, 0],
+    desc: 'Each 2009 battery has an isolation switch that dead-faces its connector, so a spacewalker never touches a live plug: the last step of the change-out was turning each switch on. Positions on the modules approximate.',
+  }, [mesh(merge(batSw), HM.box()), mesh(merge(batConn), HM.iridite())]);
   const ccc = [];
-  for (const k of [2, 3]) for (const t of [-0.26, 0, 0.26]) ccc.push(bayBox(k, 0.26, 0.1, 0.22, X_EQ0 + 0.23, DOOR_IN - 0.05, t));
+  for (const k of [2, 3]) for (const t of [-0.26, 0, 0.26]) { ccc.push(bayBox(k, 0.26, 0.1, 0.22, X_EQ0 + 0.23, DOOR_IN - 0.05, t)); addConn(k, X_EQ0 + 0.23, DOOR_IN - 0.1, t); }
   P('Charge current controllers', {
     system: 'Power', material: 'Six voltage–temperature charge regulators, one per battery', mass: 24, count: 6, temp: 296, explode: [0, -1.0, 0],
     desc: 'Each battery has its own controller, which tapers the charging current from the arrays as the battery\'s voltage and temperature rise so it is never overcharged — the care that let the 1990 batteries last 19 years. Placed in bays 2 and 3 beside their batteries; exact position approximate.',
@@ -361,25 +415,28 @@ export function buildSSM(P) {
     system: 'Avionics', material: 'Ultra-stable quartz oscillator and a backup, 10 cm × 23 cm cylinders', mass: 2.8, massSource: 'NASA SM3A Media Guide (3 lb each)', count: 2, temp: 296,
     desc: 'The master clock: a highly stable timing pulse, distributed by the data management unit, that time-tags every observation and keeps every box in step.',
   }, mesh(merge([-0.13, 0.13].map((t) => inBay(2, new THREE.CylinderGeometry(0.05, 0.05, 0.23, 16).rotateZ(Math.PI / 2).translate(X_EQ0 + 0.25, RAD.shell + 0.1, t)))), HM.iridite()));
+  for (const t of [-0.13, 0.13]) addConn(2, X_EQ0 + 0.25, RAD.shell + 0.15, t);
   DIU(3, 'bay 3', X_EQ0 + 0.3, RAD.shell + 0.12);
   // bay 4: power control
   B(4, 'Power control unit', {
     system: 'Power', material: 'Relay and switching electronics, 109 × 30 × 20 cm', mass: 55, massSource: 'NASA SM3A Media Guide (120 lb)', temp: 299,
     desc: 'Bay 4. Interconnects and switches the current among the solar arrays, batteries and charge controllers and feeds the main bus to the four distribution units. Replaced in 2002 on a spacewalk that required powering the whole observatory down for the first time.',
   }, oru(4, [[1.09, 0.2, 0.3, X_EQM, RAD.shell + 0.11, 0]], HM.iridite()));
+  for (const [t, x] of [[-0.13, X_EQM - 0.25], [0.13, X_EQM - 0.25], [-0.13, X_EQM + 0.25], [0.13, X_EQM + 0.25]]) addConn(4, x - 0.2, DOOR_IN - 0.13, t);
   B(4, 'Power distribution units', {
     system: 'Power', material: 'Bus, switch and fuse boxes, 25 × 12.5 × 45 cm each', mass: 44, massSource: 'NASA SM3A Media Guide (25 lb each)', count: 4, temp: 296,
-    desc: 'Four distribution units on the inside of the bay 4 door carry the power buses, switches, fuses and monitors: two buses feed the telescope, instruments and SI C&DH, two the spacecraft.',
-  }, mesh(merge([[-0.13, X_EQM - 0.25], [0.13, X_EQM - 0.25], [-0.13, X_EQM + 0.25], [0.13, X_EQM + 0.25]].map(([t, x]) => bayBox(4, 0.45, 0.125, 0.25, x, DOOR_IN - 0.0625, t))), HM.box()));
+    desc: 'Four distribution units on the inside of the bay 4 door carry the power buses, switches, fuses and monitors: two buses feed the telescope, instruments and SI C&DH, two the spacecraft. Their fuses are plug-in units a gloved hand can change; a spare fuse-plug bracket flew in 2009.',
+  }, [mesh(merge([[-0.13, X_EQM - 0.25], [0.13, X_EQM - 0.25], [-0.13, X_EQM + 0.25], [0.13, X_EQM + 0.25]].map(([t, x]) => bayBox(4, 0.45, 0.125, 0.25, x, DOOR_IN - 0.0625, t))), HM.box()),
+    mesh(merge([[-0.13, X_EQM - 0.25], [0.13, X_EQM - 0.25], [-0.13, X_EQM + 0.25], [0.13, X_EQM + 0.25]].flatMap(([t, x]) => [-0.15, -0.05, 0.05, 0.15].map((dx) => bayBox(4, 0.03, 0.03, 0.03, x + dx, DOOR_IN - 0.14, t + 0.05)))), HM.iridite())]);
   // bay 5: communications + two recorders
   B(5, 'S-band single-access transmitters', {
     system: 'Communications', material: 'Two S-band transmitters (one on, one spare)', mass: 13, count: 2, temp: 297,
-    desc: 'Bay 5. Send the science data at up to 1 Mbit/s through a high-gain antenna to a TDRS relay; "single access" names the relay\'s dish they aim at. One failed in 1998 and was replaced in 1999.',
-  }, oru(5, [[-0.17, 3.95], [0.17, 3.95]].map(([t, x]) => [0.36, 0.17, 0.26, x, RAD.shell + 0.11, t]), HM.box()));
+    desc: 'Bay 5. Send the science data at up to 1 Mbit/s through a high-gain antenna to a TDRS relay; "single access" names the relay\'s dish they aim at. One failed in 1998 and was replaced in 1999 — two circular and three coaxial connectors to demate, on a box never designed to be changed, so the crew used a special tool.',
+  }, oru(5, [[-0.17, 3.95], [0.17, 3.95]].map(([t, x]) => [0.36, 0.17, 0.26, x, RAD.shell + 0.11, t]), HM.box(), { coax: 3 }));
   B(5, 'Multiple-access transponders', {
     system: 'Communications', material: 'Two S-band transponders (receive and transmit)', mass: 13, count: 2, temp: 297,
     desc: 'Bay 5. Receive every command sent to Hubble and return low-rate engineering telemetry, through either the high-gain or the low-gain antennas — the link that keeps working in safe mode.',
-  }, oru(5, [[-0.17, 4.62], [0.17, 4.62]].map(([t, x]) => [0.36, 0.17, 0.26, x, RAD.shell + 0.11, t]), HM.box()));
+  }, oru(5, [[-0.17, 4.62], [0.17, 4.62]].map(([t, x]) => [0.36, 0.17, 0.26, x, RAD.shell + 0.11, t]), HM.box(), { coax: 3 }));
   for (const [n, t, year] of [[1, -0.14, 1997], [3, 0.14, 1999]]) {
     B(5, `Solid-state recorder ${n} (bay 5)`, {
       system: 'Avionics', material: 'DRAM memory boards, 12 Gbit, 30 × 23 × 18 cm', mass: 9, massSource: 'NASA SM4 Media Guide (20 lb)', temp: 297,
@@ -401,6 +458,7 @@ export function buildSSM(P) {
     const axis = new THREE.Vector3(Math.sin(tilt) * 0.5, Math.cos(tilt), Math.sin(tilt) * 0.86).normalize().applyAxisAngle(new THREE.Vector3(1, 0, 0), BAY_PHI[k]);
     g.position.copy(c);
     g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+    (CONN[k] || (CONN[k] = [])).push(c.toArray());
     out.wheels.push(rot);
     const p = B(k, `Reaction wheel assembly ${n}`, {
       system: 'Attitude control', material: 'Flywheel on ball bearings up to 3,000 rpm, brushless DC motor', mass: 45, massSource: 'NASA SM3A Media Guide (about 100 lb)', temp: 300,
@@ -424,7 +482,7 @@ export function buildSSM(P) {
   DIU(7, 'bay 7', X_EQ1 - 0.4, DOOR_IN - 0.1);
   // bay 8: pointing control + the backup tape recorder
   B(8, 'Pointing/safemode electronics assembly', {
-    system: 'Attitude control', material: 'PSEA: about 40 circuit boards in one enclosure', mass: 32, temp: 296,
+    system: 'Attitude control', material: 'PSEA: about 40 circuit boards in one enclosure', mass: 39, massSource: 'NASA SM3A Media Guide (86 lb)', temp: 296,
     desc: 'Bay 8. The independent safe-mode computer: if the flight computer stops sending its keep-alive signal, it takes over, turns the arrays to the Sun using the coarse sun sensors and sheds power until the ground steps in. Box size approximate.',
   }, oru(8, [[0.8, 0.28, 0.5, X_EQ0 + 0.5, RAD.shell + 0.16, 0.08]], HM.box()));
   B(8, 'Retrieval mode gyro assembly', {
@@ -435,30 +493,60 @@ export function buildSSM(P) {
     system: 'Avionics', material: 'Reel-to-reel tape recorder, 1.2 Gbit, 30 × 23 × 18 cm', mass: 9, massSource: 'NASA SM4 Media Guide (20 lb)', temp: 297,
     desc: 'The last of the three original reel-to-reel recorders, kept as a backup to the two solid-state recorders. NASA puts the three recorders in bays 5 and 8; this one\'s placement in bay 8 is inferred.',
   }, oru(8, [[0.3, 0.18, 0.23, X_EQ1 - 0.35, 1.88, -0.12]], HM.box()));
-  // bay 10: SI C&DH on the door, gyro electronics on the floor
+  // bay 10: SI C&DH on the door, gyro electronics on the floor. The unit is a tray of boxes in
+  // redundant pairs (rows from aft: NSSC-I, CU/SDF, standard interfaces, power control unit) with
+  // bus couplers, an RIU and the connector drive stud down the middle
+  const ROW = (i) => X_EQ0 + 0.25 + i * 0.33;
   const sicTray = bayBox(10, 1.3, 0.025, 0.95, X_EQM, DOOR_IN - 0.0125);
-  const sicBox = (i, t) => bayBox(10, 0.36, 0.2, 0.34, X_EQ0 + 0.35 + i * 0.4, DOOR_IN - 0.125, t);
+  const sicBox = (i, t, sy = 0.2) => bayBox(10, 0.28, sy, 0.33, ROW(i), DOOR_IN - 0.025 - sy / 2, t);
+  const recept = [];
+  for (const x of [X_EQ0 + 0.3, X_EQM, X_EQ1 - 0.3]) for (const t of [-0.5, 0.5]) recept.push(inBay(10, new THREE.CylinderGeometry(0.03, 0.03, 0.03, 12).translate(x, DOOR_IN - 0.02, t)));
+  for (let i = 0; i < 10; i++) recept.push(inBay(10, new THREE.CylinderGeometry(0.012, 0.012, 0.03, 6).translate(X_EQ0 + 0.18 + (i % 5) * 0.29, DOOR_IN - 0.035, i < 5 ? -0.46 : 0.46)));   // the ten mounting bolts
   const sic = B(10, 'Science instrument command & data handling unit', {
-    system: 'Avionics', material: 'Orbital replacement unit tray on the bay 10 door carrying fourteen boxes in redundant pairs', mass: 107, temp: 298,
-    desc: 'Bay 10. Commands the instruments and formats their data for the data management unit. Its side A failed in September 2008, delaying the last servicing mission; astronauts installed a replacement in May 2009, bolting it to the inside of the door with ten bolts.',
-  }, mesh(merge([sicTray, sicBox(2, -0.2), sicBox(2, 0.2)]), HM.iridite()));
-  P('NASA standard spacecraft computer (NSSC-I)', {
-    system: 'Avionics', material: 'One central processor (and a spare) with eight 8,192-word, 18-bit memory modules', temp: 298, explode: [0, 0, 0],
+    system: 'Avionics', material: 'Orbital replacement unit tray on the bay 10 door carrying its boxes in redundant pairs', mass: 107, temp: 298, xrayWeight: 0.4,
+    desc: 'Bay 10. Commands the instruments and formats their data for the data management unit. Its side A failed in September 2008, delaying the last servicing mission. In 2009 astronauts removed ten bolts and turned one connector drive stud to unplug the whole unit from receptacles on the door, then drove the new one down evenly onto them.',
+  }, [mesh(sicTray, HM.iridite()), mesh(merge(recept), HM.al())]);
+  out.sicdh = sic;
+  const SUB = (name, info, objs) => P(name, { temp: 298, explode: [0, 0, 0], ...info }, objs, sic);
+  SUB('NASA standard spacecraft computer (NSSC-I)', {
+    system: 'Avionics', material: 'One central processor (and a spare) with eight 8,192-word, 18-bit memory modules',
     desc: 'The SI C&DH\'s own computer runs the instrument "applications": it moves commands and programs in and out of the processor, checks each instrument\'s health and stores timed commands for when Hubble is out of contact. Part of the SI C&DH; mass included.',
-  }, mesh(merge([sicBox(0, -0.2), sicBox(0, 0.2)]), HM.box()), sic);
-  P('Control unit / science data formatters', {
-    system: 'Avionics', material: 'Two CU/SDF units', count: 2, temp: 298, explode: [0, 0, 0],
-    desc: 'Translate ground and spacecraft commands into each instrument\'s format (ground commands use 27-bit words, spacecraft commands 16-bit) and format the instruments\' science data for the recorders. Part of the SI C&DH; mass included.',
-  }, mesh(merge([sicBox(1, -0.2), sicBox(1, 0.2)]), HM.iridite()), sic);
+  }, mesh(merge([sicBox(0, -0.235), sicBox(0, 0.235)]), HM.box()));
+  SUB('Control unit / science data formatters', {
+    system: 'Avionics', material: 'Two CU/SDF units', count: 2,
+    desc: 'Translate ground and spacecraft commands into one common format for the instruments (ground commands use 27-bit words, spacecraft commands 16-bit) and format the instruments\' science data for the recorders. Part of the SI C&DH; mass included.',
+  }, mesh(merge([sicBox(1, -0.235), sicBox(1, 0.235)]), HM.iridite()));
+  SUB('SI C&DH standard interfaces', {
+    system: 'Avionics', material: 'Two standard interface boards', count: 2,
+    desc: 'Link the NSSC-I processor and the formatters to the spacecraft\'s data management unit. Part of the SI C&DH; mass included.',
+  }, mesh(merge([sicBox(2, -0.235, 0.16), sicBox(2, 0.235, 0.16)]), HM.box()));
+  SUB('SI C&DH power control unit', {
+    system: 'Power', material: 'Redundant DC–DC converters', count: 2,
+    desc: 'Makes +5, −5 and +12 V for the processor memories and +28 V for the control unit / science data formatters from the spacecraft bus. Part of the SI C&DH; mass included.',
+  }, mesh(merge([sicBox(3, -0.235, 0.18), sicBox(3, 0.235, 0.18)]), HM.iridite()));
+  SUB('SI C&DH bus coupler units', {
+    system: 'Avionics', material: 'Bus couplers on the instrument data bus', count: 2,
+    desc: 'Couple the remote interface units onto the shared instrument bus and isolate any one that fails, so a single bad instrument cannot take the bus down. Part of the SI C&DH; mass included.',
+  }, mesh(merge([0, 1].map((i) => bayBox(10, 0.2, 0.1, 0.1, ROW(i), DOOR_IN - 0.075, 0))), HM.box()));
+  SUB('SI C&DH remote interface unit', {
+    system: 'Avionics', material: 'RIU serving the CU/SDF and the power control unit',
+    desc: 'The sixth RIU: the other five sit on the instruments. It passes commands, clock signals and engineering data — never science data — and can drive two expander units. Part of the SI C&DH; mass included.',
+  }, mesh(bayBox(10, 0.2, 0.12, 0.12, ROW(3), DOOR_IN - 0.085, 0), HM.box()));
+  SUB('SI C&DH connector drive stud', {
+    system: 'Crew systems', material: 'Hex drive stud on a jack screw',
+    desc: 'One turn of a tool on this stud jacks the whole unit off, or down onto, its blind-mate receptacles on the door, so dozens of connectors mate evenly at once. Part of the SI C&DH.',
+  }, mesh(merge([bayBox(10, 0.06, 0.12, 0.06, ROW(2), DOOR_IN - 0.085, 0), inBay(10, new THREE.CylinderGeometry(0.015, 0.015, 0.06, 6).translate(ROW(2), DOOR_IN - 0.175, 0))]), HM.ti()));
   B(10, 'Gyro electronics control units', {
     system: 'Attitude control', material: 'Three dual-string electronics control units', mass: 21, count: 3, temp: 297,
     desc: 'Bay 10. Each rate gyro assembly pairs a sensor unit in the aft shroud with an electronics control unit here that processes the two gyros\' outputs.',
   }, mesh(merge([0, 1, 2].map((i) => bayBox(10, 0.3, 0.14, 0.24, X_EQ0 + 0.3 + i * 0.36, RAD.shell + 0.08, -0.14))), HM.box()));
+  for (let i = 0; i < 3; i++) addConn(10, X_EQ0 + 0.3 + i * 0.36, RAD.shell + 0.16, -0.14);
+  addConn(10, X_EQ0 + 0.11, DOOR_IN - 0.06, 0);
   DIU(10, 'bay 10', X_EQ1 - 0.3, RAD.shell + 0.1, 0.2);
   P('Data interface unit (OTA equipment section)', {
     system: 'Avionics', material: 'Dual-redundant command/data interface box, 38 × 41 × 18 cm', mass: 16, massSource: 'NASA SM3A Media Guide (35 lb)', temp: 296, explode: [0, 5.9, 0],
-    desc: 'The fourth DIU, in the OTA equipment section: it relays commands and data between the data management unit and the telescope\'s own electronics. Bay assignment approximate.',
-  }, mesh(oBox(6, 0.38, 0.2, 0.34), HM.box()));
+    desc: 'The fourth DIU, in the OTA equipment section beside the optical control electronics (SM3A Fig. 5-25): it relays commands and data between the data management unit and the telescope\'s own electronics. Bay D assumed.',
+  }, mesh(oBox(3, 0.38, 0.2, 0.34), HM.box()));
 
   // ------------------------------------------------------------------ aft shroud
   const shroud = sunShadowShell(RAD.big, ST.bulkhead, ST.aftShroud, [HM.mli(2), HM.mli(3)], 300, 215, { seg: 64, hs: 3 });
@@ -472,7 +560,7 @@ export function buildSSM(P) {
   for (let k = 0; k < 16; k++) lon.push(atPhi(deg(11.25 + k * 22.5), new THREE.BoxGeometry(ST.aftShroud - ST.bulkhead - 0.2, 0.05, 0.04).translate((ST.bulkhead + ST.aftShroud) / 2, RAD.big - 0.05, 0)));
   for (const x of [0.22, 1.8, 3.4]) lon.push(flange(RAD.big - 0.1, RAD.big - 0.02, x - 0.025, x + 0.025, 96));
   P('Aft shroud longerons & rings', {
-    system: 'Structure', material: 'Aluminium longeron bars and internal reinforcing rings', mass: 120, count: 16, temp: 272, explode: [-1.6, -3.4, 0],
+    system: 'Structure', material: 'Aluminium longeron bars and internal reinforcing rings', mass: 120, count: 16, temp: 272, explode: [-1.6, -3.4, 0], xrayWeight: 0.25,
     desc: 'Sixteen longeron bars, inside and outside the skin, and internal rings stiffen the shroud around its large door cut-outs. Shown evenly spaced; their real stations follow the doors.',
   }, mesh(merge(lon), HM.al()));
 
@@ -498,21 +586,47 @@ export function buildSSM(P) {
   });
   doorPair('−V2 aft shroud doors (COS, ACS)', [[46, 89, 46], [91, 134, 134]], AX0, AX1, {
     material: 'Two hinged honeycomb doors with light-tight seals', mass: 60, count: 2, explode: [-1.4, 0, 3.2],
-    desc: 'Open onto the two −V2 axial bays: COSTAR came out through them in 2009 and the Cosmic Origins Spectrograph went in, and the ACS repair was done here. Door size estimated.',
+    desc: 'Open onto the two −V2 axial bays: COSTAR came out through them in 2009 and the Cosmic Origins Spectrograph went in, and the ACS repair was done here. The doors were stiff to close, so the crew carried Latch Over Center Kits to help. Door size estimated.',
   });
   doorPair('−V3 aft shroud doors (gyros, star trackers)', [[147, 166, 147], [194, 218, 218]], 2.35, 3.42, {
     material: 'Hinged honeycomb doors with light-tight seals around the star-tracker openings', mass: 30, count: 2, explode: [-0.6, -4.6, 0],
     desc: 'Behind them, at the forward end of the aft shroud on the shadow side, sit the three rate sensor units and the fixed-head star trackers. In 2009 spacewalkers retracted the star-tracker door seals, opened these doors and swapped all three gyro units. Leaf sizes estimated.',
   });
-  const rdoors = [], rframes = [];
-  for (const c of [0, 90, 270]) {
-    rdoors.push(shellPatch(rD, 1.85, 3.38, deg(c - 14), deg(c + 14), { nphi: 8 }));
-    rframes.push(...patchFrame(rD + 0.008, 1.85, 3.38, deg(c - 14), deg(c + 14), 0.014, rod));
+  doorPair('Radial bay doors (FGS)', [0, 90, 270].flatMap((c) => [[c - 14, c - 0.6, c - 14], [c + 0.6, c + 14, c + 14]]), 1.85, 3.38, {
+    material: 'Three pairs of hinged honeycomb door leaves, hinged at their outer edges and latched where they meet', mass: 45, count: 6, explode: [0, 0, 0],
+    desc: 'A pair of doors over each Fine Guidance Sensor bay near the joint with the equipment section (FGS-2 on +V3, FGS-1 and FGS-3 on the ±V2 sides). In 2009 the crew opened the +V3 FGS-2 doors and carried eight Aft Shroud Latch Repair kits in case a door latch ran stiff. The radial camera has no door: its own radiator forms that part of the skin.',
+  });
+
+  // retractable light seals around the star-tracker openings in the −V3 door, with their seal bolts
+  const seals = [];
+  for (const a of [198.5, 206, 213.5]) {
+    seals.push(new THREE.TorusGeometry(0.12, 0.014, 6, 24).rotateX(Math.PI / 2).translate(3.0, rD + 0.02, 0).rotateX(deg(a)));
+    for (let i = 0; i < 4; i++) seals.push(new THREE.CylinderGeometry(0.012, 0.012, 0.03, 6).translate(3.0 + 0.15 * Math.cos(i * Math.PI / 2 + 0.785), rD + 0.025, 0.15 * Math.sin(i * Math.PI / 2 + 0.785)).rotateX(deg(a)));
   }
-  P('Radial bay doors (FGS)', {
-    system: 'Skin & fairings', skin: true, material: 'Hinged honeycomb doors', mass: 45, count: 3, temp: 266, explode: [0, 0, 0],
-    desc: 'Doors over the three Fine Guidance Sensor bays near the joint with the equipment section (FGS-2 on +V3, FGS-1 and FGS-3 on the ±V2 sides). The radial camera has none: its own radiator forms that part of the shroud skin.',
-  }, [mesh(merge(rdoors), HM.bayDoor()), mesh(merge(rframes), HM.al())]);
+  P('Star-tracker door light seals', {
+    system: 'Skin & fairings', material: 'Retractable light-seal rings with seal bolts', mass: 3, count: 3, temp: 262, explode: [-0.6, -4.8, 0],
+    desc: 'Before opening the gyro doors in 2009 spacewalkers first retracted the star trackers\' door seal bolts, and the job was not done until the seals were extended again so no stray light could leak in. Ring size estimated.',
+  }, mesh(merge(seals), HM.fitting()));
+
+  // interior lights at the internal rings near each door pair, for the spacewalkers
+  const il = [], lens = [];
+  for (const [x, a] of [[0.4, 90], [0.4, 180], [0.4, 270], [3.3, 72], [3.3, 165], [3.3, 288]]) {
+    il.push(atPhi(deg(a), new THREE.BoxGeometry(0.15, 0.08, 0.1).translate(x, 2.0, 0)));
+    lens.push(atPhi(deg(a), new THREE.BoxGeometry(0.11, 0.01, 0.07).translate(x, 1.955, 0)));
+  }
+  P('Aft shroud interior lights', {
+    system: 'Crew systems', material: 'Floodlights on the internal rings', mass: 4, count: 6, temp: 270, explode: [-0.8, 0, 0],
+    desc: 'There is no sunlight inside a 4.3 m drum: lights on the internal rings by each door pair illuminate the instrument compartments while spacewalkers work in them. Positions and size estimated.',
+  }, [mesh(merge(il), HM.box()), mesh(merge(lens), HM.radiator())]);
+
+  // radiation shields inside the doors and blankets lining the shroud and bulkhead
+  const shield = [];
+  for (const [a, b, x0, x1] of [[226, 314, AX0, AX1], [46, 134, AX0, AX1], [147, 218, 2.35, 3.42], [-14, 14, 1.85, 3.38], [76, 104, 1.85, 3.38], [256, 284, 1.85, 3.38]]) shield.push(shellPatch(RAD.big - 0.025, x0 + 0.04, x1 - 0.04, deg(a + 1), deg(b - 1), { nphi: 8, nx: 1 }));
+  shield.push(annulus(0.95, RAD.big - 0.04, ST.bulkhead + 0.004, 72, 1));
+  P('Aft shroud radiation shields & interior MLI', {
+    system: 'Thermal control', skin: true, material: 'Radiation shields behind the door leaves; MLI lining the bulkhead', mass: 25, temp: 285, explode: [-1.0, 0, 0],
+    desc: 'Shields inside the doors and blankets lining the shroud keep the instruments\' temperature steady while the outside swings between sunlight and shadow every 95 minutes. Shown ghosted.',
+  }, mesh(merge(shield), HM.mli(5)));
 
   // ------------------------------------------------------------------ aft bulkhead and servicing interfaces
   const bh = [tube(RAD.big - 0.01, 0, ST.bulkhead, { seg: 96, open: false })];
@@ -534,14 +648,36 @@ export function buildSSM(P) {
     desc: 'Three pins the Shuttle\'s Flight Support System latched onto, standing Hubble upright in the payload bay for every servicing mission. The soft-capture mechanism is clamped to them.',
   }, mesh(merge(pins), HM.ti()));
 
-  P('Umbilical connector panel', {
-    system: 'Power', material: 'Spring-loaded electrical connector plate', mass: 8, temp: 262, explode: [-3.5, 0, 0.4],
-    desc: 'While berthed in the payload bay, Hubble ran on Shuttle power through this umbilical, so its batteries were not drained during the servicing spacewalks. Position on the bulkhead approximate.',
-  }, mesh(new THREE.BoxGeometry(0.1, 0.3, 0.42).translate(...az(deg(120), 1.22, -0.05)), HM.box()));
+  // umbilical tower at the aft end: the FSS main umbilical drives onto J101; P105/P106 under covers
+  // and the backup plugs P107/P108 on its sides
+  const UT = deg(330);
+  const ut = [new THREE.BoxGeometry(0.3, 0.25, 0.3).translate(-0.15, 1.82, 0), new THREE.BoxGeometry(0.04, 0.32, 0.38).translate(-0.02, 1.82, 0)];
+  const utC = [new THREE.BoxGeometry(0.04, 0.12, 0.18).translate(-0.32, 1.82, 0)];
+  for (const [x, t] of [[-0.1, -0.15], [-0.22, -0.15], [-0.1, 0.15], [-0.22, 0.15]]) utC.push(new THREE.CylinderGeometry(0.05, 0.05, 0.03, 16).rotateX(Math.PI / 2).translate(x, 1.82, t + Math.sign(t) * 0.015));
+  P('Umbilical tower (J101)', {
+    system: 'Electrical', material: 'Connector tower with the J101 umbilical receptacle, P105/P106 under covers and backup plugs P107/P108', mass: 10, temp: 262, explode: [-3.6, 0, 0.4],
+    desc: 'Once Hubble was berthed, the Flight Support System drove its umbilical 4.5 in (in about 8 s) onto connector J101 here, so the Shuttle powered the telescope during the spacewalks. The P105/P106 covers were inspected every day; backup plugs P107/P108 could be mated by hand. Position on the bulkhead approximate.',
+  }, [mesh(merge(ut.map((g) => g.rotateX(UT))), HM.al()), mesh(merge(utC.map((g) => g.rotateX(UT))), HM.box())]);
+
+  // light-tight purge vents between the pin beams, and the berthing target the FSS camera watched
+  const pv = [];
+  for (const p of [0, 120, 240]) {
+    pv.push(new THREE.BoxGeometry(0.04, 0.16, 0.16).translate(-0.02, 1.0, 0).rotateX(deg(p)));
+    for (let i = 0; i < 3; i++) pv.push(new THREE.BoxGeometry(0.03, 0.012, 0.15).rotateZ(0.6).translate(-0.05, 0.95 + i * 0.05, 0).rotateX(deg(p)));
+  }
+  P('Light-tight purge vents', {
+    system: 'Structure', material: 'Baffled vent housings', mass: 1.5, count: 3, temp: 262, explode: [-3.4, 0, 0],
+    desc: 'A dry-gas purge kept the instruments clean before launch. Every vent is baffled light-tight, so no stray light reaches the focal plane through the bulkhead. Positions and size approximate.',
+  }, mesh(merge(pv), HM.black()));
+  P('Berthing target', {
+    system: 'Structure', material: 'High-contrast target plate', mass: 1, temp: 262, explode: [-3.5, 0, 0],
+    desc: 'The crew berthed Hubble by watching this target on its aft end through a television camera on the Flight Support System, then closed three latches on its pins; up to 2 in of misalignment was allowed. Position approximate.',
+  }, mesh(new THREE.BoxGeometry(0.01, 0.3, 0.3).translate(-0.006, 1.25, 0).rotateX(deg(30)), HM.target()));
 
   // soft capture mechanism: a 1.83 m (72 in) ring structure about 0.6 m (2 ft) high, clamped to the three pins
   const RS0 = 0.8, RS1 = 0.915, XS0 = -0.06, XS1 = -0.66;
-  const scm = [axial([[RS0, XS0], [RS1, XS0], [RS1, XS0 - 0.06], [RS1 - 0.04, XS0 - 0.06], [RS1 - 0.04, XS1 + 0.08], [RS1, XS1 + 0.08], [RS1, XS1], [RS0, XS1], [RS0, XS0]], 72)];
+  const scm = [axial([[RS0, XS0], [RS1, XS0], [RS1, XS0 - 0.06], [RS1 - 0.04, XS0 - 0.06], [RS1 - 0.04, XS1 + 0.09], [RS0, XS1 + 0.09], [RS0, XS0]], 72)];
+  const lids = [axial([[RS0, XS1 + 0.09], [RS1, XS1 + 0.09], [RS1, XS1], [RS0, XS1], [RS0, XS1 + 0.09]], 72)];
   for (let k = 0; k < 12; k++) scm.push(atPhi(deg(k * 30 + 15), new THREE.BoxGeometry(XS0 - XS1 - 0.12, 0.07, 0.03).translate((XS0 + XS1) / 2, RS1 - 0.06, 0)));   // stiffeners
   for (const p of [60, 180, 300]) {
     const pin = az(deg(p), 1.55, -0.36);
@@ -550,14 +686,26 @@ export function buildSSM(P) {
   }
   for (const p of [0, 120, 240]) {
     // LIDS-style guide petal leaning inward from the aft ring
-    scm.push(new THREE.BoxGeometry(0.34, 0.02, 0.36).translate(-0.17, 0, 0).rotateZ(deg(16)).translate(XS1, RS0 + 0.04, 0).rotateX(deg(p)));
-    scm.push(new THREE.BoxGeometry(0.14, 0.1, 0.18).translate(...az(deg(p + 60), RS0 - 0.04, XS1 + 0.06)));   // capture latch
+    lids.push(new THREE.BoxGeometry(0.34, 0.02, 0.36).translate(-0.17, 0, 0).rotateZ(deg(16)).translate(XS1, RS0 + 0.04, 0).rotateX(deg(p)));
+    lids.push(new THREE.BoxGeometry(0.14, 0.1, 0.18).translate(...az(deg(p + 60), RS0 - 0.04, XS1 + 0.06)));   // capture latch
   }
+  const scmMat = new THREE.MeshStandardMaterial({ color: 0xc9cdd1, roughness: 0.42, metalness: 0.7, side: THREE.DoubleSide });
   out.scm = P('Soft capture mechanism', {
-    system: 'Structure', material: 'Aluminium ring structure with a Low Impact Docking System interface ring, guide petals and latches, clamped to the berthing pins', mass: 440, temp: 262, explode: [-4.4, 0, 0],
-    desc: 'Fitted on the last servicing mission in 2009: about 1.83 m (72 in) across and 0.6 m (2 ft) high, so a future spacecraft can dock and steer Hubble to a safe re-entry, or boost it. The three petals guide a docking ring into its latches. Mass estimated.',
+    system: 'Structure', material: 'Aluminium ring structure clamped to the three berthing pins', mass: 440, temp: 262, explode: [-4.4, 0, 0], xrayWeight: 0.4,
+    desc: 'Fitted on the last servicing mission in 2009: about 1.83 m (72 in) across and 0.6 m (2 ft) high, so a future spacecraft can dock and steer Hubble to a safe re-entry, or boost it. It rode up on the FSS berthing ring and was clamped onto Hubble\'s pins as the telescope was released. Mass estimated.',
     callout: true, anchor: [XS1 - 0.1, 0.75, 0.3],
-  }, mesh(merge(scm), new THREE.MeshStandardMaterial({ color: 0xc9cdd1, roughness: 0.42, metalness: 0.7, side: THREE.DoubleSide })));
+  }, mesh(merge(scm), scmMat));
+  P('SCM LIDS interface ring', {
+    system: 'Structure', material: 'Low Impact Docking System interface ring with three guide petals and capture latches', temp: 262, explode: [-0.5, 0, 0],
+    desc: 'The docking face a future vehicle would capture: a Low Impact Docking System ring whose three petals guide the visitor\'s ring into its latches. Part of the soft capture mechanism; mass included.',
+  }, mesh(merge(lids), scmMat), out.scm);
+  const drv = [new THREE.BoxGeometry(0.16, 0.14, 0.16).translate(-0.3, RS1 + 0.07, 0).rotateX(deg(120)), new THREE.CylinderGeometry(0.022, 0.022, 0.05, 6).translate(-0.3, RS1 + 0.165, 0).rotateX(deg(120))];
+  drv.push(...cablePath(arcPts(RS1 + 0.03, -0.36, 60, 300, 15), 0.016, 6));
+  for (const p of [60, 180, 300]) drv.push(...cablePath([az(deg(p), RS1 + 0.03, -0.36), az(deg(p), 1.45, -0.36)], 0.016, 6));
+  P('SCM EVA drive & clamp linkage', {
+    system: 'Structure', material: 'Single-bolt EVA drive fitting with torque tubes to the three pin clamps', temp: 262, explode: [-0.3, 0, 0],
+    desc: 'A spacewalker transferred the mechanism to Hubble by turning one bolt: this drive fitting works all three pin clamps at once through linkages round the ring. Linkage layout schematic. Part of the soft capture mechanism; mass included.',
+  }, [mesh(merge(drv.slice(0, 2)), HM.ti()), mesh(merge(drv.slice(2)), HM.fitting())], out.scm);
   const tg = [];
   for (const p of [90, 210, 330]) tg.push(new THREE.BoxGeometry(0.01, 0.12, 0.16).rotateX(deg(p)).translate(...az(deg(p), (RS0 + RS1) / 2, XS1 - 0.006)));
   P('Relative-navigation targets', {
@@ -611,11 +759,10 @@ export function buildSSM(P) {
     rail(rails.aft, az(deg(c), rR, 1.35), az(deg(c), rR, 3.3));
     for (const x of [1.4, 2.3, 3.25]) standoff(rails.aft, deg(c), RAD.big + 0.02, x);
   }
-  for (const x of [0.24, 3.46]) {
-    for (let a = 0; a < 360; a += 20) {
-      rail(rails.aft, az(deg(a + 2), rR, x), az(deg(a + 18), rR, x));
-      standoff(rails.aft, deg(a + 10), RAD.big + 0.02, x);
-    }
+  // along the outer edges of each pair of FGS doors
+  for (const c of [0, 90, 270]) for (const s of [-1, 1]) {
+    rail(rails.aft, az(deg(c + s * 16), rR, 1.95), az(deg(c + s * 16), rR, 3.3));
+    for (const x of [2.0, 2.62, 3.25]) standoff(rails.aft, deg(c + s * 16), RAD.big + 0.02, x);
   }
   // forward shell: four longitudinal rails between the masts, torquers and grapple fixtures, and a ring rail
   const rF = RAD.shell + 0.09;
@@ -623,28 +770,27 @@ export function buildSSM(P) {
     rail(rails.fs, az(deg(c), rF, 5.95), az(deg(c), rF, 8.85));
     for (let x = 6.0; x < 8.9; x += 0.7) standoff(rails.fs, deg(c), RAD.shell, x);
   }
-  for (let a = 0; a < 360; a += 30) {
-    rail(rails.fs, az(deg(a + 3), rF, 5.9), az(deg(a + 27), rF, 5.9));
-    standoff(rails.fs, deg(a + 15), RAD.shell, 5.9);
+  for (const c of [22.5, 112.5, 247.5, 337.5]) {
+    const pts = arcPts(rF, 5.9, c - 15, c + 15, 10);
+    for (let i = 0; i < pts.length - 1; i++) rail(rails.fs, pts[i], pts[i + 1]);
+    for (const a of [c - 12, c + 12]) standoff(rails.fs, deg(a), RAD.shell, 5.9);
   }
   const HR = (where, list, mass, desc) => P(`EVA handrails (${where})`, {
-    system: 'Crew systems', material: 'Yellow-painted aluminium rails on stand-offs', mass, temp: 265, explode: [0, 0, 0], desc,
+    system: 'Crew systems', material: 'Yellow-painted aluminium rails, 3.2 cm across, on stand-offs', mass, temp: 265, explode: [0, 0, 0], xrayWeight: 0.25, desc,
   }, mesh(merge(list), HM.handrail()));
-  HR('aft shroud', rails.aft, 30, 'Rails along the edges of every instrument door and two rings round the shroud. Hubble was designed to be repaired by hand: 225 ft (69 m) of handrails in all let spacewalkers move hand over hand to every door. Rail runs simplified.');
-  HR('equipment section', rails.eq, 20, 'Two rails on every bay door give a spacewalker something to hold while the J-hooks are released and the door swings open.');
-  HR('forward shell', rails.fs, 25, 'A ring rail at the equipment section and four runs along the barrel lead forward past the antenna masts, torquer bars and grapple fixtures. Rail runs simplified.');
-  HR('light shield', rails.ls, 20, 'Handrails encircle the light shield, opening only over the antenna latch lines, and four runs lead toward the aperture. Rail runs simplified.');
+  out.railLength = railLen;
+  const m = (k) => Math.round(railLen[k]);
+  HR('aft shroud', rails.aft, 14, `Rails along the edges of every instrument door, about ${m('aft')} m here. Hubble was designed to be repaired by hand: 225 ft (69 m) of handrails in all let spacewalkers move hand over hand to every door. Runs simplified.`);
+  HR('equipment section', rails.eq, 16, `Two rails on every bay door, ${m('eq')} m in all, give a spacewalker something to hold while the J-hooks are released and the door swings open.`);
+  HR('forward shell', rails.fs, 12, `Four runs along the barrel, joined by short arcs at the equipment section (${m('fs')} m), lead forward past the antenna masts, torquer bars and grapple fixtures. Runs simplified.`);
+  HR('light shield', rails.ls, 14, `Four runs toward the aperture and arcs between the antenna latch lines and scuff plates, ${m('ls')} m in all. Runs simplified.`);
 
   // 31 portable-foot-restraint sockets (10 on the bay doors above, 21 placed here)
-  for (const [x, c] of [[3.3, 30], [3.3, 60], [3.3, 120], [3.3, 240], [3.3, 300], [3.3, 330], [0.45, 0], [0.45, 30], [0.45, 150], [0.45, 180], [0.45, 210], [0.45, 330]]) {
-    out.sockets.push(new THREE.BoxGeometry(0.1, 0.06, 0.1).translate(0, RAD.big + 0.03, 0).rotateX(deg(c)).translate(x, 0, 0));
-  }
-  for (const [x, c] of [[6.25, 30], [6.25, 150], [6.25, 210], [6.25, 330], [7.7, 90], [7.7, 270], [8.6, 60], [8.6, 240], [8.6, 0]]) {
-    out.sockets.push(new THREE.BoxGeometry(0.1, 0.06, 0.1).translate(x, RAD.shell + 0.03, 0).rotateX(deg(c)));
-  }
+  for (const [x, c] of [[3.3, 30], [3.3, 60], [3.3, 120], [3.3, 240], [3.3, 300], [3.3, 330], [0.45, 0], [0.45, 30], [0.45, 150], [0.45, 180], [0.45, 210], [0.45, 330]]) socket(x, RAD.big + 0.005, deg(c));
+  for (const [x, c] of [[6.25, 30], [6.25, 150], [6.25, 210], [6.25, 330], [7.7, 90], [7.7, 270], [8.6, 60], [8.6, 240], [8.6, 0]]) socket(x, RAD.shell, deg(c));
   P('Foot-restraint sockets', {
-    system: 'Crew systems', material: 'Aluminium sockets for portable foot restraints', mass: 12, count: 31, temp: 265, explode: [0, 0, 0],
-    desc: '31 sockets accept the portable foot restraint, a platform that locks an astronaut\'s boots in place so both hands are free to work. Socket positions approximate.',
+    system: 'Crew systems', material: 'Square aluminium receptacles on doubler plates', mass: 12, count: 31, temp: 265, explode: [0, 0, 0], xrayWeight: 0.25,
+    desc: '31 sockets accept the portable foot restraint, a platform that locks an astronaut\'s boots in place so both hands are free to work. Its probe drops into the 10 cm square socket; a 90° socket converter lets the same socket face another way. Socket positions approximate.',
   }, mesh(merge(out.sockets), HM.handrail()));
 
   return out;

@@ -7,7 +7,7 @@ import { mesh } from '../../engine/assembly.js';
 import { lathe } from '../../engine/geometry.js';
 import { M } from '../../engine/materials.js';
 import { GM } from './materials.js';
-import { ROWS, coreAt, PLUG_TIP } from './layout.js';
+import { ROWS, coreAt, PLUG_TIP, TCF } from './layout.js';
 import { cutLathe, cutPair, bladeGeometry, ring, boxAt, radialCyl, axialCyl, hoop, kept, merge, P3, tube, cutTube, rotorRow } from './geom.js';
 import { coreRow, coreRotor, coreBlade } from './fan.js';
 
@@ -397,8 +397,7 @@ export function buildCore(ctx) {
   // The GE90's mid-engine frame (GE patent EP 1 149 987 / US 6,358,001): 12 hollow struts, each
   // bolted to the outer case by eight bolts and a shear bolt, carry the aft HP-turbine bearing's
   // load from the hub and conical sump out to the casing; fairings shield them from the gas.
-  const TCF_Y0 = -4.06, TCF_Y1 = -4.17, TCF_YM = -4.112;
-  const TCF_N = 12;
+  const { y0: TCF_Y0, y1: TCF_Y1, ym: TCF_YM, struts: TCF_N } = TCF;
   const tcfPhi = (k) => Math.PI / 2 + (k / TCF_N) * TAU;           // struts at multiples of 30°, one at 6 o'clock
   const [tcfHub, tcfTip] = coreAt(TCF_YM);
   const tcfRings = cut(cutLathe([
@@ -431,7 +430,7 @@ export function buildCore(ctx) {
   }, [tcfRings, tcfLiners, tcfFairings, tcfStruts]).userData.part.stationTemp = '45';
 
   // TCF sump: the conical sump member from the hub to the bearing housing, with its seals
-  const TCF_BRG_Y = -4.13;
+  const TCF_BRG_Y = TCF.bearingY;
   P('TCF sump & bearing housing', {
     system: 'Drive system', material: 'Steel bearing housing and conical sump member, carbon and labyrinth seals', mass: 45,
     explode: [0, -1.4, 0.45], temp: 700,

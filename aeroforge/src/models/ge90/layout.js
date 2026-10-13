@@ -98,6 +98,10 @@ export const ROWS = {
   lptBlades: lptRotorY.map((y, i) => ({ y, chord: 0.055 + i * 0.006, count: [126, 134, 140, 146, 150, 156][i] })),
 };
 
+/** Turbine center frame between the HP and LP turbines (GE patent EP 1 149 987: 12 bolted
+ *  hollow struts carrying the aft HP-turbine bearing, #4): axial extent, strut station and count. */
+export const TCF = { y0: -4.06, y1: -4.17, ym: -4.112, struts: 12, bearingY: -4.13 };
+
 // SAE ARP755 station planes: [id, y, inner r, outer r]
 export const STATIONS = [
   ['2', 0.12, 0.47, 1.632], ['13', -0.66, 0.66, 1.632], ['25', -2.06, 0.37, 0.55], ['3', -3.25, 0.44, 0.48],
@@ -119,3 +123,45 @@ export const STATION_NAMES = {
   '2': 'Fan face', '13': 'Fan exit (bypass)', '25': 'Booster exit / HPC inlet', '3': 'HPC exit',
   '4': 'Combustor exit', '45': 'HPT exit / LPT inlet', '5': 'LPT exit', '9': 'Core nozzle', '19': 'Fan nozzle',
 };
+
+// ------------------------------------------------------------------ accessory gearbox gear train
+/** Accessory-gearbox pitch-line radius (m) and the pad gears round its crescent: phi (rad), pitch
+ *  radius (m; null = sized to touch the gear before it) and what each pad drives. */
+export const AGB = { R: 1.845, interior: [1.785, 1.905] };
+export const AGB_PADS = [
+  { phi: 0.5, r: 0.02, kind: 'pad', name: 'VSCF backup generator', ratio: 2.4126 }, { phi: 0.62, r: 0.05, kind: 'pad', name: 'starter' },
+  { phi: 0.7, r: 0.028, kind: 'pad', name: 'IDG', ratio: 0.7947 }, { phi: 0.82, r: 0.04, kind: 'pad', name: 'fuel pump' },
+  { phi: 0.95, r: 0.059, kind: 'pad', name: 'hydraulic pump', ratio: 0.3783 }, { phi: 1.0, r: null, kind: 'pad', name: 'HMU drive' },
+  { phi: Math.PI / 3, r: null, kind: 'input', name: 'input' }, { phi: 1.205, r: 0.035, kind: 'pad', name: 'lubrication unit / PMA' },
+  { phi: 1.305, r: 0.03, kind: 'pad', name: 'deoiler / hand crank' },
+];
+
+/**
+ * Spur-gear train of the accessory gearbox. Pads sit round the crescent at fixed angles (their
+ * accessories hang on the gearbox faces); each pad shaft carries one gear, and idlers fill the
+ * gaps so that neighbouring pitch circles touch. Gears with radius null are sized to touch the
+ * gear before them. Returns [{ phi, r, kind, name }] in order round the gearbox.
+ */
+export function agbTrain(R, pads, { maxIdler = 0.06, minGap = 0.008 } = {}) {
+  const out = [];
+  const s = (phi) => R * phi;                       // arc length; the arc is nearly straight over a gear pitch
+  let prev = null;
+  for (const p of pads) {
+    const g = { ...p };
+    if (prev) {
+      const d = s(g.phi) - s(prev.phi);
+      if (g.r == null) g.r = Math.max(0.02, d - prev.r);
+      const gap = d - prev.r - g.r;
+      if (gap > minGap) {
+        const n = gap / 2 <= maxIdler ? 1 : 2;
+        const ri = gap / (2 * n);
+        let at = s(prev.phi) + prev.r;
+        for (let k = 0; k < n; k++) { out.push({ phi: (at + ri) / R, r: ri, kind: 'idler', name: 'idler' }); at += 2 * ri; }
+      }
+    } else if (g.r == null) g.r = 0.03;
+    out.push(g);
+    prev = g;
+  }
+  return out;
+}
+

@@ -38,9 +38,9 @@ export default [
     focus: ['Fan containment case', 'Fan case rub strip & acoustic liners', 'Fan blades', 'Fan outlet guide vanes'], view: { dir: [0.7, 0.3, 1] },
   },
   {
-    title: 'The booster and its bleed valves',
-    body: 'Four booster stages on the fan shaft, with the fan hub, raise the core air\'s pressure about 2.3-fold (modelled). The -115B added the fourth stage, and dropped an HP-compressor stage, to push more air through a core of the same size. At low power or in rapid throttle changes the booster pumps more than the core can swallow, so bleed valves open and dump the excess into the bypass duct.',
-    key: 'Stall margin: opening bleed lowers the booster\'s exit pressure and moves its operating point away from the surge line.',
+    title: 'The booster and its bypass valves',
+    body: 'Four booster stages on the fan shaft, with the fan hub, raise the core air\'s pressure about 2.3-fold (modelled). The -115B added the fourth stage, and dropped an HP-compressor stage, to push more air through a core of the same size. At low power or in rapid throttle changes the booster pumps more than the core can swallow, so the variable bypass valves (VBVs), moved by two fuel-powered actuators, open and dump the excess into the bypass duct.',
+    key: 'Stall margin: opening the VBVs lowers the booster\'s exit pressure and moves its operating point away from the surge line.',
     focus: BOOSTER, explode: 0.3, view: { dir: [0.55, 0.45, 1] },
   },
   {
@@ -83,7 +83,7 @@ export default [
     title: 'Oil and fuel: one loop cools the other',
     body: 'Trace the lubrication loop: tank, anti-leak valve, the lubrication unit\'s pressure element, filter, then the bearing sumps; scavenge elements suck the oil back through a filter and the debris monitor, which counts metal particles from wearing bearings. The hot oil then gives its heat to the fuel in the main heat exchanger on its way to the pump\'s high-pressure stage, the HMU and the burners — and to the servo lines that move every actuator.',
     key: 'Heat into the fuel: Q = ṁ_fuel·c_p,fuel·ΔT ≈ 4.6 kg/s × 2 kJ/(kg·K) × 15 K ≈ 140 kW at take-off (illustrative).',
-    focus: OIL_FUEL, mode: 'systems', view: { dir: [0.75, -0.25, 1], fill: 0.9 },
+    focus: OIL_FUEL, mode: 'systems', view: { dir: [-0.3, -0.55, 1], fill: 0.8 },
   },
   {
     title: 'Follow the flow',

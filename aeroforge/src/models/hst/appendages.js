@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { rod, lathe, mergeGeometries } from '../../engine/geometry.js';
-import { RAD, ST, az, deg, ni } from './layout.js';
+import { RAD, ST, az, deg, ni, cablePath } from './layout.js';
 import { HM } from './materials.js';
 
 const merge = (list) => mergeGeometries(list.map(ni));
@@ -20,67 +20,138 @@ const merge = (list) => mergeGeometries(list.map(ni));
 export const SA = { x: 6.3, rDrive: RAD.shell, mast: 0.75, wing: 7.1, width: 2.6 };
 export const HGA = { x: 6.95, mast: 3.3, dish: 0.65 };
 
-export function buildAppendages(P) {
+export function buildAppendages(P, body) {
   const out = { arrays: [], hgas: [] };
 
   // ------------------------------------------------------------------ solar arrays (±z)
+  // Each SA3 wing hangs off the forward shell on a chain (NASA NTRS 20010070991 §2.1): the ESA solar
+  // array drive adapter (female end on HST), the drive mechanism, a visco-elastic damper, a titanium
+  // coupler carrying the array connectors, and the M55J graphite mast with its hinge, then the
+  // aluminium-lithium panel support structure carrying four panels (two each side of the fold hinge).
+  // Chain sizes estimated from photographs.
+  const Z_SADA = SA.rDrive, Z_SADM = SA.rDrive + 0.05, Z_PIV = SA.rDrive + 0.3;     // 1.55, 1.60, 1.85
+  const L_DAMP = 0.12, L_COUP = 0.15, L_MAST = 0.4;                                    // wing root at |z| 2.52
+  const ROOT = L_DAMP + L_COUP + L_MAST;
+  const zc = (s, z0, z1) => [s * (z0 + z1) / 2, z1 - z0];
+  const cylZ = (r, x, y, z, len, seg = 24) => new THREE.CylinderGeometry(r, r, len, seg).rotateX(Math.PI / 2).translate(x, y, z);
+  const sadaPts = [], dba = [], dbaDet = [], cables = [];
   for (const s of [1, -1]) {
     const side = s > 0 ? '−V2' : '+V2';
-    // drive housing fixed to the forward shell
-    const drive = [new THREE.CylinderGeometry(0.2, 0.24, 0.22, 24).rotateX(Math.PI / 2).translate(SA.x, 0, s * (SA.rDrive + 0.1))];
-    drive.push(new THREE.BoxGeometry(0.62, 0.38, 0.1).translate(SA.x, 0, s * (SA.rDrive + 0.03)));
+    // fixed to the shell: drive adapter and drive mechanism
+    const [zA, lA] = zc(s, Z_SADA, Z_SADM);
+    const sada = [cylZ(0.2, SA.x, 0, zA, lA, 32), new THREE.BoxGeometry(0.5, 0.4, 0.03).translate(SA.x, 0, s * (Z_SADA + 0.015))];
+    for (let k = 0; k < 8; k++) sada.push(cylZ(0.014, SA.x + 0.17 * Math.cos(k * Math.PI / 4), 0.17 * Math.sin(k * Math.PI / 4), s * (Z_SADM + 0.008), 0.016, 6));
+    P(`Solar array drive adapter (${side})`, {
+      system: 'Power', material: 'ESA-built adapter flange; its female end is fixed to the telescope, the male end takes the array', mass: 8, temp: 285, explode: [0, 0, s * 0.5],
+      desc: 'The interface plate that lets a whole wing be unbolted and swapped by spacewalkers: the 2002 crew changed both wings here. Size estimated.',
+    }, mesh(merge(sada), HM.al()));
+    const [zM, lM] = zc(s, Z_SADM, Z_PIV);
+    const sadm = [cylZ(0.15, SA.x, 0, zM, lM - 0.03, 32)];
+    const sadmEnd = [cylZ(0.16, SA.x, 0, s * (Z_PIV - 0.012), 0.024, 32), cylZ(0.16, SA.x, 0, s * (Z_SADM + 0.012), 0.024, 32)];
+    for (const y of [-0.06, 0.06]) sadmEnd.push(new THREE.BoxGeometry(0.05, 0.04, 0.06).translate(SA.x + 0.16, y, s * (Z_PIV - 0.04)));   // cable-set connectors
+    P(`Solar array drive mechanism (${side})`, {
+      system: 'Power', material: 'ESA stepper-motor drive under a metal shield and MLI blanket; two 10 W survival heaters', mass: 20, temp: 280, explode: [0, 0, s * 0.8],
+      desc: 'Turns its wing about the mast so the cells keep facing the Sun wherever the telescope points. Thermostats switch its two 10 W survival heaters on at −27 °C (−33 °C for the backup); two sets of cables and connectors carry the array\'s power past it into the telescope. Size estimated.',
+    }, [mesh(merge(sadm), HM.mli(6)), mesh(merge(sadmEnd), HM.al())]);
+    // rotating chain on the deploy pivot
     const pivot = new THREE.Group();
-    pivot.position.set(SA.x, 0, s * (SA.rDrive + 0.2));
-    const mastGeo = [rod([0, 0, 0], [0, 0, s * SA.mast], 0.07, 16), new THREE.CylinderGeometry(0.13, 0.13, 0.12, 20).rotateX(Math.PI / 2).translate(0, 0, s * 0.06)];
-    pivot.add(mesh(merge(mastGeo), HM.al()));
-    const dp = P(`Solar array drive & mast (${side})`, {
-      system: 'Power', material: 'Stepper-motor drive with slip rings, aluminium mast', mass: 55, temp: 280, explode: [0, 0, s * 1.0],
-      desc: 'Turns its wing through a full rotation about the mast so the cells face the Sun wherever the telescope points; slip rings carry the power across the rotating joint. A deployment hinge at the root swings the mast out from its stowed position.',
-    }, [mesh(merge(drive), HM.al()), pivot]);
+    pivot.position.set(SA.x, 0, s * Z_PIV);
+    const damper = [cylZ(0.1, 0, 0, s * L_DAMP / 2, L_DAMP - 0.03, 28), cylZ(0.11, 0, 0, s * 0.008, 0.016, 28), cylZ(0.11, 0, 0, s * (L_DAMP - 0.008), 0.016, 28)];
+    P(`Solar array damper (${side})`, {
+      system: 'Power', material: 'Titanium spool with visco-elastic material between titanium shear laps, under MLI; 25 W heater', mass: 6, temp: 288, explode: [0, 0.3, s * 0.15],
+      desc: 'Damps the wing\'s flexing, which gives Hubble\'s pointing a margin of stability. The visco-elastic layers only work warm, so a 25 W heater holds it between +10 and +15 °C.',
+    }, [mesh(merge(damper.slice(0, 1)), HM.mli(7)), mesh(merge(damper.slice(1)), HM.ti())], pivot);
+    const z0c = L_DAMP, z1c = L_DAMP + L_COUP;
+    const coup = [cylZ(0.1, 0, 0, s * (z0c + z1c) / 2, L_COUP, 28)];
+    const coupConn = [], coupH = [], pig = [];
+    for (const y of [-0.06, 0.06]) {
+      coupConn.push(new THREE.CylinderGeometry(0.025, 0.025, 0.06, 12).rotateZ(Math.PI / 2).translate(0.12, y, s * (z0c + 0.05)));
+      pig.push(...cablePath([[0.15, y, s * (z0c + 0.05)], [0.17, y, s * 0.02], [0.16, y, -s * 0.03]], 0.012, 6));
+    }
+    for (const sx of [-1, 1]) coupH.push(...cablePath([[sx * 0.08, -0.07, s * (z0c + 0.03)], [sx * 0.16, -0.07, s * (z0c + 0.03)], [sx * 0.16, -0.07, s * (z1c - 0.03)], [sx * 0.08, -0.07, s * (z1c - 0.03)]], 0.012, 6));
+    P(`Solar array coupler (${side})`, {
+      system: 'Power', material: 'Titanium spool carrying the array\'s electrical connectors; two gold-anodised EVA handles', mass: 6, temp: 285, explode: [0, 0.45, s * 0.25],
+      desc: 'Where the wing\'s power leaves the array: its connectors and two gold-anodised handles stick out through the blanket, so a spacewalker can hold the wing and demate it. From here the two cable sets run down past the drive into the telescope.',
+    }, [mesh(merge(coup), HM.ti()), mesh(merge(coupConn), HM.box()), mesh(merge(coupH), HM.kapton()), mesh(merge(pig), HM.powerCable())], pivot);
+    const mast = [rod([0, 0, s * z1c], [0, 0, s * ROOT], 0.07, 20)];
+    const hinge = [cylZ(0.085, 0, 0, s * (z1c + 0.14), 0.06, 24), new THREE.CylinderGeometry(0.03, 0.03, 0.22, 12).translate(0, 0, s * (z1c + 0.14))];
+    const mh = [];
+    for (const sx of [-1, 1]) mh.push(...cablePath([[sx * 0.05, 0.05, s * (z1c + 0.22)], [sx * 0.05, 0.14, s * (z1c + 0.22)], [sx * 0.05, 0.14, s * (ROOT - 0.04)], [sx * 0.05, 0.05, s * (ROOT - 0.04)]], 0.011, 6));
+    const dp = P(`Solar array mast (${side})`, {
+      system: 'Power', material: 'M55J graphite-composite tube under MLI, with a hinge and two gold-anodised handles', mass: 12, temp: 270, explode: [0, 0.6, s * 0.4],
+      desc: 'Carries the wing out from the drive. Graphite composite barely changes length between sunlight and shadow; the hinge folded the wing against its carrier for launch in the Shuttle. Length estimated.',
+    }, [mesh(merge(mast), HM.mli(8)), mesh(merge(hinge), HM.ti()), mesh(merge(mh), HM.kapton())], pivot);
 
-    // the wing: two halves, the outer folding back over the inner when stowed
+    // the wing: panel support structure and four panels, the outer pair folding back over the inner when stowed
     const wingRoot = new THREE.Group();
-    wingRoot.position.set(0, 0, s * SA.mast);
+    wingRoot.position.set(0, 0, s * ROOT);
     pivot.add(wingRoot);
     const half = SA.wing / 2;
-    const panel = (z0) => {
-      const g = new THREE.BoxGeometry(SA.width, 0.035, half - 0.04);
-      g.translate(0, 0, s * (z0 + half / 2));
-      return g;
-    };
+    const PW = SA.width / 2 - 0.02;          // each panel 1.28 m wide, 3.51 m long: two side by side per half
+    const panels = (z0) => [-1, 1].map((sx) => new THREE.BoxGeometry(PW, 0.03, half - 0.04).translate(sx * (PW / 2 + 0.01), 0, s * (z0 + half / 2)));
     const frame = (z0) => {
       const f = [];
       const z1 = z0 + half - 0.04;
-      for (const x of [-SA.width / 2, 0, SA.width / 2]) f.push(rod([x, 0.03, s * z0], [x, 0.03, s * z1], 0.022, 6));
-      for (const z of [z0, (z0 + z1) / 2, z1]) f.push(rod([-SA.width / 2, 0.03, s * z], [SA.width / 2, 0.03, s * z], 0.018, 6));
+      for (const x of [-SA.width / 2, 0, SA.width / 2]) f.push(rod([x, -0.035, s * z0], [x, -0.035, s * z1], 0.022, 6));
+      for (const z of [z0, (z0 + z1) / 2, z1]) f.push(rod([-SA.width / 2, -0.035, s * z], [SA.width / 2, -0.035, s * z], 0.018, 6));
+      // three flexures per panel between the panel and the frame
+      for (const sx of [-1, 1]) for (const z of [z0 + 0.35, (z0 + z1) / 2, z1 - 0.35]) f.push(new THREE.BoxGeometry(0.07, 0.03, 0.05).translate(sx * (z === (z0 + z1) / 2 ? SA.width / 2 - 0.05 : 0.05), -0.022, s * z));
       return f;
     };
     const mats = [HM.sa3Back(), HM.sa3Back(), HM.sa3Cells(), HM.sa3Back(), HM.sa3Back(), HM.sa3Back()];
     const inner = new THREE.Group();
-    // root yoke: a hub on the mast tip and a spreader beam carrying the inner panel's root edge
-    const yoke = [new THREE.CylinderGeometry(0.1, 0.1, 0.14, 20).rotateX(Math.PI / 2).translate(0, 0, s * 0.0)];
-    yoke.push(new THREE.BoxGeometry(SA.width - 0.1, 0.06, 0.07).translate(0, 0.03, s * 0.045));
-    for (const x of [-1, 1]) yoke.push(rod([0, 0.02, s * 0.03], [x * (SA.width / 2 - 0.15), 0.03, s * 0.06], 0.025, 6));
-    inner.add(mesh(panel(0.04), mats), mesh(merge(frame(0.04)), HM.al()), mesh(merge(yoke), HM.ti()));
+    // root yoke: a hub on the mast tip and a spreader beam carrying the inner panels' root edge
+    const yoke = [cylZ(0.1, 0, 0, 0, 0.14, 20)];
+    yoke.push(new THREE.BoxGeometry(SA.width - 0.1, 0.06, 0.07).translate(0, -0.03, s * 0.045));
+    for (const x of [-1, 1]) yoke.push(rod([0, -0.02, s * 0.03], [x * (SA.width / 2 - 0.15), -0.03, s * 0.06], 0.025, 6));
     const hingeG = new THREE.Group();
     hingeG.position.set(0, 0.04, s * (half + 0.02));
     const outer = new THREE.Group();
     outer.position.set(0, -0.04, -s * (half + 0.02));
-    outer.add(mesh(panel(half + 0.04), mats), mesh(merge(frame(half + 0.04)), HM.al()));
     hingeG.add(outer);
-    inner.add(hingeG, mesh(rod([-SA.width / 2 + 0.1, 0.04, s * (half + 0.02)], [SA.width / 2 - 0.1, 0.04, s * (half + 0.02)], 0.03, 10), HM.ti()));
+    inner.add(hingeG);
     const track = new THREE.Group();          // sun-tracking rotation about the mast axis
     track.add(inner);
     wingRoot.add(track);
+    const foldHinge = [rod([-SA.width / 2 + 0.1, 0.04, s * (half + 0.02)], [SA.width / 2 - 0.1, 0.04, s * (half + 0.02)], 0.03, 10)];
     const wp = P(`Solar array wing (${side})`, {
-      system: 'Power', material: 'Gallium-arsenide cells on four Iridium-derived rigid panels per wing, aluminium-lithium frame', mass: 290, massSource: 'NASA SM4 Media Guide (640 lb per wing)', temp: 330,
+      system: 'Power', material: 'Aluminium-lithium X2096 panel support structure under MLI; hinges under silver-Teflon tape', mass: 290, massSource: 'NASA SM4 Media Guide (640 lb per wing)', temp: 330,
       explode: [0, 0, s * 1.6],
-      desc: 'The third set of arrays (SA3), fitted in 2002: 7.1 × 2.6 m, rigid instead of the roll-up blankets that flexed and jittered the telescope as they crossed between sunlight and shadow. Smaller than the old wings yet about 30 % more powerful: ≈ 5.3 kW together (5,270 W predicted at 6 years). Fold scheme in the deploy demo simplified.',
+      desc: 'The third set of arrays (SA3), fitted in 2002: 7.1 × 2.6 m, rigid instead of the roll-up blankets that flexed and jittered the telescope as they crossed between sunlight and shadow. Twelve flexures, three per panel, let the frame swing between −70 °C and +86 °C every orbit without "snapping". ≈ 5.3 kW for both wings (5,270 W predicted at 6 years). Fold scheme in the deploy demo simplified.',
       callout: s > 0, anchor: [0.3, 0.4, s * 5.0],
-    }, track, wingRoot);
+    }, [mesh(merge([...frame(0.04), ...yoke]), HM.al()), mesh(merge(foldHinge), HM.ti())], track);
+    // the wing part is the tracking group's child, so move the groups under it
+    wp.add(inner);
     wp.userData.part.thermalRole = 'array';
+    const panelInfo = (which) => ({
+      system: 'Power', material: 'Two Iridium-design panels, each 1,000 gallium-arsenide-on-germanium cells on a Kapton face sheet over aluminium honeycomb; white Tedlar backs', count: 2, temp: 330, explode: [0, 0.5, 0],
+      desc: `The ${which} pair of the wing's four panels, about 4.6 m² each. The white Tedlar backs radiate heat to space; the cells face the Sun. Part of the wing; mass included.`,
+    });
+    // one mesh per panel: the box keeps its face groups, so the cells show on the front only
+    const ip = P(`SA3 solar panels, inner pair (${side})`, panelInfo('inner'), panels(0.04).map((g) => mesh(g, mats)), inner);
+    ip.userData.part.thermalRole = 'array';
+    const op = P(`SA3 solar panels, outer pair (${side})`, panelInfo('outer'), [...panels(half + 0.04).map((g) => mesh(g, mats)), mesh(merge(frame(half + 0.04)), HM.al())], outer);
+    op.userData.part.thermalRole = 'array';
     out.arrays.push({ s, pivot, hinge: hingeG, track, drivePart: dp, wingPart: wp });
+    // the pivot rides on the drive mechanism's part so the chain explodes with it
+    body.add(pivot);
+
+    // diode box beside the drive, and the two cable sets that run from the coupler down past the
+    // drive and adapter into it, then into the shell
+    const c = s > 0 ? 90 : 270;
+    dba.push(new THREE.BoxGeometry(0.3, 0.12, 0.25).translate(6.75, RAD.shell + 0.06, 0).rotateX(deg(c)));
+    for (const y of [-0.06, 0.06]) dbaDet.push(new THREE.CylinderGeometry(0.022, 0.022, 0.04, 10).rotateZ(Math.PI / 2).translate(6.59, RAD.shell + 0.06, y).rotateX(deg(c)), new THREE.CylinderGeometry(0.022, 0.022, 0.04, 10).rotateZ(Math.PI / 2).translate(6.91, RAD.shell + 0.06, y).rotateX(deg(c)));
+    for (const y of [-0.06, 0.06]) cables.push(...cablePath([[SA.x + 0.185, y, s * (Z_PIV - 0.04)], [SA.x + 0.185, y, s * (Z_SADM + 0.03)], [SA.x + 0.24, y, s * (Z_SADA + 0.045)], [6.56, y, s * (Z_SADA + 0.045)]], 0.013, 6));
+    sadaPts.push(c);
   }
+  P('Diode box assemblies (DBA-2)', {
+    system: 'Power', material: 'Diode networks in boxes beside each wing\'s drive, one per wing', mass: 10, count: 2, temp: 290, explode: [0, 0, 0.9],
+    desc: 'Diode networks steer the current from the array strings and keep a shaded or failed string from drawing power. New DBA-2 boxes went in with the SA3 wings on the first two spacewalks of 2002. Exact location unconfirmed; size estimated.',
+  }, [mesh(merge(dba), HM.iridite()), mesh(merge(dbaDet), HM.box())]);
+  P('Solar array drive cable sets', {
+    system: 'Power', material: 'Two power cable sets per wing, from the coupler past the drive to the diode box', mass: 6, count: 4, temp: 285, explode: [0, 0, 0.7],
+    desc: 'Two sets of cables and connectors carry each wing\'s power into the telescope, past the turning drive. From the diode box the current goes on to the power control unit in bay 4.',
+  }, mesh(merge(cables), HM.powerCable()));
 
   // ------------------------------------------------------------------ high-gain antennas (±y)
   // the reflector as a closed shell 2.5 cm thick (front face, rim, back face), so it renders single-sided
@@ -90,6 +161,7 @@ export function buildAppendages(P) {
   const dishProfile = [];
   for (let i = 0; i <= DN; i++) { const r = (i / DN) * HGA.dish; dishProfile.push([r, sag(r) - DISH_T]); }
   for (let i = DN; i >= 0; i--) { const r = (i / DN) * HGA.dish; dishProfile.push([r, sag(r)]); }
+  const Y1 = 0.11, Y2 = 0.13;                // outer axis above the mast tip; inner axis above the outer
   for (const s of [1, -1]) {
     const side = s > 0 ? '+V3' : '−V3';
     const base = [new THREE.BoxGeometry(0.5, 0.12, 0.34).translate(HGA.x, s * (RAD.shell + 0.05), 0)];
@@ -97,17 +169,32 @@ export function buildAppendages(P) {
     const pivot = new THREE.Group();
     pivot.position.set(HGA.x, s * (RAD.shell + 0.14), 0);
     pivot.add(mesh(merge([rod([0, 0, 0], [0, s * HGA.mast, 0], 0.065, 16), new THREE.CylinderGeometry(0.11, 0.11, 0.2, 16).rotateX(Math.PI / 2)]), HM.al()));
+    // waveguide and cable run along the mast
+    pivot.add(mesh(merge([rod([0.09, s * 0.15, 0.05], [0.09, s * (HGA.mast - 0.1), 0.05], 0.018, 6), rod([-0.08, s * 0.15, -0.05], [-0.08, s * (HGA.mast - 0.1), -0.05], 0.012, 6)]), HM.kapton()));
     const mp = P(`High-gain antenna mast (${side})`, {
       system: 'Communications', material: 'Aluminium/graphite boom with root deployment hinge, waveguide and cabling', mass: 30, temp: 255, explode: [2.5, s * 2.0, 0],
       desc: 'Holds its antenna clear of the telescope so the dish can see a TDRS relay over most of the sky. Latched flat along the forward shell and light shield for launch, it was swung out 90° by its hinge drive after release in 1990. Length estimated.',
     }, [mesh(merge(base), HM.al()), pivot]);
+    const hd = [new THREE.CylinderGeometry(0.07, 0.07, 0.2, 20).rotateX(Math.PI / 2).translate(HGA.x, s * (RAD.shell + 0.14), 0.32), new THREE.CylinderGeometry(0.025, 0.025, 0.04, 6).rotateX(Math.PI / 2).translate(HGA.x, s * (RAD.shell + 0.14), 0.44)];
+    hd.push(new THREE.BoxGeometry(0.2, 0.1, 0.12).translate(HGA.x, s * (RAD.shell + 0.06), 0.3));
+    P(`HGA mast hinge drive (${side})`, {
+      system: 'Structure', material: 'Stepper-motor rotary drive actuator on the hinge line, hex fitting for manual drive', mass: 6, temp: 255, explode: [1.2, s * 0.6, 0.4],
+      desc: 'One of Hubble\'s three hinge drives (two antenna masts and the aperture door), all the same rotary drive actuator. Each has a hex fitting so a spacewalker can crank it by hand if the motor fails.',
+    }, mesh(merge(hd), HM.box()));
     const tip = new THREE.Group();
     tip.position.set(0, s * HGA.mast, 0);
     pivot.add(tip);
-    const gimbal = new THREE.Group();
+    const gimbal = new THREE.Group();          // deploy compensation; carries the outer-axis drive
     tip.add(gimbal);
-    const g2 = new THREE.Group();              // elevation axis
-    gimbal.add(g2);
+    const ax1 = new THREE.Group();             // outer axis (about z)
+    ax1.position.set(0, s * Y1, 0);
+    gimbal.add(ax1);
+    const g2 = new THREE.Group();              // inner axis (about x)
+    g2.position.set(0, s * Y2, 0);
+    ax1.add(g2);
+    const dishG = new THREE.Group();           // dish geometry kept in the gimbal's frame
+    dishG.position.set(0, -s * (Y1 + Y2), 0);
+    g2.add(dishG);
     const dish = lathe(dishProfile, 48);
     if (s < 0) dish.rotateZ(Math.PI);
     dish.translate(0, s * 0.3, 0);
@@ -125,21 +212,36 @@ export function buildAppendages(P) {
       const a = (k / 3) * Math.PI * 2 + 0.4;
       feed.push(rod([Math.cos(a) * HGA.dish * 0.85, s * (0.3 + sag(HGA.dish * 0.85)), Math.sin(a) * HGA.dish * 0.85], [0, s * (0.3 + 0.36), 0], 0.01, 5));
     }
-    const gim = [new THREE.BoxGeometry(0.22, 0.2, 0.22).translate(0, s * 0.1, 0), new THREE.CylinderGeometry(0.07, 0.07, 0.34, 14).rotateZ(Math.PI / 2).translate(0, s * 0.22, 0)];
-    g2.add(mesh(dish, HM.dishShell()), mesh(merge(back), HM.grEp()), mesh(merge(feed), HM.al()));
-    // waveguide and cable run along the mast
-    pivot.add(mesh(merge([rod([0.09, s * 0.15, 0.05], [0.09, s * (HGA.mast - 0.1), 0.05], 0.018, 6), rod([-0.08, s * 0.15, -0.05], [-0.08, s * (HGA.mast - 0.1), -0.05], 0.012, 6)]), HM.kapton()));
+    // RF line from the inner rotary joint into the hub, out along the face and up one feed strut
+    const a0 = 0.4, rS = HGA.dish * 0.85;
+    const rf = cablePath([[0.19, s * (Y1 + Y2), 0], [0.06, s * 0.25, 0], [0, s * 0.3, 0], ...[0.12, 0.3, 0.45].map((r) => [Math.cos(a0) * r, s * (0.3 + sag(r) + 0.012), Math.sin(a0) * r]), [Math.cos(a0) * rS, s * (0.3 + sag(rS) + 0.015), Math.sin(a0) * rS], [0.012, s * (0.3 + 0.35), 0.005]], 0.008, 6);
+    dishG.add(mesh(dish, HM.dishShell()), mesh(merge(back), HM.grEp()), mesh(merge(feed), HM.al()), mesh(merge(rf), HM.kapton()));
     const hp = P(`High-gain antenna (${side})`, {
-      system: 'Communications', material: 'Parabolic reflector of aluminium honeycomb with graphite-epoxy facesheets (General Electric), S-band feed', mass: 28, temp: 250,
+      system: 'Communications', material: 'Parabolic reflector of aluminium honeycomb with graphite-epoxy facesheets (General Electric), S-band feed 0.38 m in front of the vertex', mass: 28, temp: 250,
       explode: [0, s * 0.8, 0],
-      desc: 'Steerable dish (≈1.3 m, estimated) that sends science data at 2255.5 or 2287.5 MHz to NASA\'s Tracking and Data Relay Satellites 36,000 km up, which relay it to White Sands. Its beam is about 4° wide, so the gimbal aims it to within 1° as Hubble circles the Earth.',
+      desc: 'Steerable dish (≈1.3 m, estimated) that sends science data at 2255.5 or 2287.5 MHz (±10 MHz) to NASA\'s Tracking and Data Relay Satellites 36,000 km up, which relay it to White Sands. Its beam is just over 4° wide, so the gimbal aims it to within 1° as Hubble circles the Earth.',
       callout: s > 0, anchor: [0.4, s * 0.5, 0.4],
     }, gimbal, tip);
-    P(`HGA gimbal (${side})`, {
-      system: 'Communications', material: 'Two-axis stepper-motor gimbal with rotary joints for the RF path', mass: 14, temp: 255, explode: [0, s * 0.35, 0],
-      desc: 'Turns the dish up to 100° either way on two axes so it can follow a TDRS satellite across the sky while Hubble holds its target. Rotary joints carry the S-band signal across both axes.',
-    }, mesh(merge(gim), HM.box()), gimbal);
-    out.hgas.push({ s, pivot, gimbal, g2, mastPart: mp, dishPart: hp });
+    // outer-axis drive: bracket on the mast tip, rotary drive actuator and rotary joint on the z axis
+    const od = [new THREE.BoxGeometry(0.16, 0.06, 0.16).translate(0, s * 0.03, 0), new THREE.BoxGeometry(0.08, Y1, 0.05).translate(0, s * Y1 / 2, -0.12)];
+    const odA = [new THREE.CylinderGeometry(0.07, 0.07, 0.2, 20).rotateX(Math.PI / 2).translate(0, s * Y1, -0.24)];
+    const odJ = [new THREE.CylinderGeometry(0.04, 0.04, 0.08, 16).rotateX(Math.PI / 2).translate(0, s * Y1, 0.1)];
+    const odRF = cablePath([[0.09, -s * 0.1, 0.05], [0.09, s * 0.04, 0.05], [0.03, s * Y1, 0.14]], 0.009, 6);
+    P(`HGA outer-axis drive (${side})`, {
+      system: 'Communications', material: 'Rotary drive actuator (stepper motor) with an RF rotary joint', mass: 6, temp: 255, explode: [0, s * 0.25, -0.3],
+      desc: 'The first of the gimbal\'s two axes. Its stepper-motor actuator swings the dish up to 100° either way, and a rotary joint carries the S-band signal across the turning axis, so the transmitter in bay 5 stays wired straight through to a dish that never stops moving.',
+    }, [mesh(merge(od), HM.al()), mesh(merge(odA), HM.box()), mesh(merge(odJ), HM.ti()), mesh(merge(odRF), HM.kapton())], gimbal);
+    // inner-axis drive on the outer axis: yoke, actuator and rotary joint on the x axis
+    const id = [new THREE.BoxGeometry(0.32, 0.05, 0.12).translate(0, s * 0.03, 0)];
+    for (const sx of [-1, 1]) id.push(new THREE.BoxGeometry(0.03, Y2 + 0.04, 0.1).translate(sx * 0.13, s * (Y2 / 2 + 0.02), 0));
+    const idA = [new THREE.CylinderGeometry(0.07, 0.07, 0.2, 20).rotateZ(Math.PI / 2).translate(-0.25, s * Y2, 0)];
+    const idJ = [new THREE.CylinderGeometry(0.04, 0.04, 0.08, 16).rotateZ(Math.PI / 2).translate(0.19, s * Y2, 0)];
+    const idRF = cablePath([[0.03, 0, 0.14], [0.17, s * 0.04, 0.1], [0.23, s * Y2, 0.04]], 0.009, 6);
+    P(`HGA inner-axis drive (${side})`, {
+      system: 'Communications', material: 'Yoke with a rotary drive actuator and an RF rotary joint', mass: 6, temp: 255, explode: [0, s * 0.45, 0.3],
+      desc: 'The second gimbal axis, at right angles to the first: together they aim the dish anywhere in a wide cone, to within 1° of a TDRS satellite. The second rotary joint passes the signal on to the feed.',
+    }, [mesh(merge(id), HM.al()), mesh(merge(idA), HM.box()), mesh(merge(idJ), HM.ti()), mesh(merge(idRF), HM.kapton())], ax1);
+    out.hgas.push({ s, pivot, gimbal, ax1, g2, mastPart: mp, dishPart: hp });
   }
 
   // ------------------------------------------------------------------ low-gain antennas
@@ -204,39 +306,33 @@ export function buildAppendages(P) {
     desc: 'The other three sun sensors, on the aft shroud. Together the five fix the initial attitude after deployment and guide the safe mode that turns the solar arrays toward the Sun when something goes wrong. Positions approximate.',
   }, mesh(cssGeo([[0.85, RAD.big, 20], [0.85, RAD.big, 180], [0.85, RAD.big, 340]]), HM.box()));
 
-  // ------------------------------------------------------------------ wiring: data/power trunk, array power, RF
-  // trunk bundles from the equipment section forward to the light-shield hardware and aft to the instruments
+  // ------------------------------------------------------------------ wiring: forward trunk, array power, RF
+  // trunk bundles from the equipment section's forward ring harness to the light-shield hardware
   const hz = [];
   for (const c of [62, 118, 242, 298]) {
-    hz.push(rod(az(deg(c), 1.485, ST.equip), az(deg(c), 1.485, ST.fwdShell), 0.016, 6), rod(az(deg(c), 1.485, ST.fwdShell), az(deg(c), 1.485, 12.6), 0.012, 6));
+    hz.push(...cablePath([az(deg(c), 1.68, 4.98), az(deg(c), 1.485, ST.equip + 0.02), az(deg(c), 1.485, ST.fwdShell), az(deg(c), 1.485, 12.6)], 0.016, 6));
   }
-  for (const c of [20, 160, 200, 340]) {
-    hz.push(rod(az(deg(c), 1.96, 3.5), az(deg(c), 1.96, 0.45), 0.022, 6));
-    hz.push(rod(az(deg(c), 1.96, 0.45), az(deg(c), 1.15, 0.28), 0.018, 6));
-  }
-  P('Electrical harness', {
-    system: 'Electrical', material: 'Shielded copper wiring bundles and connectors', mass: 150, temp: 285, explode: [0, 0, 0],
-    desc: 'Many kilometres of wire tie the equipment bays to the instruments, sensors and drives through hundreds of connectors — the reason servicing tools were designed to be worked in pressure gloves. Shown as the main trunk runs; routing simplified.',
-  }, mesh(merge(hz), new THREE.MeshStandardMaterial({ color: 0x5a5148, roughness: 0.7, metalness: 0.2 })));
+  P('Forward harness trunk', {
+    system: 'Electrical', material: 'Shielded copper wiring bundles and connectors', mass: 60, temp: 285, explode: [0, 0, 0], xrayWeight: 0.4,
+    desc: 'Four bundles leave the equipment section\'s forward ring harness and run up the inside of the forward shell and light shield to the torquer bars, magnetometers, sun sensors and the forward low-gain antenna. Hubble carries kilometres of wire through hundreds of connectors. Routing simplified.',
+  }, mesh(merge(hz), HM.harness()));
 
-  // array power: each wing's drive → along the forward shell → round the equipment section to the
-  // power control unit in bay 4, passing the battery bays 2 and 3
+  // array power: each wing's diode box → into the shell → aft along the forward shell → round the
+  // equipment section to the power control unit in bay 4, passing the battery bays 2 and 3
   const arc = (list, r, x, a0, a1, rr = 0.02, step = 15) => {
     const n = Math.max(1, Math.round(Math.abs(a1 - a0) / step));
     for (let i = 0; i < n; i++) list.push(rod(az(deg(a0 + ((a1 - a0) * i) / n), r, x), az(deg(a0 + ((a1 - a0) * (i + 1)) / n), r, x), rr, 6));
   };
   const pw = [];
-  for (const c of [90, 270]) {
-    pw.push(rod(az(deg(c), SA.rDrive + 0.03, SA.x), az(deg(c), 1.485, SA.x), 0.024, 6), rod(az(deg(c), 1.485, SA.x), az(deg(c), 1.485, 5.02), 0.024, 6), rod(az(deg(c), 1.485, 5.02), az(deg(c), 1.6, 4.98), 0.024, 6));
-  }
+  for (const c of [90, 270]) pw.push(...cablePath([az(deg(c), RAD.shell + 0.06, 6.93), az(deg(c), 1.485, 6.95), az(deg(c), 1.485, 5.02), az(deg(c), 1.6, 4.98)], 0.024, 6));
   arc(pw, 1.6, 4.98, 90, 225, 0.024);
   arc(pw, 1.6, 4.98, 270, 225, 0.024);
   pw.push(rod(az(deg(225), 1.6, 4.98), az(deg(225), 1.6, 4.82), 0.024, 6));
   for (const c of [165, 195]) pw.push(rod(az(deg(c), 1.6, 4.98), az(deg(c), 1.62, 4.9), 0.02, 6));
   P('Solar array power harness', {
-    system: 'Power', material: 'Heavy-gauge copper power cables', mass: 40, temp: 285, explode: [0, 0, 0],
-    desc: 'Carries each wing\'s current from its drive\'s slip rings along the inside of the forward shell to the power control unit in bay 4, past the battery modules in bays 2 and 3 that it recharges every orbit. Routing simplified.',
-  }, mesh(merge(pw), new THREE.MeshStandardMaterial({ color: 0x7a4b2c, roughness: 0.6, metalness: 0.35 })));
+    system: 'Power', material: 'Heavy-gauge copper power cables', mass: 40, temp: 285, explode: [0, 0, 0], xrayWeight: 0.5,
+    desc: 'Carries each wing\'s current from its diode box into the forward shell, aft and round the equipment section to the power control unit in bay 4, past the battery modules in bays 2 and 3. The arrays recharge the six batteries after every ~36-minute eclipse, through each battery\'s charge current controller. Routing simplified.',
+  }, mesh(merge(pw), HM.powerCable()));
 
   // RF: the transmitters and transponders in bay 5 → coax to both high-gain antennas and waveguide to the low-gain antennas
   const rf = [];
@@ -248,7 +344,7 @@ export function buildAppendages(P) {
   rf.push(rod(az(deg(200), 1.62, 4.88), az(deg(200), 1.47, 5.05), 0.014, 6), rod(az(deg(200), 1.47, 5.05), az(deg(200), 1.47, ST.front - 0.15), 0.014, 6), rod(az(deg(200), 1.47, ST.front - 0.15), az(deg(200), RAD.shell + 0.1, ST.front - 0.15), 0.014, 6));
   rf.push(rod(az(deg(297), 1.62, 4.88), az(deg(297), 1.62, 3.62), 0.016, 6), rod(az(deg(297), 1.62, 3.62), az(deg(297), 1.9, 3.5), 0.016, 6), rod(az(deg(297), 1.9, 3.5), az(deg(297), 1.9, 0.3), 0.016, 6), rod(az(deg(297), 1.9, 0.3), az(deg(270), 1.75, 0.08), 0.016, 6));
   P('RF cables & waveguide', {
-    system: 'Communications', material: 'Low-loss S-band coaxial cable and waveguide, with RF transfer switches', mass: 20, temp: 280, explode: [0, 0, 0],
+    system: 'Communications', material: 'Low-loss S-band coaxial cable and waveguide, with RF transfer switches', mass: 20, temp: 280, explode: [0, 0, 0], xrayWeight: 0.6,
     desc: 'Links the transmitters and transponders in bay 5 to the two high-gain antennas (up their masts through the gimbals\' rotary joints) and, by waveguide, to the forward and aft low-gain antennas, so any radio can reach any antenna. Routing simplified.',
   }, mesh(merge(rf), HM.kapton()));
 

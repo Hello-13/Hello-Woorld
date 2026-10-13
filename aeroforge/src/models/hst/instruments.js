@@ -67,7 +67,8 @@ export function buildInstruments(P, root) {
   const sub = (parent, s, explode, geoms, extra = {}) => {
     const groups = Array.isArray(geoms) && geoms.length && !(geoms[0] instanceof THREE.BufferGeometry) ? geoms : [[s.mat || null, geoms]];
     const meshes = groups.map(([m, list]) => mesh(merge(list), m ? MAT[m]() : (s.temp < 150 ? HM.kapton() : HM.iridite())));
-    return P(s.name, { system: s.system || 'Payload', material: s.material, temp: s.temp, count: s.count, mass: s.mass, explode, xrayWeight: s.xw, desc: `${s.desc} ${s.tail || ''}`.trim(), ...extra }, meshes, parent);
+    // sub-units stack inside their enclosures, so X-ray draws them at 60 % unless told otherwise
+    return P(s.name, { system: s.system || 'Payload', material: s.material, temp: s.temp, count: s.count, mass: s.mass, explode, xrayWeight: s.xw ?? 0.6, desc: `${s.desc} ${s.tail || ''}`.trim(), ...extra }, meshes, parent);
   };
 
   // ------------------------------------------------------------------ axial instruments

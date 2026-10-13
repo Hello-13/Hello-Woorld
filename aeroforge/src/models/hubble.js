@@ -17,6 +17,7 @@ import { buildOTA } from './hst/ota.js';
 import { buildSSM } from './hst/ssm.js';
 import { buildInstruments, labelInstruments } from './hst/instruments.js';
 import { buildAppendages } from './hst/appendages.js';
+import { buildWiring } from './hst/wiring.js';
 
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const SUN_TILT = -0.45;            // array angle about the mast that faces the lighting rigs' Sun
@@ -31,7 +32,8 @@ export function buildHubble() {
   const ota = buildOTA(P);
   const ssm = buildSSM(P);
   const si = buildInstruments(P, body);
-  const app = buildAppendages(P);
+  const app = buildAppendages(P, body);
+  const wiring = buildWiring(P, { oes: ssm.oes });
   body.add(ota.lightPath);
 
   A.root.updateMatrixWorld(true);
@@ -99,6 +101,8 @@ export function buildHubble() {
     thermalRange: [120, 340],
     state,
     lightPath: ota.lightPath,
+    wiring: wiring.length,
+    railLength: ssm.railLength,
 
     /**
      * Tour 'deploy' hook: a lower value snaps to the stowed launch configuration and the release
@@ -141,7 +145,8 @@ export function buildHubble() {
       // the wheels never stop: they hold the telescope still against small disturbance torques
       for (const [i, w] of ssm.wheels.entries()) w.rotation.y += dt * (2.2 + i * 0.35);
       const hd = smooth(0.5, 0.6, state.deploy);
-      for (const h of app.hgas) h.g2.rotation.x = Math.sin(t * 0.07 + h.s) * 0.35 * hd;
+      // both gimbal axes follow a TDRS relay across the sky
+      for (const h of app.hgas) { h.g2.rotation.x = Math.sin(t * 0.07 + h.s) * 0.35 * hd; h.ax1.rotation.z = Math.sin(t * 0.05 + 2 * h.s) * 0.3 * hd; }
       // light path: in the analysis views while the door is open (unless a tour step is focused on
       // parts outside the optics), and on request in Studio
       const modes = globalThis.__aeroforge?.modes;
