@@ -1,179 +1,140 @@
-// GPS III navigation payload (L3Harris): the L-band helix array and its feed network, the three
-// rubidium clocks, the Mission Data Unit and L-band transmitters; the hosted nuclear-detonation
-// sensors; the laser retroreflector array; crosslink and telemetry antennas and radios.
+// GPS III navigation payload element (L3Harris): the Mission Data Unit, the L1, L2, L3 and L5
+// transmitters, the atomic frequency standards and the signal filters (Marquis & Shaw, InsideGNSS
+// 2011); the network communications element (crosslink transponder, thin communications unit,
+// S-band uplink/downlink units); the hosted nuclear-detonation sensors; the laser retroreflector.
+// Unit positions on the radiator panels are estimates.
 
-import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
-import { lathe } from '../../engine/geometry.js';
 import { G } from './materials.js';
-import { HX, HY, HZ, IX, IY, IZ, boxG, cylG, merge, unit, pipeG } from './kit.js';
+import { IY, IZ, DECK, AFT, boxG, cylG, merge, unit, pipeG, plateG, octagon, connPoint } from './kit.js';
+import { LRA_C } from './antennas.js';
 
-export const DECK = HZ + 0.012;           // top of the Earth-deck blanket
-export const PANEL_Z = DECK + 0.085;      // top of the L-band antenna panel
-const PANEL_R = 0.68;
-
-/** Helical conductor of radius r between z0 and z1, centred on (x, y). */
-function helixG(x, y, r, z0, z1, turns, wire = 0.0032, phase = 0) {
-  const pts = [];
-  const n = Math.ceil(turns * 18);
-  for (let i = 0; i <= n; i++) {
-    const t = i / n, a = phase + t * turns * Math.PI * 2;
-    pts.push(new THREE.Vector3(x + Math.cos(a) * r, y + Math.sin(a) * r, z0 + (z1 - z0) * t));
-  }
-  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n, wire, 5, false);
-}
-
-/** Radome: a cylinder with a shallow dome, height h, standing on z0. */
-function radomeG(x, y, r, h, z0, seg = 28) {
-  const prof = [[r, 0], [r, h - 0.03], [r * 0.72, h - 0.008], [0.0001, h]];
-  return lathe(prof, seg).rotateX(Math.PI / 2).translate(x, y, z0);
-}
+/** Harness landing points collected from every module; the harness is drawn last (power.js). */
+export const HARNESS = [];
 
 export function buildPayload(P) {
-  // ------------------------------------------------------------------ L-band antenna: support frame, panel, beam-forming network
-  const struts = [];
-  for (let k = 0; k < 8; k++) {
-    const a = (k / 8) * Math.PI * 2 + Math.PI / 8;
-    struts.push(cylG([Math.cos(a) * 0.56, Math.sin(a) * 0.56, DECK + 0.035], 0.014, 0.07, 'z', 10));
-  }
-  struts.push(cylG([0, 0, DECK + 0.004], 0.6, 0.008, 'z', 64, 0.6), cylG([0, 0, DECK + 0.004], 0.36, 0.008, 'z', 48, 0.36));
-  P('Antenna support frame', {
-    system: 'Structure', material: 'Carbon-fibre struts and ring', mass: 10, temp: 250, explode: [0, 0, 1.85],
-    desc: 'Stands the L-band antenna panel off the Earth deck so its beam-forming network fits underneath, and holds the array\'s pointing to the spacecraft axes. Geometry estimated.',
-  }, mesh(merge(struts), G.cfrp(2)));
-
-  const panel = merge([
-    cylG([0, 0, PANEL_Z - 0.015], PANEL_R, 0.03, 'z', 72),
-    cylG([0, 0, PANEL_Z - 0.032], PANEL_R - 0.02, 0.006, 'z', 72),
-  ]);
-  P('L-band antenna panel', {
-    system: 'Payload', material: 'White-painted aluminium honeycomb ground plane', mass: 38, temp: 245, explode: [0, 0, 2.05],
-    desc: 'Ground plane of the Earth-coverage L-band antenna, which broadcasts the civil and military (M-code) navigation signals to the whole visible Earth. Modelled on the two-ring, 12-helix layout of the Block IIR/IIR-M panel (four inner, eight outer); GPS III\'s exact element design and the placement of its crosslink antennas are not public. Diameter estimated at 1.36 m.',
-    callout: true, anchor: [PANEL_R * 0.72, -PANEL_R * 0.72, PANEL_Z],
-  }, mesh(panel, G.whitePaint()));
-
-  const bfn = [cylG([0, 0, DECK + 0.03], 0.46, 0.03, 'z', 48)];
-  const inner = [0, 1, 2, 3].map((k) => (k / 4) * Math.PI * 2 + Math.PI / 4);
-  const outer = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => (k / 8) * Math.PI * 2 + Math.PI / 8);
-  for (const a of inner) bfn.push(pipeG([[Math.cos(a) * 0.12, Math.sin(a) * 0.12, DECK + 0.05], [Math.cos(a) * 0.22, Math.sin(a) * 0.22, DECK + 0.05], [Math.cos(a) * 0.22, Math.sin(a) * 0.22, PANEL_Z - 0.03]], 0.008));
-  for (const a of outer) bfn.push(pipeG([[Math.cos(a) * 0.4, Math.sin(a) * 0.4, DECK + 0.05], [Math.cos(a) * 0.52, Math.sin(a) * 0.52, DECK + 0.05], [Math.cos(a) * 0.52, Math.sin(a) * 0.52, PANEL_Z - 0.03]], 0.008));
-  bfn.push(pipeG([[0.3, 0.6, IZ - 0.02], [0.3, 0.6, DECK + 0.02], [0.2, 0.4, DECK + 0.03]], 0.012));
-  P('Beam-forming network', {
-    system: 'Payload', material: 'Coaxial power dividers and phase-trimmed cables', mass: 16, temp: 270, explode: [0, 0, 1.95],
-    desc: 'Splits each transmitter\'s output twelve ways and sets the phase between the inner and outer rings, shaping the beam so a receiver at the Earth\'s edge — about 5,600 km farther away than one directly below, roughly 2 dB more path loss — still gets nearly the same signal strength.',
-  }, [mesh(merge(bfn), G.connector())]);
-
-  // ------------------------------------------------------------------ twelve L-band helices
-  const helix = (name, x, y, h, ex, ring) => {
-    const z0 = PANEL_Z;
-    const metal = merge([cylG([x, y, z0 + 0.015], 0.074, 0.03, 'z', 24), cylG([x, y, z0 + 0.03 + (h - 0.07) / 2], 0.009, h - 0.07, 'z', 8)]);
-    return P(name, {
-      system: 'Payload', material: 'Copper helix on a dielectric support inside a fibreglass radome', mass: 2, temp: 240, explode: ex,
-      desc: ring === 'inner'
-        ? 'One of four inner-ring helical elements. An axial-mode helix about one wavelength round (19 cm at L1) radiates right-hand circularly polarised waves. Each element radiates L1, L2 and L5 together; how the bands are combined at the element is not public (element dimensions estimated).'
-        : 'One of eight outer-ring helices. Fed with a phase offset from the inner ring, the outer ring pushes power out toward the limb so the beam covers the whole Earth disc, 13.9° either side of nadir (element dimensions estimated).',
-    }, [mesh(metal, G.aluminium()), mesh(radomeG(x, y, 0.062, h, z0 + 0.03), G.radome()), mesh(helixG(x, y, 0.042, z0 + 0.04, z0 + h - 0.02, Math.round((h - 0.06) / 0.048)), G.helixWire())]);
+  const yP = (d) => IY - d / 2;          // centre of a unit of depth d on the +Y radiator
+  const yB = (d) => -(IY - d / 2);       // ... on the −Y radiator
+  const box = (name, info, c, s, mat, opts) => {
+    HARNESS.push(connPoint(c, s, opts.conn, 0.04));
+    return P(name, info, unit(c, s, mat, opts));
   };
-  inner.forEach((a, k) => helix(`L-band helix, inner ${k + 1}`, Math.cos(a) * 0.22, Math.sin(a) * 0.22, 0.34, [Math.cos(a) * 0.15, Math.sin(a) * 0.15, 2.3], 'inner'));
-  outer.forEach((a, k) => helix(`L-band helix, outer ${k + 1}`, Math.cos(a) * 0.52, Math.sin(a) * 0.52, 0.44, [Math.cos(a) * 0.35, Math.sin(a) * 0.35, 2.25], 'outer'));
 
-  // ------------------------------------------------------------------ payload electronics on the +Y radiator (inner face y = IY)
-  const at = (d) => IY - d / 2;
-  P('Mission Data Unit', {
+  // ------------------------------------------------------------------ Mission Data Unit and transmitters (+Y radiator, x > 0)
+  box('Mission Data Unit', {
     system: 'Payload', material: 'Aluminium chassis, radiation-hardened processors', mass: 52, temp: 300, explode: [0, 1.2, 0],
-    desc: 'L3Harris\'s signal generator, the heart of the navigation payload: a largely (about 70 %) digital unit that builds every ranging code and navigation message from the clock reference. It enables accuracy about three times better than earlier GPS satellites.',
-    callout: true, anchor: [0.36, at(0.2) - 0.1, 0.94],
-  }, unit([0.36, at(0.2), 0.78], [0.46, 0.2, 0.32], G.alodine(), { mount: '+y', conn: '-y', n: 6, fins: 6 }));
+    desc: 'L3Harris\'s payload computer and waveform generator, the heart of the navigation payload: a largely (about 70 %) digital unit that builds every ranging code and navigation message from the clock reference. GPS III is required to hold a 1.0 m user range error at 24 hours, three times better than Block IIR.',
+  }, [0.40, yP(0.22), 1.13], [0.46, 0.22, 0.34], G.alodine(), { mount: '+y', conn: '-x', n: 6, fins: 6 });
+  const TX = { s: [0.44, 0.2, 0.24] };
+  const tx = (name, z, desc, s = TX.s) => box(name, {
+    system: 'Payload', material: 'High-power L-band amplifier, aluminium heat-sink chassis', mass: s === TX.s ? 30 : 18, temp: 305, explode: [0, 1.2, 0], desc,
+  }, [0.40, yP(s[1]), z], s, G.blackBox(), { mount: '+y', conn: '-y', n: 3 });
+  tx('L1 transmitter', 0.78, 'Amplifies the 1575.42 MHz carrier (154 × 10.23 MHz) holding the civil C/A and L1C signals and the military P(Y) and M-code. Higher transmitted power is one reason GPS III gives military users up to eight times the anti-jam margin of earlier satellites (amplifier type and mass estimated).');
+  tx('L2 transmitter', 0.48, 'Amplifies 1227.60 MHz (120 × 10.23 MHz): the civil L2C signal plus P(Y) and M-code. Two frequencies let a receiver measure and remove the ionosphere\'s delay, which scales with 1/f².');
+  tx('L5 transmitter', 0.18, 'Amplifies 1176.45 MHz (115 × 10.23 MHz), the civil safety-of-life signal in a protected aeronautical band, with a 10.23 Mchip/s code ten times faster than C/A for sharper ranging.');
+  tx('L3 transmitter', -0.11, 'Carries the nuclear-detonation detection system\'s data down to the ground on 1381.05 MHz (135 × 10.23 MHz). It is not a navigation signal (size and mass estimated).', [0.38, 0.18, 0.2]);
 
+  // output multiplexer under the Earth deck (inner face z = IZ)
+  const omux = [boxG([0.45, 0.74, IZ - 0.012], [0.4, 0.22, 0.024])];
+  for (let i = 0; i < 6; i++) omux.push(cylG([0.31 + (i % 3) * 0.14, 0.69 + Math.floor(i / 3) * 0.1, IZ - 0.024 - 0.065], 0.034, 0.13, 'z', 16));
+  P('L-band output multiplexer', {
+    system: 'Payload', material: 'Silver-plated invar filter cavities', mass: 20, temp: 300, explode: [0, 0.6, 1.0],
+    desc: 'The payload\'s signal filters: they keep each transmitter inside its allocated band and combine L1, L2, L3 and L5 onto the antenna feed. Invar is used because it barely expands with temperature, so the cavities stay tuned.',
+  }, mesh(merge(omux), G.silverBox()));
+  // RF cables: transmitter fronts → up the radiator → multiplexer → through the deck → beam-forming network
+  const rf = [];
+  [0.78, 0.48, 0.18, -0.11].forEach((z, i) => {
+    const x = 0.3 + i * 0.05, y0 = IY - 0.2 - 0.03, y1 = IY - 0.25 - i * 0.012;
+    rf.push(pipeG([[x, y0, z], [x, y1, z], [x, y1, 1.33], [0.31 + (i % 3) * 0.14, 0.86, 1.33], [0.31 + (i % 3) * 0.14, 0.8, 1.29]], 0.008));
+  });
+  rf.push(pipeG([[0.45, 0.74, IZ], [0.45, 0.74, DECK + 0.03], [0.17, 0.17, DECK + 0.03]], 0.011));
+  P('L-band RF cables', {
+    system: 'Payload', material: 'Low-loss semi-rigid coaxial cable', mass: 5, temp: 295, explode: [0, 0.9, 0.5],
+    desc: 'Coaxial lines from each transmitter to the output multiplexer, and from the multiplexer through the Earth deck to the antenna\'s beam-forming network. Every tenth of a decibel lost here is transmitter power wasted as heat (routing estimated).',
+  }, mesh(merge(rf), G.tubing()));
+
+  // ------------------------------------------------------------------ clocks (+Y radiator, x < 0)
   P('Clock baseplate', {
-    system: 'Thermal control', material: 'Aluminium plate with heaters and thermostats', mass: 7, temp: 293, explode: [0, 1.25, 0],
-    desc: 'A temperature-controlled mounting plate for the three clocks. A rubidium standard\'s frequency shifts slightly with temperature, so the plate holds them to a fraction of a degree as the satellite swings between sunlight and eclipse.',
-  }, mesh(boxG([-0.42, IY - 0.01, 0.78], [0.62, 0.02, 0.42]), G.silverBox()));
-  [-0.62, -0.42, -0.22].forEach((x, k) => {
-    const pkg = unit([x, IY - 0.02 - 0.075, 0.78], [0.15, 0.15, 0.3], G.silverBox(), { mount: '+y', conn: '-z', n: 2 });
-    pkg.push(mesh(cylG([x, IY - 0.02 - 0.075 - 0.075 - 0.035, 0.84], 0.045, 0.07, 'y', 20), G.alodine()));
+    system: 'Thermal control', material: 'Aluminium plate with heaters and thermostats', mass: 8, temp: 293, explode: [0, 1.25, 0],
+    desc: 'A temperature-controlled mounting plate with four clock positions. A rubidium standard\'s frequency shifts slightly with temperature, so the plate holds the clocks to a fraction of a degree as the satellite swings between sunlight and eclipse.',
+  }, mesh(boxG([-0.455, IY - 0.01, 1.1], [0.7, 0.02, 0.48]), G.silverBox()));
+  const CLK_X = [-0.72, -0.555, -0.39];
+  CLK_X.forEach((x, k) => {
+    const c = [x, IY - 0.02 - 0.075, 1.1], s = [0.15, 0.15, 0.3];
+    const pkg = unit(c, s, G.silverBox(), { mount: '+y', conn: '-z', n: 2 });
+    pkg.push(mesh(cylG([x, c[1] - 0.075 - 0.03, 1.16], 0.045, 0.06, 'y', 20), G.alodine()));
+    HARNESS.push(connPoint(c, s, '-z', 0.04));
     P(`Rubidium atomic clock ${k + 1}`, {
       system: 'Payload', material: 'Rubidium lamp, absorption cell and quartz oscillator (Excelitas RAFS)', mass: 8, temp: 293, explode: [0, 1.15, 0],
       desc: k === 0
-        ? 'Rubidium atomic frequency standard. It locks a quartz oscillator to the 6.834 682 6 GHz hyperfine transition of rubidium-87 and drifts only a few parts in 10¹⁴ over a day — a few nanoseconds. One clock runs the payload; the other two are spares.'
+        ? 'Rubidium atomic frequency standard. It locks a quartz oscillator to the 6.834 682 6 GHz hyperfine transition of rubidium-87 and drifts only a few parts in 10¹⁴ over a day, a few nanoseconds. One clock runs the payload; GPS III can also run a second one and monitor its stability in orbit.'
         : 'One of the three rubidium atomic frequency standards. A one-nanosecond clock error is a 30 cm range error, so the spares are kept ready to take over (mass estimated).',
-      callout: k === 0, anchor: [x, IY - 0.17, 0.95],
     }, pkg);
   });
-  P('Frequency synthesiser', {
+  const slot = [boxG([-0.225, IY - 0.026, 1.1], [0.15, 0.012, 0.3])];
+  for (const dx of [-0.055, 0.055]) for (const dz of [-0.12, 0.12]) slot.push(cylG([-0.225 + dx, IY - 0.035, 1.1 + dz], 0.008, 0.012, 'y', 8));
+  P('Fourth clock slot', {
+    system: 'Payload', material: 'Mounting pad with inserts, harness connector', mass: 1, temp: 293, explode: [0, 1.15, 0],
+    desc: 'GPS III was designed with a fourth clock position for a new or experimental frequency standard, such as a hydrogen maser, so future clocks can be tried in orbit without redesigning the payload (shown empty).',
+  }, mesh(merge(slot), G.connector()));
+  box('Frequency synthesiser & distribution unit', {
     system: 'Payload', material: 'Aluminium chassis, phase-locked synthesisers', mass: 12, temp: 298, explode: [0, 1.2, 0],
-    desc: 'Turns the active clock\'s output into the 10.23 MHz reference that every GPS code and carrier is a multiple of: L1 = 154 × 10.23 MHz, L2 = 120 ×, L5 = 115 ×.',
-  }, unit([-0.42, at(0.15), 0.38], [0.44, 0.15, 0.16], G.alodine(), { mount: '+y', conn: '-z', n: 4 }));
-  const tx = (name, x, z, desc) => P(name, {
-    system: 'Payload', material: 'High-power L-band amplifier, aluminium heat-sink chassis', mass: 30, temp: 305, explode: [0, 1.2, 0], desc,
-  }, unit([x, at(0.2), z], [0.44, 0.2, 0.24], G.blackBox(), { mount: '+y', conn: '+z', n: 3, fins: 8 }));
-  tx('L1 transmitter', 0.36, 0.36, 'Amplifies the 1575.42 MHz carrier holding the civil C/A and L1C signals and the military P(Y) and M-code. GPS III raises the transmitted power, which with M-code improves anti-jam capability up to eightfold (amplifier type and mass estimated).');
-  tx('L2 transmitter', 0.36, 0.06, 'Amplifies 1227.60 MHz: the civil L2C signal plus P(Y) and M-code. Two frequencies let a receiver measure and remove the ionosphere\'s delay, which scales with 1/f².');
-  tx('L5 transmitter', -0.42, 0.06, 'Amplifies 1176.45 MHz, the civil safety-of-life signal in a protected aeronautical band, with a 10.23 Mchip/s code ten times faster than C/A for sharper ranging.');
-
-  // output multiplexer under the Earth deck (inner face z = IZ)
-  const omux = [boxG([0.35, 0.75, IZ - 0.012], [0.38, 0.2, 0.024])];
-  for (let i = 0; i < 6; i++) omux.push(cylG([0.21 + (i % 3) * 0.14, 0.7 + Math.floor(i / 3) * 0.1, IZ - 0.024 - 0.065], 0.034, 0.13, 'z', 16));
-  P('L-band output multiplexer', {
-    system: 'Payload', material: 'Silver-plated invar filter cavities', mass: 20, temp: 300, explode: [0, 0.6, 1.0],
-    desc: 'Filters and combines the L1, L2 and L5 transmitter outputs (and the L3 detection-system link at 1381.05 MHz) onto the single antenna feed, keeping each signal inside its allocated band.',
-  }, [mesh(merge(omux), G.silverBox())]);
+    desc: 'Turns the active clock\'s output into the 10.23 MHz reference that every GPS code and carrier is a multiple of, and distributes it to the Mission Data Unit. A unit of this kind flew on Block IIR; its GPS III form is not described publicly.',
+  }, [-0.42, yP(0.15), 0.7], [0.44, 0.15, 0.18], G.alodine(), { mount: '+y', conn: '-y', n: 4 });
 
   // ------------------------------------------------------------------ nuclear detonation detection system (hosted)
-  const nds = [boxG([-0.46, 0.8, DECK + 0.06], [0.24, 0.15, 0.12])];
-  const ndsLens = [cylG([-0.52, 0.8, DECK + 0.125], 0.03, 0.012, 'z', 18), cylG([-0.4, 0.8, DECK + 0.125], 0.022, 0.012, 'z', 18), cylG([-0.4, 0.84, DECK + 0.125], 0.012, 0.012, 'z', 12)];
-  P('NDS sensor package', {
-    system: 'Payload', material: 'Optical, X-ray and EMP sensor heads (generic)', mass: 40, temp: 260, explode: [0, 0, 1.9],
-    desc: 'Hosted sensors of the US Nuclear Detonation Detection System, flown on GPS since the early 1980s: optical (bhangmeter), X-ray and EMP sensors watch for the signatures of a nuclear explosion anywhere on Earth, supporting test-ban treaty monitoring. Their real layout is not public, so this is a generic stand-in.',
-  }, [mesh(merge(nds), G.alodine()), mesh(merge(ndsLens), G.lens())]);
-  P('NDS processor', {
-    system: 'Payload', material: 'Aluminium chassis', mass: 22, temp: 298, explode: [0, 1.2, 0],
-    desc: 'Processes the detection sensors\' data and sends reports to the ground on the L3 signal at 1381.05 MHz (135 × 10.23 MHz) and between satellites over the UHF crosslinks. Generic box; size and position estimated.',
-  }, unit([-0.42, at(0.15), -0.24], [0.36, 0.15, 0.2], G.alodine(), { mount: '+y', conn: '-z', n: 3 }));
+  box('NDS processor', {
+    system: 'Payload', material: 'Aluminium chassis (generic)', mass: 22, temp: 298, explode: [0, 1.2, 0],
+    desc: 'Processes the detection sensors\' data and reports to the ground on the L3 link and between satellites over the UHF crosslinks. Generic box; size and position estimated.',
+  }, [-0.42, yP(0.16), 0.42], [0.36, 0.16, 0.22], G.alodine(), { mount: '+y', conn: '-y', n: 3 });
+  const opt = [boxG([-0.62, 1.02, DECK + 0.05], [0.24, 0.16, 0.1]), boxG([-0.62, 1.02, DECK + 0.004], [0.28, 0.2, 0.008])];
+  const optL = [cylG([-0.69, 1.02, DECK + 0.106], 0.032, 0.012, 'z', 18), cylG([-0.57, 1.0, DECK + 0.106], 0.024, 0.012, 'z', 18), cylG([-0.57, 1.06, DECK + 0.106], 0.014, 0.012, 'z', 12)];
+  P('NDS optical sensors', {
+    system: 'Payload', material: 'Silicon photodiode radiometers ("bhangmeters") behind filters (generic)', mass: 16, temp: 260, explode: [0, 0, 1.9],
+    desc: 'GPS satellites have carried bhangmeters since 1980: fast optical sensors that see the double flash a nuclear explosion makes in the atmosphere, supporting test-ban treaty monitoring. Their real layout is not public, so this is a generic stand-in.',
+  }, [mesh(merge(opt), G.alodine()), mesh(merge(optL), G.lens())]);
+  P('NDS X-ray & dosimeter sensor', {
+    system: 'Payload', material: 'Detector head with beryllium window (generic)', mass: 8, temp: 255, explode: [0, 0, 1.9],
+    desc: 'X-ray and charged-particle sensors of the hosted detection payload. On earlier GPS blocks a combined X-ray and dosimeter instrument also mapped the radiation belts; Los Alamos released 16 years of its particle data in 2017 (generic stand-in, position estimated).',
+  }, [mesh(merge([boxG([-0.36, 0.93, DECK + 0.04], [0.12, 0.12, 0.08])]), G.alodine()), mesh(cylG([-0.36, 0.93, DECK + 0.084], 0.035, 0.008, 'z', 16), G.prism())]);
 
-  // ------------------------------------------------------------------ laser retroreflector array (SV09 onward)
-  const lraC = [-0.66, -0.74];
-  const plate = [boxG([lraC[0], lraC[1], DECK + 0.02], [0.34, 0.26, 0.04])];
-  const cubes = [];
-  for (let i = 0; i < 8; i++) for (let j = 0; j < 6; j++) {
-    cubes.push(cylG([lraC[0] - 0.14 + i * 0.04, lraC[1] - 0.1 + j * 0.04, DECK + 0.038], 0.0185, 0.006, 'z', 12));
+  // ------------------------------------------------------------------ laser retroreflector array (SV09 and SV10)
+  const plate = mesh(plateG(octagon(LRA_C[0], LRA_C[1], 0.406), 0.04, DECK), G.aluminium());
+  const pts = [];
+  const pitch = 0.046;
+  for (let i = -6; i <= 6; i++) for (let j = -6; j <= 6; j++) {
+    const x = (i + (j % 2 ? 0.5 : 0)) * pitch, y = j * pitch * 0.866;
+    pts.push([x, y, Math.hypot(x, y)]);
   }
+  pts.sort((a, b) => a[2] - b[2]);
+  const cubes = pts.slice(0, 48).map(([x, y]) => cylG([LRA_C[0] + x, LRA_C[1] + y, DECK + 0.034], 0.0203, 0.006, 'z', 12));
   P('Laser retroreflector array', {
-    system: 'Payload', material: '48 fused-silica corner cubes in an aluminium plate', mass: 10, count: 48, temp: 250, explode: [-0.2, -0.2, 1.9],
-    desc: 'NASA / Naval Research Laboratory array of 48 recessed corner cubes, each 4.09 cm across, that return ground-station laser pulses straight back so the satellite\'s range is measured to millimetres — an independent check on the orbit in the navigation message. First flown on GPS III SV09 (launched January 2026); SV01–SV08 do not carry it.',
-    callout: true, anchor: [lraC[0], lraC[1], DECK + 0.05],
-  }, [mesh(merge(plate), G.aluminium()), mesh(merge(cubes), G.prism())]);
+    system: 'Payload', material: '48 fused-silica corner cubes in an aluminium plate', mass: 10, count: 48, temp: 250, explode: [0, 0.2, 1.9],
+    desc: 'NASA array of 48 corner cubes, each 1.6 in (4.1 cm) across, in a 16-in planar plate. They return ground-station laser pulses straight back, so the satellite\'s range is measured to millimetres, an independent check on the orbit in the navigation message. SV09 (launched January 2026) and SV10 are the first GPS III satellites to carry one; two Block IIA satellites carried arrays in the 1990s.',
+    callout: true, anchor: [LRA_C[0] + 0.2, LRA_C[1], DECK + 0.04],
+  }, [plate, mesh(merge(cubes), G.prism())]);
 
-  // ------------------------------------------------------------------ UHF crosslink
-  const uhfC = [0.66, 0.7], uhfH = 0.55, uhfR = 0.13;
-  const uhfBase = merge([cylG([uhfC[0], uhfC[1], DECK + 0.02], uhfR + 0.02, 0.04, 'z', 32)]);
-  const qha = [];
-  for (let k = 0; k < 4; k++) qha.push(helixG(uhfC[0], uhfC[1], uhfR - 0.02, DECK + 0.05, DECK + uhfH - 0.02, 0.75, 0.005, (k * Math.PI) / 2));
-  P('UHF crosslink antenna', {
-    system: 'Communications', material: 'Quadrifilar helix in a fibreglass radome', mass: 9, temp: 245, explode: [0.25, 0.25, 1.9],
-    desc: 'GPS satellites talk to each other over UHF crosslinks, relaying data and measuring the ranges between satellites. Modelled as a quadrifilar helix; its real size and position are estimates.',
-    callout: true, anchor: [uhfC[0], uhfC[1], DECK + uhfH],
-  }, [mesh(uhfBase, G.aluminium()), mesh(radomeG(uhfC[0], uhfC[1], uhfR, uhfH - 0.04, DECK + 0.04, 36), G.radome()), mesh(merge(qha), G.helixWire())]);
-  P('UHF crosslink transceiver', {
-    system: 'Communications', material: 'Aluminium chassis', mass: 14, temp: 300, explode: [0.6, 0.6, 1.0],
-    desc: 'Transmits and receives on the crosslinks. Inter-satellite ranges let the constellation keep its orbit and clock estimates current even if ground uploads stop for a while.',
-  }, unit([0.7, 0.45, IZ - 0.075], [0.22, 0.18, 0.15], G.alodine(), { mount: '+z', conn: '-x', n: 3 }));
-
-  // ------------------------------------------------------------------ S-band telemetry, tracking and command
-  const sAnt = (name, x, y, z0, dir, ex, desc) => {
-    const s = Math.sign(dir);
-    const metal = merge([cylG([x, y, z0 + s * 0.025], 0.05, 0.05, 'z', 20), cylG([x, y, z0 + s * 0.06], 0.012, 0.03, 'z', 8)]);
-    const cone = cylG([x, y, z0 + s * 0.13], s > 0 ? 0.075 : 0.02, 0.12, 'z', 24, s > 0 ? 0.02 : 0.075);
-    return P(name, { system: 'Communications', material: 'Conical-spiral element in a radome', mass: 1.5, temp: 240, explode: ex, desc }, [mesh(metal, G.aluminium()), mesh(cone, G.radome())]);
-  };
-  sAnt('S-band antenna (Earth side)', 0.76, -0.62, DECK, 1, [0.2, -0.2, 1.9], 'Telemetry, tracking and command antenna facing the Earth. Ground antennas of the Space Force control segment send commands and navigation uploads on S-band (Space-Ground Link System, uplink ≈ 1,783.74 MHz).');
-  sAnt('S-band antenna (aft)', 0.74, 0.02, -HZ - 0.012, -1, [0.3, 0, -1.9], 'The second TT&C antenna, on the anti-Earth side, so the satellite can be commanded in any attitude — essential while it tumbles or reorients for apogee burns (downlink ≈ 2,227.5 MHz).');
-  const xp = (name, z, ex) => P(name, {
+  // ------------------------------------------------------------------ network communications element
+  box('Crosslink transponder (ECTS)', {
+    system: 'Communications', material: 'Aluminium chassis', mass: 16, temp: 300, explode: [0, 1.2, 0],
+    desc: 'The enhanced crosslink transponder subsystem transmits and receives on the UHF crosslinks. Inter-satellite ranges and relayed data keep the constellation\'s orbit and clock estimates current even if ground uploads stop for a while.',
+  }, [-0.42, yP(0.18), 0.1], [0.4, 0.18, 0.24], G.alodine(), { mount: '+y', conn: '+z', n: 3 });
+  box('Thin communications unit', {
+    system: 'Communications', material: 'Aluminium chassis', mass: 7, temp: 298, explode: [0, 1.2, 0],
+    desc: 'The TCU distributes commands to the payload units and collects their telemetry, part of the network communications element alongside the crosslink and S-band boxes.',
+  }, [-0.42, yP(0.12), -0.2], [0.3, 0.12, 0.16], G.alodine(), { mount: '+y', conn: '-y', n: 3 });
+  const udu = (name, z, ex) => box(name, {
     system: 'Communications', material: 'Aluminium chassis', mass: 8, temp: 298, explode: ex,
-    desc: 'One of a redundant pair of S-band transponders: it demodulates and decrypts ground commands, returns telemetry and turns the ranging tones around so the ground can measure the satellite\'s distance.',
-  }, unit([-0.4, -(IY - 0.065), z], [0.26, 0.13, 0.16], G.alodine(), { mount: '-y', conn: '+z', n: 3 }));
-  xp('S-band transponder (A)', -0.16, [0, -1.2, 0]);
-  xp('S-band transponder (B)', -0.38, [0, -1.2, 0]);
+    desc: 'One of a redundant pair of S-band uplink/downlink units (transponders): each demodulates and decrypts ground commands, returns telemetry and turns the ranging tones around so the ground can measure the satellite\'s distance.',
+  }, [-0.42, yB(0.13), z], [0.26, 0.13, 0.16], G.alodine(), { mount: '-y', conn: '+y', n: 3 });
+  udu('Uplink/downlink unit (A)', 0.14, [0, -1.2, 0]);
+  udu('Uplink/downlink unit (B)', -0.1, [0, -1.2, 0]);
+  const sc = [
+    pipeG([[-0.5, -(IY - 0.16), 0.14], [-0.5, -1.0, 0.14], [-0.6, -1.0, 1.33], [-0.62, -1.02, 1.36], [-0.62, -1.02, DECK + 0.02]], 0.007),
+    pipeG([[-0.5, -(IY - 0.16), -0.1], [-0.5, -1.0, -0.1], [-0.42, -1.0, -1.3], [-0.2, -0.75, -1.3], [0.2, -0.7, -1.3], [0.62, -0.45, -1.3], [0.76, -0.1, -1.3], [0.72, 0, -1.34], [0.72, 0, AFT - 0.01]], 0.007),
+  ];
+  P('S-band RF cables', {
+    system: 'Communications', material: 'Semi-rigid coaxial cable', mass: 2, temp: 290, explode: [0, -0.9, 0],
+    desc: 'Coaxial lines from the two uplink/downlink units to the Earth-side and aft S-band antennas, so either radio can reach the ground whichever way the satellite points (routing estimated).',
+  }, mesh(merge(sc), G.tubing()));
 }
-
-export { HX, HY, IX };
