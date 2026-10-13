@@ -19,7 +19,7 @@ import { setPaintTone } from './falcon/materials.js';
 const PIVOT = 30;                 // stack-frame height of the pitch pivot (≈ centre of mass)
 const FOLLOW_STACK = 35;          // camera tracks the middle of the stack…
 const FOLLOW_UPPER = 56;          // …then the second stage and payload after staging
-const PAD_TONE = 0.8;             // white finishes under the pad floodlights (see falcon/materials.js)
+const PAD_TONE = 0.74;            // white finishes under the pad floodlights (see falcon/materials.js)
 const FLOODS_OFF = 600;           // m: altitude at which the pad look's floodlights switch off
 const smooth = (x) => { const k = Math.min(1, Math.max(0, x)); return k * k * (3 - 2 * k); };
 

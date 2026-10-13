@@ -15,7 +15,7 @@ const once = (k, make) => { if (!cache.has(k)) cache.set(k, make()); return cach
 // White exterior finishes. The launch-pad look adds three floodlights to the dawn sky and sun, which
 // lift the lower white skins past the renderer's bloom threshold (diffuse HDR luminance ≈ 2.1
 // measured on the side boosters, threshold 1.9; with the floods off the peak is 1.8), so the vehicle
-// seemed to glow. While the floods are on, these finishes are toned to 80 % so the vehicle reads as
+// seemed to glow. While the floods are on, these finishes are toned to 74 % so the vehicle reads as
 // painted white; elsewhere they are at full albedo.
 const painted = new Set();
 const paint = (m) => { painted.add(m); m.userData.albedo = m.color.clone(); return m; };

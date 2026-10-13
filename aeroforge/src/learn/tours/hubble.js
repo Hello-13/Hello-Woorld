@@ -39,7 +39,7 @@ export default [
     title: 'The science instruments',
     body: 'Four instruments the size of telephone booths slide into axial bays behind the primary: STIS, NICMOS (dormant since 2008), ACS and COS. Wide Field Camera 3 fills the one radial bay, its curved white radiator forming part of the skin. Together they cover 115 nm in the far ultraviolet to 2.5 µm in the infrared. Each was designed to be pulled out and replaced by spacewalkers.',
     key: 'Four axial bays, one radial camera, three guidance sensors: all latched to the focal-plane structure.',
-    focus: ['Space Telescope Imaging Spectrograph', 'Near Infrared Camera and Multi-Object Spectrometer', 'Advanced Camera for Surveys', 'Cosmic Origins Spectrograph', 'Wide Field Camera 3', 'WFC3 UVIS channel', 'WFC3 IR channel', 'ACS Wide Field Channel', 'ACS Solar Blind Channel', 'STIS detectors', 'STIS mode select mechanism', 'NICMOS dewar', 'COS optics select mechanism', 'COS far-UV detector', 'Focal plane structure', 'WFC3 radiator'],
+    focus: ['Space Telescope Imaging Spectrograph', 'Near Infrared Camera and Multi-Object Spectrometer', 'Advanced Camera for Surveys', 'Cosmic Origins Spectrograph', 'Wide Field Camera 3', 'WFC3 UVIS channel', 'WFC3 IR channel', 'ACS Wide Field Channel', 'ACS Solar Blind Channel', 'STIS detectors', 'STIS mode select mechanism', 'NICMOS dewar', 'COS optics select mechanism', 'COS far-UV detector', 'Focal plane structure', 'WFC3 radiator', 'Pick-off mirrors'],
     mode: 'systems', explode: 0.6, view: { dir: [-0.85, 0.45, 0.7], fill: 1.0 },
   },
   {
