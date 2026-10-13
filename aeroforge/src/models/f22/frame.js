@@ -170,7 +170,8 @@ export function ringA(s) {
     nat.push([z, lowerAnative(s, z)]);
     if (j === 0) box.push([jz, jy]);
     else if (j <= 3) box.push([w, lerp(jy, -D, j / 3)]);
-    else { const f = (j - 3) / (NL - 3); box.push([w - (w - 0) * f, -D]); }
+    else if (j <= outerN) { const f = (j - 3) / (outerN - 3); box.push([w - (w - wellZ) * f, -D]); }
+    else box.push([z, -D]);
   }
   nat[0] = [w, yc];
   const b = bL(s);
@@ -229,8 +230,7 @@ function cowlPoint(e, f, tau) {
   const inner = (s, top) => {
     const [jz, jy] = aJunction(s);
     const g = gap(s);
-    if (top) return [jz + g, jy];
-    return [jz + g, bottomAt(s, jz)];
+    return top ? [jz + g, jy] : [jz + g, bottomAt(s, jz)];
   };
   const outerTop = (s) => {
     const t = clamp((s - LIP.OT[2]) / (S_AB - LIP.OT[2]), 0, 1);
@@ -241,30 +241,31 @@ function cowlPoint(e, f, tau) {
     return [lerp(LIP.OB[0], bWb(S_AB), t), lerp(LIP.OB[1], -bD(S_AB), t)];
   };
   if (e === 'top') {
-    const s = sAt(lerp(LIP.IT[2], LIP.OT[2], f));
-    const a = inner(s, true), b = outerTop(s);
+    const sa = sAt(LIP.IT[2]), sb = sAt(LIP.OT[2]);
+    const a = inner(sa, true), b = outerTop(sb);
     const z = lerp(a[0], b[0], f);
     const flat = lerp(a[1], b[1], f) + 0.035 * Math.sin(Math.PI * f) * (1 - tau);
-    const glove = s >= S_AB - 1e-6 ? upperB(S_AB, z) : flat;
-    return [z, lerp(flat, glove, smooth(0.35, 1, tau)), s];
+    // the shelf over the inlet sweeps up into the wing glove toward S_AB
+    const glove = upperB(S_AB, z) + (a[1] - upperB(S_AB, a[0])) * (1 - f) + (b[1] - upperB(S_AB, b[0])) * f;
+    return [z, lerp(flat, glove, smooth(0.3, 1, tau)), lerp(sa, sb, f)];
   }
   if (e === 'outer') {
-    const s = sAt(lerp(LIP.OT[2], LIP.OB[2], f));
-    const a = outerTop(s), b = outerBot(s);
-    const lip = [lerp(a[0], b[0], f), lerp(a[1], b[1], f)];
-    const wall = wallB(S_AB, f);
+    const sa = sAt(LIP.OT[2]), sb = sAt(LIP.OB[2]);
+    const a = outerTop(sa), b = outerBot(sb);
     const k = smooth(0.2, 1, tau);
-    return [lerp(lip[0], wall[0], k) + 0.02 * Math.sin(Math.PI * f) * (1 - k), lerp(lip[1], wall[1], k), s];
+    const wall = wallB(S_AB, f);
+    const lip = [lerp(a[0], b[0], f) + 0.02 * Math.sin(Math.PI * f), lerp(a[1], b[1], f)];
+    return [lerp(lip[0], wall[0], k), lerp(lip[1], wall[1], k), lerp(sa, sb, f)];
   }
   if (e === 'bottom') {
-    const s = sAt(lerp(LIP.OB[2], LIP.IB[2], f));
-    const a = outerBot(s), b = inner(s, false);
-    return [lerp(a[0], b[0], f), lerp(a[1], b[1], f), s];
+    const sa = sAt(LIP.OB[2]), sb = sAt(LIP.IB[2]);
+    const a = outerBot(sa), b = inner(sb, false);
+    return [lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(sa, sb, f)];
   }
   // inner wall (diverter side), bottom → top
-  const s = sAt(lerp(LIP.IB[2], LIP.IT[2], f));
-  const a = inner(s, false), b = inner(s, true);
-  return [lerp(a[0], b[0], f), lerp(a[1], b[1], f), s];
+  const sa = sAt(LIP.IB[2]), sb = sAt(LIP.IT[2]);
+  const a = inner(sa, false), b = inner(sb, true);
+  return [lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(sa, sb, f)];
 }
 /** Closed cowl ring (right side) at fraction tau; corners duplicated so the lips stay sharp. */
 export function cowlRing(tau) {
@@ -285,13 +286,12 @@ export const FAN_S = 13.38;                      // F119 fan face
 export const ENG_Z = 0.78, ENG_Y = -0.02;        // engine centre line
 export const DUCT = [
   // [s, z, y, width, height, roundness 0 (lip shape) … 1 (circle)]
-  [6.75, 1.37, -0.45, 0.70, 0.80, 0.0],
-  [7.6, 1.34, -0.40, 0.72, 0.80, 0.1],
-  [8.4, 1.31, -0.33, 0.70, 0.80, 0.2],
-  [9.4, 1.25, -0.20, 0.72, 0.80, 0.35],
-  [10.4, 1.17, -0.08, 0.76, 0.80, 0.5],
-  [11.4, 1.05, 0.02, 0.82, 0.84, 0.68],
-  [12.4, 0.90, 0.02, 0.92, 0.92, 0.88],
+  [7.6, 1.36, -0.30, 0.66, 0.76, 0.12],
+  [8.4, 1.33, -0.13, 0.62, 0.72, 0.25],
+  [9.4, 1.26, -0.04, 0.66, 0.72, 0.38],
+  [10.4, 1.17, 0.01, 0.72, 0.74, 0.52],
+  [11.4, 1.05, 0.04, 0.82, 0.80, 0.70],
+  [12.4, 0.90, 0.03, 0.92, 0.90, 0.88],
   [FAN_S, ENG_Z, ENG_Y, 0.98, 0.98, 1.0],
 ];
 

@@ -210,6 +210,7 @@ export function sector(r0, r1, y0, y1, p0, p1, seg = 12) {
 
 /** Merge geometries after making them all non-indexed (mixed sources). */
 export function merge(list) {
+  if (!list.filter(Boolean).length) return new THREE.BufferGeometry();
   const geos = list.filter(Boolean).map((g) => (g.index ? g.toNonIndexed() : g));
   for (const g of geos) {
     if (!g.attributes.normal) g.computeVertexNormals();

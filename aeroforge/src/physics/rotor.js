@@ -25,7 +25,7 @@ export const UH60 = {
   // main rotor: 16.36 m diameter, 4 blades, 258 rpm (published). Chord: the wide-chord blade adds
   // about 10 % solidity to the 0.527 m UH-60A blade (NASA/Yeo), so ≈ 0.58 m (estimate).
   R: 8.18, blades: 4, chord: 0.58, rpm: 258,
-  Cd0: 0.0095,           // mean blade profile-drag coefficient (estimate)
+  Cd0: 0.0100,           // mean blade profile-drag coefficient (estimate)
   kappa: 1.12,           // induced-power factor: non-uniform inflow and tip losses (estimate)
   liftSlope: 5.73,       // blade-section lift-curve slope, per radian
   bladeMass: 120,        // kg per blade (estimate) for the rotor's stored energy
@@ -33,7 +33,7 @@ export const UH60 = {
   // tail rotor: 3.35 m diameter, 4 blades, canted 20° (published); 1,190 rpm and 0.247 m chord (GenHel data)
   tr: { R: 1.676, blades: 4, chord: 0.247, rpm: 1190, arm: 9.93, cant: 20, Cd0: 0.010, kappa: 1.2 },
   fin: { area: 3.0, cl: 0.2 },  // cambered pylon: side force that unloads the tail rotor at speed (estimate)
-  f: 2.7,                // equivalent flat-plate drag area, m², clean aircraft incl. rotor hub (estimate)
+  f: 3.6,                // equivalent flat-plate drag area, m²: fuselage ≈ 35 ft² plus hub, suppressors, antennas (estimate)
   download: 0.05,        // hover download on the fuselage as a fraction of weight (estimate)
   transEff: 0.975,       // gearbox efficiency (estimate)
   accessoriesKW: 45,     // generators, hydraulic pumps, oil-cooler blower (estimate)

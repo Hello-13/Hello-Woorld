@@ -100,6 +100,7 @@ export const G = {
   lens: () => once('lens', () => new THREE.MeshPhysicalMaterial({ color: 0x15181c, roughness: 0.12, metalness: 0.6, clearcoat: 1, clearcoatRoughness: 0.1 })),
   prism: () => once('prism', () => new THREE.MeshPhysicalMaterial({ color: 0xcfe3ef, roughness: 0.1, metalness: 0.9, clearcoat: 1, clearcoatRoughness: 0.1 })),
   aluminium: () => M.aluminium(),
+  titanium: () => M.titanium(),
   darkMetal: () => M.darkMetal(),
   gunmetal: () => M.gunmetal(),
 };

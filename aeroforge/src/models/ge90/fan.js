@@ -73,7 +73,7 @@ export function buildFan(ctx) {
   P('Fan disk', {
     system: 'Propulsion', material: 'Forged titanium alloy', mass: 420,
     explode: [0, 1.85, 0], temp: 300,
-    desc: 'Holds the 22 blade roots in dovetail slots and carries their centrifugal pull — about 90 tonnes-force per blade at take-off N1. Composite platforms between the roots form the smooth inner flow surface.',
+    desc: 'Holds the 22 blade roots in dovetail slots and carries their centrifugal pull — on the order of 100 tonnes-force per blade at take-off N1 (estimate). Composite platforms between the roots form the smooth inner flow surface.',
   }, disk);
 
   // ------------------------------------------------------------------ fan containment case

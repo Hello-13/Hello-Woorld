@@ -98,3 +98,52 @@ export function plate(w, h, t, p, n, up = [1, 0, 0]) {
 
 /** Non-indexed copy so geometries of mixed index state can be merged. */
 export const ni = (g) => (g.index ? g.toNonIndexed() : g);
+
+/**
+ * Curved skin patch on a cylinder of radius r around the x axis: x0..x1, azimuth φ0..φ1 (rad).
+ * Normals point outward; UVs run u along x (metres) and v around (metres).
+ */
+export function shellPatch(r, x0, x1, phi0, phi1, { nx = 2, nphi = 12 } = {}) {
+  const pos = [], uv = [], idx = [];
+  for (let i = 0; i <= nx; i++) {
+    const x = x0 + ((x1 - x0) * i) / nx;
+    for (let j = 0; j <= nphi; j++) {
+      const p = phi0 + ((phi1 - phi0) * j) / nphi;
+      pos.push(x, r * Math.cos(p), r * Math.sin(p));
+      uv.push(x - x0, (p - phi0) * r);
+    }
+  }
+  const row = nphi + 1;
+  for (let i = 0; i < nx; i++) for (let j = 0; j < nphi; j++) {
+    const a = i * row + j, b = a + 1, c = a + row, d = c + 1;
+    idx.push(a, b, c, b, d, c);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  // make sure the normals face away from the axis
+  const n = g.attributes.normal;
+  if (n.getY(0) * pos[1] + n.getZ(0) * pos[2] < 0) {
+    for (let i = 0; i < idx.length; i += 3) { const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t; }
+    g.setIndex(idx);
+    g.computeVertexNormals();
+  }
+  return g;
+}
+
+/** Edge frame (four rods) around a shellPatch, standing slightly proud of it. */
+export function patchFrame(r, x0, x1, phi0, phi1, rodR = 0.012, rodFn) {
+  const out = [];
+  const arc = (x) => {
+    const n = Math.max(2, Math.ceil(Math.abs(phi1 - phi0) / 0.12));
+    for (let j = 0; j < n; j++) {
+      const a = phi0 + ((phi1 - phi0) * j) / n, b = phi0 + ((phi1 - phi0) * (j + 1)) / n;
+      out.push(rodFn(az(a, r, x), az(b, r, x), rodR, 4));
+    }
+  };
+  arc(x0); arc(x1);
+  out.push(rodFn(az(phi0, r, x0), az(phi0, r, x1), rodR, 4), rodFn(az(phi1, r, x0), az(phi1, r, x1), rodR, 4));
+  return out;
+}
