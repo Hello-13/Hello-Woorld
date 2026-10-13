@@ -13,10 +13,10 @@ const cache = new Map();
 const once = (k, make) => { if (!cache.has(k)) cache.set(k, make()); return cache.get(k); };
 
 // White exterior finishes. The launch-pad look adds three floodlights to the dawn sky and sun, which
-// lift the lower white skins past the renderer's bloom threshold (HDR luminance ≈ 2.1 measured on
-// the side boosters, threshold 1.9), so the vehicle seemed to glow. While the floods are on, these
-// finishes are toned to 78 % so the vehicle reads as painted white (peaks ≈ 1.6); elsewhere they
-// are at full albedo.
+// lift the lower white skins past the renderer's bloom threshold (diffuse HDR luminance ≈ 2.1
+// measured on the side boosters, threshold 1.9; with the floods off the peak is 1.8), so the vehicle
+// seemed to glow. While the floods are on, these finishes are toned to 80 % so the vehicle reads as
+// painted white; elsewhere they are at full albedo.
 const painted = new Set();
 const paint = (m) => { painted.add(m); m.userData.albedo = m.color.clone(); return m; };
 /** Scale every white exterior finish (1 = full albedo). */
@@ -95,14 +95,18 @@ export function stagePaint(key, { seams = [], soot = 0, streaks = 0, word = null
   });
 }
 
-/** Painted aluminium-lithium tank skin with a stage paint map. */
+/**
+ * Painted aluminium-lithium tank skin with a stage paint map. The shared tank skin's weld and
+ * isogrid normal map gives the surface detail; its satin roughness map (0.3–0.46) is left out
+ * because it multiplies the material roughness down to ≈ 0.3, which turned the pad floodlights
+ * into hot specular spots (HDR ≈ 40) on the white paint. Falcon's paint is close to matte.
+ */
 export function tankMaterial(paintMap, lengthM) {
   const sk = tankSkin();
   const normalMap = sk.normalMap.clone(); normalMap.repeat.set(10, lengthM / 3.4); normalMap.wrapT = THREE.RepeatWrapping; normalMap.needsUpdate = true;
-  const roughnessMap = sk.roughnessMap.clone(); roughnessMap.repeat.set(4, lengthM / 6); roughnessMap.wrapT = THREE.RepeatWrapping; roughnessMap.needsUpdate = true;
   return paint(new THREE.MeshStandardMaterial({
-    color: 0xffffff, map: paintMap, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.5, 0.5),
-    roughness: 0.82, metalness: 0.02,
+    color: 0xffffff, map: paintMap, normalMap, normalScale: new THREE.Vector2(0.5, 0.5),
+    roughness: 0.68, metalness: 0.02,
   }));
 }
 

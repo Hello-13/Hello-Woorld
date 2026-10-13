@@ -135,10 +135,14 @@ export function buildHubble() {
       for (const [i, w] of ssm.wheels.entries()) w.rotation.y += dt * (2.2 + i * 0.35);
       const hd = smooth(0.5, 0.6, state.deploy);
       for (const h of app.hgas) h.g2.rotation.x = Math.sin(t * 0.07 + h.s) * 0.35 * hd;
-      // light path: always in the analysis views when the door is open, on request in Studio
-      const mode = globalThis.__aeroforge?.modes?.mode;
+      // light path: in the analysis views while the door is open (unless a tour step is focused on
+      // parts outside the optics), and on request in Studio
+      const modes = globalThis.__aeroforge?.modes;
+      const mode = modes?.mode;
       const analysis = mode ? OVERLAY.has(mode) : probe.material !== probe.userData.studio && !!probe.userData.studio;
-      ota.lightPath.visible = state.door > 0.6 && (state.lightPath || analysis);
+      let optics = true;
+      if (modes?.focus) { optics = false; for (const p of modes.focus) if (p.userData.part?.system === 'Optics') { optics = true; break; } }
+      ota.lightPath.visible = state.door > 0.6 && (state.lightPath || (analysis && optics));
     },
   };
 }

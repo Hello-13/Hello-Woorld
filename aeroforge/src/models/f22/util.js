@@ -205,9 +205,8 @@ export function sparWeb(secs, f, thick = 0.014, scale = 0.94, naca) {
   return g;
 }
 
-/** Twisted blade row around +x (a turbomachinery stage), merged. */
+/** Twisted blade row around +x (a turbomachinery stage), written straight into one buffer. */
 export function bladeRow({ x, y, z, count, rHub, rTip, chord, twist = 0.6, thick = 0.012, lean = 0 }) {
-  const geos = [];
   const base = new THREE.BoxGeometry(chord, rTip - rHub, thick, 1, 2, 1);
   // twist the blade along its span: rotate vertices about the radial axis by an angle ∝ radius
   const p = base.attributes.position;
@@ -217,16 +216,25 @@ export function bladeRow({ x, y, z, count, rHub, rTip, chord, twist = 0.6, thick
     const a = twist * (0.55 + 0.45 * t);
     p.setXYZ(k, vx * Math.cos(a) - vz * Math.sin(a), vy + (rHub + rTip) / 2, vx * Math.sin(a) + vz * Math.cos(a) + lean * t);
   }
-  const m = new THREE.Matrix4();
+  const flat = base.toNonIndexed();
+  flat.computeVertexNormals();                       // faceted normals, as on the merged row
+  const P = flat.attributes.position.array, N = flat.attributes.normal.array, UV = flat.attributes.uv.array;
+  const n = P.length;
+  const pos = new Float32Array(n * count), nor = new Float32Array(n * count), uv = new Float32Array(UV.length * count);
   for (let i = 0; i < count; i++) {
-    const g = base.clone();
-    m.makeRotationX((i / count) * Math.PI * 2);
-    g.applyMatrix4(m);
-    geos.push(g.toNonIndexed());
+    const a = (i / count) * Math.PI * 2, c = Math.cos(a), sn = Math.sin(a);
+    const o = i * n;
+    for (let k = 0; k < n; k += 3) {
+      const py = P[k + 1], pz = P[k + 2], ny = N[k + 1], nz = N[k + 2];
+      pos[o + k] = P[k] + x; pos[o + k + 1] = c * py - sn * pz + y; pos[o + k + 2] = sn * py + c * pz + z;
+      nor[o + k] = N[k]; nor[o + k + 1] = c * ny - sn * nz; nor[o + k + 2] = sn * ny + c * nz;
+    }
+    uv.set(UV, i * UV.length);
   }
-  const out = mergeGeometries(geos);
-  out.translate(x, y, z);
-  out.computeVertexNormals();
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   return out;
 }
 

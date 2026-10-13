@@ -19,7 +19,7 @@ import { setPaintTone } from './falcon/materials.js';
 const PIVOT = 30;                 // stack-frame height of the pitch pivot (≈ centre of mass)
 const FOLLOW_STACK = 35;          // camera tracks the middle of the stack…
 const FOLLOW_UPPER = 56;          // …then the second stage and payload after staging
-const PAD_TONE = 0.78;            // white finishes under the pad floodlights (see falcon/materials.js)
+const PAD_TONE = 0.8;             // white finishes under the pad floodlights (see falcon/materials.js)
 const FLOODS_OFF = 600;           // m: altitude at which the pad look's floodlights switch off
 const smooth = (x) => { const k = Math.min(1, Math.max(0, x)); return k * k * (3 - 2 * k); };
 
@@ -139,7 +139,7 @@ export function buildRocket() {
       ['Fairing', '13.1 m × 5.2 m'], ['Propellants', 'RP-1 / LOX'], ['Pad', 'LC-39A, Kennedy Space Center'],
     ],
     heroStats: [['63.8', 't', 'Payload to LEO'], ['22,819', 'kN', 'Liftoff thrust'], ['27', '', 'Merlin engines at liftoff']],
-    sources: 'SpaceX Falcon Heavy and Falcon 9 vehicle pages and Falcon User\'s Guide; NASA KSC LC-39 fact sheets (FSS, flame trench, lightning protection); NASA Commercial Crew blog (crew access arm); Spaceflight Now Falcon Heavy launch timelines; Wikipedia: Falcon Heavy, Falcon 9, SpaceX Merlin, AMOS-6 and CRS-7 investigations.',
+    sources: 'SpaceX Falcon Heavy and Falcon 9 vehicle pages and Falcon User\'s Guide; NASA KSC LC-39 fact sheets (FSS, flame trench, lightning protection); NASA Commercial Crew blog (crew access arm); Spaceflight Now Falcon Heavy launch timelines; Wikipedia: Falcon Heavy, Falcon 9, Falcon 9 Full Thrust (stage and tank loads after Espace & Exploration no. 39), SpaceX Merlin, AMOS-6 and CRS-7 investigations.',
     fleetTag: '63.8 t LEO',
     root: A.root,
     rigPivot, stack, ground,

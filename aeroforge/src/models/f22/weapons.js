@@ -130,12 +130,12 @@ export function buildWeapons(ctx) {
         bay.ejectors.push({ holder, y0: y, arms: arms.map((a) => ({ mesh: a, x: a.position.x })), top: body.position.y - 0.05, z: side * zz });
       }
       P(`AIM-120C AMRAAM ×3 (${R} main bay)`, {
-        system: 'Weapons', material: 'Steel / composite airframe, active radar seeker', mass: 152, massSource: 'USAF AIM-120 fact sheet (each)', count: 3,
+        system: 'Weapons', material: 'Steel / composite airframe, active radar seeker', mass: 456, massSource: 'USAF AIM-120 fact sheet: 152 kg (335 lb) each', count: 3,
         explode: [0, -1.05, 0.55 * side], callout: side > 0, anchor: [X(9.5), -0.55, side * 0.4],
         desc: 'Active-radar medium-range missiles, 3.65 m long and 17.8 cm in diameter (USAF fact sheet). The C model\'s clipped wings and fins were designed so that six fit in the F-22\'s main bay.',
       }, ms);
       P(`LAU-142/A AVEL launchers ×3 (${R})`, {
-        system: 'Weapons', material: 'Mostly aluminium, pneumatic / hydraulic ejector', mass: 50, count: 3,
+        system: 'Weapons', material: 'Mostly aluminium, pneumatic / hydraulic ejector', mass: 135, count: 3,
         explode: [0, -0.45, 0.35 * side],
         desc: 'AMRAAM Vertical Eject Launchers push each missile 9 in (23 cm) down and clear of the bay\'s turbulent airflow at over 25 ft/s (7.6 m/s) and up to 40 g, using aircraft hydraulics rather than explosive cartridges.',
       }, ls);
