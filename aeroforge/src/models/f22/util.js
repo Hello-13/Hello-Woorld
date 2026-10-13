@@ -239,3 +239,24 @@ export function latheX(profile, y, z, seg = 32) {
   g.translate(0, y, z);
   return g;
 }
+
+/** Mirror across the x–y plane (z → −z) for indexed or non-indexed geometry, keeping winding. */
+export function mirror(geometry) {
+  const g = geometry.clone();
+  g.scale(1, 1, -1);
+  if (g.index) {
+    const idx = g.index.array;
+    for (let i = 0; i < idx.length; i += 3) { const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t; }
+    g.index.needsUpdate = true;
+  } else {
+    for (const a of Object.values(g.attributes)) {
+      const n = a.itemSize, arr = a.array;
+      for (let v = 0; v < a.count; v += 3) {
+        for (let k = 0; k < n; k++) { const t = arr[(v + 1) * n + k]; arr[(v + 1) * n + k] = arr[(v + 2) * n + k]; arr[(v + 2) * n + k] = t; }
+      }
+      a.needsUpdate = true;
+    }
+  }
+  g.computeVertexNormals();
+  return g;
+}

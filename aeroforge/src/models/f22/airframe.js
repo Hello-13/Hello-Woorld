@@ -7,7 +7,7 @@ import { mesh } from '../../engine/assembly.js';
 import { wingPanel, wingPoint, mirrorZ, naca00 } from '../../engine/geometry.js';
 import { F } from './materials.js';
 import * as FR from './frame.js';
-import { merge, dedupe, frameBand, platePoly, slab, hinge, ribPlate, sparWeb } from './util.js';
+import { merge, dedupe, frameBand, platePoly, slab, hinge, ribPlate, sparWeb, mirror } from './util.js';
 
 const { X, P3, lerp, DEG } = FR;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -318,7 +318,7 @@ export function buildAirframe(ctx) {
       system: 'Structure', material: 'Titanium and resin-transfer-moulded composite spars, composite ribs', mass: 900,
       explode: [0, -0.2, 2.2 * side], callout: side > 0, anchor: [X(10.6), 0.1, 3.4 * side],
       desc: 'A multi-spar torque box that carries the wing\'s bending and twisting loads and doubles as an integral fuel tank. Boeing built the wings, using titanium spars and some of the first resin-transfer-moulded composite spars in production.',
-    }, mesh(side > 0 ? boxGeo : mirrorZ(boxGeo), F.composite()));
+    }, mesh(side > 0 ? boxGeo : mirror(boxGeo), F.composite()));
 
     // wing control actuators: LEF rotary actuators on a torque tube, flaperon and aileron actuators
     {
@@ -369,7 +369,7 @@ export function buildAirframe(ctx) {
     const spindle = new THREE.CylinderGeometry(0.075, 0.075, 1.15, 16).rotateX(Math.PI / 2).translate(X(FR.STAB.pivotS), FR.STAB.y, 1.68);
     g.push(spindle);
     const boxGeo = merge(g);
-    const hb = hinge(mesh(side > 0 ? boxGeo : mirrorZ(boxGeo), F.ti()), p0, p1, testTE, V(0, -1, 0));
+    const hb = hinge(mesh(side > 0 ? boxGeo : mirror(boxGeo), F.ti()), p0, p1, testTE, V(0, -1, 0));
     P(`Stabilator torque box & spindle (${R})`, {
       system: 'Structure', material: 'Titanium spindle and spars', mass: 110, explode: [-2.3, -0.2, 1.4 * side],
       desc: 'The whole stabilator turns on a single titanium spindle carried in bearings in the aft boom; spars and ribs inside spread the load into the composite skins.',

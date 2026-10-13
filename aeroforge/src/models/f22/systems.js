@@ -9,7 +9,7 @@ import { M } from '../../engine/materials.js';
 import { naca00, mirrorZ } from '../../engine/geometry.js';
 import { F } from './materials.js';
 import * as FR from './frame.js';
-import { merge, slab, hinge } from './util.js';
+import { merge, slab, hinge, mirror } from './util.js';
 
 const { X, mono, lerp } = FR;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -134,7 +134,7 @@ export function buildSystems(ctx) {
       system: 'Fuel', material: 'Integral (wet) wing box, sealed', mass: kg[3],
       explode: [0, 0.8, 2.55 * side],
       desc: `The wing box itself is the tank, between the front and rear spars. Modelled capacity ≈ ${kg[3].toLocaleString('en-US')} kg (estimate). Two 2,270 L drop tanks can be added for ferry flights, at the cost of stealth.`,
-    }, mesh(side > 0 ? tw.geo : mirrorZ(tw.geo), fuelMat)));
+    }, mesh(side > 0 ? tw.geo : mirror(tw.geo), fuelMat)));
   }
   {
     const g = [];
