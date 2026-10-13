@@ -93,7 +93,7 @@ export const G = {
    *  (a satin resin finish rather than a polished metal). */
   tank: () => once('tank', () => {
     const cw = carbonWeave();
-    return new THREE.MeshPhysicalMaterial({ color: 0x8a8f95, map: tile(cw.map, 6), roughness: 0.48, metalness: 0.25, clearcoat: 0.45, clearcoatRoughness: 0.35 });
+    return new THREE.MeshPhysicalMaterial({ color: 0x80858b, normalMap: tile(cw.normalMap, 6), normalScale: new THREE.Vector2(0.4, 0.4), roughness: 0.5, metalness: 0.3, clearcoat: 0.35, clearcoatRoughness: 0.4 });
   }),
   copv: () => once('copv', () => {
     const cw = carbonWeave();

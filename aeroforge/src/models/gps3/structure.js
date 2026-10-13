@@ -124,7 +124,6 @@ export function buildStructure(P) {
       desc: s > 0
         ? 'Yaw steering keeps this face edge-on to the Sun, so it is the payload\'s radiator: the clocks, Mission Data Unit and L-band transmitters bolt to its inside (layout estimated). The mirror tiles absorb only about 8 % of sunlight but emit about 80 % of the infrared of a black body.'
         : 'The bus radiator: batteries, power regulation unit, computer and S-band units mount on its inner face (layout estimated). Like its twin it never faces the Sun, and the solar-array drive passes through its centre.',
-      callout: s > 0, anchor: [-0.55, HY, -0.8],
     }, mesh(boxG([0, s * (HY - T / 2), 0], [2 * HX, T, 2 * HZ]), faces));
     rad.userData.part.thermalRole = 'radiator';
     const pipes = [];

@@ -56,7 +56,7 @@ export function buildAntennas(P) {
   P('L-band antenna panel', {
     system: 'Payload', material: 'White-painted aluminium honeycomb ground plane', mass: 40, temp: 245, explode: [0, 0, 2.05],
     desc: 'Ground plane of the navigation antennas. Its 12 Earth-coverage helices broadcast every civil and military signal to the whole visible Earth; four military Earth-coverage (M-code) elements sit at one end. Lockheed\'s patent drawing of the GPS III nadir deck shows this arrangement; panel size and element positions here are scaled from it (estimate).',
-    callout: true, anchor: [0.8, -0.2, PANEL_Z],
+    callout: true, anchor: [0, -1.2, PANEL_Z],
   }, mesh(plateG(OUTLINE, PANEL_T, PANEL_Z - PANEL_T), G.whitePaint()));
 
   const bfn = [cylG([0, 0, DECK + 0.03], 0.24, 0.03, 'z', 40)];
@@ -92,7 +92,7 @@ export function buildAntennas(P) {
     desc: inner
       ? 'One of the UHF crosslink elements interleaved with the L-band helices, as the GPS III patent drawing shows: satellites exchange data and measure the distances between each other over these links. The form of each element (here a quadrifilar helix) and its size are estimates.'
       : 'Outer-ring UHF crosslink element. Placing the crosslink elements among high-power L-band helices raises the risk of passive intermodulation, one reason Lockheed and Northrop Grumman have patented alternative layouts (element form and size estimated).',
-    callout: !inner && k === 5, anchor: [x, y, PANEL_Z + 0.4],
+    callout: !inner && k === 0, anchor: [x, y, PANEL_Z + 0.4],
   }, helixElement(x, y, 0.4, 0.078, 0.75, { quad: true }));
   UHF_INNER.forEach(([x, y], k) => uhf(`UHF crosslink element, inner ${k + 1}`, x, y, k, true));
   UHF_OUTER.forEach(([x, y], k) => uhf(`UHF crosslink element, outer ${k + 1}`, x, y, k, false));
