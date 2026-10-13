@@ -13,6 +13,7 @@ import { LRA_C } from './antennas.js';
 export const HARNESS = [];
 
 export function buildPayload(P) {
+  HARNESS.length = 0;                    // a fresh list for every build
   const yP = (d) => IY - d / 2;          // centre of a unit of depth d on the +Y radiator
   const yB = (d) => -(IY - d / 2);       // ... on the −Y radiator
   const box = (name, info, c, s, mat, opts) => {
