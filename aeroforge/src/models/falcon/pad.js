@@ -109,7 +109,7 @@ export function buildPad(A, site, base) {
     const p = [T[0], T[1], T[2], T[0], T[2], T[3]].flat();
     g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0], 2));
-    lining.push(faceAway(g, new THREE.Vector3(0, H / 2, 0)));
+    lining.push(faceAway(g, new THREE.Vector3(s * 30, H / 2, 0)));     // face into the trench
   }
   const floor = new THREE.PlaneGeometry(2 * W, 85.6).rotateX(-Math.PI / 2).translate(0, 0.04, 0);
   // inverted-V flame deflector under the vehicle: ridge across the trench, slopes toward both ends
@@ -143,7 +143,6 @@ export function buildPad(A, site, base) {
     legs.push(beam([sx * 9.8, H + 0.6, sz * 3.3], [sx * 9.8, DECK - 2.0, -sz * 3.3], 0.35, 0.35));
   }
   for (const x of [-BOOSTER_X, 0, BOOSTER_X]) legs.push(hoop(1.96, 0.18, DECK - 1.7, { x, seg: 40, tube: 6 }));
-  A.mountTop = DECK;
   G('Launch mount', {
     material: 'Welded steel deck on four legs straddling the flame trench', mass: null,
     desc: 'Part of SpaceX\'s transporter-erector: the deck that carries the three cores, with an exhaust opening under each. It straddles the flame trench on the hardstand.',
@@ -200,7 +199,7 @@ export function buildPad(A, site, base) {
     const y = STACK0 + ys;
     arms.push(beam([-0.9, y, zb], [-0.7, y, -R - 0.25], 0.32, 0.5), beam([0.9, y, zb], [0.7, y, -R - 0.25], 0.32, 0.5));
     const arc = new THREE.TorusGeometry(R + 0.18, 0.1, 6, 24, wrap);
-    arc.rotateX(Math.PI / 2); arc.rotateY(Math.PI / 2 - wrap / 2 + Math.PI);
+    arc.rotateX(Math.PI / 2); arc.rotateY(Math.PI / 2 + wrap / 2);       // centred on −z, facing the strongback
     arc.translate(0, y, 0);
     arms.push(arc);
     arms.push(block(0, y, -R - 0.12, 0.9, 0.7, 0.2));                                    // umbilical carrier plate
