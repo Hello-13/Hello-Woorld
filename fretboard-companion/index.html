@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fretboard Companion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders:wght@600;700;800&family=Instrument+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  /* Workbench layout: the widget sits on a dotted canvas you can resize and re-theme; integration notes run beside it. */
+  :root {
+    --page: #EEECE7;
+    --panel: #FBFAF7;
+    --sunk: #E6E3DC;
+    --line: #D8D3C9;
+    --ink: #1D1B18;
+    --ink-2: #57524B;
+    --muted: #736E65;
+    --accent: #B35C0A;
+    --dot: #CDC7BB;
+    --f-display: 'Big Shoulders', 'Barlow Condensed', 'Arial Narrow', sans-serif;
+    --f-body: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --f-mono: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page: #0F0E0C; --panel: #171513; --sunk: #110F0D; --line: #2F2A25;
+      --ink: #EEE8DD; --ink-2: #BAB2A6; --muted: #8D857A; --accent: #EE9E3E; --dot: #2B2723;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #0F0E0C; --panel: #171513; --sunk: #110F0D; --line: #2F2A25;
+    --ink: #EEE8DD; --ink-2: #BAB2A6; --muted: #8D857A; --accent: #EE9E3E; --dot: #2B2723;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font: 400 15px/1.55 var(--f-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding-inline: 24px; padding-block: 40px 56px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .masthead { display: grid; gap: 10px; margin-bottom: 28px; max-width: 64ch; }
+  .kicker { margin: 0; font: 600 12px/1.2 var(--f-body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  h1 { margin: 0; font: 800 clamp(40px, 6vw, 64px)/0.92 var(--f-display); letter-spacing: -0.005em; text-wrap: balance; }
+  h1 span { color: var(--accent); }
+  .lede { margin: 0; font-size: 17px; color: var(--ink-2); text-wrap: pretty; }
+
+  .bench { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 900px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+
+  .stage { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--panel); }
+  .controls { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .ctl { display: flex; align-items: center; gap: 8px; }
+  .ctl-label { font: 600 11px/1 var(--f-body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 9px; background: var(--sunk); }
+  .seg button {
+    height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: none; cursor: pointer;
+    font: 500 13px var(--f-body); color: var(--ink-2);
+  }
+  .seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+  .swatches { display: flex; gap: 6px; }
+  .swatch {
+    width: 24px; height: 24px; border-radius: 50%; cursor: pointer; padding: 0;
+    border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line);
+    background: var(--sw-light);
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .swatch { background: var(--sw-dark); } }
+  :root[data-theme="dark"] .swatch { background: var(--sw-dark); }
+  .swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink); }
+
+  .canvas {
+    display: grid; justify-items: center; padding: 28px 20px 32px;
+    background-color: var(--page);
+    background-image: radial-gradient(var(--dot) 1px, transparent 1.2px);
+    background-size: 16px 16px;
+    min-height: 560px;
+  }
+  .frame { width: 100%; max-width: 440px; transition: max-width .3s ease; }
+  .frame-meta { margin-top: 10px; font: 500 12px var(--f-mono); color: var(--muted); text-align: center; }
+
+  .docs { display: grid; gap: 20px; min-width: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; min-width: 0; }
+  .card h2 { margin: 0 0 4px; font: 700 24px/1.1 var(--f-display); letter-spacing: .01em; }
+  .card > p { margin: 0 0 14px; color: var(--ink-2); font-size: 14px; max-width: 60ch; }
+  .code-head { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; margin-bottom: 6px; }
+  .code-head span { font: 500 12px var(--f-mono); color: var(--muted); }
+  .copy {
+    height: 28px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel);
+    font: 600 12px var(--f-body); color: var(--ink); cursor: pointer;
+  }
+  pre {
+    margin: 0; padding: 12px 14px; border-radius: 10px; background: var(--sunk); overflow-x: auto;
+    font: 400 12.5px/1.6 var(--f-mono); color: var(--ink);
+  }
+  pre .t { color: var(--accent); }
+  pre .c { color: var(--muted); }
+
+  .events { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; max-height: 260px; overflow-y: auto; }
+  .events li { display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--line); font-size: 13px; }
+  .events li:first-child { border-top: 0; }
+  .events time { font: 400 12px var(--f-mono); color: var(--muted); }
+  .events code { font: 500 12px var(--f-mono); color: var(--accent); }
+  .events span { color: var(--ink-2); overflow-wrap: anywhere; }
+  .events .empty { display: block; color: var(--muted); padding: 10px 0; }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font: 600 11px var(--f-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 0 12px 8px 0; }
+  td { padding: 8px 12px 8px 0; border-top: 1px solid var(--line); vertical-align: top; color: var(--ink-2); }
+  td code { font: 500 12.5px var(--f-mono); color: var(--ink); white-space: nowrap; }
+
+  @media (max-width: 520px) {
+    .wrap { padding-inline: 16px; padding-block: 28px 40px; }
+    thead { display: none; }
+    tbody tr { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+    tbody td { padding: 0; border: 0; }
+    tbody td:nth-child(2)::before { content: 'default '; color: var(--muted); }
+    tbody td:last-child { grid-column: 1 / -1; }
+    .canvas { padding: 20px 12px 24px; min-height: 0; }
+    .size-ctl { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="masthead">
+    <p class="kicker">Dashboard widget · Web Component</p>
+    <h1>Fretboard <span>Companion</span></h1>
+    <p class="lede">A chromatic tuner, a chord of the day you can strum, a metronome and a practice-streak tracker in one card. Add one script tag and it fits into any dashboard.</p>
+  </header>
+
+  <main class="bench">
+    <section class="stage" aria-label="Live widget">
+      <div class="controls">
+        <div class="ctl size-ctl">
+          <span class="ctl-label" id="size-label">Width</span>
+          <div class="seg" role="group" aria-labelledby="size-label" id="size-ctl">
+            <button type="button" data-size="340" aria-pressed="false">S</button>
+            <button type="button" data-size="440" aria-pressed="true">M</button>
+            <button type="button" data-size="640" aria-pressed="false">L</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <span class="ctl-label" id="theme-label">Theme</span>
+          <div class="seg" role="group" aria-labelledby="theme-label" id="theme-ctl">
+            <button type="button" data-theme-opt="auto" aria-pressed="true">Auto</button>
+            <button type="button" data-theme-opt="light" aria-pressed="false">Light</button>
+            <button type="button" data-theme-opt="dark" aria-pressed="false">Dark</button>
+          </div>
+        </div>
+        <div class="ctl">
+          <span class="ctl-label" id="accent-label">Accent</span>
+          <div class="swatches" role="group" aria-labelledby="accent-label" id="accent-ctl">
+            <button type="button" class="swatch" aria-pressed="true" aria-label="Amber (default)" style="--sw-light:#B35C0A;--sw-dark:#EE9E3E"></button>
+            <button type="button" class="swatch" aria-pressed="false" aria-label="Blue" data-light="#2F66CC" data-dark="#7FA8F2" style="--sw-light:#2F66CC;--sw-dark:#7FA8F2"></button>
+            <button type="button" class="swatch" aria-pressed="false" aria-label="Teal" data-light="#137A70" data-dark="#4CC2B4" style="--sw-light:#137A70;--sw-dark:#4CC2B4"></button>
+            <button type="button" class="swatch" aria-pressed="false" aria-label="Rose" data-light="#B83A62" data-dark="#F07FA0" style="--sw-light:#B83A62;--sw-dark:#F07FA0"></button>
+          </div>
+        </div>
+      </div>
+      <div class="canvas">
+        <div class="frame" id="frame">
+          <fretboard-companion id="fc" sample-data weekly-goal="150" storage-key="fretboard-companion-demo"></fretboard-companion>
+        </div>
+        <div class="frame-meta" id="frame-meta">440 px card · sample practice history</div>
+      </div>
+    </section>
+
+    <div class="docs">
+      <section class="card">
+        <h2>Add it to your dashboard</h2>
+        <p>One file, no build step and no dependencies. It renders inside Shadow DOM, so your dashboard’s CSS can’t break it and its CSS can’t leak out.</p>
+        <div class="code-head"><span>HTML</span><button type="button" class="copy" data-copy="snippet-html">Copy</button></div>
+<pre id="snippet-html"><span class="c">&lt;!-- once, anywhere on the page --&gt;</span>
+&lt;script src="fretboard-companion.js" defer&gt;&lt;/script&gt;
+
+<span class="c">&lt;!-- wherever the card should go --&gt;</span>
+&lt;<span class="t">fretboard-companion</span> weekly-goal="150"&gt;&lt;/<span class="t">fretboard-companion</span>&gt;</pre>
+        <div class="code-head"><span>Sync practice to your backend</span><button type="button" class="copy" data-copy="snippet-js">Copy</button></div>
+<pre id="snippet-js">const fc = document.querySelector('fretboard-companion');
+
+fc.addEventListener('practice-logged', (e) =&gt; {
+  <span class="c">// { date: '2026-10-12', minutes: 25, totalForDay, streak, weekMinutes }</span>
+  fetch('/api/practice', { method: 'POST', body: JSON.stringify(e.detail) });
+});
+
+<span class="c">// Restore history saved elsewhere</span>
+fc.setPracticeLog({ '2026-10-11': 30, '2026-10-12': 25 });</pre>
+      </section>
+
+      <section class="card">
+        <h2>Live events</h2>
+        <p>The widget fires DOM events as you use it. These are the ones your dashboard can listen for.</p>
+        <ul class="events" id="events" aria-live="polite">
+          <li class="empty">Strum a chord, start the metronome or log practice. Events show up here.</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Attributes</h2>
+        <p>All optional.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Attribute</th><th>Default</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><code>theme</code></td><td><code>auto</code></td><td><code>light</code>, <code>dark</code>, or <code>auto</code>. Auto follows <code>data-theme</code>, a <code>.dark</code> class on <code>&lt;html&gt;</code>, or the OS setting.</td></tr>
+              <tr><td><code>weekly-goal</code></td><td><code>150</code></td><td>Practice minutes per week for the goal bar.</td></tr>
+              <tr><td><code>a4</code></td><td><code>440</code></td><td>Reference pitch in Hz for the tuner and tones (400–480).</td></tr>
+              <tr><td><code>bpm</code></td><td><code>96</code></td><td>Starting tempo when nothing is saved yet.</td></tr>
+              <tr><td><code>tab</code></td><td><code>tuner</code></td><td>Opening tab: <code>tuner</code>, <code>chords</code>, <code>metronome</code> or <code>practice</code>.</td></tr>
+              <tr><td><code>storage-key</code></td><td><code>fretboard-companion</code></td><td>localStorage key, so two cards can keep separate logs.</td></tr>
+              <tr><td><code>sample-data</code></td><td>off</td><td>Shows example history until the first real session is logged.</td></tr>
+              <tr><td><code>no-fonts</code></td><td>off</td><td>Skips loading Google Fonts and uses your dashboard’s fonts.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="fretboard-companion.js"></script>
+<script>
+  (function () {
+    var fc = document.getElementById('fc');
+    var frame = document.getElementById('frame');
+    var meta = document.getElementById('frame-meta');
+
+    function press(group, btn) {
+      group.querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', String(b === btn)); });
+    }
+    function updateMeta() {
+      var w = Math.round(fc.getBoundingClientRect().width);
+      meta.textContent = w + ' px card' + (fc.hasAttribute('sample-data') && !Object.keys(fc.practiceLog).length ? ' · sample practice history' : '');
+    }
+
+    var sizeCtl = document.getElementById('size-ctl');
+    sizeCtl.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      press(sizeCtl, b);
+      frame.style.maxWidth = b.dataset.size + 'px';
+      setTimeout(updateMeta, 320);
+    });
+
+    var themeCtl = document.getElementById('theme-ctl');
+    themeCtl.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      press(themeCtl, b);
+      fc.setAttribute('theme', b.dataset.themeOpt);
+    });
+
+    var accentCtl = document.getElementById('accent-ctl');
+    accentCtl.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      press(accentCtl, b);
+      if (b.dataset.light) {
+        fc.style.setProperty('--fc-accent', b.dataset.light);
+        fc.style.setProperty('--fc-accent-dark', b.dataset.dark);
+      } else {
+        fc.style.removeProperty('--fc-accent');
+        fc.style.removeProperty('--fc-accent-dark');
+      }
+    });
+
+    document.querySelectorAll('[data-copy]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var pre = document.getElementById(btn.dataset.copy);
+        var text = pre.textContent;
+        var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1600); };
+        var fallback = function () {
+          var range = document.createRange(); range.selectNodeContents(pre);
+          var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+          btn.textContent = 'Press ⌘C / Ctrl+C';
+          setTimeout(function () { btn.textContent = 'Copy'; }, 2400);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+        else fallback();
+      });
+    });
+
+    var list = document.getElementById('events');
+    var lastNote = '';
+    function log(name, text) {
+      var empty = list.querySelector('.empty'); if (empty) empty.remove();
+      var li = document.createElement('li');
+      var t = document.createElement('time'); t.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      var c = document.createElement('code'); c.textContent = name;
+      var s = document.createElement('span'); s.textContent = text;
+      li.append(t, c, s);
+      list.prepend(li);
+      while (list.children.length > 12) list.lastElementChild.remove();
+    }
+    fc.addEventListener('practice-logged', function (e) { var d = e.detail; log('practice-logged', d.minutes + ' min on ' + d.date + ' · streak ' + d.streak); updateMeta(); });
+    fc.addEventListener('practice-log-change', function (e) { log('practice-log-change', Object.keys(e.detail.log).length + ' days in log'); updateMeta(); });
+    fc.addEventListener('chord-change', function (e) { log('chord-change', e.detail.fullName + ' · ' + e.detail.frets.map(function (f) { return f < 0 ? 'x' : f; }).join('')); });
+    // Dragging the tempo slider fires many events; show one row once it settles.
+    var tempoTimer = 0;
+    fc.addEventListener('tempo-change', function (e) {
+      var bpm = e.detail.bpm; clearTimeout(tempoTimer);
+      tempoTimer = setTimeout(function () { log('tempo-change', bpm + ' BPM'); }, 400);
+    });
+    fc.addEventListener('metronome-change', function (e) { log('metronome-change', (e.detail.running ? 'started' : 'stopped') + ' · ' + e.detail.bpm + ' BPM ' + e.detail.timeSignature); });
+    fc.addEventListener('session-change', function (e) { log('session-change', e.detail.state); });
+    fc.addEventListener('tuner-pitch', function (e) {
+      var d = e.detail; var key = d.note + d.octave + (d.inTune ? '✓' : '');
+      if (key === lastNote) return; lastNote = key;
+      log('tuner-pitch', d.note + d.octave + ' · ' + d.frequency + ' Hz · ' + (d.cents > 0 ? '+' : '') + d.cents + '¢' + (d.inTune ? ' · in tune' : ''));
+    });
+
+    requestAnimationFrame(updateMeta);
+  })();
+</script>
+</body>
+</html>

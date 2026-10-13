@@ -1,0 +1,114 @@
+export type ToolId = 'tuner' | 'metronome' | 'chords' | 'scales' | 'jam' | 'changes' | 'hunt' | 'ear' | 'piano' | 'tab';
+
+export interface ToolInfo {
+  id: ToolId;
+  name: string;
+  /** Label in the top navigation. */
+  short: string;
+  /** Model number printed on the pedal. */
+  code: string;
+  color: string;
+  /** Dark text on a light enclosure. */
+  lightEnclosure?: boolean;
+  blurb: string;
+  knobs: string[];
+}
+
+export const TOOLS: ToolInfo[] = [
+  {
+    id: 'tuner',
+    name: 'Tuner',
+    short: 'Tuner',
+    code: 'ST-01',
+    color: 'var(--p-tuner)',
+    blurb: 'Tune with the mic or by ear. Strobe and needle, ten tunings.',
+    knobs: ['Pitch', 'Cal'],
+  },
+  {
+    id: 'metronome',
+    name: 'Metronome',
+    short: 'Metronome',
+    code: 'ST-02',
+    color: 'var(--p-metro)',
+    blurb: 'A steady click with accents, subdivisions and a speed trainer.',
+    knobs: ['Tempo', 'Beat', 'Sub'],
+  },
+  {
+    id: 'chords',
+    name: 'Chord Lab',
+    short: 'Chords',
+    code: 'ST-03',
+    color: 'var(--p-chords)',
+    lightEnclosure: true,
+    blurb: 'Every chord with fingered shapes up the neck. Or tap frets and it names the chord.',
+    knobs: ['Root', 'Type'],
+  },
+  {
+    id: 'scales',
+    name: 'Scale Map',
+    short: 'Scales',
+    code: 'ST-04',
+    color: 'var(--p-scales)',
+    blurb: 'Light up any scale across the neck, one hand position at a time.',
+    knobs: ['Key', 'Mode'],
+  },
+  {
+    id: 'jam',
+    name: 'Backing Band',
+    short: 'Band',
+    code: 'ST-05',
+    color: 'var(--p-jam)',
+    blurb: 'Drums and strummed chords to play along with. Pick a progression or write your own.',
+    knobs: ['Key', 'Tempo', 'Feel'],
+  },
+  {
+    id: 'changes',
+    name: 'Chord Changes',
+    short: 'Changes',
+    code: 'ST-06',
+    color: 'var(--p-changes)',
+    blurb: 'The one-minute changes drill. Switch between two chords and beat your best.',
+    knobs: ['Time', 'Count'],
+  },
+  {
+    id: 'hunt',
+    name: 'Note Hunt',
+    short: 'Note Hunt',
+    code: 'ST-07',
+    color: 'var(--p-hunt)',
+    blurb: 'A 60-second game for learning every note on the neck. Tap it, or play it.',
+    knobs: ['Speed', 'Score'],
+  },
+  {
+    id: 'ear',
+    name: 'Ear Trainer',
+    short: 'Ear',
+    code: 'ST-08',
+    color: 'var(--p-ear)',
+    blurb: 'Intervals, chord qualities and single notes, with songs to remember them by.',
+    knobs: ['Gain', 'Tone'],
+  },
+  {
+    id: 'piano',
+    name: 'Piano Bridge',
+    short: 'Piano',
+    code: 'ST-09',
+    color: 'var(--p-piano)',
+    lightEnclosure: true,
+    blurb: 'Play what you know on the keys and see where it lives on the fretboard.',
+    knobs: ['Keys', 'Neck'],
+  },
+  {
+    id: 'tab',
+    name: 'Tab Trainer',
+    short: 'Tab',
+    code: 'ST-10',
+    color: 'var(--p-tab)',
+    blurb: 'Learn melodies from tab. It plays them, counts you in, or waits until you hit each note.',
+    knobs: ['Tempo', 'Loop'],
+  },
+];
+
+export function toolInfo(id: ToolId): ToolInfo {
+  return TOOLS.find((t) => t.id === id)!;
+}
