@@ -476,6 +476,18 @@ export function buildUAV() {
     system: 'Propulsion', material: 'Aluminium tank', mass: 5, explode: [0, 0.75, -0.45],
     desc: 'Holds the engine and gearbox lubricating oil (a few litres; estimate). The same oil cools the gearbox bearings and drives the propeller pitch control.',
   }, L(merge([cylX(X(8.95), X(8.62), 0.06, 0.06, 1.43, -0.24, 16), cylX(X(8.7), X(8.66), 0.025, 0.025, 1.5, -0.24, 8)]), m.alu)), 'oil');
+  role(P('Fuel control unit', {
+    system: 'Propulsion', material: 'Engine-driven fuel pump and metering unit', mass: 6, explode: [0.3, 0.55, 0.55],
+    desc: 'The engine-driven high-pressure pump and fuel metering unit at the end of the feed line. The DEEC trims how much fuel it meters to the ten combustor nozzles (position approximate).',
+  }, L(merge([lru(0.16, 0.11, 0.1, [X(8.15), ENGINE_Y - 0.1, 0.26]), tubeBetween([X(8.15), ENGINE_Y - 0.04, 0.24], [X(8.4), ENGINE_Y + 0.02, 0.22], 0.008, 6)]), m.darkMetal)), 'compressor');
+  P('Propeller governor', {
+    system: 'Propulsion', material: 'Flyweight governor and oil pump on the gearbox', mass: 3, explode: [-0.6, 0.85, 0.3],
+    desc: 'Holds propeller speed constant: flyweights sense rpm and meter gearbox oil to the pitch-change piston, coarsening the blades when the engine speeds up (position approximate).',
+  }, L(cylX(X(9.65) - 0.1, X(9.65) - 0.01, 0.035, 0.035, 1.765, 0.1, 14), m.gun));
+  role(P('Ignition exciter', {
+    system: 'Propulsion', material: 'Capacitor-discharge ignition unit', mass: 2, explode: [0, 0.9, -0.5],
+    desc: 'Fires the two igniter plugs in the combustor during start; once the flame is self-sustaining the exciter switches off.',
+  }, L(lru(0.12, 0.06, 0.08, [X(8.8), ENGINE_Y + 0.2, -0.17]), m.lruOlive)), 'generator');
   P('Propeller drive shaft', {
     system: 'Propulsion', material: 'Steel shaft with flexible couplings', mass: 8, explode: [-1.0, 0.45, 0],
     desc: 'Carries up to 900 shp (671 kW) from the gearbox to the propeller flange through the tail cone, with flexible couplings for misalignment.',

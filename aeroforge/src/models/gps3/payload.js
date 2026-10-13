@@ -70,7 +70,7 @@ export function buildPayload(P) {
     return P(name, {
       system: 'Payload', material: 'Copper helix on a dielectric support inside a fibreglass radome', mass: 2, temp: 240, explode: ex,
       desc: ring === 'inner'
-        ? 'One of four inner-ring helical elements. An axial-mode helix about one wavelength round (19 cm at L1) radiates right-hand circularly polarised waves; each element carries L1, L2 and L5 through a built-in triplexer (element dimensions estimated).'
+        ? 'One of four inner-ring helical elements. An axial-mode helix about one wavelength round (19 cm at L1) radiates right-hand circularly polarised waves. Each element radiates L1, L2 and L5 together; how the bands are combined at the element is not public (element dimensions estimated).'
         : 'One of eight outer-ring helices. Fed with a phase offset from the inner ring, the outer ring pushes power out toward the limb so the beam covers the whole Earth disc, 13.9° either side of nadir (element dimensions estimated).',
     }, [mesh(metal, G.aluminium()), mesh(radomeG(x, y, 0.062, h, z0 + 0.03), G.radome()), mesh(helixG(x, y, 0.042, z0 + 0.04, z0 + h - 0.02, Math.round((h - 0.06) / 0.048)), G.helixWire())]);
   };

@@ -56,7 +56,7 @@ export function mountOrbitLab(root, ctx) {
   const rel = readouts([
     { key: 'gr', label: 'Weaker gravity (general relativity)', unit: 'µs/day' }, { key: 'sr', label: 'Orbital speed (special relativity)', unit: 'µs/day' },
     { key: 'net', label: 'Net: satellite clock vs ground', unit: 'µs/day' }, { key: 'err', label: 'Range error if left uncorrected', unit: 'km/day' },
-    { key: 'f0', label: 'Clock reference set before launch', unit: 'MHz' }, { key: 'frac', label: 'Fractional offset Δf/f' },
+    { key: 'f0', label: 'Offset of the 10.23 MHz reference', unit: 'mHz' }, { key: 'frac', label: 'Fractional offset Δf/f' },
   ]);
   const met = readouts([{ key: 'met', label: 'Mission elapsed time' }, { key: 'phase', label: 'Phase' }]);
   const chart = new LineChart({
@@ -129,9 +129,9 @@ export function mountOrbitLab(root, ctx) {
     rel.set('gr', `+${r.gravUs.toFixed(1)}`); rel.set('sr', r.velUs.toFixed(1));
     rel.set('net', `${r.netUs >= 0 ? '+' : ''}${r.netUs.toFixed(1)}`, Math.abs(r.netUs) > 30 ? 'warn' : undefined);
     rel.set('err', fmt.n(Math.abs(r.netUs) * 1e-6 * C_LIGHT, 1));
-    rel.set('f0', (10.23 * (1 - r.net)).toFixed(11));
+    rel.set('f0', (-10.23e6 * r.net * 1e3).toFixed(2));
     rel.set('frac', `${(-r.net * 1e10).toFixed(3)} × 10⁻¹⁰`);
-    relChart.setData({ net: relPts }, { xDomain: [200, 40000], zero: true, markers: [{ x: cross, label: 'crossover' }, { x: GPS3.altitude, label: 'GPS' }], cursor: { x: p.h2, label: `${r.netUs >= 0 ? '+' : ''}${r.netUs.toFixed(1)} µs/day` } });
+    relChart.setData({ net: relPts }, { xDomain: [200, 40000], zero: true, markers: [{ x: cross, label: 'crossover' }], cursor: { x: p.h2, label: `${r.netUs >= 0 ? '+' : ''}${r.netUs.toFixed(1)} µs/day` } });
     const tot = [], sat = [];
     for (let i = 0; i <= 120; i++) {
       const h2 = 500 + (i / 120) * 39500;

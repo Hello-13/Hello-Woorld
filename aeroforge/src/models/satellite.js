@@ -68,7 +68,7 @@ export function buildSatellite({ compact = false } = {}) {
       ['Bus', 'Lockheed Martin A2100M'],
       ['Power', `${fmt.n(GPS3.powerEOL)} W at end of life`],
       ['Orbit', `${fmt.n(GPS3.altitude)} km circular, ${GPS3.inclination}° inclination`],
-      ['Period', `${fmt.hms(T)} (half a sidereal day)`],
+      ['Period', `≈ 11 h 58 min (half a sidereal day; two-body ${fmt.hms(T)})`],
       ['Signals', 'L1 C/A, L1C, L1/L2 P(Y), L2C, L5, M-code'],
       ['Clocks', '3 rubidium atomic frequency standards'],
       ['Relativity', `+${rel.netUs.toFixed(1)} µs/day, clocks pre-set to 10.22999999543 MHz`],
