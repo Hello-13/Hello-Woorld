@@ -273,13 +273,16 @@ async function start() {
   function updateViewShift() {
     if (narrow()) { stage.setViewShift(0); stage.frameCover = 0; stage.frameCoverY = 0; return; }
     const w = Math.max(1, stage.container.clientWidth), h = Math.max(1, stage.container.clientHeight);
-    // the dossier, or else the colour legend (Systems / Thermal / Pressure) on the right
-    const right = dossierOpen() ? dossier.offsetWidth / w : !legend.hidden && legend.offsetWidth ? (legend.offsetWidth + 38) / w : 0;
+    const right = dossierOpen() ? dossier.offsetWidth / w : 0;
     const left = tour.active ? 0.15 : dossierOpen() ? (app.orbit ? 0.13 : 0.07) : 0.14;
+    // The colour legend (Systems / Thermal / Pressure) narrows the free view's framing but does not
+    // shift it: shifting would push the subject under the hero copy. Tour steps frame themselves
+    // around the legend, so it does not count there.
+    const key = !tour.active && !dossierOpen() && !legend.hidden && legend.offsetWidth ? (legend.offsetWidth + 38) / w : 0;
     // nav bar above; fleet index and view tools below
     const top = 68 / h, bottom = 156 / h;
     stage.setViewShift(left - right / 2, (bottom - top) / 2);
-    stage.frameCover = Math.min(0.6, right + left * 1.6);
+    stage.frameCover = Math.min(0.6, right + key + left * 1.6);
     stage.frameCoverY = top + bottom;
   }
   const reframe = () => {
