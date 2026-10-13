@@ -95,9 +95,16 @@ export function upperB(s, z) {
   const w = bW(s), ht = bHT(s);
   return bezY([[0, ht], [w * 0.45, ht], [w * 0.72, ht * 0.8], [w, 0]], clamp(z, 0, w));
 }
+// Beside the cockpit the upper fuselage sides stand steeply (~58°, close to the fins' 62° from
+// horizontal) so the canopy sill sits high: the one-piece canopy is then ≈ 0.73 m deep, near the
+// published 140 × 45 × 27 in (3.56 × 1.14 × 0.69 m) transparency. Elsewhere the shoulder is rounder.
+const cockpitShoulder = (s) => smooth(2.9, 3.9, s) * (1 - smooth(6.4, 7.6, s));
 function upperAnative(s, z) {
   const w = aW(s), ht = aHT(s), yc = aYC(s);
-  return yc + bezY([[0, ht], [w * 0.55, ht], [w * 0.7, Math.min(w * 0.17, ht * 0.6)], [w, 0]], clamp(z, 0, w));
+  const k = cockpitShoulder(s);
+  const P1 = [w * lerp(0.55, 0.7, k), ht];
+  const P2 = [w * lerp(0.7, 0.88, k), lerp(Math.min(w * 0.17, ht * 0.6), ht * 0.68, k)];
+  return yc + bezY([[0, ht], P1, P2, [w, 0]], clamp(z, 0, w));
 }
 function lowerAnative(s, z) {
   const w = aW(s), hb = aHB(s), yc = aYC(s);

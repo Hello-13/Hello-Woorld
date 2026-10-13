@@ -80,11 +80,12 @@ function truss(x0, z0, w, d, levels, { col = 0.5, hor = 0.35, diag = 0.25, mid =
 }
 
 /**
- * Build the pad. site: group shown only in the launch-pad look (hardstand, trench, tower, TE,
- * scenery). base: group always shown (launch mount, clamps, tail service masts).
- * Returns { scenery, glowAnchor }.
+ * Build the pad. bed: the hardstand and flame trench, shown in the launch-pad look in every render
+ * mode so the vehicle always stands on it there. site: the towers, TE, deluge and scenery, shown
+ * only in the launch-pad look's studio rendering. base: always shown (launch mount, clamps, tail
+ * service masts). Returns { scenery, deckTop }.
  */
-export function buildPad(A, site, base) {
+export function buildPad(A, site, base, bed) {
   const G = (name, info, objs, grp = site) => {
     const p = A.part(name, { system: 'Ground support', ...info }, objs, grp);
     p.userData.part.temp = info.temp ?? 300;
@@ -113,7 +114,7 @@ export function buildPad(A, site, base) {
   G('Pad hardstand', {
     skin: true, material: 'Reinforced concrete pad on a raised earth-and-fill mound', mass: null,
     desc: 'LC-39A stands on a raised hardstand built for Saturn V. Its surface is about 48 ft above sea level, high enough for the 42 ft-deep flame trench to drain at grade. Footprint compressed here.',
-  }, [mesh(merge(tops), FM.hardstand()), mesh(merge(slopes), FM.embankment())]);
+  }, [mesh(merge(tops), FM.hardstand()), mesh(merge(slopes), FM.embankment())], bed);
 
   const lining = [];
   for (const s of [1, -1]) {
@@ -141,7 +142,7 @@ export function buildPad(A, site, base) {
   G('Flame trench & deflector', {
     material: 'Refractory-brick lining, steel deflector faced with high-temperature concrete',
     desc: 'The Apollo-era trench is 490 ft long, 58 ft wide and 42 ft deep. An inverted-V deflector under the vehicle splits the 27-engine exhaust and turns it along the trench toward both ends.',
-  }, [mesh(merge(lining), FM.refractory()), mesh(floor, FM.refractory()), mesh(defl, FM.deflector())]);
+  }, [mesh(merge(lining), FM.refractory()), mesh(floor, FM.refractory()), mesh(defl, FM.deflector())], bed);
 
   // ------------------------------------------------------------------ launch mount (always shown)
   const shape = new THREE.Shape();

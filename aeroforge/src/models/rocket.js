@@ -25,9 +25,10 @@ export function buildRocket() {
   const world = new THREE.Group();          // shifted down in looks without the hardstand
   A.root.add(world);
   const ground = new THREE.Group();         // everything on the pad; scrolls away during ascent
-  const site = new THREE.Group();           // hardstand, trench, tower, TE: launch-pad look only
+  const bed = new THREE.Group();            // hardstand and flame trench: launch-pad look, every mode
+  const site = new THREE.Group();           // towers, TE, deluge, scenery: launch-pad look, studio only
   const base = new THREE.Group();           // launch mount, clamps, tail service masts: always
-  ground.add(site, base);
+  ground.add(bed, site, base);
   world.add(ground);
 
   const rigPivot = new THREE.Group();       // rotates for pitch during ascent
@@ -50,7 +51,7 @@ export function buildRocket() {
     buildCore(A, boosterG[1], { kind: 'booster', prefix: 'Side booster B', explodeBase: [-7.0, 6, 6], paint: { soot: 0.22, streaks: 40, seed: 13 }, attachSide: -1 }),
   ];
   const upper = buildUpper(A, upperG, { explodeBase: [0, 16.5, 6] });
-  const pad = buildPad(A, site, base);
+  const pad = buildPad(A, site, base, bed);
 
   // ----------------------------------------------------------------- exhaust (effects, not parts)
   const enginePos = [[0, 0], ...Array.from({ length: 8 }, (_, k) => polar(ENGINE_RING, 22.5 + k * 45))];
@@ -82,15 +83,19 @@ export function buildRocket() {
 
   A.finalize();
 
-  // The pad site is context, not the subject: it shows only in the launch-pad look and only while
-  // the hardstand wears its studio material. X-ray, Systems, Blueprint and Thermal (and tour steps
-  // that ghost the pad) then show the vehicle alone. A getter keeps this synchronous with every
-  // visibility check (rendering, framing, picking) instead of lagging a frame behind mode changes.
+  // The pad site is context, not the subject: the towers, TE and deluge show only in the launch-pad
+  // look and only while the TE wears its studio material, so X-ray, Systems, Blueprint and Thermal
+  // (and tour steps that ghost the pad) show the vehicle without them. The hardstand and trench stay
+  // in every mode of the pad look so the vehicle never floats above the ground there. Getters keep
+  // this synchronous with every visibility check (rendering, framing, picking) instead of lagging a
+  // frame behind mode changes.
   let probe = null;
-  site.traverse((o) => { if (!probe && o.isMesh && !o.userData.fx) probe = o; });
+  A.parts.find((p) => p.userData.part.name === 'Transporter-erector strongback')
+    .traverse((o) => { if (!probe && o.isMesh && !o.userData.fx) probe = o; });
   let onPad = true;
   const siteShown = () => onPad && (!probe || !probe.userData.studio || probe.material === probe.userData.studio);
   Object.defineProperty(site, 'visible', { get: siteShown, set() {}, configurable: true });
+  Object.defineProperty(bed, 'visible', { get: () => onPad, set() {}, configurable: true });
 
   const st = {
     firing: { booster: false, core: false, upper: false },
@@ -265,6 +270,11 @@ export function buildRocket() {
       smoke.update(dt, emit, st.altitudeVis < 200 ? 1 : 0.5);
     },
   };
+  // The exploded offsets already raise every stage and subsystem clear of the launch mount, and
+  // the mount and pad must stay on the ground, so this vehicle takes no rigid exploded-view lift of
+  // its whole root (the app assigns the fleet's value after building). With no root lift the tour's
+  // framing of exploded parts is also exact.
+  Object.defineProperty(vehicle, 'explodeLift', { get: () => 0, set() {}, enumerable: true });
   for (const m of allPlumeMats) m.uniforms.intensity.value = 0;
   vehicle.resetFlight();
   return vehicle;
