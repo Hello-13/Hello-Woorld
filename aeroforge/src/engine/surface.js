@@ -351,8 +351,10 @@ export function perforated({ tile = 256, pitch = 10 } = {}) {
 }
 
 /** Painted floor markings: safety-yellow lines, a turntable keep-out circle and hatching. */
-export function floorMarkings(size = 2048, worldSize = 80) {
-  return once(`floor.${size}`, () => {
+/** geometric: false leaves out the lines, ring and hatching (drawn analytically by the hangar floor
+ *  shader so they stay sharp at any distance) and keeps the stencil text and tie-down points. */
+export function floorMarkings(size = 2048, worldSize = 80, { geometric = true } = {}) {
+  return once(`floor.${size}.${geometric}`, () => {
     const c = canvas(size);
     const ctx = c.getContext('2d');
     ctx.clearRect(0, 0, size, size);
@@ -360,9 +362,10 @@ export function floorMarkings(size = 2048, worldSize = 80) {
     const cx = size / 2;
     ctx.strokeStyle = 'rgba(232,184,30,0.92)';
     ctx.lineWidth = 0.12 * m;
-    for (const off of [-13, 13]) {
+    if (geometric) for (const off of [-13, 13]) {
       ctx.beginPath(); ctx.moveTo(0, cx + off * m); ctx.lineTo(size, cx + off * m); ctx.stroke();
     }
+    if (geometric) {
     ctx.beginPath(); ctx.arc(cx, cx, 10.2 * m, 0, Math.PI * 2); ctx.stroke();
     // hatched keep-out band
     ctx.save();
@@ -370,6 +373,7 @@ export function floorMarkings(size = 2048, worldSize = 80) {
     ctx.lineWidth = 0.18 * m;
     for (let x = -size; x < size * 2; x += 0.7 * m) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + size, size); ctx.stroke(); }
     ctx.restore();
+    }
     // tie-down points
     ctx.fillStyle = 'rgba(40,40,40,0.9)';
     for (let x = -36; x <= 36; x += 6) for (let y = -36; y <= 36; y += 6) {

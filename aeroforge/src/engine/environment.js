@@ -104,6 +104,27 @@ function radialFade(inner = 0.55, outer = 1) {
   return new THREE.CanvasTexture(c);
 }
 
+// Hangar bay markings drawn analytically in plane coordinates (metres): the two 13 m lines, the
+// 10.2 m ring and the hatched keep-out band, each antialiased over one pixel at any distance and
+// faded to its average coverage where the hatching gets finer than a pixel. The canvas texture
+// keeps the stencil text and tie-down points. Matches floorMarkings() in surface.js.
+const BAY_MARKINGS = /* glsl */`
+  varying vec2 vMark;
+  float bayFill(float d, float w) { return 1.0 - smoothstep(-w, w, d); }
+  vec4 bayMarkings(vec2 p) {
+    float r = length(p);
+    float dl = abs(abs(p.y) - 13.0) - 0.06, dr = abs(r - 10.2) - 0.06;
+    float cov = max(bayFill(dl, 0.7 * fwidth(dl)), bayFill(dr, 0.7 * fwidth(dr)));
+    float band = bayFill(abs(r - 9.9) - 0.3, 0.7 * fwidth(r));
+    float period = 0.49497;                            // 0.7 m across the 45° stripes
+    float s = (p.x + p.y) * 0.70710678 / period;
+    float foot = fwidth(s) * period;                   // pixel footprint across the stripes, metres
+    float stripe = bayFill(abs(fract(s + 0.5) - 0.5) * period - 0.09, 0.7 * foot);
+    stripe = mix(stripe, 0.36, smoothstep(0.15, 0.45, foot / period));
+    cov = max(cov, stripe * band);
+    return vec4(0.807, 0.479, 0.0129, cov * 0.92);     // rgba(232, 184, 30, 0.92), linear
+  }`;
+
 function hangarFloor() {
   const g = new THREE.Group();
   const size = 80;
@@ -117,10 +138,25 @@ function hangarFloor() {
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   floor.renderOrder = -2;
-  const marks = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshStandardMaterial({
-    map: floorMarkings(window.matchMedia?.('(pointer: coarse)').matches ? 2048 : 4096), transparent: true, roughness: 0.6, alphaMap: radialFade(0.35, 0.8), depthWrite: false,
+  const markMat = new THREE.MeshStandardMaterial({
+    map: floorMarkings(window.matchMedia?.('(pointer: coarse)').matches ? 2048 : 4096, size, { geometric: false }), transparent: true, roughness: 0.6, alphaMap: radialFade(0.35, 0.8), depthWrite: false,
     polygonOffset: true, polygonOffsetFactor: -2,
-  }));
+  });
+  markMat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vMark;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvMark = position.xy;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>\n${BAY_MARKINGS}`)
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        {   // analytic markings over the text / tie-down texture ("over" compositing, straight alpha)
+          vec4 mk = bayMarkings(vMark);
+          float a = mk.a + diffuseColor.a * (1.0 - mk.a);
+          diffuseColor.rgb = (mk.rgb * mk.a + diffuseColor.rgb * diffuseColor.a * (1.0 - mk.a)) / max(a, 1e-4);
+          diffuseColor.a = a;
+        }`);
+  };
+  const marks = new THREE.Mesh(new THREE.PlaneGeometry(size, size), markMat);
   marks.rotation.x = -Math.PI / 2;
   marks.position.y = 0.004;
   marks.receiveShadow = true;
