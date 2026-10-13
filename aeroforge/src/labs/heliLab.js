@@ -92,7 +92,7 @@ export function mountHeliLab(root, ctx) {
     { key: 'oge', label: 'Hover power OGE', unit: 'shp' }, { key: 'ige', label: 'Hover power IGE (10 ft)', unit: 'shp' },
     { key: 'avail', label: 'Power available (30 min)', unit: 'shp' }, { key: 'tr', label: 'Tail rotor share', unit: '%' },
     { key: 'cOge', label: 'Hover ceiling OGE', unit: 'm' }, { key: 'cIge', label: 'Hover ceiling IGE', unit: 'm' },
-    { key: 'vroc', label: 'Vertical climb OGE', unit: 'ft/min' }, { key: 'th', label: 'Collective θ 0.75R', unit: '°' },
+    { key: 'vroc', label: 'Vertical climb (95 % IRP)', unit: 'ft/min' }, { key: 'th', label: 'Collective θ 0.75R', unit: '°' },
   ]);
   const roF = readouts([
     { key: 'p', label: 'Power required', unit: 'shp' }, { key: 'da', label: 'Density altitude', unit: 'm' },

@@ -109,9 +109,9 @@ export function buildPropulsion(ctx) {
       cas.push(new THREE.TorusGeometry(0.55, 0.025, 6, 40).rotateY(Math.PI / 2).translate(X(13.38), yc, zc));
       cas.push(new THREE.TorusGeometry(0.55, 0.02, 6, 40).rotateY(Math.PI / 2).translate(X(14.1), yc, zc));
       const fan = P(`F119 fan (${R})`, {
-        system: 'Propulsion', material: 'Titanium integrally bladed rotors (blisks), titanium case', mass: 360,
+        system: 'Propulsion', material: 'Hollow wide-chord titanium blades linear-friction-welded to their discs (blisks), titanium case', mass: 480,
         explode: [1.2, 0.55, 0.45 * side], callout: side > 0, anchor: [X(13.6), 0.55, zc],
-        desc: 'Three fan stages built as integrally bladed rotors, driven by the single-stage LP turbine. About 23 % of the air (bypass ratio 0.3) goes around the core to cool the augmentor and nozzle (blade counts illustrative).',
+        desc: 'Three shroudless fan stages built as integrally bladed rotors (blisks), driven by the single-stage LP turbine; the first vane row is variable for stall margin. With a bypass ratio of 0.30, about 23 % of the air flows around the core to cool the augmentor and nozzle (blade counts illustrative; the whole F119 weighs about 2,270 kg).',
       }, [mesh(blades, F.blade()), mesh(merge(cas), F.tiDull())]);
       fan.userData.part.thermalRole = 'fan';
     }
@@ -127,9 +127,9 @@ export function buildPropulsion(ctx) {
       g.push(latheX([[0.19, 14.15], [0.205, 14.5], [0.215, 14.82]], yc, zc, 24));
       const cas = latheX([[0.32, 14.12], [0.3, 14.45], [0.27, 14.82]], yc, zc, 32);
       const hpc = P(`F119 HP compressor (${R})`, {
-        system: 'Propulsion', material: 'Titanium and nickel blisks', mass: 210,
+        system: 'Propulsion', material: 'Titanium and nickel blisks, burn-resistant Alloy C stators', mass: 300,
         explode: [0.6, 0.55, 0.55 * side],
-        desc: 'Six stages squeeze the core air before combustion; the HP spool turns opposite to the LP spool, which lets the engine drop a row of turbine vanes and save weight (stage count from Pratt & Whitney).',
+        desc: 'Six stages (the F100 needed ten) raise the core pressure so that the whole engine reaches an overall pressure ratio of about 26:1. Its stators are a burn-resistant titanium alloy, because a titanium fire in a compressor can otherwise sustain itself.',
       }, [mesh(merge(g), F.blade()), mesh(cas, F.tiDull())]);
       hpc.userData.part.thermalRole = 'compressor';
     }
@@ -142,9 +142,9 @@ export function buildPropulsion(ctx) {
         noz.push(new THREE.CylinderGeometry(0.012, 0.012, 0.08, 6).rotateZ(Math.PI / 2).translate(X(14.83), yc + Math.cos(a) * 0.275, zc + Math.sin(a) * 0.275));
       }
       const comb = P(`F119 annular combustor (${R})`, {
-        system: 'Propulsion', material: 'Nickel-alloy Floatwall liner, thermal-barrier coating', mass: 95,
+        system: 'Propulsion', material: 'Floatwall liner of cooled high-cobalt alloy panels', mass: 140,
         explode: [0.1, 0.6, 0.6 * side],
-        desc: 'A short annular combustor with replaceable liner panels burns fuel from a ring of injectors (count illustrative); its exit gas is far hotter than the melting point of the turbine blades it feeds.',
+        desc: 'A short annular combustor fed by a ring of fuel injectors (count illustrative). Its Floatwall liner is made of separate, air-cooled panels with no welds, so thermal cycling cannot start cracks at weld seams; it burns cleanly with little smoke.',
       }, [mesh(ann, F.inconel()), mesh(merge(noz), F.brass())]);
       comb.userData.part.thermalRole = 'combustor';
     }
@@ -154,9 +154,9 @@ export function buildPropulsion(ctx) {
       g.push(bladeRow({ x: X(15.32), y: yc, z: zc, count: 52, rHub: 0.225, rTip: 0.335, chord: 0.045, twist: 0.8, thick: 0.01 }));
       g.push(FR.cylX(15.33, yc, zc, 0.07, 0.215, 0.215, 28));
       const hpt = P(`F119 HP turbine (${R})`, {
-        system: 'Propulsion', material: 'Single-crystal nickel superalloy blades, cooled', mass: 120,
+        system: 'Propulsion', material: 'Single-crystal nickel superalloy blades, impingement cooled', mass: 170,
         explode: [-0.4, 0.6, 0.6 * side],
-        desc: 'One stage of air-cooled single-crystal blades drives the six-stage compressor. Cooling air bled from the compressor flows through each hollow blade and out of tiny holes to form a protective film.',
+        desc: 'One stage of single-crystal blades drives the six-stage compressor. The gas reaching it is around 1,900 K (about 3,000 °F), hotter than the alloy can survive, so compressor air is blown through each hollow blade and out of tiny holes as a protective film.',
       }, mesh(merge(g), F.bladeHot()));
       hpt.userData.part.thermalRole = 'turbine';
       const l = [bladeRow({ x: X(15.42), y: yc, z: zc, count: 40, rHub: 0.225, rTip: 0.355, chord: 0.05, twist: -0.6, thick: 0.012 })];
@@ -164,29 +164,29 @@ export function buildPropulsion(ctx) {
       l.push(FR.cylX(15.52, yc, zc, 0.06, 0.22, 0.22, 28));
       l.push(FR.cylX(14.7, yc, zc, 2.0, 0.05, 0.05, 10));           // LP shaft to the fan
       const lpt = P(`F119 LP turbine (${R})`, {
-        system: 'Propulsion', material: 'Nickel superalloy', mass: 105,
+        system: 'Propulsion', material: 'Nickel superalloy', mass: 150,
         explode: [-0.8, 0.6, 0.6 * side],
-        desc: 'A single LP stage turns the three-stage fan through a shaft running inside the HP spool, in the opposite direction to the HP turbine (counter-rotating spools).',
+        desc: 'A single LP stage turns the three-stage fan through a shaft running inside the HP spool. The two spools spin in opposite directions, which cancels much of their gyroscopic moment when the jet manoeuvres hard (the vanes between the turbines were kept).',
       }, mesh(merge(l), F.bladeHot()));
       lpt.userData.part.thermalRole = 'turbine';
     }
     // ---------------------------------------------------------------- augmentor
     {
       const g = [];
-      for (let k = 0; k < 8; k++) {
-        const a = (k / 8) * Math.PI * 2;
-        g.push(new THREE.BoxGeometry(0.16, 0.26, 0.02).rotateX(a).translate(X(15.68), yc + Math.cos(a) * 0.33, zc + Math.sin(a) * 0.33));
-        g.push(new THREE.BoxGeometry(0.04, 0.24, 0.05).rotateX(a).translate(X(16.0), yc + Math.cos(a) * 0.32, zc + Math.sin(a) * 0.32));
+      // thick, curved radial vanes with the fuel injectors built in (they replace spray bars and
+      // V-gutter flameholders, and hide the turbine); three fuel-zone manifolds feed them
+      for (let k = 0; k < 12; k++) {
+        const a = (k / 12) * Math.PI * 2;
+        g.push(new THREE.BoxGeometry(0.24, 0.27, 0.05).rotateY(0.45).rotateX(a).translate(X(15.7), yc + Math.cos(a) * 0.335, zc + Math.sin(a) * 0.335));
       }
       g.push(latheX([[0.215, 15.58], [0.2, 15.75], [0.14, 15.95], [0.06, 16.12], [0.001, 16.2]], yc, zc, 24));
-      for (const r of [0.22, 0.33, 0.43]) g.push(new THREE.TorusGeometry(r, 0.012, 6, 36).rotateY(Math.PI / 2).translate(X(15.9), yc, zc));
-      for (const r of [0.28, 0.4]) g.push(new THREE.TorusGeometry(r, 0.028, 4, 36).rotateY(Math.PI / 2).translate(X(16.02), yc, zc));
+      for (const r of [0.25, 0.34, 0.43]) g.push(new THREE.TorusGeometry(r, 0.014, 6, 36).rotateY(Math.PI / 2).translate(X(15.84), yc, zc));
       const liner = FR.cylX(16.5, yc, zc, 1.5, 0.48, 0.47, 40, true);
       const outer = FR.cylX(16.48, yc, zc, 1.55, 0.52, 0.5, 40, true);
       const aug = P(`F119 augmentor (${R})`, {
-        system: 'Propulsion', material: 'Nickel / cobalt alloys, perforated cooling liner', mass: 260,
+        system: 'Propulsion', material: 'Nickel / cobalt alloys, ceramic RAM-coated vanes, perforated cooling liner', mass: 380,
         explode: [-1.3, 0.55, 0.6 * side],
-        desc: 'The afterburner: spray rings inject fuel behind the turbine and V-gutter flameholders anchor the flame, lifting thrust from about 116 kN dry to about 156 kN. A perforated liner keeps a film of bypass air between flame and casing.',
+        desc: 'The three-zone afterburner lifts thrust from about 116 kN dry to the 156 kN class. Instead of spray bars and V-gutters, fuel is injected from thick curved vanes coated with radar-absorbent ceramic, which also hold the flame and block any view of the turbine (vane count illustrative); a perforated liner keeps bypass air between flame and casing.',
       }, [mesh(merge(g), F.hot()), mesh(liner, F.liner()), mesh(outer, F.hot())]);
       aug.userData.part.thermalRole = 'augmentor';
       const glow = mesh(new THREE.CircleGeometry(0.46, 32).rotateY(-Math.PI / 2).translate(X(17.2), yc, zc), anim.turbine, { cast: false });
@@ -256,7 +256,7 @@ export function buildPropulsion(ctx) {
       const extU = ext(1), extL = ext(-1);
       anim.tvc.push({ pivot, extU, extL });
       const nz = P(`2-D vectoring nozzle (${R})`, {
-        system: 'Propulsion', material: 'Nickel and titanium flaps, ceramic-coated hot sections', mass: 430,
+        system: 'Propulsion', material: 'Burn-resistant titanium (Alloy C) and nickel flaps, ceramic-coated hot sections', mass: 550,
         explode: [-2.6, 0.3, 0.85 * side], callout: side > 0, anchor: [X(18.3), 0.5, zc],
         desc: 'A two-dimensional convergent–divergent nozzle: upper and lower flaps set the throat area and swing the exhaust ±20° in pitch, giving pitch control even when the tail has too little airflow to bite. Its flat sides and serrated edges also shield the hot turbine from view.',
       }, [mesh(trans, F.nozzleIn()), mesh(merge(walls), F.nozzle()), mesh(merge(acts), F.hyd()), pivot, extU, extL]);
@@ -276,13 +276,22 @@ export function buildPropulsion(ctx) {
       }, mesh(merge(g), F.boxLight()));
       const m = [];
       for (const dz of [-0.6, 0.6]) m.push(FR.pipe([[13.9, yc, zc + dz * 0.95], [13.75, yc + 0.05, zc + dz * 1.12]], 0.03, 6));
-      m.push(FR.pipe([[16.6, yc + 0.5, zc], [16.4, yc + 0.55, zc + 0.08 * side]], 0.025, 6));
+      m.push(FR.pipe([[16.55, yc + 0.1, zc + side * 0.5], [16.4, yc + 0.1, zc + side * 0.66]], 0.025, 6));
       m.push(FR.pipe([[14.1, yc + 0.54, zc], [13.7, yc + 0.6, zc]], 0.022, 6));
       P(`Engine mounts (${R})`, {
         system: 'Propulsion', material: 'Steel trunnions and links', mass: 35,
         explode: [0.2, 1.0, 0.7 * side],
         desc: 'Trunnions on the fan case take thrust and vertical loads into the engine-bay frame; an aft link at the augmentor lets the hot engine grow in length as it heats up. The engine drops out downward for change.',
       }, mesh(merge(m), F.steel()));
+      // dual-channel FADEC on the outboard side of the engine case, with its harness to the fan case
+      const fd = [new THREE.BoxGeometry(0.4, 0.2, 0.08).translate(X(14.75), yc + 0.13, zc + side * 0.6)];
+      fd.push(new THREE.BoxGeometry(0.04, 0.16, 0.05).translate(X(14.52), yc + 0.13, zc + side * 0.56));
+      fd.push(FR.pipe([[14.55, yc + 0.2, zc + side * 0.6], [14.2, yc + 0.32, zc + side * 0.5], [13.9, yc + 0.4, zc + side * 0.43]], 0.012, 5));
+      P(`FADEC engine control (${R})`, {
+        system: 'Propulsion', material: 'Dual-redundant digital engine controller (Hamilton Standard), fuel cooled', mass: 18,
+        explode: [0.0, 0.5, 1.15 * side],
+        desc: 'Full-authority digital engine control: two independent channels schedule fuel flow, variable vanes, nozzle area and vectoring, and talk directly to the vehicle-management computers, which makes the F119 stall-resistant and tolerant of slamming the throttles.',
+      }, mesh(merge(fd), F.box()));
     }
   }
 }

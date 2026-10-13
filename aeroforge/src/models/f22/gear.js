@@ -182,7 +182,7 @@ export function buildGear(ctx) {
     g.push(new THREE.BoxGeometry(0.14, 0.08, 0.16).translate(X(17.12), -0.52, 0));
     g.push(new THREE.CylinderGeometry(0.05, 0.05, 0.2, 12).rotateX(Math.PI / 2).translate(X(15.7), -0.5, 0));
     g.push(rodV(V(X(15.9), -0.45, 0), V(X(16.4), -0.4, 0), 0.035, 10));
-    const door = new THREE.BoxGeometry(1.7, 0.02, 0.2).translate(X(16.45), -FR.bD(16.45) + 0.004, 0);
+    const door = slab([15.65, 16.0, 16.35, 16.7, 17.05].map((s) => [-0.1, 0.1].map((z) => [X(s), -FR.bD(s) - 0.002, z])), () => [0, 0.02, 0], V(0, -1, 0));
     P('Arresting hook', {
       system: 'Landing gear', material: 'Steel shank and hook point, composite door', mass: 45,
       explode: [-0.6, -1.0, 0],

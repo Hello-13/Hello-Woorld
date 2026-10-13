@@ -39,7 +39,8 @@ export const UH60 = {
   accessoriesKW: 45,     // generators, hydraulic pumps, oil-cooler blower (estimate)
   engines: 2,
   ratings: { contingency: 2000, max: 1994, irp: 1902, mcp: 1716 },  // shp per engine, GE T700-701D datasheet
-  install: 0.97,         // installed losses: inlet particle separator and IR suppressor (estimate)
+  install: 0.95,         // installed losses: inlet particle separator, IR suppressor, inlet recovery (estimate,
+                         // calibrated so 16,800 lb at 4,000 ft / 95 °F climbs close to the brochure's 1,553 ft/min)
   lapse: 1.5,            // power ∝ δ·θ^(−1.5) at fixed turbine temperature (estimate)
   lapseCap: 1.05,        // cold-day power growth stops at the engine's torque/speed limits (estimate)
   transLimit: 3400,      // shp, dual-engine main-transmission rating (UH-60L/M)
@@ -287,9 +288,12 @@ export function rotorEnergy(powerW, { toFraction = 0.8, r = UH60 } = {}) {
   return { I, E, seconds: ((1 - toFraction * toFraction) * E) / Math.max(1, powerW) };
 }
 
-/** Maximum vertical rate of climb (m/s) out of ground effect from the power margin. */
-export function verticalClimb({ mass, pressureAltitude = 0, isaDev = 0, rating = 'irp', oei = false, r = UH60 } = {}) {
-  const avail = powerAvailable({ pressureAltitude, isaDev, rating, oei, r }).W;
+/**
+ * Maximum vertical rate of climb (m/s) out of ground effect from the power margin. powerFraction
+ * scales the rating: the US Army quotes vertical climb on 95 % of intermediate rated power.
+ */
+export function verticalClimb({ mass, pressureAltitude = 0, isaDev = 0, rating = 'irp', oei = false, powerFraction = 1, r = UH60 } = {}) {
+  const avail = powerAvailable({ pressureAltitude, isaDev, rating, oei, r }).W * powerFraction;
   const req = (Vc) => powerRequired({ mass, pressureAltitude, isaDev, Vc, r }).total;
   if (req(0) > avail) return 0;
   return bisect((Vc) => avail - req(Vc), 0, 40, 0.01);
@@ -318,7 +322,7 @@ export function heliPerformance({ mass = 7700, pressureAltitude = 0, isaDev = 0,
     FM: figureOfMerit(hogeP.mr),
     ceilingOGE: hoverCeiling({ mass, isaDev, rating: 'irp', oei }),
     ceilingIGE: hoverCeiling({ mass, isaDev, rating: 'irp', oei, wheelHeight: 3.05 }),
-    vroc: verticalClimb({ mass, pressureAltitude, isaDev, oei }),
+    vroc: verticalClimb({ mass, pressureAltitude, isaDev, oei, powerFraction: 0.95 }),
     energy: rotorEnergy(fwd.mainRotor + fwd.tailRotor),
     canHoverOGE: irp.W >= hogeP.total, canHoverIGE: irp.W >= higeP.total,
     overweight: mass > UH60.mtow, overExternal: mass > UH60.mtowExternal,

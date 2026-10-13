@@ -371,7 +371,7 @@ export function buildUAV() {
     storeParts.gbu.push(P(`GBU-12 Paveway II (${sn})`, {
       system: 'Weapons', material: 'Mk 82 steel bomb body, laser guidance kit', mass: 230, massSource: 'Published GBU-12 figure (≈ 230 kg)', explode: [0, -1.1, 2.1 * side],
       desc: 'A 500 lb-class Mk 82 bomb with a laser seeker and steering canards on the nose and folding wings at the tail: 3.27 m long, 0.27 m across. It steers toward laser energy reflected from a marked spot.',
-      callout: side > 0, anchor: [gx - 1.25, gy - 0.1, gb.z * side],
+      callout: side > 0, anchor: [gx + 0.75, gy - 0.12, gb.z * side],   // forward, on the guidance kit: clear of the Hellfire label
     }, [L(place(g.body), m.olive), L(place(g.guidance), m.seeker), L(place(g.dome), m.glass), L(place(g.band), m.yellow)]));
 
     // two Hellfires on a two-rail launcher, middle station

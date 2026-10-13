@@ -1,6 +1,9 @@
-// Optical Telescope Assembly (Perkin-Elmer, now Goodrich/Collins): the 2.4 m Ritchey–Chrétien
-// telescope. The mirror shapes are the design conics solved in physics/optics.js (K1 = −1.0023,
-// K2 = −1.4969), the spacings are NASA's (4.906 m between vertices, focus 1.5 m behind the primary).
+// Optical Telescope Assembly (Perkin-Elmer, now L3Harris): the 2.4 m Ritchey–Chrétien telescope.
+// The mirror shapes are the design conics solved in physics/optics.js (K1 = −1.0023, K2 = −1.4969),
+// the spacings are NASA's (4.906 m between vertices, focus 1.5 m behind the primary). Structure
+// sizes follow the SM3A Media Reference Guide §5.2: titanium main ring 2.9 m across and 38 cm deep,
+// beryllium reaction plate behind the mirror, graphite-epoxy metering truss 4.8 m long and 2.7 m
+// across (48 struts, three rings), main baffle 4.8 m × 2.7 m, central baffle 3 m long.
 // Also builds the light-path overlay drawn in X-ray, Systems and Blueprint.
 
 import * as THREE from 'three';
@@ -76,16 +79,27 @@ export function buildOTA(P) {
     const p = deg(k < 8 ? k * 45 + 22.5 : (k - 8) * 22.5);
     act.push(new THREE.CylinderGeometry(0.035, 0.035, 0.16, 10).rotateZ(Math.PI / 2).translate(...az(p, ring, xBack - 0.08)));
   }
-  // reaction structure behind the mirror: six radial beams from the main ring
-  for (let k = 0; k < 6; k++) {
-    const p = deg(k * 60);
-    sup.push(beam(az(p, 0.45, xBack - 0.18), az(p, 1.3, xBack - 0.18), 0.07, 0.07));
-  }
-  sup.push(tube(0.45, xBack - 0.22, xBack - 0.14, { seg: 32, open: false }));
   P('Primary mirror mounts & actuators', {
-    system: 'Optics', material: 'Titanium flexure mounts, 24 push-pull figure actuators', mass: 95, temp: 294, explode: [-1.6, 0, 0], count: 24,
-    desc: 'Three kinematic flexures hang the mirror from the main ring without forcing its shape; 24 actuators on the back can push the surface by fractions of a wavelength. They proved too weak to cancel the spherical aberration.',
+    system: 'Optics', material: 'Titanium kinematic linkages; 24 figure-control actuators', mass: 45, temp: 294, explode: [-1.6, 0, 0], count: 24,
+    desc: 'Three rods through the glass fix the mirror axially and three bonded pads hold it laterally, so the main ring carries it without forcing its shape. 24 actuators in two rings behind it can push the surface by fractions of a wavelength; they proved too weak to cancel the 1990 spherical aberration.',
   }, [mesh(merge(sup), HM.ti()), mesh(merge(act), HM.box())]);
+
+  // reaction plate: a beryllium wheel of 15 radial I-beams behind the mirror, spanning the main ring
+  const rp = [tube(0.45, xBack - 0.24, xBack - 0.13, { seg: 40, open: false })];
+  for (let k = 0; k < 15; k++) {
+    const p = deg(k * 24);
+    const a = az(p, 0.45, xBack - 0.185), b = az(p, 1.3, xBack - 0.185);
+    rp.push(beam(a, b, 0.11, 0.012));                                        // web
+    rp.push(beam(az(p, 0.45, xBack - 0.135), az(p, 1.3, xBack - 0.135), 0.012, 0.07), beam(az(p, 0.45, xBack - 0.235), az(p, 1.3, xBack - 0.235), 0.012, 0.07));   // flanges
+  }
+  for (let k = 0; k < 15; k++) {                                             // intercostal ribs between the beams
+    for (const r of [0.75, 1.05]) rp.push(rod(az(deg(k * 24), r, xBack - 0.185), az(deg(k * 24 + 24), r, xBack - 0.185), 0.012, 4));
+  }
+  rp.push(annulus(0.45, 1.3, xBack - 0.245, 64, -1));
+  P('Reaction plate', {
+    system: 'Structure', material: 'Beryllium: 15 radial I-beams, 48 intercostal ribs, central ring', mass: 90, temp: 293, explode: [-2.0, 0, 0],
+    desc: 'A wheel of beryllium I-beams spanning the main ring behind the primary. It carries the heater array that keeps the back of the mirror at 21 °C, the 24 figure-control actuators, and the central baffle on its centre ring. Rib layout simplified.',
+  }, mesh(merge(rp), HM.ti()));
 
   const heater = annulus(OPT.rHole + 0.05, OPT.rPM - 0.02, xBack - 0.012, 64, -1);
   P('Primary mirror heaters', {
@@ -98,8 +112,8 @@ export function buildOTA(P) {
   const ringParts = [axial(ringProfile, 96)];
   for (let k = 0; k < 24; k++) ringParts.push(new THREE.BoxGeometry(0.36, 0.08, 0.025).rotateX(deg(k * 15)).translate(...az(deg(k * 15), 1.46, 3.92)));
   out.mainRing = P('Main ring', {
-    system: 'Structure', material: 'Titanium box-section ring', mass: 520, temp: 292, explode: [0, 0, 0],
-    desc: 'The structural heart of the telescope: the primary mirror, the metering truss and the focal-plane structure all hang from it, and three kinematic links tie it to the spacecraft. 2.9 m across.',
+    system: 'Structure', material: 'Titanium hollow box-section ring, 38 cm deep', mass: 545, massSource: 'NASA SM3A Media Guide (1,200 lb)', temp: 292, explode: [0, 0, 0],
+    desc: 'The structural backbone of the telescope, 2.9 m across: the primary mirror, the main baffle, the metering truss and the focal-plane structure all hang from it, and kinematic brackets tie it to the spacecraft.',
   }, mesh(merge(ringParts), HM.ti()));
   const links = [];
   for (let k = 0; k < 3; k++) {
@@ -113,44 +127,48 @@ export function buildOTA(P) {
   }, mesh(merge(links), HM.ti()));
 
   // ------------------------------------------------------------------ metering truss
-  const rings = [4.12, 5.41, 6.7, 7.99, 9.28];
+  // three rings and 48 struts: 24 in each bay, zig-zagging between 12 nodes per ring
+  const rings = [4.12, 6.56, 9.0];
   const nodes = 12;
+  out.trussFront = rings[2];
   const nodeAt = (i, j) => az(deg((j + (i % 2) * 0.5) * (360 / nodes)), RAD.truss, rings[i]);
-  const struts = [], fittings = [];
+  const struts = [], ringsGeo = [], fittings = [];
   for (let i = 0; i < rings.length; i++) {
+    ringsGeo.push(axial([[RAD.truss - 0.035, rings[i] - 0.04], [RAD.truss + 0.035, rings[i] - 0.04], [RAD.truss + 0.035, rings[i] + 0.04], [RAD.truss - 0.035, rings[i] + 0.04], [RAD.truss - 0.035, rings[i] - 0.04]], 72));
     for (let j = 0; j < nodes; j++) {
-      struts.push(rod(nodeAt(i, j), nodeAt(i, (j + 1) % nodes), 0.026, 8));
-      fittings.push(new THREE.IcosahedronGeometry(0.055, 0).translate(...nodeAt(i, j)));
+      fittings.push(new THREE.IcosahedronGeometry(0.06, 0).translate(...nodeAt(i, j)));
       if (i < rings.length - 1) {
         const back = (i % 2) ? j : (j - 1 + nodes) % nodes;
         const fwd = (i % 2) ? (j + 1) % nodes : j;
-        struts.push(rod(nodeAt(i, j), nodeAt(i + 1, back), 0.03, 8));
-        struts.push(rod(nodeAt(i, j), nodeAt(i + 1, fwd), 0.03, 8));
+        struts.push(rod(nodeAt(i, j), nodeAt(i + 1, back), 0.032, 8));
+        struts.push(rod(nodeAt(i, j), nodeAt(i + 1, fwd), 0.032, 8));
       }
     }
   }
   out.truss = P('Metering truss', {
-    system: 'Structure', material: 'Graphite-epoxy tubes, titanium end fittings', mass: 114, temp: 292, explode: [0, 0, 0],
-    desc: 'A 5.3 m cylindrical truss, 2.9 m across, that holds the secondary mirror 4.906 m in front of the primary. Graphite-epoxy barely expands with temperature, but it slowly sheds absorbed water, so the secondary has been refocused by a few micrometres over the years. Strut layout simplified.',
-    callout: true, anchor: [6.7, 1.5, 0.2],
-  }, [mesh(merge(struts), HM.grEp()), mesh(merge(fittings), HM.fitting())]);
+    system: 'Structure', material: 'Graphite fibre-reinforced epoxy struts and rings, titanium end fittings; aluminised-Mylar MLI inside', mass: 114, temp: 292, explode: [0, 0, 0],
+    desc: 'A cage of 48 struts and three rings, 4.8 m long and 2.7 m across, that holds the secondary mirror 4.906 m in front of the primary to within 2.5 µm. Graphite-epoxy barely expands with temperature, but it slowly sheds absorbed water, so the secondary has been refocused by a few micrometres over the years.',
+    callout: true, anchor: [6.0, 1.42, 0.2],
+  }, [mesh(merge(struts), HM.grEp()), mesh(merge(ringsGeo), HM.grEp()), mesh(merge(fittings), HM.fitting())]);
 
   // ------------------------------------------------------------------ baffles
-  const mb = [tube(1.31, 4.3, 7.75, { seg: 72 })];
-  for (let k = 0; k < 10; k++) mb.push(annulus(1.235, 1.31, 4.45 + k * 0.36, 72, 1));
+  const mb = [tube(1.3, 4.12, 8.92, { seg: 72 })];
+  for (let k = 0; k < 13; k++) mb.push(annulus(1.235, 1.3, 4.3 + k * 0.36, 72, 1));
   P('Main baffle', {
-    system: 'Optics', material: 'Aluminium cylinder with internal stray-light vanes, flat black', mass: 55, temp: 290, explode: [0.6, 0, 0],
-    desc: 'Lines the inside of the metering truss in front of the primary. Its sharp-edged vanes trap light that enters the tube at an angle so it cannot scatter onto the mirror and fog the images.',
+    system: 'Optics', material: 'Aluminium cylinder with internal stray-light fins, flat black', mass: 70, temp: 290, explode: [0.6, 0, 0],
+    desc: 'A 4.8 m aluminium cylinder, 2.7 m across, standing on the front face of the main ring inside the metering truss. Its sharp-edged fins trap light that enters the tube at an angle so it cannot scatter onto the mirror and fog the images.',
   }, mesh(merge(mb), HM.black()));
-  const cb = [tube(0.3, 3.86, 6.35, { seg: 40, rTop: 0.24 })];
+  // the cone stops where it would start to clip the innermost rays bound for the secondary
+  const cb0 = xBack - 0.24, cb1 = 6.4;
+  const cb = [tube(0.3, cb0, cb1, { seg: 40, rTop: 0.235 })];
   for (let k = 0; k < 6; k++) {
     const x = 4.3 + k * 0.38;
-    const r = 0.3 + ((0.24 - 0.3) * (x - 3.86)) / (6.35 - 3.86);
-    cb.push(annulus(0.215, r, x, 40, 1));
+    const r = 0.3 + ((0.235 - 0.3) * (x - cb0)) / (cb1 - cb0);
+    cb.push(annulus(0.21, r, x, 40, 1));
   }
   P('Central baffle', {
-    system: 'Optics', material: 'Aluminium cone, flat black with vanes', mass: 14, temp: 291, explode: [0.9, 0, 0],
-    desc: 'A cone rising 2.2 m from the hole in the primary. Together with the secondary baffle it blocks every straight path from the sky to the focal plane, so only light that has bounced off both mirrors reaches the instruments.',
+    system: 'Optics', material: 'Aluminium cone, flat black with vanes', mass: 18, temp: 291, explode: [0.9, 0, 0],
+    desc: 'A cone about 3 m long, mounted on the reaction plate and rising through the 60 cm hole in the primary. With the secondary baffle it blocks every straight path from the sky to the focal plane, so only light that has bounced off both mirrors reaches the instruments.',
   }, mesh(merge(cb), HM.black()));
 
   // ------------------------------------------------------------------ secondary mirror and its assembly
@@ -159,28 +177,28 @@ export function buildOTA(P) {
   const smFace = mesh(axial(sm.slice().reverse(), 64), HM.mirror());
   const smBody = mesh(tube(OPT.rSM, smSurface(OPT.rSM), OPT.xSM + 0.055, { seg: 48, open: false }), HM.ule());
   out.sm = P('Secondary mirror', {
-    system: 'Optics', material: 'Low-expansion glass (ULE), Al + MgF₂ coating', mass: 12, temp: 291, explode: [1.3, 0, 0],
-    desc: '0.3 m convex hyperboloid (conic −1.497) facing back down the tube. It multiplies the primary\'s 5.52 m focal length by 10.4 into the 57.6 m, f/24 beam and sends it through the hole in the primary.',
+    system: 'Optics', material: 'Zerodur glass ceramic, Al + MgF₂ coating', mass: 12, temp: 291, explode: [1.3, 0, 0],
+    desc: '0.3 m convex hyperboloid (conic −1.497) facing back down the tube. It multiplies the primary\'s 5.52 m focal length by 10.4 into the 57.6 m, f/24 beam and sends it back through the hole in the primary. Its surface is figured even more accurately than the primary\'s.',
     callout: true, anchor: [OPT.xSM, 0.3, 0.15],
   }, [smFace, smBody]);
 
   const sma = [tube(0.22, OPT.xSM + 0.06, OPT.xSM + 0.36, { seg: 40, open: false })];
   for (let k = 0; k < 6; k++) sma.push(new THREE.BoxGeometry(0.1, 0.05, 0.05).translate(...az(deg(k * 60 + 30), 0.18, OPT.xSM + 0.4)));
   P('Secondary mirror assembly', {
-    system: 'Optics', material: 'Graphite-epoxy housing, stepper-motor actuators', mass: 48, temp: 290, explode: [1.9, 0, 0],
-    desc: 'Holds the secondary on actuators that can tilt, decenter and refocus it from the ground. Focus moves of a few micrometres compensate the slow shrinkage of the metering truss.',
+    system: 'Optics', material: 'Central hub with base plate, three pairs of alignment actuators', mass: 48, temp: 290, explode: [1.9, 0, 0],
+    desc: 'The hub at the front of the truss holds the secondary on three pairs of actuators that can tilt, decenter and refocus it from the ground, using wavefront data from the optical control sensors in the Fine Guidance Sensors. Focus moves of a few micrometres compensate the slow shrinkage of the truss.',
   }, mesh(merge(sma), HM.grEp()));
 
   const vanes = [];
   for (let k = 0; k < 4; k++) {
     const p = deg(k * 90);
-    const g = new THREE.BoxGeometry(0.3, RAD.truss - 0.4, 0.022);
-    g.translate(0, (RAD.truss + 0.4) / 2, 0).rotateX(p).translate(OPT.xSM + 0.2, 0, 0);
+    const g = new THREE.BoxGeometry(0.22, RAD.truss - 0.4, 0.02);
+    g.translate(0, (RAD.truss + 0.4) / 2, 0).rotateX(p).translate(out.trussFront - 0.02, 0, 0);
     vanes.push(g);
   }
   P('Secondary mirror spider', {
     system: 'Optics', material: 'Thin graphite-epoxy vanes', mass: 9, count: 4, temp: 290, explode: [1.6, 0, 0],
-    desc: 'Four thin vanes hold the secondary assembly in the beam. Light diffracting around them makes the four-pointed spikes on every bright star in a Hubble picture.',
+    desc: 'Four thin vanes from the front ring of the truss hold the secondary assembly in the beam. Light diffracting around them makes the four-pointed spikes on every bright star in a Hubble picture.',
   }, mesh(merge(vanes), HM.grEp()));
 
   const sb = [tube(OPT.rObsc, 8.3, OPT.xSM + 0.06, { seg: 48 }), annulus(0.22, OPT.rObsc, OPT.xSM + 0.06, 48, 1)];
@@ -209,8 +227,8 @@ export function buildOTA(P) {
     fps.push(beam([0.5, -c, s * c], [2.55, c, s * c], 0.06, 0.06));
   }
   P('Focal plane structure', {
-    system: 'Structure', material: 'Graphite-epoxy box frame with registration fittings', mass: 290, temp: 293, explode: [-2.2, 0, 0],
-    desc: 'Hangs behind the main ring and holds the four axial instruments, the radial instrument and the three Fine Guidance Sensors at the focal surface to within a few hundredths of a millimetre, so swapped instruments land in focus.',
+    system: 'Structure', material: 'Graphite-epoxy optical bench with guide rails and latches', mass: 545, massSource: 'NASA SM3A Media Guide (more than 1,200 lb)', temp: 293, explode: [-2.2, 0, 0],
+    desc: 'A 3 m × 2.1 m optical bench cantilevered off the rear of the main ring at eight flexible points. It holds the axial instruments, the radial camera and the three Fine Guidance Sensors at the focal surface so swapped instruments land in focus; its −V3 side carries the star trackers and gyros.',
   }, mesh(merge(fps), HM.grEp()));
 
   const latches = [];

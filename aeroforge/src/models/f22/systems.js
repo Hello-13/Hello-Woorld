@@ -236,11 +236,13 @@ export function buildSystems(ctx) {
       desc: 'Driven by the accessory drive, it supplies the 270 V DC primary bus. A high-voltage DC system saves copper weight; development-era figures give about 157 kW of primary and auxiliary electrical power in total.',
     }, mesh(merge([FR.cylX(13.36, -0.42, side * 1.38, 0.26, 0.1, 0.1, 18), box(13.2, -0.42, side * 1.38, 0.06, 0.16, 0.16)]), F.yellow()));
   }
+  // APU embedded in the left wing root, between two wing spars, exhausting through the upper skin
   P('Auxiliary power unit (APU)', {
     system: 'Electrical', material: 'Small gas turbine, 335 kW (450 hp) class', mass: 75,
-    explode: [0.2, -1.65, 0],
-    desc: 'Part of the auxiliary power generation system (AlliedSignal, now Honeywell): it starts the engines without ground carts and can restart them in flight below about 12,500 m. Location in the lower fuselage is approximate.',
-  }, mesh(merge([FR.cylX(13.75, -0.5, 0, 0.55, 0.14, 0.12, 18), FR.pipe([[14.0, -0.5, 0], [14.15, -0.62, 0], [14.2, -0.78, 0]], 0.05, 8)]), F.boxLight()));
+    explode: [0.2, 0.9, -1.3],
+    desc: 'Part of the auxiliary power generation system (AlliedSignal, now Honeywell), embedded in the left wing root: it starts the engines without ground carts and can restart them in flight. Inlet and exhaust door positions are approximate.',
+  }, mesh(merge([FR.cylX(11.95, -0.08, -1.8, 0.56, 0.1, 0.09, 18), box(11.62, -0.08, -1.8, 0.1, 0.2, 0.2),
+    FR.pipe([[12.2, -0.08, -1.8], [12.3, -0.04, -1.82], [12.36, 0.08, -1.84]], 0.045, 8, 6)]), F.boxLight()));
   P('Stored-energy system', {
     system: 'Electrical', material: 'High-pressure gas bottle and turbine', mass: 30,
     explode: [0.5, -1.85, 0.2],

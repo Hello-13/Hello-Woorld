@@ -252,8 +252,7 @@ export function buildFighter() {
       // anti-collision strobes: one soft ~0.12 s pulse per second, only while the lab flies the jet
       if (targets.airborne && air > 0.5) {
         state.strobeT += dt;
-        const ph = state.strobeT % 1.0;
-        anim.strobe.emissiveIntensity = ph < 0.12 ? 5 * Math.sin((Math.PI * ph) / 0.12) : 0;
+        anim.strobe.emissiveIntensity = FR.strobeLevel(state.strobeT);
       } else {
         state.strobeT = 0;
         anim.strobe.emissiveIntensity = 0;

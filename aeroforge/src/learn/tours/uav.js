@@ -72,12 +72,12 @@ export default [
     title: 'Seven stations',
     body: 'Six under-wing pylons and a centreline station carry up to 1,361 kg of stores. Shown: a GBU-12 laser-guided bomb on each inboard station and two Hellfire missiles on each middle station. Every kilogram of stores is a kilogram of fuel not carried, and every pylon adds drag.',
     key: 'MTOW 4,760 kg = empty 2,223 kg + fuel + payload: weight is the currency of the mission.',
-    explode: 0.25, focus: STORES, view: { dir: [0.6, 0.14, 1], fill: 0.85 },
+    explode: 0.25, focus: STORES, view: { dir: [0.45, -0.32, 1], fill: 0.95 },
   },
   {
     title: 'Wheels and control surfaces',
     body: 'Trailing-arm main legs and a steerable nose leg retract into the fuselage. Electric servos drive the ailerons, flaps, the two ruddervators and the ventral rudder. Watch the demonstration: roll, then pitch, then yaw, the ruddervators moving together for pitch and apart for yaw.',
     key: 'Ruddervator mixing: δ_left,right = δ_pitch ± δ_yaw.',
-    focus: [...CONTROLS, 'Main gear leg (starboard)', 'Main gear leg (port)', 'Nose landing gear'], view: { dir: [-1, 0.75, 0.6], fill: 0.7 }, demo: 'surfaces',
+    focus: [...CONTROLS, 'Main gear leg (starboard)', 'Main gear leg (port)', 'Nose landing gear'], view: { dir: [-1, 0.7, 0.7], fill: 0.85 }, demo: 'surfaces',
   },
 ];

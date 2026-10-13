@@ -107,6 +107,19 @@ test('the 4,000 ft / 95 °F hot-and-high case at 16,800 lb', () => {
   assert.ok(verticalClimb(cond) > 500 * FPM, 'and climbs vertically faster than 500 ft/min');
 });
 
+test('vertical climb on 95 % IRP at 4,000 ft / 95 °F matches the Sikorsky UH-60M brochure', () => {
+  // brochure: 1,553 ft/min at 16,800 lb and 941 ft/min at 18,000 lb (95 % intermediate rated power)
+  const cond = { pressureAltitude: 1219, isaDev: 35 - (15 - 0.0065 * 1219), powerFraction: 0.95 };
+  const lb = 0.45359237;
+  close(verticalClimb({ ...cond, mass: 16800 * lb }) / FPM, 1553, 0.12 * 1553, '16,800 lb');
+  close(verticalClimb({ ...cond, mass: 18000 * lb }) / FPM, 941, 0.18 * 941, '18,000 lb');
+  // and the climb power obeys momentum theory: P = κT(Vc/2 + √((Vc/2)² + v_h²)) + profile + Vc·T
+  const Vc = 5, p = powerRequired({ mass: 7620, Vc });
+  const vh = p.mr.vh, vi = -Vc / 2 + Math.sqrt(Vc * Vc / 4 + vh * vh);
+  close(p.mr.induced, UH60.kappa * p.Tmr * vi, 1e-6 * p.mr.induced, 'climb induced power');
+  close(p.mr.climb, p.Tmr * Vc, 1e-6 * p.mr.climb, 'climb power T·Vc');
+});
+
 test('hover ceilings: IGE above OGE, falling with weight and temperature', () => {
   const oge = hoverCeiling({ mass: UH60.mtow });
   const ige = hoverCeiling({ mass: UH60.mtow, wheelHeight: 3.05 });

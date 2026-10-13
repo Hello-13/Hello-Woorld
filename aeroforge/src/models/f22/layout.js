@@ -328,6 +328,18 @@ export function stabSection(z) {
 // vertical tail: built in a local frame (chord toward −x, span along +z) then canted 28° outward
 export const FIN = { rootS: 13.45, rootZ: 1.42, rootY: 0.33, span: 3.12, rootC: 3.9, tipC: 1.45, sweep: 22.9 * DEG, cant: 28 * DEG };
 
+// ------------------------------------------------------------------ lighting
+/**
+ * Anti-collision strobe brightness (emissive intensity) at time t (s) since the strobes came on:
+ * one soft 0.12 s pulse per second. The model runs this clock only while the lab's flight mode
+ * is on, so the strobes stay dark in the showroom and hangar.
+ */
+export const STROBE = { period: 1.0, pulse: 0.12, peak: 5 };
+export function strobeLevel(t) {
+  const ph = ((t % STROBE.period) + STROBE.period) % STROBE.period;
+  return ph < STROBE.pulse ? STROBE.peak * Math.sin((Math.PI * ph) / STROBE.pulse) : 0;
+}
+
 // ------------------------------------------------------------------ ring helpers
 /** Rounded-rectangle (superellipse) ring in the y–z plane around (cz, cy) at model x. */
 export function superRing(x, cz, cy, w, h, n = 24, k = 3.2, start = Math.PI / 2) {
