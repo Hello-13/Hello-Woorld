@@ -140,7 +140,7 @@ const SanitizeShader = {
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null }, time: { value: 0 }, vignette: { value: 0.3 }, grain: { value: 0.022 },
-    aberration: { value: 0.0045 }, contrast: { value: 0.14 }, split: { value: 0.035 },
+    aberration: { value: 0.0008 }, contrast: { value: 0.14 }, split: { value: 0.035 },
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: /* glsl */`

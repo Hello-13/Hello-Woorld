@@ -411,7 +411,7 @@ export class Environment {
 
   ensureEarth() {
     if (!this.earth) {
-      this.earth = createEarth(1, { segments: 160, atmosphere: 1 });
+      this.earth = createEarth(1, { segments: 256, atmosphere: 1, shell: 1.016, scaleH: 0.0042 });   // ~27 km glow scale height
       // drawn as part of the backdrop: opaque queue (so it precedes every scene object), no depth,
       // alpha handled with explicit blend state rather than the transparent queue
       for (const o of [this.earth.surface, this.earth.clouds, this.earth.atmosphere]) {
