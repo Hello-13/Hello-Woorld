@@ -87,26 +87,31 @@ export class Callouts {
       items.push({ o, x: (v.x * 0.5 + 0.5) * width, y: (-v.y * 0.5 + 0.5) * height, w, h });
     }
     items.sort((a, b) => a.y - b.y);                 // top to bottom: upper labels claim upward slots first
+    const R = 7;                                     // every dot is kept clear of the other labels
+    const dots = items.map((it) => [it.x - R, it.y - R, it.x + R, it.y + R]);
     const rectFor = (it, [sx, sy, k]) => {
       const lx = sx > 0 ? it.x + DX : it.x - DX - it.w;
       const ly = sy < 0 ? it.y - DY - it.h - k * (it.h + GAP) : it.y + DY + k * (it.h + GAP);
       return [lx, ly, lx + it.w, ly + it.h];
     };
-    const cost = (r) => {
+    const overlap = (r, q) => {
+      const ox = Math.min(r[2], q[2]) - Math.max(r[0], q[0]), oy = Math.min(r[3], q[3]) - Math.max(r[1], q[1]);
+      return ox > 0 && oy > 0 ? ox * oy : 0;
+    };
+    const cost = (r, self) => {
       let c = 0;
-      for (const q of placed) {
-        const ox = Math.min(r[2], q[2]) - Math.max(r[0], q[0]), oy = Math.min(r[3], q[3]) - Math.max(r[1], q[1]);
-        if (ox > 0 && oy > 0) c += ox * oy;
-      }
+      for (const q of placed) c += overlap(r, q);
+      for (let j = 0; j < dots.length; j++) if (j !== self) c += overlap(r, dots[j]) * 4;   // covering a dot hides a part's anchor
       const off = Math.max(0, -r[0]) + Math.max(0, r[2] - width) + Math.max(0, -r[1]) + Math.max(0, r[3] - height);
       return c + off * 400;
     };
-    for (const it of items) {
+    for (let n = 0; n < items.length; n++) {
+      const it = items[n];
       let best = it.o.slot >= 0 ? it.o.slot : 0;
-      let bestCost = cost(rectFor(it, SLOTS[best]));
+      let bestCost = cost(rectFor(it, SLOTS[best]), n);
       if (bestCost > 0) {
         for (let i = 0; i < SLOTS.length && bestCost > 0; i++) {
-          const c = cost(rectFor(it, SLOTS[i]));
+          const c = cost(rectFor(it, SLOTS[i]), n);
           if (c < bestCost) { best = i; bestCost = c; }
         }
       }

@@ -54,6 +54,7 @@ export class TourPlayer {
   prev() { if (this.steps && this.i > 0) this.apply(this.i - 1); }
 
   apply(i) {
+    if (!this.steps?.[i]) return;            // e.g. a stale progress dot clicked after the tour closed
     this.exitDemo();
     this.i = i;
     const step = this.steps[i];
