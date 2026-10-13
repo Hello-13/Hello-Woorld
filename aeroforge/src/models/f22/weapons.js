@@ -127,7 +127,7 @@ export function buildWeapons(ctx) {
           arms.push(arm);
         }
         ls.push(lg);
-        bay.ejectors.push({ holder, y0: y, arms, top: body.position.y - 0.05, z: side * zz });
+        bay.ejectors.push({ holder, y0: y, arms: arms.map((a) => ({ mesh: a, x: a.position.x })), top: body.position.y - 0.05, z: side * zz });
       }
       P(`AIM-120C AMRAAM ×3 (${R} main bay)`, {
         system: 'Weapons', material: 'Steel / composite airframe, active radar seeker', mass: 152, massSource: 'USAF AIM-120 fact sheet (each)', count: 3,

@@ -183,12 +183,12 @@ export function buildFighter() {
       state.airborne = approach(state.airborne, targets.airborne, 0.5, dt);
 
       // landing gear: legs swing on their trunnions, main wheels turn flat, doors lead and follow
-      const up = 1 - state.gear;
-      const ku = smooth(0, 1, up);
+      const ret = 1 - state.gear;
+      const ku = smooth(0, 1, ret);
       for (const g of anim.gear) {
         qT.copy(qI).slerp(g.q, ku);
         for (const p of g.pivots) p.quaternion.copy(qT);
-        if (g.twist) g.twist.g.quaternion.setFromAxisAngle(g.twist.axis, g.twist.angle * smooth(0.15, 0.85, up));
+        if (g.twist) g.twist.g.quaternion.setFromAxisAngle(g.twist.axis, g.twist.angle * smooth(0.15, 0.85, ret));
       }
       const doorOpen = smooth(0, 0.15, state.gear) * 1;
       for (const d of anim.gearDoors) d.h.set(d.angle * doorOpen);
@@ -199,11 +199,10 @@ export function buildFighter() {
       for (const d of anim.bay.doors) d.h.set(d.angle * kd);
       for (const e of anim.bay.ejectors) {
         e.holder.position.y = e.y0 - 0.23 * ke;
-        for (const arm of e.arms) {
-          ej0.set(arm.position.x || e.holder.position.x, e.top, e.z);
-          ej1.set(ej0.x, e.holder.position.y + 0.085, e.z);
-          stretch(arm, ej0, ej1);
-          arm.position.x = ej0.x;
+        for (const a of e.arms) {
+          ej0.set(a.x, e.top, e.z);
+          ej1.set(a.x, e.holder.position.y + 0.085, e.z);
+          stretch(a.mesh, ej0, ej1);
         }
       }
       for (const tz of anim.bay.trapeze) {
