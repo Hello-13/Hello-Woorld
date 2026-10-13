@@ -174,7 +174,7 @@ export function tube(points, radius, { seg = 48, radial = 8, closed = false } = 
 }
 
 /** A circumferential pipe (torus) of radius r at station y. */
-export function hoop(r, y, thickness, { radial = 8, tubular = 96, arc = TAU, start = 0 } = {}) {
+export function hoop(r, y, thickness, { radial = 6, tubular = 72, arc = TAU, start = 0 } = {}) {
   const g = new THREE.TorusGeometry(r, thickness, radial, tubular, arc);
   g.rotateX(Math.PI / 2);                 // torus in the x–z plane: x = R cos u, z = R sin u
   // so phi(u) = π/2 − u runs from π/2 − arc to π/2; rotating about y adds to phi

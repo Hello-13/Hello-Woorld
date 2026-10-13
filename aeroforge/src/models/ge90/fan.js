@@ -23,13 +23,13 @@ function fanBlade(sheath = false) {
     chord, stagger, t: (f) => 0.11 - 0.08 * f, camber: (f) => 0.09 - 0.065 * f,
     sweep: (f) => le(f) - 0.5 * chord(f) * Math.cos(stagger(f) * D2R),
     lean: (f) => 0.05 * f * f,
-    stations: 12, n: sheath ? 6 : 16,
+    stations: 10, n: sheath ? 5 : 14,
     ...(sheath ? { c0: 0, c1: 0.1, scale: 1.18 } : {}),
   });
 }
 
 /** A blade row sized to the core annulus at y. Rotors leave a tip gap, stators a hub gap. */
-export function coreRow({ y, chord, count, rotor = true, stagger = rotor ? [38, 56] : [-24, -32], t = [0.07, 0.05], camber = rotor ? 0.05 : -0.05, stations = 2, n = 6, ann = coreAt, gap = 0.003, phase = 0 }, keep) {
+export function coreRow({ y, chord, count, rotor = true, stagger = rotor ? [38, 56] : [-24, -32], t = [0.07, 0.05], camber = rotor ? 0.05 : -0.05, stations = 2, n = 5, ann = coreAt, gap = 0.003, phase = 0 }, keep) {
   const [hub, tip] = ann(y);
   const g = bladeGeometry({ rHub: rotor ? hub : hub + gap, rTip: rotor ? tip - gap : tip, chord, stagger, t, camber, y, stations, n });
   return ring(g, count, { keep, phase });

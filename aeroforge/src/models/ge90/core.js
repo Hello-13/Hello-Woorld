@@ -96,7 +96,7 @@ export function buildCore(ctx) {
     const h = coreAt(r.y)[0];
     hpcDisks.push([[h - 0.012, r.y + 0.03], [h, r.y + 0.03], [h, r.y - 0.03], [h - 0.012, r.y - 0.03], [h - 0.05, r.y - 0.012], [0.24, r.y - 0.01], [0.24, r.y - 0.03], [0.2, r.y - 0.03], [0.2, r.y + 0.03], [0.24, r.y + 0.03], [0.24, r.y + 0.01], [h - 0.05, r.y + 0.012]]);
   }
-  const hpcSpool = cut(cutLathe(hpcDisks, GM.titanium(), { seg: 64 }));
+  const hpcSpool = cut(cutLathe(hpcDisks, GM.titanium(), { seg: 48 }));
   P('HP compressor spool', {
     system: 'Propulsion', material: 'Titanium front disks, nickel-alloy rear disks', mass: 360,
     explode: [0, -0.7, 0], temp: 650,
@@ -123,7 +123,7 @@ export function buildCore(ctx) {
     const list = [];
     for (const r of vsvRows) {
       const t = coreAt(r.y)[1];
-      list.push(hoop(t + 0.08, r.y - 0.02, 0.008, { tubular: 64, start: keep.start, arc: keep.arc }));
+      list.push(hoop(t + 0.08, r.y - 0.02, 0.008, { tubular: 48, start: keep.start, arc: keep.arc }));
       for (let i = 0; i < 36; i++) {
         const phi = (i / 36) * TAU;
         if (!keep(phi)) continue;
@@ -217,7 +217,7 @@ export function buildCore(ctx) {
   }, nozzles).userData.part.stationTemp = '3';
 
   const manifold = cut(cutPair((keep) => {
-        return merge([hoop(0.86, -3.275, 0.012, { start: keep.start, arc: keep.arc, tubular: 120 }), hoop(0.885, -3.31, 0.012, { start: keep.start, arc: keep.arc, tubular: 120 })]);
+        return merge([hoop(0.86, -3.275, 0.012, { start: keep.start, arc: keep.arc, tubular: 80 }), hoop(0.885, -3.31, 0.012, { start: keep.start, arc: keep.arc, tubular: 80 })]);
   }, GM.steel()));
   P('Fuel manifolds', {
     system: 'Fuel', material: 'Stainless-steel tubing', mass: 22, count: 2,
@@ -268,7 +268,7 @@ export function buildCore(ctx) {
   }
   hptDisk.push([[0.4, -3.775], [0.47, -3.81], [0.47, -3.82], [0.395, -3.79]]);           // forward cooling plate
   hptDisk.push(rect(0.43, 0.47, -3.89, -3.99));                                         // interstage seal
-  const hptRotor = cut(cutLathe(hptDisk, GM.nickelDark(), { seg: 64 }));
+  const hptRotor = cut(cutLathe(hptDisk, GM.nickelDark(), { seg: 48 }));
   P('HPT disks & cooling plates', {
     system: 'Propulsion', material: 'Powder-metallurgy nickel superalloy', mass: 230,
     explode: [0, -1.25, 0], temp: 900,
@@ -297,7 +297,7 @@ export function buildCore(ctx) {
 
   // ====================================================================== LP turbine
   ROWS.lptNozzles.forEach((r, i) => {
-    const vanes = cut(cutPair((keep) => coreRow({ ...r, rotor: false, stagger: [-40, -46], t: [0.14, 0.1], camber: -0.12, gap: 0.004, stations: 3, n: 6 }, keep), GM.heat(i / 5)));
+    const vanes = cut(cutPair((keep) => coreRow({ ...r, rotor: false, stagger: [-40, -46], t: [0.14, 0.1], camber: -0.12, gap: 0.004, stations: 2, n: 5 }, keep), GM.heat(i / 5)));
     vanes.traverse((o) => { if (o.isMesh) o.userData.temp = lt('45', '5', (i + 0.1) / 6); });
     P(`LPT stage ${i + 1} nozzle`, {
       system: 'Propulsion', material: 'Cast nickel-alloy vane segments (count estimated)', mass: 55 + i * 10, count: r.count,
@@ -308,7 +308,7 @@ export function buildCore(ctx) {
     }, vanes).userData.part.stationTemp = '45';
   });
   ROWS.lptBlades.forEach((r, i) => {
-    const m = mesh(coreRow({ ...r, stagger: [32, 40], t: [0.12, 0.06], camber: 0.12, gap: 0.004, stations: 3, n: 6 }), GM.heat(0.2 + i * 0.12));
+    const m = mesh(coreRow({ ...r, stagger: [32, 40], t: [0.12, 0.06], camber: 0.12, gap: 0.004, stations: 2, n: 5 }), GM.heat(0.2 + i * 0.12));
     m.userData.temp = lt('45', '5', (i + 0.6) / 6);
     const g = new THREE.Group();
     g.add(m);
@@ -329,7 +329,7 @@ export function buildCore(ctx) {
     lptDisks.push([[h - 0.02, r.y + 0.03], [h, r.y + 0.03], [h, r.y - 0.03], [h - 0.02, r.y - 0.03], [h - 0.05, r.y - 0.01], [0.3, r.y - 0.01], [0.3, r.y - 0.025], [0.26, r.y - 0.025], [0.26, r.y + 0.025], [0.3, r.y + 0.025], [0.3, r.y + 0.01], [h - 0.05, r.y + 0.01]]);
   }
   lptDisks.push([[0.29, -4.76], [0.3, -4.76], [0.112, -5.1], [0.102, -5.1]]);           // LPT shaft cone to the LP shaft
-  const lptRotor = cut(cutLathe(lptDisks, GM.nickelDark(), { seg: 64 }));
+  const lptRotor = cut(cutLathe(lptDisks, GM.nickelDark(), { seg: 48 }));
   P('LP turbine rotor', {
     system: 'Propulsion', material: 'Nickel-alloy disks on a bolted drum', mass: 640,
     explode: [0, -1.55, 0], temp: 800,
@@ -345,11 +345,11 @@ export function buildCore(ctx) {
     desc: 'The flared case that holds the six LPT nozzle rows. Its cone angle shows how much the gas expands: the annulus area grows about 2.5-fold from LPT inlet to exit.',
   }, lptC).userData.part.stationTemp = '5';
   const lptAcc = cut(cutPair((keep) => {
-        const list = ROWS.lptBlades.map((r) => hoop(coreAt(r.y)[1] + 0.075, r.y, 0.012, { start: keep.start, arc: keep.arc, tubular: 96 }));
+        const list = ROWS.lptBlades.map((r) => hoop(coreAt(r.y)[1] + 0.075, r.y, 0.012, { start: keep.start, arc: keep.arc, tubular: 56, radial: 5 }));
     for (const phi of [0.3, 2.4]) {
       if (!keep(phi)) continue;
       const pts = ROWS.lptBlades.map((r) => P3(coreAt(r.y)[1] + 0.105, r.y, phi));
-      list.push(tube([P3(1.03, -3.95, phi), P3(0.86, -4.12, phi), ...pts], 0.026, { seg: 40, radial: 10 }));
+      list.push(tube([P3(1.03, -3.95, phi), P3(0.86, -4.12, phi), ...pts], 0.026, { seg: 32, radial: 8 }));
       list.push(axialCyl(1.03, -3.92, phi, 0.05, 0.1, 16));
     }
     return merge(list);

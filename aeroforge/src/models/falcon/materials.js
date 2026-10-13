@@ -145,7 +145,7 @@ export const FM = {
   deflector: () => once('deflector', () => new THREE.MeshStandardMaterial({ color: 0x8f8a83, roughness: 0.9, metalness: 0.1 })),
   water: () => once('waterPipe', () => new THREE.MeshStandardMaterial({ color: 0xb7b9b2, roughness: 0.5, metalness: 0.6 })),
   hardstand: () => once('hardstand', () => {
-    const c = concrete({ seed: 23 });
+    const c = concrete({ seed: 11 });           // same tile as the pad floor (cached)
     const out = {};
     for (const k of ['map', 'normalMap', 'roughnessMap']) { const t = c[k].clone(); t.repeat.set(1 / 12, 1 / 12); t.needsUpdate = true; out[k] = t; }
     return new THREE.MeshStandardMaterial({ color: 0xb4b0a8, ...out, roughness: 1, metalness: 0 });
