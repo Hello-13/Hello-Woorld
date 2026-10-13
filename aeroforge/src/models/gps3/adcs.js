@@ -107,7 +107,8 @@ export function buildADCS(P) {
   }, rodMesh(a, b)); };
   torque('Magnetic torque rod (X)', [0.56, 0.3, 1.4], [1.12, 0.3, 1.4], [0.75, 0, 0.3], 'high in the +X bay');
   torque('Magnetic torque rod (Y)', [1.03, -0.3, 1.53], [1.03, 0.3, 1.53], [0.85, 0, 0.35], 'under the Earth deck in the +X bay');
-  torque('Magnetic torque rod (Z)', [0.7, 0.4, -1.1], [0.7, 0.4, -0.5], [0.8, 0.1, 0], 'on the +X/+Y shear web');
+  // on the +X bay face of the +X/+Y shear web (web face at y = 0.475; end caps r 0.026 seat against it), inboard of the tank struts
+  torque('Magnetic torque rod (Z)', [0.64, 0.449, -1.1], [0.64, 0.449, -0.5], [0.8, 0.1, 0], 'on the +X/+Y shear web');
 
   // ------------------------------------------------------------------ bus avionics (TT&C subsystem)
   box('On-board computer', {

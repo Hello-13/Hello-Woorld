@@ -36,7 +36,7 @@ export default [
     title: 'Built to stay up, not to go fast',
     body: 'The MQ-9A Reaper is an 11 m, 4.8-tonne aircraft designed to circle one area for a day or more while its sensors watch the ground. Almost everything you see follows from that: a 20 m wing, a fuel-sipping turboprop at the back, and a nose full of sensors and antennas instead of a cockpit.',
     key: 'For a propeller aircraft, endurance grows with η · C_L^1.5 / C_D: efficiency matters, speed does not.',
-    view: { dir: [0.3, 0.55, 1], fill: 0.7 },
+    view: { dir: [0.41, 0.866, 0.287], fill: 0.72 },   // high front quarter: all nine labels clear of each other's dots
   },
   {
     title: 'A long, thin wing',

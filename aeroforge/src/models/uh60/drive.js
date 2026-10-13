@@ -59,7 +59,7 @@ export function buildDrive({ A, P, roofY }) {
   for (const sd of [1, -1]) bevel.push(place(new THREE.CylinderGeometry(0.055, 0.09, 0.14, 18), [cx + 0.06, 2.45, 0.36 * sd], [Math.PI / 2 * sd, 0, 0]));
   bevel.push(place(new THREE.CylinderGeometry(0.05, 0.075, 0.1, 16), [cx - 0.36, 2.45, 0], [0, 0, Math.PI / 2]));   // tail take-off pinion
   P('Main bevel gear & combining pinions', {
-    system: 'Drive system', material: 'Carburised steel spiral-bevel gears', mass: 105, explode: [0.95, 0.4, 0],
+    system: 'Drive system', material: 'Carburised steel spiral-bevel gears', mass: 105, explode: [1.05, 0.4, 0],
     desc: 'Inside the main module the two input pinions mesh with one large spiral-bevel bull gear, combining both engines on a vertical shaft; a third pinion off the same gear drives the tail take-off. If one engine stops, its freewheel unit lets the other drive the gear alone.',
   }, [mesh(merge(bevel), MAT.steel())]);
   const planet = [cyl(0.32, 0.32, 0.09, [cx, 2.62, 0], 'y', 40, true), cyl(0.07, 0.07, 0.12, [cx, 2.62, 0], 'y', 16), cyl(0.27, 0.27, 0.03, [cx, 2.68, 0], 'y', 36)];
@@ -68,7 +68,7 @@ export function buildDrive({ A, P, roofY }) {
     planet.push(cyl(0.105, 0.105, 0.08, [cx + 0.185 * Math.cos(a), 2.62, 0.185 * Math.sin(a)], 'y', 20));
   }
   P('Planetary reduction stage', {
-    system: 'Drive system', material: 'Steel sun gear, five planet gears, fixed ring gear and planet carrier', mass: 95, explode: [-1.05, 0.3, 0],
+    system: 'Drive system', material: 'Steel sun gear, five planet gears, fixed ring gear and planet carrier', mass: 95, explode: [-1.05, 0.75, 0],
     desc: 'The final stage: the bull-gear shaft turns a sun gear, five planets roll round a fixed ring gear, and their carrier drives the rotor shaft. Splitting the torque five ways keeps the gears small enough for the transmission to fit under the rotor.',
   }, [mesh(merge(planet), MAT.steel())]);
   P('Main transmission lubrication & chip detectors', {
@@ -237,7 +237,7 @@ export function buildDrive({ A, P, roofY }) {
   // ------------------------------------------------------------------ tail take-off, brake, oil cooler, tail shafts
   const tto = V3(cx - 0.62, 2.45, 0);
   P('Rotor brake', {
-    system: 'Drive system', material: 'Steel disc, hydraulic caliper', mass: 12, explode: [-0.4, 1.2, 0],
+    system: 'Drive system', material: 'Steel disc, hydraulic caliper', mass: 12, explode: [-0.4, 1.4, 0],
     desc: 'A hydraulic disc brake on the tail take-off stops the rotor after shutdown and holds it while the engines are started with the rotor locked.',
   }, [mesh(merge([cyl(0.15, 0.15, 0.02, [tto.x - 0.02, tto.y, 0], 'x', 28), box(0.09, 0.12, 0.08, [tto.x - 0.02, tto.y + 0.14, 0])]), MAT.steel())]);
   P('Transmission oil cooler & blower', {

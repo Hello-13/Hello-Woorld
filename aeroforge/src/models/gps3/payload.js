@@ -117,13 +117,18 @@ export function buildPayload(P) {
 
   // ---- L-band RF cables: transmitters → multiplexer / L3 filter → through the Earth deck → beam-forming network
   const rf = [], yr = IY - 0.235;
-  const muxIn = (k) => [muxC[0] - 0.15 + k * 0.1, muxC[1] - MUX.s[1] / 2 - 0.012, muxC[2]];
+  // the three inputs enter the multiplexer's lower face, below its filter cavities (input ports drawn as short SMA-style bosses)
+  const muxBot = muxC[2] - MUX.s[2] / 2;
+  const muxIn = (k) => [muxC[0] - 0.13 + k * 0.13, muxC[1] - 0.04, muxBot - 0.012];
+  const ports = [];
   [['L1 transmitter', 0], ['L5 transmitter', 1], ['L2 transmitter', 2]].forEach(([n, k]) => {
     const { c, s } = TX[n];
     const p = [c[0] - s[0] / 2 + 0.06, c[1] - s[1] / 2 - 0.012, c[2]], m = muxIn(k);
-    const yy = yr - k * 0.014;
-    rf.push(pipeG([p, [p[0], yy, p[2]], [p[0], yy, 1.6 - k * 0.022], [m[0], yy, 1.6 - k * 0.022], [m[0], yy, m[2]], m], 0.007));
+    const yy = yr - k * 0.014, zr = muxBot - 0.07 - k * 0.022;
+    rf.push(pipeG([p, [p[0], yy, p[2]], [p[0], yy, zr], [m[0], yy, zr], [m[0], m[1], zr], m], 0.007));
+    ports.push(cylG([m[0], m[1], muxBot - 0.006], 0.013, 0.012, 'z', 10));
   });
+  rf.push(...ports);
   {
     const { c, s } = TX['L3 transmitter'];
     const p = [c[0] + s[0] / 2 - 0.06, c[1] - s[1] / 2 - 0.012, c[2]], f = npe(L3F.c, L3F.s);
@@ -214,7 +219,6 @@ export function buildPayload(P) {
   P('Laser retroreflector array', {
     system: 'Payload', material: '48 fused-silica corner cubes in an aluminium plate', mass: 10, count: 48, temp: 250, explode: [0.2, -0.3, 2.0],
     desc: `NASA array of 48 corner cubes, each 1.6 in (4.1 cm) across, in a 16-in plate. They return ground-station laser pulses straight back, so the satellite's range is measured to millimetres, an independent check on the orbit in the navigation message. SV09 (launched January 2026) and SV10 are the GPS III satellites that carry one; two Block IIA satellites carried arrays in the 1990s. Position on the deck estimated. ${COMPOSITE}`,
-    callout: true, anchor: [lx + 0.2, ly, lz + 0.04],
   }, [plate, mesh(merge(cubes), G.prism())]);
 
   // ================================================================== SV10 optical communications terminal

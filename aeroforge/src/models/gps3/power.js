@@ -13,20 +13,15 @@ import { G } from './materials.js';
 import { HX, HY, HZ, IY, SADA_C, boxG, cylG, merge, unit, pipeG, connPoint, reg } from './kit.js';
 import { onBUS } from './layout.js';
 
-const SADA_L = 0.15;          // drive stand-off from the radiator face
-const YOKE_L = 1.33;          // yoke reach, set so the folded wing just covers the 2.46 m face (estimate)
-const PANEL_L = 2.45;         // panel length along the span (estimate)
-const PANEL_W = 2.88;         // panel width (along the bus Z axis); 4 × 2.45 × 2.88 m = 28.2 m²
-const PANEL_T = 0.025;
-const GAP = 0.02;             // hinge gap between panels
+import { SADA_L, YOKE_L, PANEL_L, PANEL_W, PANEL_T, GAP, ARRAY_SPAN, ARRAY_AREA } from './dims.js';
+
 const FOLD = 0.035;           // stack spacing when stowed
 const ARM_Z = 1.0;            // yoke arm ends and hinge-line fittings along Z
 const BRACE = 0.55 * ARM_Z;   // the cross-brace meets the arms at 55 % of the reach
 /** Frangibolt hold-down pattern on each ±Y face (x, z), from the scale model. */
 const HOLD = [0.65, -0.37].flatMap((x) => [0.88, 0.09, -0.82, -1.61].map((z) => [x, z]));
 
-export const ARRAY_SPAN = 2 * HY + 2 * (SADA_L + YOKE_L + 2 * PANEL_L + 2 * GAP);
-export const ARRAY_AREA = 4 * PANEL_L * PANEL_W;
+export { ARRAY_SPAN, ARRAY_AREA };
 
 export function buildPower(P, body) {
   const wings = [];
@@ -48,7 +43,9 @@ export function buildPower(P, body) {
       system: 'Power', material: 'Stepper motor, slip rings, bearings', mass: 19, temp: 290, explode: [0, 1.95, 0],
       desc: s < 0
         ? 'The "SADA" (solar array drive assembly) that Lockheed\'s figure labels on the bus panel, seated about 0.35 m below mid-height on the face as the scale model shows. It turns its wing once per 718-minute orbit, about 0.5° a minute, so the cells face the Sun while the body points at the Earth; slip rings carry the array current across the rotating joint.'
-        : 'Turns the +Y wing once per orbit, about 0.5° a minute, in step with its twin. Slip rings inside carry the wing\'s share of the 4,480 W end-of-life power across the rotating joint to the power regulation unit.',
+        : 'One of the two solar array drive assemblies: a stepper motor turns the +Y wing once per 718-minute orbit, about 0.5° a minute, in step with its twin, so the cells face the Sun while the body points at the Earth. Slip rings inside carry the wing\'s share of the 4,480 W end-of-life power across the rotating joint to the power regulation unit.',
+      // the drive's callout, on the +Y one (the one the default framings see), at the rim of the motor housing
+      callout: s > 0, anchor: [0, 0.12, 0.11],
     }, [mesh(sada, G.gunmetal()), mesh(merge(bolts), G.satinTi())], mount);
 
     const drive = new THREE.Group();
@@ -68,7 +65,8 @@ export function buildPower(P, body) {
       desc: 'A triangular frame that holds the inboard panel about 1.3 m clear of the bus, so the wing\'s shadow and the radiator\'s view of space don\'t interfere. It folds flat against the face for launch; its length is estimated so the folded wing just covers the 2.46 m face, which gives a span of about 14.6 m against the 15 m published.',
     }, mesh(yoke, G.cfrp(2)), yokePivot);
     const ah = [];
-    for (const sz of [1, -1]) ah.push(pipeG([[0.03, 0.06, 0], [0.03, YOKE_L * 0.5, sz * ARM_Z * 0.5], [0.03, YOKE_L - 0.05, sz * (ARM_Z - 0.05)], [0.03, YOKE_L + 0.03, sz * (ARM_Z - 0.12)]], 0.0075, 6));
+    for (const sz of [1, -1]) ah.push(pipeG([[0.03, 0.06, 0], [0.03, YOKE_L * 0.5, sz * ARM_Z * 0.5], [0.03, YOKE_L - 0.05, sz * (ARM_Z - 0.05)], [0.03, YOKE_L + 0.01, sz * (ARM_Z - 0.12)],
+      [-PANEL_T / 2 - 0.007, YOKE_L + GAP + 0.012, sz * (ARM_Z - 0.12)]], 0.0075, 6));   // service loop across the root hinge line
     ah.push(pipeG([[0.03, 0.06, 0], [0.05, 0.02, 0.04], [0.05, -0.02, 0.02]], 0.011, 6));
     P(`Array harness (${tag})`, {
       system: 'Electrical', material: 'Copper power and sense wires in a beta-cloth sleeve', mass: 4, temp: 300, explode: [0, 2.1, 0],
@@ -93,7 +91,8 @@ export function buildPower(P, body) {
       const g = new THREE.BoxGeometry(PANEL_T, PANEL_L, PANEL_W).translate(0, PANEL_L / 2, 0);
       const edge = G.aluminium();
       const back = [];
-      for (const z of [-(ARM_Z - 0.12), ARM_Z - 0.12]) back.push(pipeG([[-PANEL_T / 2 - 0.007, 0.03, z], [-PANEL_T / 2 - 0.007, PANEL_L - 0.12, z]], 0.006, 6));
+      const tipEnd = i === 0 ? PANEL_L - 0.012 : PANEL_L - 0.12;   // the inboard panel's runs continue across the hinge to the outboard panel
+      for (const z of [-(ARM_Z - 0.12), ARM_Z - 0.12]) back.push(pipeG([[-PANEL_T / 2 - 0.007, 0.012, z], [-PANEL_T / 2 - 0.007, tipEnd, z]], 0.006, 6));
       for (let k = 1; k <= 4; k++) back.push(pipeG([[-PANEL_T / 2 - 0.007, (k / 5) * PANEL_L, -(ARM_Z - 0.12)], [-PANEL_T / 2 - 0.007, (k / 5) * PANEL_L, ARM_Z - 0.12]], 0.004, 6));
       const part = P(`Solar panel ${i + 1} (${tag}, ${names[i]})`, {
         system: 'Power', material: 'Ultra-triple-junction GaAs cells on carbon-fibre / aluminium honeycomb', mass: 26, temp: 330, explode: [0, 2.2 + i * 0.2, 0],

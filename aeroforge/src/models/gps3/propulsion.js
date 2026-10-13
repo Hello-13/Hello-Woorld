@@ -14,9 +14,9 @@ import { G } from './materials.js';
 import { GPS3 } from './data.js';
 import { HX, HZ, IZ, CORE, AFT, ADAPTER, boxG, cylG, capsuleG, merge, pipeG, rodG, plateG, reg } from './kit.js';
 
-export const FUEL = { c: [0, 0, 0.1], r: 0.45, L: 2.0 };
-export const OX = { x: 0.85, z: -0.6, r: 0.27, L: 1.5 };
-export const HE = { x: 0.86, z: 0.75, r: 0.24 };
+import { FUEL, OX, HE } from './dims.js';
+
+export { FUEL, OX, HE };
 const LAE_TOP = -1.72;
 export const CORNERS = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
 /** Thruster cluster position (outboard end of each aft-corner outrigger bracket). */
@@ -197,7 +197,7 @@ export function buildPropulsion(P) {
     const holes = [[1.31, -1.77], [1.41, -1.79], [1.5, -1.81], [1.36, -1.86], [1.46, -1.88]].map(([u, v]) => { const h = new THREE.Path(); h.absarc(sx * u, v, 0.022, 0, Math.PI * 2, true); return h; });
     const outline = [[1.2, -1.69], [1.6, -1.73], [1.6, -1.93], [1.24, -1.84]].map(([u, v]) => [sx * u, v]);
     const toXZ = new THREE.Matrix4().makeBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, -1, 0));
-    for (const dy of [-0.1, 0.1]) side.push(plateG(outline, 0.012, -0.006, holes).applyMatrix4(toXZ).translate(0, c[1] + dy, 0));
+    for (const dy of [-0.1, 0.1]) side.push(plateG(outline, 0.012, -0.006, holes, 7).applyMatrix4(toXZ).translate(0, c[1] + dy, 0));
     side.push(boxG([sx * 1.4, c[1], -1.715], [0.4, 0.22, 0.012]), boxG([sx * 1.6, c[1], -1.83], [0.012, 0.22, 0.2]), boxG([sx * 1.215, c[1], -1.76], [0.03, 0.22, 0.12]));
     P(`Thruster outrigger (${tag})`, {
       system: 'Propulsion', material: 'White-painted perforated aluminium truss bracket', mass: 2.5, temp: 260, explode: [sx * 0.5, sy * 0.25, -1.6],

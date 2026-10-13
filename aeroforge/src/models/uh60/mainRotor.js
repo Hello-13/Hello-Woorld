@@ -252,11 +252,14 @@ export function buildMainRotor({ A, parent }) {
   // bifilar vibration absorber
   const bifBase = [cyl(0.21, 0.19, 0.08, [0, 0.21, 0], 'y', 28), cyl(0.12, 0.12, 0.1, [0, 0.29, 0], 'y', 24)];
   const bifMasses = [];
-  const bifPart = P('Bifilar vibration absorber', {
-    material: 'Steel arms and tuned tungsten-alloy masses on bifilar pins', mass: 100, explode: [0, UPX + 0.8, 0],
+  // a static part frame (like the bearings) so its callout dot can sit on a mass instead of on the
+  // slip ring above the shaft: the dot marks the top of the forward-left mass at rest, and the masses
+  // pass under it when the rotor turns
+  const bifPart = staticPart('Bifilar vibration absorber', {
+    material: 'Steel arms and tuned tungsten-alloy masses on bifilar pins', mass: 100, explode: [0, UPX + 1.15, 0],
     desc: 'Four tuned masses hang from the arms on two pins each (hence "bifilar"), free to swing in the plane of the rotor. Tuned to three cycles per revolution in the rotating hub (described as 3/rev in the literature), they cancel the in-plane rotating loads that would reach the fuselage as four-per-rev; the UH-60M\'s active vibration control cancels what remains in the cabin.',
-    callout: true, anchor: [0, 0.47, 0],
-  }, []);
+    callout: true, anchor: [0.42, 0.29, -0.42],
+  }).k;
   for (const i of blades) {
     const a = (i * Math.PI) / 2 + Math.PI / 4;
     const arm = box(0.36, 0.07, 0.11, [0.3, 0.24, 0]); arm.rotateY(a); bifBase.push(arm);
@@ -272,7 +275,7 @@ export function buildMainRotor({ A, parent }) {
   bifPart.add(mesh(merge(bifBase), MAT.steel()));
 
   P('Blade de-ice slip ring & distributor', {
-    system: 'Electrical', material: 'Slip-ring assembly and timer-distributor', mass: 14, explode: [0, UPX + 1.25, 0],
+    system: 'Electrical', material: 'Slip-ring assembly and timer-distributor', mass: 14, explode: [0, UPX + 1.55, 0],
     desc: 'Carries de-ice power from the airframe into the turning rotor and switches it through the blade heater mats in sequence, shedding ice in small pieces. Main and tail rotor de-ice are standard on the UH-60M.',
   }, [mesh(merge([cyl(0.09, 0.1, 0.07, [0, 0.375, 0], 'y', 22), cyl(0.05, 0.08, 0.04, [0, 0.43, 0], 'y', 20)]), MAT.casting())]);
 

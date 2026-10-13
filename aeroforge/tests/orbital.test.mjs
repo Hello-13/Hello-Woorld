@@ -1,9 +1,16 @@
-// Orbital regression tests: `npm test` (node --test).
+// Orbital and GPS III regression tests: `npm test` (node --test). The model itself needs three.js, so
+// its geometry is checked through the three.js-free dims.js, layout.js and display.js, and the tour
+// against the part names declared in the model's sources.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { hohmann, propellantFor, solveKepler, positionOnEllipse, period, clockRelativity, clockCrossoverAlt, GEO_ALT, RE, C_LIGHT, SIDEREAL_DAY } from '../src/physics/orbital.js';
 import { GPS3 } from '../src/models/gps3/data.js';
+import { readFileSync, readdirSync } from 'node:fs';
+import * as D from '../src/models/gps3/dims.js';
+import * as L from '../src/models/gps3/layout.js';
+import { DISPLAY, displayDir, toShow, toOrbit } from '../src/models/gps3/display.js';
+import TOUR from '../src/learn/tours/satellite.js';
 
 const close = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ''} expected ${b} ± ${tol}, got ${a}`);
 
@@ -70,4 +77,95 @@ test('GPS III propellant budget: launcher transfer orbit feasible, climbing alon
   assert.ok(alone > GPS3.propellant, `both burns would need ${alone.toFixed(0)} kg`);
   // the satellite's mass after the apogee burns stays above its dry mass
   assert.ok(GPS3.launchMass - apogeeOnly > GPS3.dryMass);
+});
+
+test('GPS III bus, tanks and array follow the published figures', () => {
+  // 97 × 70 × 134 in with the 97-in side along the Sun axis (X) and 70 in along the array axis (Y)
+  close(D.BX, 2.46, 0.005, 'X (Sun axis) m'); close(D.BY, 1.78, 0.005, 'Y (array axis) m'); close(D.BZ, 3.40, 0.005, 'Z m');
+  assert.ok(D.BX > D.BY, 'the ±Y radiator faces are the wider ones');
+  // A2100 dual mode: one central hydrazine tank Ø0.90 × ≤ 2.0 m inside the core, two NTO tanks Ø0.54 × ≤ 1.65 m in the ±X bays
+  close(2 * D.FUEL.r, 0.90, 0.005, 'hydrazine tank diameter');
+  assert.ok(D.FUEL.L <= 2.0 + 1e-9 && D.FUEL.L >= 1.8, 'hydrazine tank length');
+  assert.ok(D.FUEL.c[0] === 0 && D.FUEL.c[1] === 0 && D.FUEL.r <= D.CORE - D.T, 'hydrazine tank on the axis, inside the core box');
+  assert.ok(D.FUEL.c[2] - D.FUEL.L / 2 > -D.HZ && D.FUEL.c[2] + D.FUEL.L / 2 < D.IZ, 'hydrazine tank within the box height');
+  close(2 * D.OX.r, 0.54, 0.005, 'oxidiser tank diameter');
+  assert.ok(D.OX.L <= 1.65 + 1e-9, 'oxidiser tank length within the A2100 maximum');
+  assert.ok(D.OX.x - D.OX.r >= D.CORE && D.OX.x + D.OX.r <= D.HX - 0.06, 'oxidiser tanks outside the core, behind the recessed blanket');
+  assert.ok(D.OX.r <= D.BAY - D.T, 'oxidiser tanks fit between the shear webs');
+  assert.ok(D.HE.z - D.HE.r > D.OX.z + D.OX.L / 2 && D.HE.z + D.HE.r < D.IZ, 'helium tanks above the oxidiser tanks, inside the box');
+  // two wings × two panels, 28.2 m² (IGS box-wing model), 15 m span; the folded wing lies within its ±Y face
+  close(D.ARRAY_AREA, 28.2, 0.3, 'array area m²');
+  close(D.ARRAY_SPAN, GPS3.arraySpan, 0.03 * GPS3.arraySpan, 'span m');
+  assert.ok(D.PANEL_L <= D.BX + 0.01 && D.PANEL_W <= D.BZ, 'stowed panels cover, but do not overhang, the radiator face');
+  assert.ok(D.YOKE_L <= D.HX + Math.abs(D.SADA_C[0]) + 0.01, 'the folded yoke ends at the face edge');
+  assert.ok(D.SADA_C[1] < -0.3 && D.SADA_C[1] > -0.4, 'drive about 0.35 m below mid-height');
+});
+
+test('GPS III Earth deck layout: 4 + 8 rings, M-code tab, sunshade corner, no clashes', () => {
+  const r = (p) => Math.hypot(p[0] - L.ARRAY_C[0], p[1] - L.ARRAY_C[1]);
+  for (const [ring, n, rad] of [[L.EC_INNER, 4, 0.17], [L.EC_OUTER, 8, 0.54], [L.UHF_INNER, 4, 0.36], [L.UHF_OUTER, 8, 0.83]]) {
+    assert.equal(ring.length, n);
+    for (const p of ring) close(r(p), rad, 0.02, 'ring radius m');
+  }
+  assert.equal(L.MEC.length, 4);
+  for (const [x] of L.MEC) assert.ok(x < -0.8, 'M-code group at the −X end of the deck');
+  const [sx, sy] = L.DECK_AT.sunshade;
+  assert.ok(sx < -0.3 && sy < -0.6, 'burst-detector sunshade in the −X/−Y corner (IGS axes)');
+  const R = { sunshade: 0.225, xray: 0.09, esa: 0.19, hpeSensor: 0.11, hpeS: 0.06, hpeRx: 0.06, lra: 0.22, scot: 0.16, fwdMast: 0.05, mast2: 0.05 };
+  const items = [...L.EC_INNER, ...L.EC_OUTER, ...L.MEC].map((p) => [p, 0.06]).concat([...L.UHF_INNER, ...L.UHF_OUTER].map((p) => [p, 0.08]), L.JIB_POS.map((p) => [p, 0.06]),
+    Object.entries(L.DECK_AT).map(([k, p]) => [p, R[k]]));
+  for (const [[x, y], rad] of items) assert.ok(Math.abs(x) + rad <= D.HX + 0.2 && Math.abs(y) <= D.HY, `deck item at (${x}, ${y}) sits on the 2.46 × 1.78 m deck`);
+  for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
+    const [[x1, y1], r1] = items[i], [[x2, y2], r2] = items[j];
+    assert.ok(Math.hypot(x1 - x2, y1 - y2) >= r1 + r2 + 0.01, `deck items at (${x1}, ${y1}) and (${x2}, ${y2}) clash`);
+  }
+});
+
+test('GPS III display poses and guided tour', () => {
+  // showroom: nadir up; orbit look: nadir down toward the Earth backdrop and toward the viewer
+  assert.deepEqual(toShow([0, 0, 1]), [0, 1, 0]);
+  const n = toOrbit([0, 0, 1]);
+  assert.ok(n[1] < -0.6 && n[2] > 0.6, 'orbit look: nadir down and toward the default camera');
+  close(Math.hypot(...toOrbit([0.3, -0.5, 0.8])), Math.hypot(0.3, -0.5, 0.8), 1e-12, 'a rotation keeps lengths');
+  for (const orbit of [false, true]) {
+    DISPLAY.orbit = orbit;
+    for (const step of TOUR) {
+      const d = step.view ? step.view.dir : null;
+      if (d) { close(Math.hypot(...d), 1, 1e-9, 'unit camera direction'); assert.ok(d[1] >= 0.06 - 1e-9, 'camera stays above the horizon'); }
+    }
+  }
+  DISPLAY.orbit = false;
+  assert.ok(displayDir([0, 0, -1])[1] >= 0.06 - 1e-9, 'a direction below the floor is lifted');
+  // part names declared in the model: the first argument of every part-making call, literal or templated
+  const dir = new URL('../src/models/gps3/', import.meta.url);
+  const src = [readFileSync(new URL('../src/models/satellite.js', import.meta.url), 'utf8'),
+    ...readdirSync(dir).filter((f) => f.endsWith('.js')).map((f) => readFileSync(new URL(f, dir), 'utf8'))].join('\n');
+  const firstArg = (i) => {   // scan to the first top-level comma, skipping quotes, templates and ${…}
+    let q = null, depth = 0, out = '';
+    for (; i < src.length; i++) {
+      const c = src[i];
+      if (q) { out += c; if (c === '\\') { out += src[++i]; continue; } if (q === '`' && c === '$' && src[i + 1] === '{') { depth++; } if (c === '}' && depth) depth--; else if (c === q && !depth) q = null; continue; }
+      if (c === "'" || c === '`') { q = c; out += c; continue; }
+      if (c === ',' || c === ')') return out;
+      out += c;
+    }
+    return out;
+  };
+  const CALLS = /\b(?:P|box|nce|filt|tx|sse|torque|mast|fdv|battery|earthSensor|hinge|uhf)\(/g;
+  const args = [...src.matchAll(CALLS)].map((m) => firstArg(m.index + m[0].length));
+  const literals = new Set(args.flatMap((a) => [...a.replace(/`[^`]*`/g, '').matchAll(/'((?:[^'\\]|\\.)+)'/g)].map((m) => m[1].replace(/\\'/g, "'"))));
+  const esc = (t) => t.replace(/[.*+?^()|[\]\\]/g, '\\$&');
+  // template placeholders stand for a number, an axis tag (+Y, −X, +X−Y) or a panel position
+  const SLOT = '(?:\\d+|[+−][XY](?:[+−][XY])?|inboard|outboard)';
+  const templates = args.flatMap((a) => [...a.matchAll(/`([^`]*)`/g)].map((m) => new RegExp(`^${m[1].split(/\$\{[^}]+\}/).map(esc).join(SLOT)}$`)));
+  assert.ok(literals.size + templates.length > 100, `found ${literals.size} literal and ${templates.length} templated part names`);
+  assert.ok(TOUR.length >= 8 && TOUR.length <= 12, `${TOUR.length} tour steps`);
+  const modes = new Set(['studio', 'xray', 'blueprint', 'systems', 'thermal']);
+  for (const [i, step] of TOUR.entries()) {
+    assert.ok(step.title && step.body && step.key, `step ${i + 1} has a title, body and key idea`);
+    if (step.mode) assert.ok(modes.has(step.mode), `step ${i + 1}: mode ${step.mode}`);
+    if (step.demo) assert.equal(step.demo, 'deploy', `step ${i + 1}: demo ${step.demo}`);
+    for (const name of step.focus || []) assert.ok(literals.has(name) || templates.some((re) => re.test(name)), `step ${i + 1}: no part named "${name}"`);
+  }
+  assert.ok(TOUR.some((s) => s.demo === 'deploy'), 'the tour runs the array deployment');
 });

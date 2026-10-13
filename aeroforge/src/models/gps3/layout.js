@@ -10,7 +10,7 @@
 // two-aperture unit near the −X/+Y corner (taken here as the Earth sensor pair Lockheed labels
 // "ESA (2)", an identification estimate). Items without a published position say so in their desc.
 
-import { HX, IY } from './kit.js';
+import { HX, IY } from './dims.js';
 
 const D = Math.PI / 180;
 export const ARRAY_C = [0.15, 0];

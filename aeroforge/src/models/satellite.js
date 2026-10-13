@@ -17,14 +17,17 @@ import { buildAntennas } from './gps3/antennas.js';
 import { buildPayload } from './gps3/payload.js';
 import { buildPropulsion } from './gps3/propulsion.js';
 import { buildADCS } from './gps3/adcs.js';
-import { buildPower, ARRAY_SPAN, ARRAY_AREA } from './gps3/power.js';
+import { buildPower } from './gps3/power.js';
+import { ARRAY_SPAN, ARRAY_AREA } from './gps3/dims.js';
 import { buildHarness } from './gps3/harness.js';
 import { NET } from './gps3/kit.js';
 import { GPS3 } from './gps3/data.js';
+import { DISPLAY, displayDir } from './gps3/display.js';
 import { clockRelativity, period, RE } from '../physics/orbital.js';
 import { fmt } from '../ui/dom.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
+// the two display poses (gps3/display.js holds the same turns as plain vector maps, for the tour):
 // nadir (+Z) up, array axis (+Y) along world X, Sun side (+X) toward world +Z
 const Q_SHOW = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(V(0, 0, 1), V(1, 0, 0), V(0, 1, 0)));
 // nadir down toward the Earth backdrop (turned 180° about world Z), then pitched 45° about the
@@ -35,15 +38,8 @@ const Q_ORBIT = new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), -Math.PI / 4
 const VIEW_SHOW = [1.0, 0.42, 0.5];
 const VIEW_ORBIT = [0.8, -0.35, 0.55];
 
-/** Current display orientation, read by the guided tour to aim its camera at the same side. */
-export const DISPLAY = { orbit: false };
-/** A camera direction written in the satellite's body frame, turned into a world direction for the
- *  current display orientation and kept a little above the horizon (the camera cannot go below it). */
-export function displayDir(d) {
-  const v = V(...d).normalize().applyQuaternion(DISPLAY.orbit ? Q_ORBIT : Q_SHOW);
-  if (v.y < 0.06) { v.y = 0.06; v.normalize(); }
-  return [v.x, v.y, v.z];
-}
+// the current display orientation and body-frame camera directions, shared with the guided tour
+export { DISPLAY, displayDir };
 
 export function buildSatellite({ compact = false } = {}) {
   const A = new Assembly();

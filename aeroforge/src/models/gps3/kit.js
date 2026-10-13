@@ -1,34 +1,13 @@
-// Shared dimensions and small geometry helpers for the GPS III model.
-//
-// Axes (metres): the GPS spacecraft body frame used by the IGS. +Z points at the Earth (nadir, the
-// L-band antenna side), +Y runs along the solar-array axis (the two radiator / equipment panels),
-// +X completes the right-handed set and faces the Sun's hemisphere under yaw steering. Origin at
-// the centre of the bus box. Lockheed Martin's own axes are turned 180° about Z from these, so a
-// unit Lockheed places on its "−Y" panel is on +Y here, and its "−X" side is +X here.
-//
-// Size: the U.S. Space Force fact sheet gives 97 × 70 × 134 in (2.46 × 1.78 × 3.40 m). In the
-// manufacturer's scale model, photographed face by face in IGS axes (Steigenberger et al. 2020,
-// Fig. 4), the ±Y radiator faces are the wider ones, and the IGS box-wing model gives an X face
-// (7.5 m²) almost twice the Z face (4.0 m²). So X (Sun axis) = 2.46 m, Y (array axis) = 1.78 m, and
-// the box is 3.40 m tall from the aft deck to the Earth deck; the launch adapter section below it
-// and the antennas above it bring the stowed height to about 4.2 m.
+// Small geometry helpers for the GPS III model, and the harness landing-point registry. The body
+// axes and the dimensions are in dims.js (three.js-free, so the tests can read them); they are
+// re-exported here for the building modules.
 
 import * as THREE from 'three';
 import { mergeGeometries } from '../../engine/geometry.js';
 import { mesh } from '../../engine/assembly.js';
 import { G } from './materials.js';
 
-export const BX = 2.46, BY = 1.78, BZ = 3.40;         // bus box (fact sheet; axes see above)
-export const HX = BX / 2, HY = BY / 2, HZ = BZ / 2;
-export const T = 0.025;                               // honeycomb panel thickness
-export const CORE = 0.50;                             // half-width of the core box section (estimate: about 1.0 × 1.0 m)
-export const BAY = 0.50;                              // the ±X tank bays run |y| < 0.5 between the shear webs
-export const IX = HX - T, IY = HY - T, IZ = HZ - T;   // inner faces of the closure panels
-export const DECK = HZ + 0.012;                       // top of the Earth-deck blanket
-export const AFT = -HZ - 0.013;                       // outer face of the aft-deck blanket
-export const ADAPTER = { r: 0.85, z0: -HZ, z1: -2.12 };   // launch adapter section (scale model: ≈ 1.7 m across, 0.5 m tall)
-export const SEP_Z = -2.12;                           // top of the separation ring; the separation plane is its base
-export const SADA_C = [0.1, -0.37];                   // solar-array drive axis (x, z) on both ±Y faces (scale model)
+export { BX, BY, BZ, HX, HY, HZ, T, CORE, BAY, IX, IY, IZ, DECK, AFT, ADAPTER, SEP_Z, SADA_C } from './dims.js';
 
 /** Non-indexed copy so geometries of any kind can be merged. */
 export const flat = (g) => (g.index ? g.toNonIndexed() : g);
@@ -81,11 +60,12 @@ export function pipeG(points, r = 0.006, radial = 6) {
   return merge(out);
 }
 
-/** Flat polygon (x, y points) extruded `thick` along z, bottom face at z0. */
-export function plateG(points, thick, z0, holes = []) {
+/** Flat polygon (x, y points) extruded `thick` along z, bottom face at z0; `seg` sets how finely
+ *  round holes are divided (small lightening holes need far fewer than the 1.7 m adapter cut-out). */
+export function plateG(points, thick, z0, holes = [], seg = 40) {
   const s = new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x, y)));
   for (const h of holes) s.holes.push(h);
-  return new THREE.ExtrudeGeometry(s, { depth: thick, bevelEnabled: false, curveSegments: 40 }).translate(0, 0, z0);
+  return new THREE.ExtrudeGeometry(s, { depth: thick, bevelEnabled: false, curveSegments: seg }).translate(0, 0, z0);
 }
 
 /** Rectangular hole path (for plateG / panel cut-outs), centre (cx, cy), size w × h. */

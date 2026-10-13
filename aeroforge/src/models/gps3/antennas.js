@@ -50,7 +50,7 @@ export function buildAntennas(P) {
   P('L-band antenna panel', {
     system: 'Payload', material: 'Black-finished aluminium honeycomb ground plane', mass: 38, temp: 245, explode: [0, 0, 2.05],
     desc: 'Ground plane of the navigation antennas, about 2.4 × 1.8 m and covering nearly the whole Earth deck, with a tab at each end. Its 12 Earth-coverage helices broadcast every civil and military signal to the whole visible Earth; the four M-code elements sit at the −X end. SV01\'s published calibration puts the L1 phase centre 1.232 m above the centre of mass, and IGS orbit fits agreed to 2 mm.',
-    callout: true, anchor: [-1.2, 0.5, PANEL_Z],
+    callout: true, anchor: [1.36, -0.08, PANEL_Z],
   }, mesh(plateG(PANEL_OUTLINE, PANEL_T, PANEL_Z - PANEL_T, holes), G.blackPaint()));
 
   const bfn = [cylG([ARRAY_C[0], ARRAY_C[1], DECK + 0.03], 0.2, 0.03, 'z', 40)];

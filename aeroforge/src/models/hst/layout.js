@@ -148,3 +148,34 @@ export function patchFrame(r, x0, x1, phi0, phi1, rodR = 0.012, rodFn) {
   out.push(rodFn(az(phi0, r, x0), az(phi0, r, x1), rodR, 4), rodFn(az(phi1, r, x0), az(phi1, r, x1), rodR, 4));
   return out;
 }
+
+/** Points along an arc of radius r at station x, azimuth a0 → a1 in degrees (≈ step° apart). */
+export function arcPts(r, x, a0, a1, step = 12) {
+  const n = Math.max(1, Math.round(Math.abs(a1 - a0) / step));
+  const out = [];
+  for (let i = 0; i <= n; i++) out.push(az(deg(a0 + ((a1 - a0) * i) / n), r, x));
+  return out;
+}
+
+/**
+ * A cable or harness bundle along a polyline: a rod per segment and a small knuckle at every bend,
+ * so thick bundles read as one continuous run. Returns a list of geometries to merge.
+ */
+export function cablePath(pts, r = 0.015, seg = 6) {
+  const out = [];
+  const k = new THREE.Vector3();
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = new THREE.Vector3(...pts[i]), b = new THREE.Vector3(...pts[i + 1]);
+    const len = a.distanceTo(b);
+    if (len < 1e-4) continue;
+    const g = new THREE.CylinderGeometry(r, r, len, seg, 1, true);
+    g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), k.subVectors(b, a).normalize()));
+    g.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+    out.push(g);
+    if (i > 0) out.push(new THREE.SphereGeometry(r, seg, 3).translate(a.x, a.y, a.z));
+  }
+  return out;
+}
+
+/** Total length (m) of a cablePath polyline, for checking harness and handrail lengths. */
+export const pathLength = (pts) => pts.reduce((s, p, i) => (i ? s + Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1], p[2] - pts[i - 1][2]) : 0), 0);

@@ -423,7 +423,7 @@ export function buildUAV() {
     storeParts.hellfire.push(P(`AGM-114 Hellfire pair (${sn})`, {
       system: 'Weapons', material: 'Steel/aluminium airframe, semi-active laser seeker', mass: 98, massSource: 'Published AGM-114 figure (45–49 kg each)', count: 2, explode: [0, -1.2, 2.0 * side],
       desc: 'Two laser-guided Hellfire missiles, each 1.63 m long and 0.18 m in diameter. The seeker under the nose dome homes on a laser spot with a matching pulse code.',
-      callout: side < 0, anchor: [lx - 0.62, hy - hf.radius, (md.z + 0.12) * side],   // the port pair: its label falls clear of the nose sensors'
+      callout: side < 0, anchor: [lx - 0.42, hy - 0.1, md.z * side],   // the port pair, between the two missiles (placed so no label covers another part's dot)
     }, [L(pair(hf.body), m.olive), L(pair(hf.dome), m.glass), L(pair(hf.band), m.yellow), L(pair(hf.motor), m.brown)]));
   }
   // wing root fairings (both sides)
@@ -962,7 +962,7 @@ export function buildUAV() {
   P('MTS-B EO/IR turret', {
     system: 'Sensors', material: 'Gyro-stabilised gimbal, germanium and sapphire windows', mass: 105, explode: [0.9, -0.75, 0],
     desc: 'Raytheon’s Multi-Spectral Targeting System B: an infrared camera, a colour/monochrome daylight TV camera, an image-intensified (low-light) TV camera, a laser rangefinder/designator and a laser illuminator in one stabilised ball (USAF fact sheet), about 0.55 m across (size and mass estimated).',
-    callout: true, anchor: [X(1.08) + 0.234, 0.5, 0],   // the front of the ball, 30° below its equator
+    callout: true, anchor: [X(1.08) + 0.038, 0.752, 0.24],   // the starboard side of the ball, just above its equator
   }, turret);
   P('MTS-B electronics unit', {
     system: 'Sensors', material: 'Electronics unit', mass: 15, explode: [0.55, 0.3, 0.75],
@@ -979,7 +979,7 @@ export function buildUAV() {
   P('AN/APY-8 Lynx SAR antenna', {
     system: 'Sensors', material: 'Gimballed Ku-band antenna', mass: 30, explode: [1.35, 0, 0],
     desc: 'General Atomics’ Lynx synthetic-aperture radar (developed with Sandia National Laboratories) images the ground through cloud, smoke and darkness, down to about 10 cm resolution in spotlight mode, and tracks moving vehicles.',
-    callout: true, anchor: [X(0.48) - 0.05, 1.24, 0],   // the gimbal, behind the antenna face
+    callout: true, anchor: [X(0.48) + 0.035, 1.22, -0.035],   // the gimbal at the centre of the antenna
   }, lynx);
   P('Lynx radar electronics', {
     system: 'Sensors', material: 'Radar electronics unit', mass: 22, explode: [0.9, -0.15, 0.6],
@@ -1025,7 +1025,7 @@ export function buildUAV() {
   P('Ku-band SATCOM antenna', {
     system: 'Communications', material: 'Steerable reflector on a two-axis pedestal', mass: 30, explode: [1.45, 2.05, 0],
     desc: 'Tracks a geostationary satellite to carry control and sensor video beyond line of sight. The satellite hops alone add at least half a second of delay (35,786 km up and down, twice); with the ground relays the control loop takes over a second, so crews in the US can fly aircraft overseas, but not land them.',
-    callout: true, anchor: [X(0.75), 1.931, 0],   // the radome crown just ahead of the dish
+    callout: true, anchor: [X(1.15) + 0.18, 1.832, -0.045],   // the upper rim of the dish
   }, dishG);
   P('Ku-band SATCOM modem', {
     system: 'Communications', material: 'Modem and RF unit', mass: 8, explode: [1.0, 1.0, -0.4],
@@ -1250,7 +1250,8 @@ export function buildUAV() {
     aero: true,
     root: A.root,
     parts: A.parts,
-    view: { dir: [0.9, 0.5, 1.3], fill: 0.95 },
+    // a high front quarter: the planform reads, and the nose sensors' and the tail's labels stack without covering each other's dots
+    view: { dir: [1, 1.03, 1], fill: 0.95 },
     displaySize: 11.5,
     thermalRange: [230, 560],
     state,

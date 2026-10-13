@@ -65,7 +65,9 @@ export default [
     body: 'For the landing burn the centre engine relights, sometimes with two neighbours, on TEA-TEB from the engine-bay tank. In the last seconds the four carbon-fibre legs swing down, pushed out by telescoping pistons on high-pressure helium, to a stance about 18 m across.',
     key: 'Recovering the boosters costs payload: 63.8 t to LEO is the fully expendable figure, and expended cores fly without legs or grid fins.',
     focus: [`${SBA} landing legs`, `${SBA} leg deployment pistons`, `${SBA} pneumatic helium bottles`, `${SBA} Merlin 1D centre engine`, `${SBA} TEA-TEB ignition tank`],
-    mode: 'systems', view: { dir: [1.3, 0.06, 0.85], fill: 1.3 },
+    // low side view, close: the legs fill the frame left of the Systems legend, and the leg callout
+    // (anchored on the 45° leg, just left of the subject's centre) reads up-right, clear of the legend
+    mode: 'systems', view: { dir: [1.3, 0.06, 0.85], fill: 1.05 },
   },
   {
     title: 'Interstage and second stage',
