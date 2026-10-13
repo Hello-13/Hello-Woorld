@@ -25,11 +25,17 @@ export function buildOTA(P) {
     front.push([r, pmSurface(r)]);
   }
   const face = mesh(axial(front, 96), HM.mirror());
-  // body: front plate thickness, outer and inner edge bands, back plate (closed lathe profile)
-  const body = [];
-  for (const [r, x] of front) body.push([r, x - 0.004]);
-  body.push([OPT.rPM, xBack], [OPT.rHole, xBack], [OPT.rHole, pmSurface(OPT.rHole) - 0.004]);
-  const glass = mesh(axial(body.reverse(), 96), HM.ule());
+  // front faceplate (25 mm) under the coating, with the outer and inner edge bands
+  const plate = front.map(([r, x]) => [r, x - 0.003]);
+  for (let i = front.length - 1; i >= 0; i--) plate.push([front[i][0], front[i][1] - fp]);
+  plate.push(plate[0]);
+  const bands = [tube(OPT.rPM, xBack + fp, pmSurface(OPT.rPM) - fp, { seg: 96 }), tube(OPT.rHole, xBack + fp, pmSurface(OPT.rHole) - fp, { seg: 48 })];
+  out.pm = P('Primary mirror', {
+    system: 'Optics', material: 'Corning ULE (titanium-silicate) glass; 65 nm aluminium + 25 nm MgF₂ coating', mass: 828, massSource: 'NASA (1,825 lb, whole mirror)', temp: 294, explode: [-0.3, 0, 0],
+    desc: '2.4 m concave hyperboloid, f/2.3, radius of curvature 11.04 m, polished to about 10 nm. In 1990 it proved to be 2.2 µm too flat at the edge — spherical aberration from a mis-spaced test instrument — corrected optically in 1993. The 828 kg includes the core and rear plate.',
+    callout: true, anchor: [xPM + 0.05, 0.9, 0.7],
+  }, [face, mesh(axial(plate.slice().reverse(), 96), HM.ule()), mesh(merge(bands), HM.ule())]);
+
   // lightweighted egg-crate core between the plates (cell pitch simplified to 0.2 m)
   const core = [];
   const x0 = xBack + fp, x1 = xPM - fp, xm = (x0 + x1) / 2, depth = x1 - x0;
@@ -47,14 +53,15 @@ export function buildOTA(P) {
       }
     }
   }
-  const coreMesh = mesh(merge(core), HM.ule());
-  coreMesh.userData.temp = 294;
-  out.pm = P('Primary mirror', {
-    system: 'Optics', material: 'Corning ULE (titanium silicate) glass: front and back faceplates fused to an egg-crate core; 65 nm aluminium + 25 nm MgF₂ coating',
-    mass: 828, massSource: 'NASA (1,825 lb)', temp: 294, explode: [-0.4, 0, 0],
-    desc: '2.4 m concave hyperboloid, f/2.3, radius of curvature 11.04 m. The lightweight core cuts the mass to 828 kg — a solid blank would weigh about 3.6 t. It was polished 2.2 µm too flat at the edge (spherical aberration), corrected optically in 1993.',
-    callout: true, anchor: [xPM + 0.05, 0.9, 0.7],
-  }, [face, glass, coreMesh]);
+  P('Primary mirror egg-crate core', {
+    system: 'Optics', material: 'ULE glass ribs fused between the faceplates', temp: 294, explode: [-0.75, 0, 0],
+    desc: 'A grid of thin glass ribs between the two faceplates: the mirror is mostly empty space, so it weighs 828 kg where a solid blank would weigh about 3.6 t, and it is stiff enough to hold its figure under its own weight on the ground. Mass included in the primary mirror.',
+  }, mesh(merge(core), HM.ule()));
+  const rear = axial([[OPT.rHole, xBack], [OPT.rPM, xBack], [OPT.rPM, xBack + fp], [OPT.rHole, xBack + fp], [OPT.rHole, xBack]], 96);
+  P('Primary mirror rear faceplate', {
+    system: 'Optics', material: 'ULE glass plate, 25 mm', temp: 294, explode: [-1.2, 0, 0],
+    desc: 'Closes the back of the sandwich. The 24 figure-control actuators and the three mounts push against it. Mass included in the primary mirror.',
+  }, mesh(rear, HM.ule()));
 
   // mounts and figure-control actuators on the back
   const sup = [];
@@ -76,13 +83,13 @@ export function buildOTA(P) {
   }
   sup.push(tube(0.45, xBack - 0.22, xBack - 0.14, { seg: 32, open: false }));
   P('Primary mirror mounts & actuators', {
-    system: 'Optics', material: 'Titanium flexure mounts, 24 push-pull figure actuators', mass: 95, temp: 294, explode: [-1.1, 0, 0], count: 24,
+    system: 'Optics', material: 'Titanium flexure mounts, 24 push-pull figure actuators', mass: 95, temp: 294, explode: [-1.6, 0, 0], count: 24,
     desc: 'Three kinematic flexures hang the mirror from the main ring without forcing its shape; 24 actuators on the back can push the surface by fractions of a wavelength. They proved too weak to cancel the spherical aberration.',
   }, [mesh(merge(sup), HM.ti()), mesh(merge(act), HM.box())]);
 
   const heater = annulus(OPT.rHole + 0.05, OPT.rPM - 0.02, xBack - 0.012, 64, -1);
   P('Primary mirror heaters', {
-    system: 'Thermal control', material: 'Kapton heater panels with thermostats', mass: 18, temp: 294, explode: [-1.6, 0, 0],
+    system: 'Thermal control', material: 'Kapton heater panels with thermostats', mass: 18, temp: 294, explode: [-1.85, 0, 0],
     desc: 'Heaters behind the mirror hold the glass near 21 °C (70 °F) so its figure does not change as the telescope passes between sunlight and Earth shadow every orbit.',
   }, mesh(heater, HM.kapton()));
 
@@ -202,7 +209,7 @@ export function buildOTA(P) {
     fps.push(beam([0.5, -c, s * c], [2.55, c, s * c], 0.06, 0.06));
   }
   P('Focal plane structure', {
-    system: 'Structure', material: 'Graphite-epoxy box frame with registration fittings', mass: 290, temp: 293, explode: [-0.6, 0, 0],
+    system: 'Structure', material: 'Graphite-epoxy box frame with registration fittings', mass: 290, temp: 293, explode: [-2.2, 0, 0],
     desc: 'Hangs behind the main ring and holds the four axial instruments, the radial instrument and the three Fine Guidance Sensors at the focal surface to within a few hundredths of a millimetre, so swapped instruments land in focus.',
   }, mesh(merge(fps), HM.grEp()));
 
@@ -212,7 +219,7 @@ export function buildOTA(P) {
     latches.push(new THREE.BoxGeometry(0.1, 0.12, 0.12).translate(0.5, sy * 0.9, sz * 0.9));
   }
   P('Instrument registration latches', {
-    system: 'Structure', material: 'Titanium A- and B-latches', mass: 22, count: 8, temp: 292, explode: [-0.9, 0, 0],
+    system: 'Structure', material: 'Titanium A- and B-latches', mass: 22, count: 8, temp: 292, explode: [-2.2, 0, 0],
     desc: 'Each axial instrument is held at three points: a forward A-latch carries the load and fixes focus, an aft B-latch steadies it. Spacewalkers drive the latches with a power tool through access ports.',
   }, mesh(merge(latches), HM.ti()));
 

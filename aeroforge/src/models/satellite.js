@@ -64,7 +64,7 @@ export function buildSatellite({ compact = false } = {}) {
     summary: 'GPS III is Lockheed Martin\'s newest generation of the U.S. Space Force\'s Global Positioning System. Every GPS satellite is also a NAVSTAR — the system\'s original name — and carries a NAVSTAR number (SV01, launched on 23 December 2018, is NAVSTAR 77 / USA-289). Built on the A2100M bus, each satellite broadcasts the time of its atomic clocks and its own orbit on L1, L2 and L5, including the civil L1C signal shared with Galileo and the jam-resistant military M-code. A receiver that hears four satellites solves for its position and its own clock error. The launcher leaves it in a transfer orbit; its own apogee engine finishes the climb to a circular orbit 20,180 km up.',
     specs: [
       ['Launch mass', `${fmt.n(GPS3.launchMass)} kg (3,680–4,400 kg reported per launch)`],
-      ['Dry mass', `${fmt.n(GPS3.dryMass)} kg`],
+      ['Dry mass', `${fmt.n(GPS3.dryMass)} kg (brackets, fasteners and secondary structure not listed as parts)`],
       ['Bus', 'Lockheed Martin A2100M'],
       ['Power', `${fmt.n(GPS3.powerEOL)} W at end of life`],
       ['Orbit', `${fmt.n(GPS3.altitude)} km circular, ${GPS3.inclination}° inclination`],

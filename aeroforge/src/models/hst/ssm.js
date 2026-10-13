@@ -376,7 +376,7 @@ export function buildSSM(P) {
   }, mesh(merge(out.rails), HM.handrail()));
 
   // 31 portable-foot-restraint sockets (10 on the bay doors above, 21 placed here)
-  for (let k = 0; k < 12; k++) out.sockets.push(new THREE.BoxGeometry(0.1, 0.1, 0.06).translate(0, RAD.big + 0.03, 0).rotateZ(Math.PI / 2).rotateX(deg(k * 30 + 15)).translate(k % 2 ? 3.3 : 0.55, 0, 0));
+  for (let k = 0; k < 12; k++) out.sockets.push(new THREE.BoxGeometry(0.1, 0.06, 0.1).translate(0, RAD.big + 0.03, 0).rotateX(deg(k * 30 + 15)).translate(k % 2 ? 3.3 : 0.55, 0, 0));
   for (let k = 0; k < 9; k++) out.sockets.push(new THREE.BoxGeometry(0.1, 0.06, 0.1).translate(0, RAD.shell + 0.03, 0).rotateX(deg(k * 40 + 20)).translate(k % 3 === 0 ? 5.6 : k % 3 === 1 ? 6.9 : 8.4, 0, 0));
   P('Foot-restraint sockets', {
     system: 'Crew systems', material: 'Aluminium sockets for portable foot restraints', mass: 12, count: 31, temp: 265, explode: [0, 0, 0],

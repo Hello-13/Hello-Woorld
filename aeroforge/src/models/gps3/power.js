@@ -33,7 +33,7 @@ export function buildPower(P, body) {
       cylG([0, 0.095, 0], 0.06, 0.02, 'y', 20),
     ]);
     P(`Solar array drive (${tag})`, {
-      system: 'Power', material: 'Stepper motor, slip rings, bearings', mass: 13, temp: 290, explode: [0, 1.9, 0],
+      system: 'Power', material: 'Stepper motor, slip rings, bearings', mass: 19, temp: 290, explode: [0, 1.9, 0],
       desc: 'Turns its wing once per orbit — about 0.5° a minute — so the cells keep facing the Sun while the body stays pointed at the Earth. Slip rings carry the array\'s current across the rotating joint.',
       callout: s > 0, anchor: [0, 0.12, 0.12],
     }, [mesh(sada, G.gunmetal())], mount);
@@ -44,7 +44,7 @@ export function buildPower(P, body) {
       hrm.push(cylG([x, 0.035, z], 0.03, 0.07, 'y', 14), cylG([x, 0.078, z], 0.018, 0.016, 'y', 10), boxG([x, 0.004, z], [0.1, 0.008, 0.1]));
     }
     P(`Hold-down & release mechanisms (${tag})`, {
-      system: 'Power', material: 'Titanium cups, release nuts', mass: 3.5, count: 4, temp: 285, explode: [0, 1.75, 0],
+      system: 'Power', material: 'Titanium cups, release nuts', mass: 4, count: 4, temp: 285, explode: [0, 1.75, 0],
       desc: 'Bolts through the folded panel stack clamp the wing to the radiator for launch; after separation the release nuts free them and spring hinges swing the panels out. Count and positions estimated.',
     }, mesh(merge(hrm), G.titanium()), mount);
 
@@ -60,7 +60,7 @@ export function buildPower(P, body) {
       boxG([0, YOKE_L, 1.0], [0.05, 0.05, 0.08]), boxG([0, YOKE_L, -1.0], [0.05, 0.05, 0.08]),
     ]);
     P(`Array yoke (${tag})`, {
-      system: 'Power', material: 'Carbon-fibre tubes, titanium hinge fittings', mass: 7, temp: 300, explode: [0, 2.0, 0],
+      system: 'Power', material: 'Carbon-fibre tubes, titanium hinge fittings', mass: 9, temp: 300, explode: [0, 2.0, 0],
       desc: 'Holds the first panel clear of the bus so the wing\'s shadow and the radiator\'s view to space don\'t interfere. It folds flat against the radiator for launch (length estimated so the stowed stack sits centred on the face).',
     }, mesh(yoke, G.cfrp(2)), yokePivot);
 
@@ -77,7 +77,7 @@ export function buildPower(P, body) {
       const hinges = merge([boxG([0, 0.01, 1.0], [0.04, 0.04, 0.1]), boxG([0, 0.01, -1.0], [0.04, 0.04, 0.1]),
         boxG([0, PANEL_L - 0.01, 1.0], [0.04, 0.04, 0.1]), boxG([0, PANEL_L - 0.01, -1.0], [0.04, 0.04, 0.1])]);
       const part = P(`Solar panel ${i + 1} (${tag}, ${names[i]})`, {
-        system: 'Power', material: 'Triple-junction GaAs cells on carbon-fibre / aluminium honeycomb', mass: 14, temp: 330, explode: [0, 2.15 + i * 0.18, 0],
+        system: 'Power', material: 'Triple-junction GaAs cells on carbon-fibre / aluminium honeycomb', mass: 20, temp: 330, explode: [0, 2.15 + i * 0.18, 0],
         desc: i === 0
           ? `Inboard panel, ${PANEL_L.toFixed(2)} × ${PANEL_W.toFixed(2)} m (size estimated). Ultra-triple-junction cells convert about 28 % of the 1,361 W/m² of sunlight; together the six panels give GPS III its 4,480 W at end of life.`
           : i === 1
@@ -118,7 +118,7 @@ export function buildPower(P, body) {
       cells.push(new THREE.SphereGeometry(0.042, 16, 6, 0, Math.PI * 2, 0, Math.PI / 2).translate(cx, y0 + 0.232, cz));
     }
     return P(name, {
-      system: 'Power', material: 'Nickel–hydrogen pressure-vessel cells, aluminium sleeves', mass: 58, count: 16, temp: 278, explode: [0, -1.2, 0],
+      system: 'Power', material: 'Nickel–hydrogen pressure-vessel cells, aluminium sleeves', mass: 82, count: 16, temp: 278, explode: [0, -1.2, 0],
       desc: 'One of two nickel–hydrogen batteries. Twice a year, when the Sun lies near the orbit plane, the satellite crosses the Earth\'s shadow on every orbit for up to about 56 minutes, and the batteries run the whole spacecraft. Cells are kept cool (≈ 0–10 °C) on the radiator; cell count and capacity estimated.',
       callout: x > 0, anchor: [x, y0 + 0.27, z + 0.2],
     }, [mesh(merge(base), G.blackBox()), mesh(merge(cells), G.silverBox())]);
@@ -126,15 +126,15 @@ export function buildPower(P, body) {
   battery('Battery 1', 0.4);
   battery('Battery 2', -0.4);
   P('Power regulation unit', {
-    system: 'Power', material: 'Aluminium chassis, shunt regulators and battery charge electronics', mass: 34, temp: 305, explode: [0, -1.2, 0],
+    system: 'Power', material: 'Aluminium chassis, shunt regulators and battery charge electronics', mass: 46, temp: 305, explode: [0, -1.2, 0],
     desc: 'Holds the main bus voltage steady: it shunts surplus array current in sunlight, charges the batteries, and switches to battery power at each eclipse entry without a glitch to the clocks or transmitters.',
   }, unit([0.4, -(IY - 0.11), 0.12], [0.42, 0.22, 0.32], G.alodine(), { mount: '-y', conn: '+z', n: 5, fins: 7 }));
   P('Array drive electronics', {
-    system: 'Power', material: 'Aluminium chassis', mass: 7, temp: 300, explode: [0, -1.2, 0],
+    system: 'Power', material: 'Aluminium chassis', mass: 9, temp: 300, explode: [0, -1.2, 0],
     desc: 'Steps both array drives in time with the orbit and the yaw-steering law, from commands computed by the spacecraft processor.',
   }, unit([0.4, -(IY - 0.06), -0.24], [0.3, 0.12, 0.18], G.alodine(), { mount: '-y', conn: '+z', n: 3 }));
   P('Ordnance & deployment controller', {
-    system: 'Electrical', material: 'Aluminium chassis', mass: 6, temp: 290, explode: [-1.1, 0, 0],
+    system: 'Electrical', material: 'Aluminium chassis', mass: 7, temp: 290, explode: [-1.1, 0, 0],
     desc: 'Fires the one-shot devices — the array release nuts and propulsion isolation valves — with redundant arm-and-fire circuits so nothing can trigger by accident on the ground or during launch.',
   }, unit([-(IX - 0.05), -0.45, 0.42], [0.1, 0.24, 0.18], G.alodine(), { mount: '-x', conn: '+z', n: 3 }));
 
@@ -152,7 +152,7 @@ export function buildPower(P, body) {
   drop(0.8, 0.45, 0.5); drop(-0.8, 0.45, 0.5); drop(0.8, -0.45, 0.51); drop(-0.8, -0.45, 0.51);
   for (const [x, y] of [[0.8, 0.12], [-0.8, -0.12]]) runs.push(pipeG([[x * 0.89, y, ringZ], [x, y, ringZ - 0.05], [x, y, -HZ + 0.12], [x * 0.95, y * 4, -HZ + 0.06]], 0.016, 8));
   P('Wiring harness', {
-    system: 'Electrical', material: 'Shielded copper wire bundles, beta-cloth wrap', mass: 95, temp: 293, explode: [0, 0, 0.35],
+    system: 'Electrical', material: 'Shielded copper wire bundles, beta-cloth wrap', mass: 125, temp: 293, explode: [0, 0, 0.35],
     desc: 'Thousands of wires tie every unit to the power bus and the data buses. A harness is typically 4–5 % of a satellite\'s dry mass; this one is modelled as its main trunks only (routing estimated).',
   }, mesh(merge(runs), G.harness()));
 
