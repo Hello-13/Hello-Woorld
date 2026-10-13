@@ -6,12 +6,15 @@
 //                view?: { dir: [x, y, z], fill?, lift? }, demo?: name }
 // One file per vehicle in ./tours/, keyed by the vehicle id.
 
-import fighter from './tours/fighter.js';
-import rocket from './tours/rocket.js';
-import turbofan from './tours/turbofan.js';
-import satellite from './tours/satellite.js';
-import uav from './tours/uav.js';
-import helicopter from './tours/helicopter.js';
-import hubble from './tours/hubble.js';
+export const TOURS = {};
 
-export const TOURS = { fighter, rocket, turbofan, satellite, uav, helicopter, hubble };
+/** Load the tours for these vehicle ids; one that fails to load is skipped, not fatal. */
+export async function loadTours(ids) {
+  await Promise.all(ids.map(async (id) => {
+    try {
+      TOURS[id] = (await import(`./tours/${id}.js`)).default;
+    } catch (err) {
+      console.error(`AEROFORGE: the ${id} tour could not be loaded`, err);
+    }
+  }));
+}

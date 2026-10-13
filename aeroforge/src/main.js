@@ -11,6 +11,7 @@ import { triangleCount } from './engine/geometry.js';
 import { INFERNO_CSS } from './engine/effects.js';
 import { LOOKS } from './engine/environment.js';
 import { TourPlayer } from './learn/tour.js';
+import { loadTours } from './learn/tours.js';
 import { SYSTEMS, systemColor } from './engine/systems.js';
 import { QUALITY } from './engine/stage.js';
 import { setTextureDetail } from './engine/surface.js';
@@ -61,10 +62,24 @@ async function start() {
   for (const f of FLEET) {
     bootLine(`Building ${f.id === 'turbofan' ? 'turbofan rotor stages' : f.id} geometry`);
     await nextFrame();
-    f.vehicle = f.build();
-    f.vehicle.explodeLift = f.lift;
-    f.tris = triangleCount(f.vehicle.root);
+    try {
+      const { build, lab } = await f.load();
+      f.lab = lab;
+      f.vehicle = build();
+      f.vehicle.explodeLift = f.lift;
+      f.tris = triangleCount(f.vehicle.root);
+    } catch (err) {
+      f.failed = true;
+      console.error(`AEROFORGE: the ${f.id} could not be loaded and is left out of the fleet`, err);
+    }
   }
+  for (let i = FLEET.length - 1; i >= 0; i--) if (FLEET[i].failed) FLEET.splice(i, 1);
+  if (!FLEET.length) {
+    boot.classList.add('is-error');
+    bootLine('No vehicle could be loaded. The browser console has the details.');
+    return;
+  }
+  await loadTours(FLEET.map((f) => f.id));
 
   const app = {
     current: null, entry: null, lab: null, mode: 'studio', explode: 0, explodeTarget: 0,
@@ -537,6 +552,7 @@ async function start() {
     void hero.offsetWidth;            // restart the entrance animation
     hero.classList.add('is-entering');
     labTitle.textContent = f.labName;
+    tourBtn.hidden = !tour.has(f.id);
     renderSpecs(v);
     updateLegend();
     labRoot.replaceChildren();
