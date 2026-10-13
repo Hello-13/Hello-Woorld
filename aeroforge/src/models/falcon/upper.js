@@ -71,7 +71,7 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   const lox = P('Second stage LOX tank', {
     system: 'Fuel', skin: true, material: 'Aluminium-lithium 2195 monocoque', mass: 1150,
     desc: 'Upper tank of the second stage, ≈ 75 t of densified LOX; its forward skirt carries the avionics, the payload adapter and the fairing. The second stage is a shorter copy of the first, built on the same tooling.',
-    explode: [0, 1.0, -4.5],
+    callout: true, anchor: [R + 0.02, 54.5, 0.3], explode: [0, 1.0, -4.5],
   }, [mesh(tb(Y.s2CommonDome, Y.s2Top), skin), mesh(merge([53.6, 55.2, Y.s2LoxTop, Y.s2Top - 0.05].map((y) => hoop(R - 0.035, 0.03, y, { seg: 72, tube: 4 }))), FM.aluDark())]);
   lox.userData.part.thermalRole = 'lox';
   const rp = P('Second stage RP-1 tank', {
@@ -169,7 +169,7 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   const c3 = V('MVac niobium nozzle extension', {
     material: 'Niobium-alloy sheet, radiatively cooled', mass: 160,
     desc: 'The large bell expands the exhaust 165 : 1 to a ≈ 3.3 m exit, lifting Isp to 348 s. The uncooled niobium glows orange-hot in vacuum; at sea level this bell would over-expand and the flow would separate. Its length here is estimated.',
-    callout: true, anchor: [-1.4, ex + 0.85, 0.35], explode: [0, -2.0, 0],
+    callout: true, anchor: [-1.45, ex + 0.3, 0.45], explode: [0, -2.0, 0],
   }, [ext, flange]);
   c3.userData.part.thermalRole = 'mvacExt';
   V('MVac turbopump', {

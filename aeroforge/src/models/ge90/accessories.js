@@ -216,7 +216,7 @@ export function buildAccessories(ctx) {
   P('Fuel flow meter', {
     system: 'Fuel', material: 'Turbine-type mass flow transmitter', mass: 4,
     explode: [0.42, 0.0, 1.62], temp: 300,
-    desc: 'Measures the metered fuel on its way to the nozzles for the cockpit fuel-flow display and fuel-used totals: about 4.7 kg/s (17 t an hour) at take-off and roughly 1.4 kg/s in cruise (modelled).',
+    desc: 'Measures the metered fuel on its way to the nozzles for the cockpit fuel-flow display and fuel-used totals: about 4.6 kg/s (16.5 t an hour) at take-off, as the ICAO emissions databank lists, and about 1.2 kg/s in cruise (modelled).',
   }, m(merge([axialCyl(1.81, -1.15, 1.47, 0.045, 0.16, 16), boxAt(1.86, -1.15, 1.47, [0.04, 0.06, 0.06])]), GM.blue()));
 
   // ------------------------------------------------------------------ lubrication lines

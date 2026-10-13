@@ -41,7 +41,7 @@ export function buildNacelle(ctx) {
   P('Inlet cowl', {
     system: 'Skin & fairings', skin: true, material: 'Aluminium lip, composite outer barrel, acoustic honeycomb inner barrel', mass: 380,
     explode: [0, 3.05, 0], temp: 288,
-    desc: 'Boeing-supplied inlet, about 1.5 m long, that slows the air to roughly Mach 0.6 at the fan face with no separation even in crosswinds. Its lip is a D-shaped duct heated by engine bleed air for anti-icing; the inner barrel is a perforated honeycomb that absorbs fan noise.',
+    desc: 'Boeing-supplied inlet, about 1.5 m long, that slows the air to roughly Mach 0.6 at the fan face with no separation even in crosswinds. Its lip is a D-shaped duct heated by engine bleed air for anti-icing; the inner barrel is a perforated honeycomb that absorbs fan noise. Like the rest of the nacelle, it is Boeing hardware and not part of the engine\'s 8,761 kg dry weight.',
   }, [inletShell, inletLiner]).userData.part.stationTemp = '2';
 
   // ------------------------------------------------------------------ fan cowl doors
@@ -87,7 +87,7 @@ export function buildNacelle(ctx) {
   P('Thrust reverser translating sleeves', {
     system: 'Skin & fairings', skin: true, material: 'Composite outer skin, acoustic inner skin', mass: 620, count: 2,
     explode: [-0.45, -1.0, -1.35], temp: 300,
-    desc: 'The aft nacelle. For reverse thrust the two sleeves slide aft (0.6 m here; the real stroke is not published), uncovering the cascades while blocker doors fold into the duct. Its trailing edge is the fan nozzle, the exit for the bypass air.',
+    desc: 'The aft nacelle. For reverse thrust the two sleeves slide aft (0.6 m here; the real stroke is not published), uncovering the cascades while blocker doors fold into the duct. Its trailing edge is the fan nozzle, the exit for the bypass air. The reverser is Boeing\'s and is excluded from the engine\'s certified dry weight.',
   }, sleeveGrp);
 
   // cascades: rings of forward-turning vanes between axial strongbacks, behind the torque box

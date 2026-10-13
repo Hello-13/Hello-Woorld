@@ -178,11 +178,11 @@ export function buildGear({ A, P }) {
   hookPivot.position.set(-0.3, 0.55, 0);
   const hk = new THREE.TorusGeometry(0.06, 0.018, 8, 16, Math.PI * 1.4).rotateZ(Math.PI * 0.8).translate(0, -0.3, 0);
   hookPivot.add(mesh(merge([box(0.1, 0.12, 0.16, [0, -0.04, 0]), tube([0, -0.08, 0], [0, -0.25, 0], 0.028, 10), cyl(0.03, 0.03, 0.2, [0, 0, 0], 'z', 10), hk]), MAT.steel()));
-  const well = box(0.46, 0.1, 0.7, [-0.08, 0.525, 0]);
+  const well = box(0.46, 0.1, 0.8, [-0.08, 0.525, 0]);            // as wide as its opening in the belly skin
   const hookPart = P('External cargo hook', {
     system: 'Payload', material: 'Steel hook with electrical, manual and emergency release; recessed belly well', mass: 18, explode: [0, -1.3, 0],
-    desc: 'Rated at 9,000 lb (4,082 kg), enough to sling a 105 mm howitzer or a light vehicle under the rotor, close to the centre of gravity so the load barely changes the trim. When not in use it swings up into a well in the belly (stowage door, if any, not modelled).',
-    callout: true, anchor: [-0.1, 0.42, 0.12],
+    desc: 'Rated at 9,000 lb (4,082 kg), enough to sling a 105 mm howitzer or a light vehicle under the rotor, close to the centre of gravity so the load barely changes the trim. When not in use it swings up into a well in the belly (whether a door closes the well could not be confirmed from public sources, so none is modelled).',
+    callout: true, anchor: [-0.1, 0.36, 0.1],
   }, [hookPivot, mesh(well, MAT.interior(), { cast: false })]);
   const setHook = (k) => { hookPivot.rotation.z = (1 - k) * Math.PI / 2; };
   setHook(0);

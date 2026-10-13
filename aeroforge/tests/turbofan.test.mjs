@@ -3,10 +3,11 @@
 // take-off EGT (T49) limit 1,090 °C (1,050 °C maximum continuous), 100 % N1 = 2,355 rpm, 100 % N2 =
 // 9,332 rpm, N1 / N2 limits 2,602 / 11,292 rpm, length 7,281 mm (286.7 in), fuel heating value
 // 42,798 kJ/kg (EASA TCDS IM.E.002 issue 05); overall pressure ratio 42, fan 3.25 m (128 in) with
-// 22 blades, 1 + 4 + 9 compressor and 2 + 6 turbine stages (GE Aerospace); bypass ratio 7.2
-// (Aircraft Commerce no. 84, 2012). Cruise: earlier GE90s are quoted at 0.52–0.545 lb/lbf/h
-// (14.7–15.4 g/(kN·s)); the -115B figure is not published, and the model runs about 10 % above
-// those, so the cruise window below is wide on the high side.
+// 22 blades, 1 + 4 + 9 compressor and 2 + 6 turbine stages (GE Aerospace). ICAO Engine Emissions
+// Databank (EASA, v32, 2026), GE90-115B entries 7GE099 … 07P27GE240: rated thrust 513.9 kN, bypass
+// ratio 6.96–7.1, pressure ratio 42.2–43.2, fuel flow 4.59 / 3.56 / 1.07 / 0.339 kg/s at the LTO
+// cycle's 100 / 85 / 30 / 7 % thrust points. Cruise: earlier GE90s are quoted at 0.52–0.545 lb/lbf/h
+// (14.7–15.4 g/(kN·s)); the -115B figure is not published.
 //
 // The model's geometry is checked through its three.js-free layout module; the tour is checked
 // against the part names declared in the model source, so a renamed part cannot silently drop
@@ -24,13 +25,13 @@ const close = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ''
 
 test('GE90-115B design point matches the published rating', () => {
   assert.equal(DEFAULT_CYCLE.opr, 42);
-  assert.equal(DEFAULT_CYCLE.bpr, 7.2);
+  assert.equal(DEFAULT_CYCLE.bpr, 7.1);
   const to = solveTurbofan({});
   assert.ok(to.valid && !to.fanLimited);
   close(to.thrust / 1000, GE90.ratedThrust / 1000, 5, 'take-off thrust kN');
   close(to.thrust / 4.44822, 115540, 1200, 'take-off thrust lbf (TCDS)');
   close(to.opr, 42, 0.01, 'overall pressure ratio at 100 % N1');
-  assert.ok(to.tsfc * 1e6 > 8 && to.tsfc * 1e6 < 10.5, `take-off TSFC ${to.tsfc * 1e6} g/(kN·s)`);
+  close(to.fuelFlow, 4.594, 0.15, 'take-off fuel flow kg/s (ICAO databank)');
   close(to.mCore * (1 + DEFAULT_CYCLE.bpr), to.m0, 1e-6, 'core + bypass = total airflow');
   // EGT is measured at the LPT inlet (T49 ≈ station 45): a new engine on a standard day has margin
   assert.ok(to.egt < GE90.egtLimitK && to.egtMargin > 50, `EGT ${to.egt} K vs limit ${GE90.egtLimitK} K`);
@@ -60,10 +61,10 @@ test('cruise at FL350, Mach 0.84: a cruise power setting, not take-off throttle'
   assert.ok(cr.valid && !cr.fanLimited);
   // a 777-300ER early in the cruise needs about 75–85 kN from each engine
   assert.ok(cr.thrust > 72e3 && cr.thrust < 88e3, `cruise thrust ${cr.thrust / 1e3} kN`);
-  assert.ok(cr.tsfc * 1e6 > 15.5 && cr.tsfc * 1e6 < 17.5, `cruise TSFC ${cr.tsfc * 1e6} g/(kN·s)`);
+  assert.ok(cr.tsfc * 1e6 > 14.5 && cr.tsfc * 1e6 < 15.8, `cruise TSFC ${cr.tsfc * 1e6} g/(kN·s)`);
   assert.ok(cr.n1 > 82 && cr.n1 < 95, `cruise N1 ${cr.n1} %`);
   assert.ok(cr.Tt4 > 1250 && cr.Tt4 < 1550, `cruise burner exit ${cr.Tt4} K`);
-  assert.ok(cr.etaTh > 0.42 && cr.etaTh < 0.6, `thermal efficiency ${cr.etaTh}`);
+  assert.ok(cr.etaTh > 0.48 && cr.etaTh < 0.58, `thermal efficiency ${cr.etaTh}`);
   assert.ok(cr.etaP > 0.7 && cr.etaP < 0.85, `propulsive efficiency ${cr.etaP}`);
   // full thrust lever at FL350 is held by the corrected-speed limit: maximum climb, about a fifth of take-off
   const mcl = solveTurbofan({ ...OPERATING_POINTS.cruise, throttle: 1 });
@@ -98,6 +99,30 @@ test('part power on the ground: matched, monotonic, idle where a big fan idles',
   // the work-limit warning belongs to cycle-design changes only
   assert.ok(solveTurbofan({ tit: 1300 }).fanLimited, 'a design TIT of 1,300 K cannot drive the design fan');
   assert.ok(!solveTurbofan({ ...OPERATING_POINTS.climb }).fanLimited, 'the climb preset is matched');
+});
+
+test('fuel flow follows the ICAO emissions databank at the LTO thrust points', () => {
+  // the thrust lever position that gives a fraction of the rating, at sea-level static
+  const at = (frac) => {
+    let lo = 0, hi = 1;
+    for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (solveTurbofan({ throttle: m }).thrust < frac * 513.9e3) lo = m; else hi = m; }
+    return solveTurbofan({ throttle: (lo + hi) / 2 });
+  };
+  // [thrust fraction, databank fuel flow kg/s, allowed relative error]
+  for (const [frac, ff, tol] of [[1, 4.594, 0.05], [0.85, 3.562, 0.08], [0.3, 1.069, 0.2], [0.07, 0.339, 0.1]]) {
+    const r = at(frac);
+    assert.ok(Math.abs(r.fuelFlow / ff - 1) <= tol, `${frac * 100} % thrust: fuel ${r.fuelFlow.toFixed(3)} kg/s vs databank ${ff}`);
+  }
+});
+
+test('burner energy balance uses a mean specific heat, not the two-cp shortcut', async () => {
+  const { fuelAir } = await import('../src/physics/turbofan.js');
+  // air-table enthalpy rise 918 → 1,740 K is about 970 kJ/kg; LHV 42.8 MJ/kg, η_b 0.995
+  const f = fuelAir(918, 1740, 0.995);
+  assert.ok(f > 0.0235 && f < 0.0255, `take-off fuel–air ratio ${f}`);
+  // the shortcut (1150·T4 − 1004.5·T3)/(η·LHV − 1150·T4) overstates fuel more as T3 falls (part power, cruise)
+  const shortcut = (T3, T4) => (1150 * T4 - 1004.5 * T3) / (0.995 * 42.798e6 - 1150 * T4);
+  assert.ok(shortcut(444, 702) / fuelAir(444, 702, 0.995) > shortcut(918, 1740) / f, 'shortcut error grows at idle');
 });
 
 test('model layout: GE90-115B stage counts and main dimensions', () => {

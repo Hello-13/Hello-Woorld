@@ -41,7 +41,8 @@ export function buildPower(P, body) {
     P(`Solar array drive (${tag})`, {
       system: 'Power', material: 'Stepper motor, slip rings, bearings', mass: 19, temp: 290, explode: [0, 1.9, 0],
       desc: 'Turns its wing once per orbit, about 0.5° a minute, so the cells keep facing the Sun while the body stays pointed at the Earth. Slip rings carry the array\'s current across the rotating joint.',
-      callout: s > 0, anchor: [0, 0.12, 0.12],
+      // no callout: on screen the drive sits on the array axis level with the labelled inboard panel, and
+      // the panel's label (drawn to the right of its dot) ran into the drive's dot in the Showroom and tour framings
     }, [mesh(sada, G.gunmetal())], mount);
 
     // frangibolt hold-downs on the radiator face
@@ -95,9 +96,9 @@ export function buildPower(P, body) {
           : i === 1
             ? 'Middle panel. Radiation in the GPS orbit, inside the outer Van Allen belt, slowly damages the cells, so the array is sized for its fifteenth year, not its first.'
             : 'Outboard panel. Spring hinges and a closed cable loop unfold the three panels together, in seconds, once the frangibolts release.',
-        // labelled on the −Y inboard panel near its aft edge (local +z is body −Z on this wing): the array spot
-        // whose label stays on screen and clear of the other labels and the page text in the orbit-look and
-        // Showroom/Hangar framings, and more than a label height from the array-drive label in tour step 7
+        // the wing's one callout, on the −Y inboard panel near its aft edge (local +z is body −Z on this wing):
+        // the array spot whose label stays on screen and clear of the deck and engine labels and the page text
+        // in the orbit-look and Showroom/Hangar framings
         callout: s < 0 && i === 0, anchor: [0.02, PANEL_L / 2, PANEL_W / 2 - 0.15],
       }, panel, pv);
       part.userData.part.thermalRole = 'array';

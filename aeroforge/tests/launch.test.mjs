@@ -118,6 +118,7 @@ test('every slider setting either reaches its target orbit or fails with a named
         const tag = `${payload / 1e3} t, ${kick}°, ${target} km`;
         assert.ok(typeof r.label === 'string' && r.label.length > 10, `${tag}: label`);
         assert.ok(!/NaN|Infinity|undefined/.test(events.map((e) => e.label).join(' ')), `${tag}: event text`);
+        assert.ok(!/-\d/.test(r.label), `${tag}: no negative altitudes in "${r.label}"`);
         if (r.success) {
           wins++;
           assert.ok(Number.isFinite(r.apogee), `${tag}: finite apogee`);

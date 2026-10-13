@@ -156,6 +156,19 @@ export function mountRocketLab(root, ctx) {
     // no context call for this, so press the card's own close button)
     document.querySelector('#part-card:not([hidden]) .pc-head .icon-btn')?.click();
     if (ctx.stage.env.look !== 'pad') ctx.setLook('pad');
+    // start the chase from a view of the whole stack: keep the viewer's direction, centre on the
+    // point the camera will follow and back off until the full 70 m stack fits, so a close-up on
+    // one part (or a part fly-to still under way) cannot leave the vehicle out of frame later
+    {
+      const cam = stage.camera, tgt = stage.controls.target;
+      const dir = cam.position.clone().sub(tgt);
+      const d0 = dir.length();
+      if (d0 > 1e-6) dir.divideScalar(d0); else dir.set(0.6, 0.15, 0.8);
+      const centre = v.followPoint(new THREE.Vector3());
+      const { tanV, tanH } = stage.frameTan();
+      const need = ((76 * v._fitScale) / (2 * Math.min(tanV, tanH))) * 1.1;
+      stage.flyTo(centre.clone().addScaledVector(dir, Math.max(d0, need)), centre, 1.2);
+    }
     stage.ascending = true;
     prevRocket = null;
     lastShake.x = lastShake.y = 0;

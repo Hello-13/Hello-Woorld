@@ -83,7 +83,13 @@ export function buildAppendages(P) {
   }
 
   // ------------------------------------------------------------------ high-gain antennas (±y)
-  const dishProfile = Array.from({ length: 24 }, (_, i) => { const r = (i / 23) * HGA.dish; return [r, (r * r) / (4 * 0.42)]; });
+  // the reflector as a closed shell 2.5 cm thick (front face, rim, back face), so it renders single-sided
+  // and casts clean shadows onto itself; profile runs out along the back and returns along the front
+  const DISH_T = 0.025, DN = 24;
+  const sag = (r) => (r * r) / (4 * 0.42);
+  const dishProfile = [];
+  for (let i = 0; i <= DN; i++) { const r = (i / DN) * HGA.dish; dishProfile.push([r, sag(r) - DISH_T]); }
+  for (let i = DN; i >= 0; i--) { const r = (i / DN) * HGA.dish; dishProfile.push([r, sag(r)]); }
   for (const s of [1, -1]) {
     const side = s > 0 ? '+V3' : '−V3';
     const base = [new THREE.BoxGeometry(0.5, 0.12, 0.34).translate(HGA.x, s * (RAD.shell + 0.05), 0)];
@@ -105,22 +111,22 @@ export function buildAppendages(P) {
     const dish = lathe(dishProfile, 48);
     if (s < 0) dish.rotateZ(Math.PI);
     dish.translate(0, s * 0.3, 0);
-    // eight ribs following the back of the reflector, 2.5 cm behind its surface
+    // eight ribs following the back of the reflector shell
     const back = [];
-    const backY = (r) => s * (0.3 + (r * r) / 1.68 - 0.025);
+    const backY = (r) => s * (0.3 + sag(r) - DISH_T - 0.014);
     for (let k = 0; k < 8; k++) {
       const a = (k / 8) * Math.PI * 2;
       const rs = [0.05, 0.2, 0.35, 0.48, 0.6];
       for (let i = 0; i < rs.length - 1; i++) back.push(rod([Math.cos(a) * rs[i], backY(rs[i]), Math.sin(a) * rs[i]], [Math.cos(a) * rs[i + 1], backY(rs[i + 1]), Math.sin(a) * rs[i + 1]], 0.012, 5));
     }
-    back.push(new THREE.CylinderGeometry(0.07, 0.07, 0.06, 16).translate(0, s * 0.25, 0));   // hub on the gimbal
+    back.push(new THREE.CylinderGeometry(0.07, 0.07, 0.06, 16).translate(0, s * (0.3 - DISH_T - 0.03), 0));   // hub on the gimbal
     const feed = [new THREE.CylinderGeometry(0.05, 0.08, 0.16, 16).translate(0, s * (0.3 + 0.38), 0)];
     for (let k = 0; k < 3; k++) {
       const a = (k / 3) * Math.PI * 2 + 0.4;
-      feed.push(rod([Math.cos(a) * HGA.dish * 0.85, s * (0.3 + (HGA.dish * 0.85) ** 2 / 1.68), Math.sin(a) * HGA.dish * 0.85], [0, s * (0.3 + 0.36), 0], 0.01, 5));
+      feed.push(rod([Math.cos(a) * HGA.dish * 0.85, s * (0.3 + sag(HGA.dish * 0.85)), Math.sin(a) * HGA.dish * 0.85], [0, s * (0.3 + 0.36), 0], 0.01, 5));
     }
     const gim = [new THREE.BoxGeometry(0.22, 0.2, 0.22).translate(0, s * 0.1, 0), new THREE.CylinderGeometry(0.07, 0.07, 0.34, 14).rotateZ(Math.PI / 2).translate(0, s * 0.22, 0)];
-    g2.add(mesh(dish, HM.dish()), mesh(merge(back), HM.grEp()), mesh(merge(feed), HM.al()));
+    g2.add(mesh(dish, HM.dishShell()), mesh(merge(back), HM.grEp()), mesh(merge(feed), HM.al()));
     // waveguide and cable run along the mast
     pivot.add(mesh(merge([rod([0.09, s * 0.15, 0.05], [0.09, s * (HGA.mast - 0.1), 0.05], 0.018, 6), rod([-0.08, s * 0.15, -0.05], [-0.08, s * (HGA.mast - 0.1), -0.05], 0.012, 6)]), HM.kapton()));
     const hp = P(`High-gain antenna (${side})`, {

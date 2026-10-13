@@ -53,6 +53,9 @@ export function buildInstruments(P, root) {
         { name: 'STIS mode select mechanism', material: 'Rotating grating carousel', temp: 293,
           desc: 'A motor-driven wheel of gratings and mirrors that chooses the spectral mode: low or high resolution, first-order or echelle, ultraviolet or visible.',
           geo: (c) => [new THREE.CylinderGeometry(0.16, 0.16, 0.08, 28).rotateX(Math.PI / 2).translate(1.0, c[0] * 0.5, c[1] * 0.5)] },
+        { name: 'STIS low-voltage power supply (2009 repair)', material: 'Replacement LVPS-2 circuit board behind a new latched cover plate', temp: 296,
+          desc: 'The board whose power converter failed in August 2004. In 2009 a spacewalker removed 111 small screws, held captive by a fastener capture plate, pulled the board and slid in a new one, then closed the bay with a cover held by two latches. Position inside the enclosure approximate.',
+          geo: (c) => [new THREE.BoxGeometry(0.36, 0.06, 0.3).translate(0.75, c[0] * 0.88, c[1] * 0.5)] },
       ],
     },
     {
@@ -79,6 +82,9 @@ export function buildInstruments(P, root) {
         { name: 'ACS High Resolution Channel (inoperative)', material: '1024 × 1024 CCD, 0.025″ pixels, with a coronagraph', temp: 290,
           desc: 'The channel that covered 170–350 nm and took the sharpest ACS images. It failed with the CCD electronics in January 2007 and could not be restored in 2009, which is why ACS now has no channel between the far ultraviolet and 350 nm.',
           geo: (c) => [new THREE.BoxGeometry(0.4, 0.22, 0.22).translate(1.0, c[0] * 0.72, c[1] * 0.3)] },
+        { name: 'ACS replacement CCD electronics (2009)', material: 'CCD electronics box and low-voltage power supply installed in orbit', temp: 296,
+          desc: 'The 2009 repair: spacewalkers took 32 screws out of an electronics access panel never meant to be opened in space, swapped the failed CCD electronics cards for a new box and power supply, and brought the Wide Field Channel back. Position inside the enclosure approximate.',
+          geo: (c) => [new THREE.BoxGeometry(0.3, 0.1, 0.3).translate(0.55, c[0] * 0.86, c[1] * 0.62)] },
       ],
     },
     {
@@ -197,28 +203,28 @@ export function buildInstruments(P, root) {
   // ------------------------------------------------------------------ gyros, star trackers, NICMOS cooler
   // on the −V3 (shadow) side of the focal plane structure at the forward end of the aft shroud,
   // behind the −V3 doors: the rate sensor units on one side of WFC3, the star trackers on the other
-  const rsuPhi = deg(150);
+  const rsuPhi = deg(157);
   const rsu = (n, x) => {
     const box = rbox(rsuPhi, 0.28, 0.22, 0.26, x, 1.72);
     const gyros = [0, 1].map((i) => new THREE.CylinderGeometry(0.06, 0.06, 0.18, 16).translate(x - 0.07 + i * 0.14, 1.86, 0).rotateX(rsuPhi));
     const plate = rbox(rsuPhi, 0.32, 0.03, 0.32, x, 1.595);
     return P(`Rate sensor unit ${n}`, {
       system: 'Attitude control', material: 'Two gas-bearing rate-integrating gyroscopes in an enclosure, on a mounting plate', mass: 24, count: 2, temp: 296,
-      explode: az(rsuPhi, 1.2, -0.6), desc: `Each unit carries two gyros, six in all, measuring rotation rate about their sensitive axes; electronics control units in bay 10 process their output. The gyros' flex leads corroded over time; all three units were replaced in 2009 (in the order 2, 3, 1). Since 2024 Hubble points with a single gyro to conserve the rest. Position on the −V3 side approximate.`,
+      explode: az(rsuPhi, 1.2, -0.6), desc: `Each unit carries two gyros, six in all, measuring rotation rate about their sensitive axes; electronics control units in bay 10 process their output. The gyros' flex leads corroded over time; all three units were replaced in 2009. Since 2024 Hubble points with a single gyro to conserve the rest. Position on the −V3 side approximate.`,
     }, [mesh(box, HM.iridite()), mesh(merge([...gyros, plate]), HM.box())]);
   };
   rsu(1, 2.55); rsu(2, 2.9); rsu(3, 3.25);
 
   const fh = [], shades = [];
-  for (const a of [204, 212.5, 221].map(deg)) {
-    fh.push(rbox(a, 0.3, 0.3, 0.24, 3.0, 1.82));
+  for (const a of [198.5, 206, 213.5].map(deg)) {
+    fh.push(rbox(a, 0.3, 0.3, 0.22, 3.0, 1.82));
     // light shade out through the shroud door, tilted 20° toward the aperture
     const g = new THREE.CylinderGeometry(0.11, 0.08, 0.42, 4, 1, true).rotateY(Math.PI / 4).translate(0, 0.2, 0).rotateZ(deg(-20));
     g.translate(3.0, RAD.big - 0.02, 0).rotateX(a);
     shades.push(g);
   }
   P('Fixed-head star trackers', {
-    system: 'Attitude control', material: 'Image-dissector star sensors with sunshades', mass: 54, count: 3, temp: 285, explode: az(deg(212), 1.6, 0.4),
+    system: 'Attitude control', material: 'Image-dissector star sensors with sunshades', mass: 54, count: 3, temp: 285, explode: az(deg(206), 1.6, 0.4),
     desc: 'Three trackers behind the focal plane structure, next to the gyros, look out through light-sealed openings in the −V3 doors and map bright stars to fix Hubble\'s attitude to about an arc-minute — coarse enough to put the guide stars inside the Fine Guidance Sensors\' view. Positions approximate.',
   }, [mesh(merge(fh), HM.box()), mesh(merge(shades), HM.black())]);
 

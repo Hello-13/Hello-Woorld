@@ -64,7 +64,7 @@ export function buildFan(ctx) {
     system: 'Propulsion', material: 'Carbon-fibre / toughened-epoxy composite, titanium leading-edge sheath', mass: 480, count: 22,
     explode: [0, 2.3, 0],
     desc: '22 wide-chord swept composite blades, each about 1.2 m long and under 23 kg; the fan is 3.25 m (128 in) across, with about 5 mm between the blade tips and the rub strip. At take-off the tips run supersonic, and the bypass air the fan pushes makes about four fifths of the thrust. A titanium sheath protects each leading edge from birds, hail and erosion.',
-    callout: true, anchor: [-1.2, -0.05, 0.3],
+    callout: true, anchor: [-1.58, -0.1, 0.3],
   }, spinFan).userData.part.stationTemp = '13';
 
   // ------------------------------------------------------------------ fan disk & platforms
@@ -127,7 +127,7 @@ export function buildFan(ctx) {
   P('Booster casing & splitter', {
     system: 'Structure', material: 'Titanium splitter lip, aluminium casing', mass: 190,
     explode: [-0.55, 0.9, 0], temp: 300,
-    desc: 'The sharp splitter lip divides the fan exit flow: about 1 kg of air in 8.2 goes down into the core, the other 7.2 kg into the bypass duct. The casing behind it holds the booster stator vanes.',
+    desc: 'The sharp splitter lip divides the fan exit flow: about 1 kg of air in 8.1 goes down into the core, the other 7.1 kg into the bypass duct (take-off bypass ratio 7.1, ICAO databank). The casing behind it holds the booster stator vanes.',
   }, splitter).userData.part.stationTemp = '13';
 
   // ------------------------------------------------------------------ booster (LP compressor) rows
@@ -236,7 +236,6 @@ export function buildFan(ctx) {
     system: 'Propulsion', material: 'Steel doors, unison ring and fuel-powered actuators (count estimated)', mass: 70, count: 12,
     explode: [-0.4, 0.25, 0.35], temp: 330,
     desc: 'Doors in the duct between booster and HP compressor. At low power and during rapid throttle changes the booster pumps more air than the core can swallow; the FADEC opens these doors to dump the excess into the bypass and keep the booster from stalling. The GE90 introduced doors that open inward into the flow, so they also scoop out sand, hail and ice flung to the outer wall — GE calls it a FOD-free core.',
-    callout: true, anchor: [0.19, -1.7, 0.71],
   }, vbvGrp).userData.part.stationTemp = '25';
 
   // two fuel-powered actuators on the frame that turn the unison ring through bellcranks

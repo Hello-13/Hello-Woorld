@@ -55,7 +55,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal }) {
   P('Armoured crashworthy pilot seats', {
     system: 'Crew systems', material: 'Composite armour (boron-carbide class) bucket, energy-absorbing stroke guides', mass: 150, count: 2, explode: [0.6, 1.4, 0],
     desc: 'Each seat rides on vertical guides with energy absorbers: in a crash it strokes down about 0.3 m, holding the pilot\'s spinal load to survivable levels. Ceramic-composite armour shields the bucket and a sliding side panel.',
-    callout: true, anchor: [2.45, 1.92, -0.53],
+    callout: true, anchor: [2.4, 2.05, -0.53],
   }, [mesh(merge(seatF), MAT.seat()), mesh(merge(seatA), MAT.armour())]);
 
   const panelG = [place(new THREE.BoxGeometry(0.06, 0.52, 1.92), [3.72, 1.2, 0], [0, 0, 0.22]), box(0.24, 0.05, 1.84, [3.66, 1.47, 0])];
@@ -433,9 +433,9 @@ export function buildCabin({ A, P, surfPoint, surfNormal }) {
   }, [mesh(merge(dl), MAT.lens())]);
 
   // ------------------------------------------------------------------ environmental control
-  const ecs = [box(0.36, 0.2, 0.3, [1.9, 2.42, 0.32])];
+  const ecs = [box(0.36, 0.18, 0.3, [1.82, 2.38, 0.28])];          // under the tapering nose of the transmission fairing
   for (const s of [1, -1]) ecs.push(pipe([[2.2, 1.97, 0.6 * s], [0.5, 1.97, 0.7 * s], [-1.6, 1.97, 0.7 * s]], 0.04, 8));
-  ecs.push(pipe([[1.9, 2.32, 0.32], [2.3, 2.15, 0.4], [2.9, 2.05, 0.45], [3.5, 1.5, 0.75]], 0.035, 8));
+  ecs.push(pipe([[1.82, 2.3, 0.3], [2.3, 2.15, 0.4], [2.9, 2.05, 0.45], [3.5, 1.5, 0.75]], 0.035, 8));
   P('Heating, ventilation & cooling', {
     system: 'Environmental control', material: 'Bleed-air heater, blower, vapour-cycle cooling unit, ducts', mass: 45, explode: [0.4, 1.2, 0.6],
     desc: 'A bleed-air heater and blower warm the cockpit and cabin; the M model adds vapour-cycle air conditioning to keep crew and avionics cool in hot climates.',

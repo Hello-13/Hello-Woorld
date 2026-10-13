@@ -477,7 +477,7 @@ export function buildSSM(P) {
     material: 'Two hinged honeycomb doors with light-tight seals', mass: 60, count: 2, explode: [-1.4, 0, 3.2],
     desc: 'Open onto the two −V2 axial bays: COSTAR came out through them in 2009 and the Cosmic Origins Spectrograph went in, and the ACS repair was done here. Door size estimated.',
   });
-  doorPair('−V3 aft shroud doors (gyros, star trackers)', [[140, 160, 140], [200, 222, 222]], 2.35, 3.42, {
+  doorPair('−V3 aft shroud doors (gyros, star trackers)', [[147, 166, 147], [194, 218, 218]], 2.35, 3.42, {
     material: 'Hinged honeycomb doors with light-tight seals around the star-tracker openings', mass: 30, count: 2, explode: [-0.6, -4.6, 0],
     desc: 'Behind them, at the forward end of the aft shroud on the shadow side, sit the three rate sensor units and the fixed-head star trackers. In 2009 spacewalkers retracted the star-tracker door seals, opened these doors and swapped all three gyro units. Leaf sizes estimated.',
   });

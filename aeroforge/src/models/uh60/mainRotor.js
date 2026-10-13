@@ -193,7 +193,7 @@ export function buildMainRotor({ A, parent }) {
   const brg = staticPart('Elastomeric bearings', {
     material: 'Laminated natural rubber and steel shims', mass: 18, count: 4, explode: [0, UPX + 0.15, 0],
     desc: 'Each bearing is a stack of thin rubber layers bonded between curved steel shims. The rubber shears to let the blade flap, lead-lag and change pitch about one focal point 0.381 m from the shaft, while the stack carries the blade\'s centrifugal pull — about 360 kN (≈ 37 tonnes-force) at 258 rpm — in compression.',
-    callout: true, anchor: [0, -0.04, 0.44],      // fixed point on the starboard side, where the bearings pass
+    callout: true, anchor: [0, -0.1, 0.44],       // fixed point low on the starboard side, where the bearings pass
   });
   brg.k.add(mesh(merge(rubber), MAT.elastomer()), mesh(merge(steel), MAT.steel()));
 
@@ -253,7 +253,7 @@ export function buildMainRotor({ A, parent }) {
   const bifBase = [cyl(0.21, 0.19, 0.08, [0, 0.21, 0], 'y', 28), cyl(0.12, 0.12, 0.1, [0, 0.29, 0], 'y', 24)];
   const bifMasses = [];
   const bifPart = P('Bifilar vibration absorber', {
-    material: 'Steel arms and tuned tungsten-alloy masses on bifilar pins', mass: 100, explode: [0, UPX + 1.2, 0],
+    material: 'Steel arms and tuned tungsten-alloy masses on bifilar pins', mass: 100, explode: [0, UPX + 0.8, 0],
     desc: 'Four tuned masses hang from the arms on two pins each (hence "bifilar"), free to swing in the plane of the rotor. Tuned to three cycles per revolution in the rotating hub (described as 3/rev in the literature), they cancel the in-plane rotating loads that would reach the fuselage as four-per-rev; the UH-60M\'s active vibration control cancels what remains in the cabin.',
     callout: true, anchor: [0, 0.47, 0],
   }, []);
@@ -272,7 +272,7 @@ export function buildMainRotor({ A, parent }) {
   bifPart.add(mesh(merge(bifBase), MAT.steel()));
 
   P('Blade de-ice slip ring & distributor', {
-    system: 'Electrical', material: 'Slip-ring assembly and timer-distributor', mass: 14, explode: [0, UPX + 1.75, 0],
+    system: 'Electrical', material: 'Slip-ring assembly and timer-distributor', mass: 14, explode: [0, UPX + 1.25, 0],
     desc: 'Carries de-ice power from the airframe into the turning rotor and switches it through the blade heater mats in sequence, shedding ice in small pieces. Main and tail rotor de-ice are standard on the UH-60M.',
   }, [mesh(merge([cyl(0.09, 0.1, 0.07, [0, 0.375, 0], 'y', 22), cyl(0.05, 0.08, 0.04, [0, 0.43, 0], 'y', 20)]), MAT.casting())]);
 

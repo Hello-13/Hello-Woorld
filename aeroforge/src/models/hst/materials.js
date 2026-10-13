@@ -188,6 +188,8 @@ export const HM = {
   sa3Back: () => once('sa3Back', () => new THREE.MeshStandardMaterial({ color: 0xd9dcdf, roughness: 0.62, metalness: 0.15 })),
   /** Antenna reflector front: white-painted graphite. */
   dish: () => once('dish', () => new THREE.MeshStandardMaterial({ color: 0xe9e3d6, roughness: 0.55, metalness: 0.08, side: THREE.DoubleSide })),
+  /** The same paint on the closed high-gain reflector shell: single-sided, so it casts no shadow acne. */
+  dishShell: () => once('dishShell', () => new THREE.MeshStandardMaterial({ color: 0xe9e3d6, roughness: 0.55, metalness: 0.08 })),
   /** Black-and-white rendezvous target pattern on the soft-capture mechanism. */
   target: () => once('target', () => {
     const map = canvasTex(256, 256, (ctx, w, h) => {

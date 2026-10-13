@@ -24,6 +24,11 @@
 // speed in flight every temperature ratio equals the design value — the similarity a real engine
 // shows. The fan is "work-limited" only when the design inputs ask for more fan work than the LP
 // turbine can deliver at the design point; the fan pressure ratio is then bisected down.
+//
+// Calibration: the ICAO Engine Emissions Databank (EASA, v32) lists the GE90-115B's sea-level
+// fuel flow at the LTO cycle's thrust points: 4.59 kg/s at 100 %, 3.56 at 85 %, 1.07 at 30 % and
+// 0.339 at 7 %. The model gives 4.50, 3.72, 1.23 and 0.33 (tests/turbofan.test.mjs checks them),
+// and about 15.1 g/(kN·s) (0.534 lb/lbf/h) at 80 kN in cruise at FL350, Mach 0.84.
 
 import { isa } from './atmosphere.js';
 
@@ -33,14 +38,26 @@ const R_C = CP_C * (GAMMA_C - 1) / GAMMA_C;
 const R_T = CP_T * (GAMMA_T - 1) / GAMMA_T;
 const H_FUEL = 42.798e6;                // J/kg, fuel lower heating value the ratings assume (EASA TCDS IM.E.002, note 6)
 const kc = (GAMMA_C - 1) / GAMMA_C, kt = (GAMMA_T - 1) / GAMMA_T;
+/**
+ * Mean specific heat (J/kg·K) of the burner gas between T3 and T4: cp(T) ≈ 960 + 0.19·T, a fit to
+ * air and lean kerosene combustion products from 300 to 1,800 K. The textbook two-cp shortcut
+ * f = (cp_t·T4 − cp_c·T3)/(…) charges the air's whole enthalpy at the hot-gas cp, which overstates
+ * fuel by about 9 % at take-off and by more at part power and in cruise, where T3 is lower.
+ */
+const cpBurner = (T3, T4) => 960 + 0.19 * 0.5 * (T3 + T4);
+/** Fuel–air ratio from the burner energy balance: Δh_air = f·(η_b·LHV − cp·(T4 − 298 K)). */
+export const fuelAir = (Tt3, Tt4, etaB) => {
+  const cp = cpBurner(Tt3, Tt4);
+  return (cp * (Tt4 - Tt3)) / (etaB * H_FUEL - cp * (Tt4 - 298.15));
+};
 
 /** Published GE90-115B figures used by the model (EASA TCDS IM.E.002, GE, Aircraft Commerce). */
 export const GE90 = {
   name: 'GE90-115B',
-  // Take-off airflow is not published. ≈ 1,560 kg/s (3,440 lb/s) is the modelled value that gives
-  // the certified thrust with the modelled fan pressure ratio; it is about 12 % above the 1,350 kg/s
-  // quoted for the earlier GE90-94B, as Aircraft Commerce describes for the -110B/-115B fan.
-  massFlowSL: 1560,       // kg/s total airflow at sea-level static, take-off (modelled)
+  // Take-off airflow is not published. ≈ 1,490 kg/s (3,290 lb/s) is the modelled value that gives
+  // the certified thrust with the modelled fan pressure ratio; it is about 10 % above the 1,350 kg/s
+  // quoted for the earlier GE90-94B (Aircraft Commerce gives +12 % for the -110B/-115B fan).
+  massFlowSL: 1492,       // kg/s total airflow at sea-level static, take-off (modelled)
   fanDiameter: 3.25,      // m (128 in)
   ratedThrust: 513.95e3,  // N (51,395 daN = 115,540 lbf certified take-off, EASA TCDS IM.E.002)
   n1Rpm100: 2355,         // rpm at 100 % N1 (TCDS)
@@ -61,7 +78,7 @@ export const SCHEDULE = {
   fanExp: 2.2,            // compressor temperature rise ∝ (corrected speed)^fanExp
   flowExp: 1.0,           // corrected airflow ∝ n^(flowExp + n)
   eprExp: 0.8,            // EPR − 1 ∝ (corrected speed)^eprExp
-  effLoss: 0.35,          // component efficiency × (1 − effLoss (1 − n)²) away from design speed n = 1
+  effLoss: 0.2,           // component efficiency × (1 − effLoss (1 − n)²) away from design speed n = 1
 };
 
 /** N1 demand (fraction of 100 %) for a thrust-lever position 0 (idle) … 1 (take-off). */
@@ -80,17 +97,19 @@ export function n2Line(n1c) {
 export const OPERATING_POINTS = {
   takeoff: { altitude: 0, mach: 0, throttle: 1, label: 'Take-off' },
   climb: { altitude: 5000, mach: 0.55, throttle: 1, label: 'Max climb' },
-  cruise: { altitude: 10668, mach: 0.84, throttle: 0.84, label: 'Cruise M0.84' },
+  cruise: { altitude: 10668, mach: 0.84, throttle: 0.835, label: 'Cruise M0.84' },
 };
 
 export const DEFAULT_CYCLE = {
   altitude: 0, mach: 0, throttle: 1,
   // fan tip PR, booster PR (fan hub + 4 booster stages), overall PR, combustor exit T, BPR, all
   // at the sea-level-static take-off design point.
-  // GE90-115B take-off: OPR 42 (GE). BPR 7.2 (Aircraft Commerce, -115B); the 8–9 often quoted
-  // belongs to the earlier -76B…-94B. Fan PR, booster PR and combustor exit temperature are
-  // not published — they are chosen so 514 kN and a T49 (EGT) under the 1,090 °C limit result.
-  fpr: 1.75, lpcpr: 2.3, opr: 42, tit: 1680, bpr: 7.2,
+  // GE90-115B take-off: OPR 42 (GE; the ICAO databank lists 42.2–43.2). BPR 7.1 (ICAO Engine
+  // Emissions Databank, GE90-115B: 7.08 at certification, 6.96–7.1 in later entries; Aircraft
+  // Commerce gives 7.2); the 8–9 often quoted belongs to the earlier -76B…-94B. Fan PR, booster PR
+  // and combustor exit temperature are not published: they are chosen so that the certified
+  // 514 kN, the databank's 4.59 kg/s take-off fuel flow and a T49 (EGT) under the 1,090 °C limit result.
+  fpr: 1.8, lpcpr: 2.3, opr: 42, tit: 1740, bpr: 7.1,
   // isentropic component efficiencies typical of a 2000s high-bypass engine
   eff: { inlet: 0.995, fan: 0.93, lpc: 0.9, comp: 0.89, burner: 0.995, burnerPR: 0.955, hpt: 0.92, lpt: 0.935, mech: 0.99, nozzle: 0.98 },
 };
@@ -109,7 +128,7 @@ function gasPath({ T0, P0, Tt2, Pt2, lpcpr, hpcpr, Tt4, fpr, bpr, e, minNpr = 1.
   const Tt25 = Tt2 * (1 + (Math.pow(lpcpr, kc) - 1) / e.lpc);
   const Pt3 = Pt25 * hpcpr;
   const Tt3 = Tt25 * (1 + (Math.pow(hpcpr, kc) - 1) / e.comp);
-  const f = (CP_T * Tt4 - CP_C * Tt3) / (e.burner * H_FUEL - CP_T * Tt4);
+  const f = fuelAir(Tt3, Tt4, e.burner);
   const Pt4 = Pt3 * e.burnerPR;
   // HP spool: cp_c (Tt3 − Tt25) = η_m (1 + f) cp_t (Tt4 − Tt45)
   const Tt45 = Tt4 - (CP_C * (Tt3 - Tt25)) / (e.mech * (1 + f) * CP_T);

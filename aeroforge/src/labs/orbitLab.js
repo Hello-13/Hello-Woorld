@@ -20,7 +20,7 @@ export function mountOrbitLab(root, ctx) {
   const os = orbitScene;
   // orbitScene.js hard-codes the label text and sits it just above the glow, where it can cover the
   // parking-orbit label at the start; name the satellite and lift its label clear (shared-file fix suggested)
-  const nameSat = () => { if (os.satLabel?.element) { os.satLabel.element.textContent = v.designation; os.satLabel.position.set(0, 0.5, 0); } };
+  const nameSat = () => { if (os.satLabel?.element) { os.satLabel.element.textContent = v.designation; os.satLabel.position.set(0, 0.7, 0); } };
   nameSat();
   const p = { h1: GPS3.transferPerigee, h2: GPS3.altitude, di: 0, launcherBurn1: true };
   let inOrbitView = false;

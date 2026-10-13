@@ -173,6 +173,11 @@ test('top speed and its limits', () => {
   const s = speedSchedule({ mass: UH60.mtow, pressureAltitude: 0, isaDev: 0 });
   between(s.vmax / KT, 145, 165, 'max level speed at MCP, MTOW, SL (published "maximum speed" 159 kt, condition not stated)');
   assert.ok(speedSchedule({ mass: 7620, pressureAltitude: 0, isaDev: 0 }).vmax > s.vmax, 'lighter is faster');
+  // the published 159 kt maximum speed (condition not stated) is reached light, on the full 3,400 shp
+  // transmission rating: here 6,500 kg at sea level on intermediate power
+  const light = speedSchedule({ mass: 6500, pressureAltitude: 0, isaDev: 0 }, { rating: 'irp' });
+  close(light.vmax / KT, 159, 4, 'light-weight level speed on 3,400 shp');
+  assert.equal(light.avail.limit, 'transmission');
   // tip-Mach boundary: (ΩR + V)/a = M_lim
   const a = airData(0, 0).a;
   close((rotorGeometry().vtip + s.vTip) / a, UH60.tipMachLimit, 1e-6, 'advancing-tip Mach limit');

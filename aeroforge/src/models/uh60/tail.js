@@ -126,7 +126,7 @@ export function buildTail({ A, P, air, roofY }) {
   P('Tail pylon', {
     system: 'Skin & fairings', skin: true, material: 'Aluminium skins, cambered NACA 0021 (mod) section, Kevlar leading edge', mass: 70, explode: [-2.9, 0.5, 0],
     desc: 'The swept vertical fin (41° at the quarter chord) is cambered so that in forward flight it makes a side force that unloads the tail rotor. Above the tail cone it leans 20° to port, which tilts the tail-rotor shaft and lets the tail rotor help lift the tail.',
-    callout: true, anchor: [-8.5, 2.45, pylonLean(2.45) - 0.12],
+    callout: true, anchor: [-8.9, 3.0, pylonLean(3.0) + 0.1],   // mid-fin, right face
   }, [mesh(merge([pyl, tgbBulge]), paint)]);
 
   const spar = [];
@@ -202,7 +202,7 @@ export function buildTail({ A, P, air, roofY }) {
   trPart('Tail rotor blades', {
     system: 'Rotor system', material: 'Graphite/glass skins over the crossbeam spars, nickel erosion strips', mass: 32, count: 4, explode: [-3.1, 1.1, 0],
     desc: 'Four blades, 3.35 m across, turning at 1,190 rpm. Thrust to starboard balances the main rotor\'s torque; because the shaft is canted 20° up, sin 20° ≈ a third of that thrust (about 2.5 kN in a heavy hover, roughly 3 % of the weight) also lifts the tail.',
-    callout: true, anchor: [0, 0.25, 0],
+    callout: true, anchor: [0, 0.25, -0.3],     // just above the hub, over the blade roots
   }, (s) => {
     for (let i = 0; i < 4; i++) {
       const az = new THREE.Group(); az.rotation.y = (i * Math.PI) / 2;

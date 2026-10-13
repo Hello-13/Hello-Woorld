@@ -19,23 +19,85 @@ const DECK = H + PAD.mountDeck;
 // hardstand top half-extents, slope run and the chamfered concrete edge (compressed footprint)
 const TX = 22.5, TZ = 23, RUN = 7.5, LIP = 1.4, LIP_DROP = 0.9;
 
-/** Prism from a top quad and a bottom quad (corners in matching order), flat-shaded, metric UVs. */
-function frustum(top, bot) {
-  const pos = [], uv = [];
-  const tri = (a, b, c, uvf) => { for (const p of [a, b, c]) { pos.push(...p); uv.push(...uvf(p)); } };
-  const quad = (a, b, c, d, uvf) => { tri(a, b, c, uvf); tri(a, c, d, uvf); };
-  quad(top[0], top[1], top[2], top[3], (p) => [p[0], p[2]]);
-  for (let i = 0; i < 4; i++) {
-    const j = (i + 1) % 4;
-    const a = top[i], b = top[j], c = bot[j], d = bot[i];
-    const horiz = Math.abs(a[0] - b[0]) > Math.abs(a[2] - b[2]) ? 0 : 2;
-    quad(a, d, c, b, (p) => [p[horiz], p[1]]);
-  }
+// Profile of the hardstand edge, [outward offset, height] from the top edge: a rounded concrete lip
+// (the first four points), then a grassed embankment that steepens near the top and flattens out
+// toward its toe, like the real mound's slopes.
+const LIP_PROFILE = [[0, H], [0.35, H - 0.06], [0.85, H - 0.38], [LIP, H - LIP_DROP]];
+const SLOPE_PROFILE = [];
+for (let i = 0; i <= 9; i++) {
+  const u = i / 9;
+  SLOPE_PROFILE.push([LIP + (RUN - LIP) * u, (H - LIP_DROP) * Math.pow(1 - u, 1.35)]);
+}
+
+/**
+ * One half of the hardstand (s = +1 east of the trench, −1 west): the edge path runs from the
+ * trench along the −z side, round the outer corners and back along +z; the profile is swept along
+ * it with rounded corners and smooth normals. Returns { top, lip, slope }.
+ */
+function moundHalf(s) {
+  // path samples: [x, z, nx, nz, length]; corners repeat their point with a turning normal
+  const path = [];
+  const push = (x, z, nx, nz) => {
+    const prev = path[path.length - 1];
+    if (prev && Math.abs(prev[0] - x) + Math.abs(prev[1] - z) + Math.abs(prev[2] - nx) + Math.abs(prev[3] - nz) < 1e-6) return;
+    const len = prev ? prev[4] + Math.hypot(x - prev[0], z - prev[1]) + 0.35 * Math.hypot(nx - prev[2], nz - prev[3]) : 0;
+    path.push([x, z, nx, nz, len]);
+  };
+  const corner = (x, z, a0, a1) => { for (let k = 0; k <= 6; k++) { const a = a0 + ((a1 - a0) * k) / 6; push(x, z, Math.cos(a), Math.sin(a)); } };
+  const outA = s > 0 ? 0 : Math.PI;                 // outward normal of the outer (x) side
+  const span = (x0, x1, z, nz) => { for (let k = 0; k <= 6; k++) push(x0 + ((x1 - x0) * k) / 6, z, 0, nz); };
+  span(s * W, s * TX, -TZ, -1);
+  corner(s * TX, -TZ, -Math.PI / 2, s > 0 ? 0 : -Math.PI);
+  for (let k = 1; k < 8; k++) push(s * TX, -TZ + (2 * TZ * k) / 8, Math.cos(outA), 0);
+  corner(s * TX, TZ, s > 0 ? 0 : Math.PI, Math.PI / 2);
+  span(s * TX, s * W, TZ, 1);
+  const sweep = (prof) => {
+    const pos = [], uv = [], idx = [];
+    for (const [x, z, nx, nz, len] of path) {
+      let acc = 0;
+      prof.forEach(([d, y], j) => {
+        if (j) acc += Math.hypot(d - prof[j - 1][0], y - prof[j - 1][1]);
+        pos.push(x + nx * d, y, z + nz * d);
+        uv.push(len, acc);
+      });
+    }
+    const n = prof.length;
+    for (let i = 0; i < path.length - 1; i++) for (let j = 0; j < n - 1; j++) {
+      const a = i * n + j, b = a + n;
+      idx.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    // wind outward and up: the normal of the first top-edge quad must point away from the pad centre
+    const nrm = g.attributes.normal;
+    const probe = new THREE.Vector3(nrm.getX(1), nrm.getY(1), nrm.getZ(1));
+    if (probe.y < 0) { for (let i = 0; i < idx.length; i += 3) { const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t; } g.setIndex(idx); g.computeVertexNormals(); }
+    return g;
+  };
+  const top = new THREE.PlaneGeometry(TX - W, 2 * TZ).rotateX(-Math.PI / 2).translate(s * (TX + W) / 2, H, 0);
+  // metric UVs on the top so its concrete tile matches the lip
+  const tp = top.attributes.position, tu = top.attributes.uv;
+  for (let i = 0; i < tp.count; i++) tu.setXY(i, tp.getX(i), tp.getZ(i));
+  return { top, lip: sweep(LIP_PROFILE), slope: sweep(SLOPE_PROFILE) };
+}
+
+/** The trench wall under one half: the top edge, then down both ends along the mound profile. */
+function trenchWall(s) {
+  const prof = [...LIP_PROFILE, ...SLOPE_PROFILE.slice(1)];
+  const pts = [];
+  for (const [d, y] of prof) pts.push(new THREE.Vector2(TZ + d, y));
+  for (const [d, y] of [...prof].reverse()) pts.push(new THREE.Vector2(-TZ - d, y));
+  const tris = THREE.ShapeUtils.triangulateShape(pts, []);
+  const pos = [];
+  const x = s * (W - 0.05);
+  for (const t of tris) for (const k of t) pos.push(x, pts[k].y, pts[k].x);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  g.computeVertexNormals();
-  return g;
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(new Array((pos.length / 3) * 2).fill(0), 2));
+  return faceAway(g, new THREE.Vector3(s * 30, H / 2, 0));       // face into the trench
 }
 
 /** Ensure a flat-shaded geometry's faces point away from a reference point. */
@@ -95,41 +157,13 @@ export function buildPad(A, site, base, bed) {
   };
 
   // ------------------------------------------------------------------ hardstand and flame trench
-  const tops = [], lips = [], slopes = [];
-  const sub = (g, a, b) => {
-    const pos = g.attributes.position.array, uv = g.attributes.uv.array;
-    const q = new THREE.BufferGeometry();
-    q.setAttribute('position', new THREE.Float32BufferAttribute(pos.slice(a * 9, b * 9), 3));
-    q.setAttribute('uv', new THREE.Float32BufferAttribute(uv.slice(a * 6, b * 6), 2));
-    q.computeVertexNormals();
-    return q;
-  };
-  for (const s of [1, -1]) {
-    // two-step edge: a narrow chamfered concrete lip, then the grassed embankment down to grade
-    const T = [[s * W, H, -TZ], [s * TX, H, -TZ], [s * TX, H, TZ], [s * W, H, TZ]];
-    const L = [[s * W, H - LIP_DROP, -TZ - LIP], [s * (TX + LIP), H - LIP_DROP, -TZ - LIP], [s * (TX + LIP), H - LIP_DROP, TZ + LIP], [s * W, H - LIP_DROP, TZ + LIP]];
-    const B = [[s * W, 0, -TZ - RUN], [s * (TX + RUN), 0, -TZ - RUN], [s * (TX + RUN), 0, TZ + RUN], [s * W, 0, TZ + RUN]];
-    const ref = new THREE.Vector3(s * (W + TX) / 2, 4, 0);
-    const g1 = faceAway(frustum(T, L), ref), g2 = faceAway(frustum(L, B), ref);
-    // first two triangles of each are the top face; the rest are the sides and the trench wall
-    tops.push(sub(g1, 0, 2));
-    lips.push(sub(g1, 2, 10));
-    slopes.push(sub(g2, 2, 10));
-  }
+  const halves = [moundHalf(1), moundHalf(-1)];
   G('Pad hardstand', {
     skin: true, material: 'Reinforced concrete pad on a raised, grassed earth-and-fill mound', mass: null,
     desc: 'LC-39A stands on a raised hardstand built for Saturn V. Its surface is about 48 ft above sea level, high enough for the 42 ft-deep flame trench to drain at grade. Footprint compressed here.',
-  }, [mesh(merge([...tops, ...lips]), FM.hardstand()), mesh(merge(slopes), FM.embankment())], bed);
+  }, [mesh(merge(halves.flatMap((h) => [h.top, h.lip])), FM.hardstand()), mesh(merge(halves.map((h) => h.slope)), FM.embankment())], bed);
 
-  const lining = [];
-  for (const s of [1, -1]) {
-    const T = [[s * (W - 0.05), H, -TZ], [s * (W - 0.05), H, TZ], [s * (W - 0.05), 0, TZ + RUN], [s * (W - 0.05), 0, -TZ - RUN]];
-    const g = new THREE.BufferGeometry();
-    const p = [T[0], T[1], T[2], T[0], T[2], T[3]].flat();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0], 2));
-    lining.push(faceAway(g, new THREE.Vector3(s * 30, H / 2, 0)));     // face into the trench
-  }
+  const lining = [trenchWall(1), trenchWall(-1)];
   const floor = new THREE.PlaneGeometry(2 * W, 2 * (TZ + RUN)).rotateX(-Math.PI / 2).translate(0, 0.04, 0);
   // inverted-V flame deflector under the vehicle: ridge across the trench, slopes toward both ends
   const defl = new THREE.BufferGeometry();
@@ -256,7 +290,7 @@ export function buildPad(A, site, base, bed) {
   caa.push(block(cx + 0.6, caaY + 1.5, cz + 0.4, 1.2, 4.0, 1.2));                   // slew bearing / hinge
   G('Crew access arm', {
     material: 'Steel truss walkway with an environmental "white room"', mass: null,
-    desc: 'Installed in August 2018 on a new level at 217 ft for Crew Dragon; 85 ft long, and retracted for uncrewed Falcon Heavy flights (shown swung back along the tower). SpaceX removed it in February 2026, when crew launches moved to SLC-40 and 39A was refocused on Falcon Heavy and Starship.',
+    desc: 'Installed in August 2018 on a new level at 217 ft for Crew Dragon; 85 ft long, and retracted for uncrewed Falcon Heavy flights (shown swung back along the tower). SpaceX lowered it by crane into storage in February 2026, when crew launches moved to SLC-40 and 39A was refocused on Falcon Heavy and Starship.',
   }, mesh(merge(caa), FM.teWhite()));
 
   // ------------------------------------------------------------------ water deluge / sound suppression

@@ -170,7 +170,7 @@ export const FM = {
   padSteel: () => once('padSteel', () => new THREE.MeshStandardMaterial({ color: 0x6c7176, roughness: 0.6, metalness: 0.55 })),
   fssSteel: () => once('fssSteel', () => new THREE.MeshStandardMaterial({ color: 0x8a8d8f, roughness: 0.6, metalness: 0.45 })),
   teWhite: () => once('teWhite', () => new THREE.MeshStandardMaterial({ color: 0xc4c6c7, roughness: 0.6, metalness: 0.3 })),
-  refractory: () => once('refractory', () => new THREE.MeshStandardMaterial({ color: 0x66645f, roughness: 0.95, metalness: 0.02 })),
+  refractory: () => once('refractory', () => new THREE.MeshStandardMaterial({ color: 0x47443f, roughness: 0.95, metalness: 0.02 })),   // soot-darkened refractory brick
   deflector: () => once('deflector', () => new THREE.MeshStandardMaterial({ color: 0x84837f, roughness: 0.9, metalness: 0.1 })),
   water: () => once('waterPipe', () => new THREE.MeshStandardMaterial({ color: 0xb7b9b2, roughness: 0.5, metalness: 0.6 })),
   hardstand: () => once('hardstand', () => {
@@ -183,6 +183,6 @@ export const FM = {
   embankment: () => once('embankment', () => {
     const c = concrete({ seed: 11 });
     const n = c.normalMap.clone(); n.repeat.set(1 / 9, 1 / 9); n.needsUpdate = true;
-    return new THREE.MeshStandardMaterial({ color: 0x7b7f6c, normalMap: n, normalScale: new THREE.Vector2(1.5, 1.5), roughness: 1, metalness: 0 });
+    return new THREE.MeshStandardMaterial({ color: 0x67704f, normalMap: n, normalScale: new THREE.Vector2(1.5, 1.5), roughness: 1, metalness: 0 });
   }),
 };

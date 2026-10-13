@@ -16,7 +16,7 @@ import { beam, mergeGeometries } from '../engine/geometry.js';
 import { M } from '../engine/materials.js';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { inferno } from '../engine/effects.js';
-import { setCut, sector, updateRotor } from './ge90/geom.js';
+import { setCut, sector, updateRotor, kept, phiOf } from './ge90/geom.js';
 import { n1Demand, n2Line } from '../physics/turbofan.js';
 import { STATIONS, NACELLE, coreAt, bypassAt, FAN_NOZZLE_Y, PLUG_TIP } from './ge90/layout.js';
 import { buildNacelle } from './ge90/nacelle.js';
@@ -51,7 +51,7 @@ export function buildTurbofan() {
   const P = (name, info, objs) => A.part(name, info, objs, eng);
 
   // cycle total temperatures pushed in by the lab (ARP755 station id → K); take-off defaults
-  const T = { '2': 288, '13': 342, '25': 374, '3': 918, '4': 1680, '45': 1212, '5': 805, '9': 723, '19': 293 };
+  const T = { '2': 288, '13': 345, '25': 374, '3': 918, '4': 1740, '45': 1272, '5': 851, '9': 748, '19': 293 };
   const lt = (a, b, f) => () => T[a] + (T[b] - T[a]) * f;
   const cutGroups = [];
   const cut = (g) => { cutGroups.push(g); return g; };
@@ -210,6 +210,25 @@ export function buildTurbofan() {
   applyCut(true);
   // the flow particles follow the assembled flow path, so they hide while the parts are pulled apart
   const fanPart = A.parts.find((p) => p.userData.part.name === 'Fan blades');
+  // The fan and spinner stay whole in the cutaway. In the see-through modes (any mode that has swapped
+  // the studio material out) clicks on them inside the removed quadrant pass through, so the fan disk,
+  // bearings, sump and shafts behind them can be picked; in Studio the fan picks as it looks.
+  const toLathe = new THREE.Matrix4(), hitP = new THREE.Vector3();
+  for (const name of ['Fan blades', 'Spinner']) {
+    A.parts.find((p) => p.userData.part.name === name)?.traverse((m) => {
+      if (!m.isMesh) return;
+      const pick = THREE.Mesh.prototype.raycast;
+      m.raycast = function (raycaster, hits) {
+        const first = hits.length;
+        pick.call(this, raycaster, hits);
+        if (!state.cutaway || !this.userData.studio || this.material === this.userData.studio) return;
+        toLathe.copy(eng.matrixWorld).invert();
+        let w = first;
+        for (let i = first; i < hits.length; i++) if (kept(phiOf(hitP.copy(hits[i].point).applyMatrix4(toLathe)))) hits[w++] = hits[i];
+        hits.length = w;
+      };
+    });
+  }
   const burnerMat = ctx.burnerMat;
 
   const vehicle = {
@@ -218,7 +237,7 @@ export function buildTurbofan() {
     name: 'GE90',
     role: 'High-bypass turbofan · Boeing 777',
     tagline: '115,540 lbf certified · 3.25 m composite fan · overall pressure ratio 42',
-    summary: 'The world\'s most powerful certified jet engine in service, built for the Boeing 777-300ER. A 3.25 m fan of 22 swept carbon-fibre blades moves about 1.6 tonnes of air a second at take-off; roughly one kilogram in eight passes through the core, where a 4-stage booster and 9-stage HP compressor squeeze it 42-fold, a dual annular combustor heats it, and 2 HP and 6 LP turbine stages expand it to drive everything upstream. The bypass air makes most of the thrust. Shown as a cutaway in its Boeing nacelle.',
+    summary: 'The world\'s most powerful certified jet engine in service, built for the Boeing 777-300ER. A 3.25 m fan of 22 swept carbon-fibre blades moves about 1.5 tonnes of air a second at take-off; roughly one kilogram in eight passes through the core, where a 4-stage booster and 9-stage HP compressor squeeze it 42-fold, a dual annular combustor heats it, and 2 HP and 6 LP turbine stages expand it to drive everything upstream. The bypass air makes most of the thrust. Shown as a cutaway in its Boeing nacelle.',
     specs: [
       ['Manufacturer', 'GE Aerospace, with Safran, IHI and Avio Aero'],
       ['Aircraft', 'Boeing 777-300ER (exclusive), some 777-200LR; the 777F uses the same hardware at the -110B1 rating'],
@@ -230,7 +249,8 @@ export function buildTurbofan() {
       ['Engine envelope', '3.77 m wide × 3.93 m high'],
       ['Nacelle diameter', '4.22 m (166 in), Boeing'],
       ['Dry mass', '8,761 kg (19,316 lb), with starter and mounts'],
-      ['Bypass ratio', '7.2 : 1 (earlier GE90s 8.7 : 1)'],
+      ['Bypass ratio', '7.1 : 1 at take-off (ICAO databank; earlier GE90s about 8.7 : 1)'],
+      ['Take-off fuel flow', '4.59 kg/s (ICAO Engine Emissions Databank)'],
       ['Overall pressure ratio', '42 : 1'],
       ['Stages', 'Fan + 4 booster · 9 HPC · 2 HPT · 6 LPT'],
       ['Combustor', 'Dual annular (DAC)'],
@@ -243,7 +263,7 @@ export function buildTurbofan() {
       ['Entry into service', '2004 (777-300ER)'],
     ],
     heroStats: [['514', 'kN', 'Take-off thrust'], ['3.25', 'm', 'Fan diameter'], ['42', ': 1', 'Pressure ratio']],
-    sources: 'EASA type-certificate data sheet IM.E.002, issue 05, 2023 (stage counts, length, envelope, dry weight, take-off and maximum-continuous thrust, N1/N2 reference speeds and limits, T49 EGT limits, oil-temperature limits, aircraft accessory drive ratios and ratings, fuel heating value, bleed limits, Boeing thrust reverser) and FAA TCDS E00049EN; Flight International, \'GE90 modifications take shape\', 8 April 2003 (temporary Kevlar/fibreglass containment wrap, thicker aluminium case forging); Volvo Aero, GE90 fan case release, 2007 (aluminium fan case, about 3.5 m, 600 kg machined); GE Aerospace GE90 product page (stage counts, 135 in engine diameter, 115,300 lbf, OPR 42, inward-opening variable bleed doors) and press releases (dual annular combustor, swept composite fan); Wikipedia, General Electric GE90 (166 in nacelle diameter, fan-blade length and mass after MoMA); Aircraft Commerce GE90 owner\'s and operator\'s guide, issue 84, 2012 (-115B configuration, bypass ratio); Flight International, GE90-115B development (added booster stage, de-staged HPC); Museum of Modern Art collection, GE90-115B fan blade (length, mass, materials); NASA Energy Efficient Engine combustor reports (dual-annular combustor principle); GE mount patents US 5,277,382 and US 5,452,575 (mount and thrust-link arrangement); Mattingly, Elements of Propulsion (cycle method); SAE ARP755 (station numbering).',
+    sources: 'EASA type-certificate data sheet IM.E.002, issue 05, 2023 (stage counts, length, envelope, dry weight, take-off and maximum-continuous thrust, N1/N2 reference speeds and limits, T49 EGT limits, oil-temperature limits, aircraft accessory drive ratios and ratings, fuel heating value, bleed limits, Boeing thrust reverser) and FAA TCDS E00049EN; ICAO Aircraft Engine Emissions Databank, EASA v32 (03/2026), GE90-115B entries 7GE099 to 07P27GE240 (take-off bypass ratio 6.96–7.1, pressure ratio 42.2–43.2, fuel flow at 100 / 85 / 30 / 7 % thrust, used to calibrate the cycle in the lab); Flight International, \'GE90 modifications take shape\', 8 April 2003 (temporary Kevlar/fibreglass containment wrap, thicker aluminium case forging); Volvo Aero, GE90 fan case release, 2007 (aluminium fan case, about 3.5 m, 600 kg machined); GE Aerospace GE90 product page (stage counts, 135 in engine diameter, 115,300 lbf, OPR 42, inward-opening variable bleed doors) and press releases (dual annular combustor, swept composite fan); Wikipedia, General Electric GE90 (166 in nacelle diameter, fan-blade length and mass after MoMA); Aircraft Commerce GE90 owner\'s and operator\'s guide, issue 84, 2012 (-115B configuration, bypass ratio); Flight International, GE90-115B development (added booster stage, de-staged HPC); Museum of Modern Art collection, GE90-115B fan blade (length, mass, materials); NASA Energy Efficient Engine combustor reports (dual-annular combustor principle); GE mount patents US 5,277,382 and US 5,452,575 (mount and thrust-link arrangement); Mattingly, Elements of Propulsion (cycle method); SAE ARP755 (station numbering).',
     fleetTag: 'OPR 42',
     root: A.root,
     parts: A.parts,

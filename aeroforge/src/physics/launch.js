@@ -32,7 +32,7 @@ export const FAIRING_HEATING_LIMIT = 1135;
  * the second stage holds 75.2 t LOX + 32.3 t RP-1 on 4.0 t (111.5 t fuelled); the fairing is
  * 1.7 t. Those figures give 1,412.5 t, against SpaceX's published 1,420,788 kg for the vehicle
  * without payload; the ≈ 8 t gap is taken here as the strengthened centre core, so its dry mass
- * (30 t) is an estimate. The centre-core throttle setting and timing are estimates too.
+ * (30.5 t) is an estimate. The centre-core throttle setting and timing are estimates too.
  */
 export const FALCON_HEAVY = {
   name: 'Falcon Heavy',
@@ -55,6 +55,14 @@ export const FALCON_HEAVY = {
 export function exitArea(stage) {
   if (stage.exitArea != null) return stage.exitArea;
   return (stage.thrustVac - stage.thrustSL) / P_SL;
+}
+
+/** Side-booster throttle at time t (s): 1, except for the throttle bucket through max-Q. */
+export function boosterThrottle(vehicle, t) {
+  const b = vehicle.boosterBucket;
+  if (!b) return 1;
+  const k = Math.min(1, Math.max(0, Math.min((t - b.start) / b.ramp, (b.end - t) / b.ramp)));
+  return 1 - (1 - b.level) * k;
 }
 
 /** Liftoff mass (kg) of a vehicle with a given payload. */
@@ -92,7 +100,9 @@ export function deltaVBudget(vehicle = FALCON_HEAVY, payload = 0) {
   const B = vehicle.booster, C = vehicle.core, U = vehicle.upper;
   const mdot = (s) => (s.thrustVac / (G0 * s.ispVac)) * s.engines;
   const ispSL = (s) => (s.ispVac * (s.thrustVac - P_SL * exitArea(s))) / s.thrustVac;
-  const tBoost = B.prop / mdot(B);                       // each booster burns its own load
+  // each booster burns its own load; the throttle bucket stretches the burn by its deficit
+  const bk = vehicle.boosterBucket;
+  const tBoost = B.prop / mdot(B) + (bk ? (1 - bk.level) * (bk.end - bk.start - bk.ramp) : 0);
   const kT = vehicle.coreThrottleTime, kD = vehicle.coreThrottleDown;
   const coreInBoost = Math.min(C.prop, mdot(C) * (Math.min(kT, tBoost) + Math.max(0, tBoost - kT) * kD));
   const m0 = liftoffMass(vehicle, payload);
@@ -120,11 +130,14 @@ export function planarElements(r, vr, vt) {
 
 /**
  * Ideal (loss-free) Δv this model needs for a circular orbit at altitude h (m), calibrated on its
- * best-kick capability at 180–600 km: about 8.7 km/s for 200 km plus ≈ 1.9 m/s per extra km.
- * Below it no pitch programme reaches the orbit, so a failure is the payload's fault.
+ * best-kick capability from 180 to 600 km (65.3 t to 180 km, 48.6 t to 600 km): the budget at the
+ * heaviest payload that still reaches each target, less 15 m/s (about 0.5 t of payload) so that a
+ * payload one kick setting could still fly is not blamed. Below it no pitch programme reaches the
+ * orbit, so a failure is the payload's fault.
  */
 export function deltaVNeeded(h) {
-  return 8350 + 1.9 * (h / 1000);
+  const x = h / 1000;
+  return 8589 - 0.046 * x + 0.002507 * x * x;
 }
 
 /** Second-engine-start altitude (m) that suits a target orbit altitude (m) in this model. */
@@ -170,7 +183,9 @@ function judgeOrbit(el, { energyReached, hSES, targetAltitude, t, upperProp, v, 
   }
   if (hp < MIN_PERIGEE) {
     return { ...base, success: false, orbit: false, cause: lofted ? 'lofted' : 'flat', event: 'FAILED',
-      label: `Suborbital: orbital energy reached on a ${km(hp)} × ${km(ha)} km path; ${shape}` };
+      label: hp < 0
+        ? `Suborbital: orbital energy reached, but on a path that falls back into the atmosphere (perigee below the surface, apogee ${km(ha)} km); ${shape}`
+        : `Suborbital: orbital energy reached, but perigee is only ${km(hp)} km (apogee ${km(ha)} km), too low to stay up; ${shape}` };
   }
   if (Math.abs(hp - targetAltitude) > ORBIT_TOLERANCE || Math.abs(ha - targetAltitude) > ORBIT_TOLERANCE) {
     return { ...base, success: false, orbit: true, cause: lofted ? 'lofted' : 'flat', event: 'OFFTARGET',
@@ -234,7 +249,7 @@ export function simulateAscent({
     let thrust = 0, mdotB = 0, mdotC = 0, mdotU = 0;
     const coreThrottle = (boostersAttached && t > vehicle.coreThrottleTime) ? vehicle.coreThrottleDown : 1;
     if (phase === 'BOOST') {
-      const b = engineThrust(B, atm.p, 1);
+      const b = engineThrust(B, atm.p, boosterThrottle(vehicle, t));
       const c = engineThrust(C, atm.p, coreThrottle);
       thrust = b.thrust * B.count + c.thrust;
       mdotB = b.mdot * B.count; mdotC = c.mdot;

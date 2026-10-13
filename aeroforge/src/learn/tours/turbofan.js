@@ -15,7 +15,7 @@ const ACCESSORIES = ['Accessory gearbox', 'Inlet gearbox', 'Radial drive shaft',
 export default [
   {
     title: 'Two streams of air',
-    body: 'At take-off the GE90-115B swallows about 1.56 tonnes of air a second, and only one kilogram in eight goes through the core. The fan pushes the other seven down the bypass duct and out of the fan nozzle at about 315 m/s. Accelerating a lot of air a little wastes less energy than accelerating a little air a lot, so the bypass stream makes about 84 % of the thrust (modelled).',
+    body: 'At take-off the GE90-115B swallows about 1.5 tonnes of air a second, and only one kilogram in eight goes through the core. The fan pushes the other seven down the bypass duct and out of the fan nozzle at about 325 m/s. Accelerating a lot of air a little wastes less energy than accelerating a little air a lot, so the bypass stream makes about 82 % of the thrust (modelled).',
     key: 'Thrust F = ṁ_core·V₉ + ṁ_bypass·V₁₉ − ṁ·V₀, and propulsive efficiency η_p ≈ 2 / (1 + V_jet / V_flight).',
     focus: ['Fan blades', 'Fan outlet guide vanes', 'Booster casing & splitter', 'Inlet cowl', 'Core cowl & bifurcations', 'Thrust reverser translating sleeves', 'Core exhaust nozzle', 'Centre plug', 'Spinner'],
     view: { dir: [0.9, 0.35, 1.1] },
@@ -46,13 +46,13 @@ export default [
   },
   {
     title: 'Burning at 42 atmospheres',
-    body: 'Air leaves the compressor at about 920 K and 4.2 MPa (modelled). Fuel nozzles feed two rings of swirl cups: the outer pilot ring burns alone at idle for low smoke, and the inner main ring joins at high power, keeping the flame lean and short to limit NOx. About 4.7 kg of fuel a second heats the gas to about 1,680 K. Thermal view shows where the heat is.',
-    key: 'Fuel–air ratio f = (c_p,t·T₄ − c_p,c·T₃) / (η_b·LHV − c_p,t·T₄) ≈ 0.025: one kilogram of fuel per 40 kg of core air.',
+    body: 'Air leaves the compressor at about 920 K and 4.2 MPa (modelled). Fuel nozzles feed two rings of swirl cups: the outer pilot ring burns alone at idle for low smoke, and the inner main ring joins at high power, keeping the flame lean and short to limit NOx. About 4.6 kg of fuel a second (ICAO databank) heats the gas to about 1,740 K. Thermal view shows where the heat is.',
+    key: 'Burner energy balance: f = c̄_p·(T₄ − T₃) / (η_b·LHV − c̄_p·(T₄ − 298 K)) ≈ 0.024, one kilogram of fuel per 41 kg of core air.',
     focus: COMBUSTOR, mode: 'thermal', view: { dir: [0.4, 0.6, 1] },
   },
   {
     title: 'Turbine blades above their melting point',
-    body: 'The first HP turbine vanes and blades sit in gas at about 1,680 K (modelled), above the roughly 1,600 K at which their nickel alloy melts, and its hot streaks run hotter. They survive as single crystals with no grain boundaries to creep along, under a ceramic coat, cooled by compressor air that leaves through rows of film-cooling holes. The two stages take about 100 MW from the gas to drive the compressor.',
+    body: 'The first HP turbine vanes and blades sit in gas at about 1,740 K (modelled), some 150 K above the roughly 1,600 K at which their nickel alloy melts. They survive as single crystals with no grain boundaries to creep along, under a ceramic coat, cooled by compressor air that leaves through rows of film-cooling holes. The two stages take about 100 MW to drive the compressor.',
     key: 'HP spool work balance: c_p,c·(T₃ − T₂₅) = η_m·(1 + f)·c_p,t·(T₄ − T₄₅).',
     focus: HPT, explode: 0.3, view: { dir: [0.5, 0.45, 1] },
   },

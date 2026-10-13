@@ -174,8 +174,8 @@ export function buildCore(ctx) {
   P('Dual annular combustor', {
     system: 'Propulsion', material: 'Nickel / cobalt-alloy liners with thermal-barrier coating', mass: 160,
     explode: [0, -1.0, 1.25],
-    desc: 'Two rings of burners, one above the other: the outer pilot dome burns alone at idle for low smoke and hydrocarbons, and the inner main dome joins in at high power, keeping the flame lean and short to cut NOx. At take-off the gas leaves at about 1,680 K (modelled), already above the roughly 1,600 K at which the turbine alloys melt; in the hottest streaks it is a few hundred kelvin hotter still.',
-    callout: true, anchor: [0.35, -3.5, 0.56],
+    desc: 'Two rings of burners, one above the other: the outer pilot dome burns alone at idle for low smoke and hydrocarbons, and the inner main dome joins in at high power, keeping the flame lean and short to cut NOx. At take-off the gas leaves at about 1,740 K (modelled), some 150 K above the roughly 1,600 K at which the turbine alloys melt; in the hottest streaks it is hotter still.',
+    callout: true, anchor: [0.57, -3.5, 0.33],
   }, [liners, flame]).userData.part.stationTemp = '4';
 
   const domes = cut(cutLathe([rect(0.562, 0.668, -3.33, -3.345), rect(0.442, 0.548, -3.33, -3.345),
@@ -211,7 +211,7 @@ export function buildCore(ctx) {
   P('Fuel nozzles', {
     system: 'Fuel', material: 'Stainless steel stems, dual-orifice tips', mass: 45, count: 30,
     explode: [0, -1.0, 0],
-    desc: 'Each nozzle stem carries two fuel circuits, one for a pilot cup and one for a main cup, spraying atomised kerosene into the swirlers. At take-off the engine burns about 4.7 kg of fuel a second (modelled). The count of 30 is an estimate; GE does not publish it.',
+    desc: 'Each nozzle stem carries two fuel circuits, one for a pilot cup and one for a main cup, spraying atomised kerosene into the swirlers. At take-off the engine burns about 4.6 kg of fuel a second (ICAO emissions databank). The count of 30 is an estimate; GE does not publish it.',
   }, nozzles).userData.part.stationTemp = '3';
 
   const manifold = cut(cutPair((keep) => {
@@ -254,7 +254,7 @@ export function buildCore(ctx) {
       system: 'Propulsion', material: 'Single-crystal nickel superalloy, thermal-barrier coated (count estimated)', mass: 30, count: r.count,
       explode: [0, -1.25, 0],
       desc: i === 0
-        ? 'Each blade is cast as a single crystal with no grain boundaries to creep along, coated with ceramic and cooled from inside by compressor air that is itself above 600 °C. The gas reaching them averages about 1,680 K at take-off (modelled), above the roughly 1,600 K at which the alloy melts, and its hot streaks run hotter; each blade also pulls with tonnes of centrifugal force.'
+        ? 'Each blade is cast as a single crystal with no grain boundaries to creep along, coated with ceramic and cooled from inside by compressor air that is itself above 600 °C. The gas reaching them averages about 1,740 K at take-off (modelled), some 150 K above the roughly 1,600 K at which the alloy melts, and its hot streaks run hotter (the rotor sees a little less, because it moves with the flow); each blade also pulls with tonnes of centrifugal force.'
         : 'Second HPT stage. Between them, the two HPT stages extract the roughly 100 MW the HP compressor absorbs at take-off (modelled).',
     }, g);
   });
@@ -331,7 +331,7 @@ export function buildCore(ctx) {
     system: 'Propulsion', material: 'Nickel-alloy disks on a bolted drum', mass: 640,
     explode: [0, -1.55, 0], temp: 800,
     desc: 'Six disks bolted into one drum, joined to the LP shaft by a cone behind stage 4. All the power for the fan and booster — roughly 90 MW at take-off (modelled) — passes through this joint.',
-    callout: true, anchor: [0.0, -4.8, 0.56],
+    callout: true, anchor: [-0.58, -5.0, 0],
   }, lptRotor).userData.part.stationTemp = '5';
   const lptCase = [lineWall(-4.12, -5.13, 0.006, 0.026, 1)];
   for (const y of [-4.12, -4.52, -4.85, -5.13]) { const t = coreAt(y)[1]; lptCase.push(rect(t + 0.02, t + 0.065, y + 0.012, y - 0.012)); }
@@ -379,7 +379,7 @@ export function buildCore(ctx) {
   P('Core exhaust nozzle', {
     system: 'Propulsion', material: 'Inconel 625 sheet', mass: 120,
     explode: [0, -2.2, 0],
-    desc: 'Converging nozzle for the hot core stream: at take-off the core jet leaves at about 440 m/s and 730 K, faster than the fan jet (about 305 m/s) but carrying far less mass.',
+    desc: 'Converging nozzle for the hot core stream: at take-off the core jet leaves at about 490 m/s and 750 K, faster than the fan jet (about 325 m/s) but carrying far less mass (modelled).',
   }, nozzle).userData.part.stationTemp = '9';
   const plugLine = [[0.56, -5.36], [0.548, -5.46], [0.515, -5.6], [0.462, -5.75], [0.39, -5.92], [0.3, -6.08], [0.2, -6.23], [0.1, -6.38], [0.03, -6.46], [0.001, PLUG_TIP]];
   const plugProf = plugLine.concat(plugLine.slice(0, -1).reverse().map(([r, y]) => [Math.max(0.001, r - 0.01), y - 0.004]));

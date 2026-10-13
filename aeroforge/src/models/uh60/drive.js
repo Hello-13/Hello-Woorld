@@ -49,7 +49,6 @@ export function buildDrive({ A, P, roofY }) {
   P('Main module (main transmission)', {
     system: 'Drive system', material: 'Magnesium/aluminium housing, steel bearing liners', mass: 230, explode: [0, 0.3, 0],
     desc: 'The housing of the main gearbox: it carries both engines\' power through two stages — a combining spiral-bevel set and a planetary — down to the 258 rpm rotor shaft, an overall reduction of about 81 : 1 from the engines\' 20,900 rpm. The M\'s improved-durability gearbox is rated at 3,400 shp with both engines; the tail take-off leaves from its aft face.',
-    callout: true, anchor: [cx + 0.3, 2.34, 0.4],
   }, [mesh(merge(caseG), MAT.casting())]);
   // combining bevel stage inside the case: one bull gear driven by a pinion from each input module
   const bevel = [cyl(0.36, 0.33, 0.07, [cx, 2.38, 0], 'y', 40), cyl(0.12, 0.12, 0.14, [cx, 2.33, 0], 'y', 20)];
@@ -135,7 +134,6 @@ export function buildDrive({ A, P, roofY }) {
     const hotP = P(`T700 hot section ${R}`, {
       system: 'Propulsion', material: 'Nickel-alloy combustor liner, single-crystal turbine blades, thermal-barrier coatings', mass: 38, explode: [-0.25, 1.15, 1.75 * s],
       desc: 'An annular combustor fed by 12 fuel injectors and lit by two igniters, then a two-stage gas-generator turbine that drives the compressor. Gas leaving the combustor is above 1,200 °C; the cooled blades sit downstream of it.',
-      callout: s > 0, anchor: [at(0.88), ENG.y + 0.42, z + 0.05],
     }, [mesh(merge(hot), MAT.hot())]);
     // power turbine: two stages, exhaust frame; its shaft runs forward through the core to the front drive
     const ptG = [latheX([[0.001, 0], [0.15, 0], [0.19, 0.03], [0.2, 0.09], [0.19, 0.19], [0.001, 0.19]], 32).translate(ENG.rear, ENG.y, z), ring(L - 0.08, 0.202, 0.014), ring(L - 0.14, 0.2, 0.014)];
@@ -225,11 +223,12 @@ export function buildDrive({ A, P, roofY }) {
   // engine firewalls and mounts (structure on the upper deck)
   const fw = [];
   for (const s of [1, -1]) {
-    fw.push(box(1.5, 0.32, 0.02, [-1.15, 2.45, 0.38 * s]));
+    fw.push(box(1.15, 0.24, 0.02, [-1.03, 2.49, 0.43 * s]));          // inboard wall of the engine bay, inside the cowl
     for (const x of [ENG.front - 0.1, ENG.rear + 0.2]) fw.push(tube([x, 2.29, 0.5 * s], [x, ENG.y - 0.2, ENG.z * s], 0.02), tube([x, 2.29, 0.98 * s], [x, ENG.y - 0.2, ENG.z * s], 0.02));
   }
-  const deck = [box(1.4, 0.03, 1.5, [-0.05, 2.3, 0])];     // transmission deck plate (primed aluminium)
-  for (const [x, z] of [[0.42, 0.44], [0.42, -0.44], [-0.5, 0.44], [-0.5, -0.44]]) deck.push(box(0.14, 0.1, 0.14, [x, 2.34, z]));
+  // transmission deck plate (primed aluminium), kept inside the transmission fairing's footprint
+  const deck = [box(1.36, 0.03, 0.7, [-0.05, 2.3, 0])];
+  for (const [x, z] of [[0.42, 0.3], [0.42, -0.3], [-0.5, 0.3], [-0.5, -0.3]]) deck.push(box(0.14, 0.1, 0.12, [x, 2.34, z]));
   P('Upper deck, firewalls & mounts', {
     system: 'Structure', material: 'Titanium firewalls, steel engine mount links, primed aluminium deck with transmission mounting pads', mass: 95, explode: [0, 0.12, 0],
     desc: 'The deck above the cabin roof carries the transmission on four pads and each engine on tubular links; titanium firewalls separate the engines from the gearbox and from each other.',
@@ -265,7 +264,6 @@ export function buildDrive({ A, P, roofY }) {
   }, [mesh(merge(fwdShaft), MAT.steel())]);
   P('Tail drive shaft, tail cone sections', {
     system: 'Drive system', material: 'Aluminium-alloy tubes with flexible-disc couplings', mass: 28, explode: [-2.4, 1.0, 0],
-    callout: true, anchor: [-6.0, roofY(-6.0) + 0.14, 0],
     desc: 'Several short sections joined by flexible couplings run along the top of the tail cone, so the shaft can follow the tail cone as it bends in flight.',
   }, [mesh(merge(coneShaft), MAT.steel())]);
   P('Viscous-damped hanger bearings', {

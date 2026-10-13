@@ -50,7 +50,7 @@ export default [
     title: 'A turboprop at the back',
     body: 'A Honeywell TPE331-10GD makes up to 900 shp (671 kW) from an engine only 1.09 m long. Air enters behind the gearbox, is squeezed by two centrifugal impellers, burns in a reverse-flow annular combustor wrapped around the turbine, and drives three turbine stages on one shaft. Because the gearbox faces aft in this pusher, the exhaust leaves forward through two side stacks.',
     key: 'Power required P = D · V / η_prop. At a 7,600 m loiter the Reaper needs only about 150 kW, a third of the ≈ 450 kW the TPE331 still gives up there (671 kW at sea level).',
-    mode: 'xray', focus: ENGINE, view: { dir: [0.35, 0.55, 1], fill: 1.0 },
+    mode: 'xray', focus: ENGINE, view: { dir: [0.3, 0.08, 1], fill: 1.2 },
   },
   {
     title: 'Three blades, pushing',
@@ -86,7 +86,7 @@ export default [
     title: 'Fuel and time on station',
     body: 'About 1,800 kg of JP-8 fills the wing bays and a fuselage tank at the centre of gravity. Follow it: each tank feeds a small collector through motorised valves, two boost pumps send it aft through the firewall shut-off valve to the engine-driven fuel control, and a metered line takes it to the combustor nozzles. That fuel is what buys the 27 hours; open the Mission endurance lab to see what transit and stores cost.',
     key: 'Breguet endurance E = (η / c) · (L/D) · (1/V) · ln(W₀ / W₁).',
-    mode: 'systems', focus: FUEL, view: { dir: [0.12, 0.42, 1], fill: 1.0 },
+    mode: 'systems', focus: FUEL, view: { dir: [-0.75, 1, 0.3], fill: 0.95 },
   },
   {
     title: 'Seven stations',

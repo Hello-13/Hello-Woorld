@@ -267,8 +267,11 @@ export function sparGeo(z0, z1, cf, { width = 0.03, inset = 0.008, steps = 10, r
   return orientOutward(loftRings(rings, { capStart: true, capEnd: true, uvMode: 'metric' }));
 }
 
-/** Rib: airfoil-shaped plate at span z between chord fractions c0..c1, thickness th. */
-export function ribGeo(z, c0, c1, { th = 0.01, inset = 0.006, n = 14, root = W_ROOT, tip = W_TIP, twist = WING.twist } = {}) {
+/**
+ * Rib: airfoil-shaped plate at span z between chord fractions c0..c1, thickness th. `holes` lists
+ * chord fractions for elliptical lightening / fuel-flow holes centred on the camber line.
+ */
+export function ribGeo(z, c0, c1, { th = 0.01, inset = 0.006, n = 14, root = W_ROOT, tip = W_TIP, twist = WING.twist, holes = [] } = {}) {
   const up = [], lo = [];
   for (let i = 0; i <= n; i++) {
     const cf = c0 + ((c1 - c0) * (1 - Math.cos((Math.PI * i) / n))) / 2;
@@ -277,6 +280,15 @@ export function ribGeo(z, c0, c1, { th = 0.01, inset = 0.006, n = 14, root = W_R
   }
   const loop = up.concat(lo.reverse());
   const sh = new THREE.Shape(loop.map((p) => new THREE.Vector2(p[0], p[1])));
-  const g = new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: false, curveSegments: 1 });
+  const eta = (z - root.le[2]) / (tip.le[2] - root.le[2]);
+  const chord = root.chord + (tip.chord - root.chord) * eta;
+  for (const cf of holes) {
+    const a = wpt(z, cf, 1, inset, root, tip, twist), b = wpt(z, cf, -1, inset, root, tip, twist);
+    const ry = Math.abs(a[1] - b[1]) * 0.27;
+    const hole = new THREE.Path();
+    hole.absellipse((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, chord * 0.05, ry, 0, Math.PI * 2, false);
+    sh.holes.push(hole);
+  }
+  const g = new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: false, curveSegments: holes.length ? 5 : 1 });
   return g.translate(0, 0, z - th / 2);
 }

@@ -322,8 +322,8 @@ export function buildUAV() {
     }, L(f(sparGeo(0.42, 9.7, 0.69, { width: 0.025, steps: 14 })), m.composite));
     P(`Wing ribs (${sn})`, {
       system: 'Structure', material: 'Composite and machined aluminium at hardpoints (est.)', mass: 26, count: RIBS.length, explode: [0, 0.4, 1.9 * side],
-      desc: 'Ribs keep the airfoil shape and stabilise the skins against buckling; the heavier ribs at 2.4, 4.0 and 5.6 m from the centreline carry the pylon loads (spacing estimated).',
-    }, L(f(merge(RIBS.map((z) => ribGeo(z, 0.012, 0.72)))), m.primer));
+      desc: 'Ribs keep the airfoil shape and stabilise the skins against buckling; the heavier ribs at 2.4, 4.0 and 5.6 m from the centreline carry the pylon loads. Holes between the spars save weight and let fuel flow from bay to bay (spacing and hole layout estimated).',
+    }, L(f(merge(RIBS.map((z) => ribGeo(z, 0.012, 0.72, { holes: [0.3, 0.44, 0.58] })))), m.primer));
 
     const r0 = wsec(TANK[0]), r1 = wsec(TANK[1]);
     const tankG = twistGeo(wingPanel({ root: { ...r0, t: r0.t * 0.9 }, tip: { ...r1, t: r1.t * 0.9 }, c0: 0.165, c1: 0.675, stations: 10, twist: twistAt(TANK[1]) - twistAt(TANK[0]), withChord: false }), TANK[0]);
@@ -646,18 +646,18 @@ export function buildUAV() {
   const blades = merge(bladesGeo(3));
   blades.computeVertexNormals();
   P('Three-blade propeller', {
-    system: 'Propulsion', material: 'Carbon-fibre composite blades (est.)', mass: 24, count: 3, explode: [-2.3, 0, 0],
+    system: 'Propulsion', material: 'Carbon-fibre composite blades (est.)', mass: 24, count: 3, explode: [-2.3, -1.0, 0],
     desc: 'A three-blade, variable-pitch pusher propeller about 2.6 m across (diameter estimated; the extended-range modification adds a fourth blade). Behind the wing and sensors it never blocks the view or disturbs the nose.',
     callout: true, anchor: [PROP_X + 0.03, SHAFT_Y + 0.15, 0.06],
   }, propSpin);
   propSpin.add(L(blades, m.blade));
   P('Propeller hub & pitch control', {
-    system: 'Propulsion', material: 'Aluminium hub, oil-operated pitch change', mass: 20, explode: [-1.75, 0, 0],
+    system: 'Propulsion', material: 'Aluminium hub, oil-operated pitch change', mass: 20, explode: [-1.75, -1.0, 0],
     desc: 'Holds the blade roots and twists them: oil pressure moves a piston in the dome to change pitch, which keeps the engine at constant speed as power and airspeed change.',
   }, hubSpin);
   hubSpin.add(L(hubGeo(3), m.darkMetal));
   P('Spinner', {
-    system: 'Skin & fairings', skin: true, material: 'Composite spinner', mass: 4, explode: [-2.85, 0, 0],
+    system: 'Skin & fairings', skin: true, material: 'Composite spinner', mass: 4, explode: [-2.85, -1.0, 0],
     desc: 'Fairs the hub into the tail cone so the flow into the propeller roots stays smooth.',
   }, L(spinnerGeo().translate(PROP_X, SHAFT_Y, 0), m.skin));
 
@@ -977,7 +977,7 @@ export function buildUAV() {
   lynxAz.add(L(merge([box(0.03, 0.07, 0.03, [0.03, 0, 0.17]), box(0.03, 0.07, 0.03, [0.03, 0, -0.17]), new THREE.CylinderGeometry(0.05, 0.06, 0.08, 16).translate(0, -0.06, 0)]), m.darkMetal));
   lynx.add(L(merge([tubeBetween([0, -0.1, 0], [X(0.95) - X(0.48), -0.12, 0], 0.025, 8), tubeBetween([0, -0.1, 0.08], [X(0.95) - X(0.48), -0.06, 0.16], 0.015, 6), tubeBetween([0, -0.1, -0.08], [X(0.95) - X(0.48), -0.06, -0.16], 0.015, 6)]), m.darkMetal));
   P('AN/APY-8 Lynx SAR antenna', {
-    system: 'Sensors', material: 'Gimballed Ku-band antenna', mass: 30, explode: [2.2, -0.5, 0],
+    system: 'Sensors', material: 'Gimballed Ku-band antenna', mass: 30, explode: [1.35, -0.6, 0],
     desc: 'General Atomics’ Lynx synthetic-aperture radar (developed with Sandia National Laboratories) images the ground through cloud, smoke and darkness, down to about 10 cm resolution in spotlight mode, and tracks moving vehicles.',
     callout: true, anchor: [X(0.48) + 0.13, 1.34, 0.2],
   }, lynx);
@@ -1074,7 +1074,7 @@ export function buildUAV() {
   // ============================================================== electrical
   role(P('Starter-generator', {
     system: 'Electrical', material: 'Engine-driven starter-generator', mass: 22, explode: [-0.75, 0.6, 0.45],
-    desc: 'Spins the engine for starting, then becomes the main generator. Block 5 aircraft have a higher-capacity unit to power the added radios and links: NAVAIR lists 11 kW / 45 kVA of electrical power for the Block 5 with a redundant flight-critical bus.',
+    desc: 'Spins the engine for starting, then becomes the main generator. Block 5 aircraft have a higher-capacity unit to power the added radios and links: NAVAIR lists 11 kW / 45 kVA for the Block 5, with a redundant flight-critical bus, and GA-ASI’s Block 5 sheet gives 45 kVA main power.',
   }, L(merge([cylX(X(STATIONS.gear1), X(STATIONS.gear1) - 0.26, 0.085, 0.085, 1.58, 0.135, 20), box(0.08, 0.03, 0.06, [X(STATIONS.gear1) - 0.15, 1.68, 0.135])]), m.darkMetal)), 'generator');
   role(P('Backup generator', {
     system: 'Electrical', material: 'Engine-driven alternator', mass: 12, explode: [-0.75, 0.6, -0.45],
@@ -1252,7 +1252,7 @@ export function buildUAV() {
     parts: A.parts,
     view: { dir: [0.9, 0.5, 1.3], fill: 0.95 },
     displaySize: 11.5,
-    thermalRange: [220, 650],
+    thermalRange: [230, 560],
     state,
     // aircraft-frame points the endurance lab hangs its force arrows on (add root.children[0].position)
     cg: [X(4.55), 1.55, 0],
@@ -1344,4 +1344,3 @@ export function buildUAV() {
   }
 }
 
-function sn(side) { return SN(side); }

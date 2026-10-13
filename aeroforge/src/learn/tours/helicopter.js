@@ -23,8 +23,9 @@ export default [
     title: 'The hub: why blades flap and lead-lag',
     body: 'In forward flight the advancing blade meets faster air than the retreating one. Rather than roll the aircraft, each blade flaps up where it makes extra lift and down where it makes less. Flapping moves its centre of mass in and out, so it also speeds up and slows down in the plane (Coriolis) — the lead-lag the hydraulic dampers restrain. One laminated elastomeric bearing per blade allows flap, lag and pitch with no hinge pins at all.',
     key: 'The hinge (bearing focal point) sits 0.381 m from the shaft: the offset lets the hub pass pitch and roll moments to the airframe for crisp control.',
-    // the hub forging is left out of the focus so it ghosts and the bearings inside it show
-    focus: ['Elastomeric bearings', 'Blade spindles & cuffs', 'Lead-lag dampers', 'Droop stops & flap restrainers', 'Pitch horns'], explode: 0.5, view: { dir: [1, 0.35, 0.8], fill: 1.15 },
+    // the hub forging is left out of the focus so it ghosts and the bearings inside it show; a light
+    // explode lifts the hub clear of them
+    focus: ['Elastomeric bearings', 'Blade spindles & cuffs', 'Lead-lag dampers', 'Droop stops & flap restrainers', 'Pitch horns'], explode: 0.35, view: { dir: [1, 0.3, 0.8], fill: 0.85, lift: 0.15 },
   },
   {
     title: 'Taming four-per-rev vibration',
@@ -36,7 +37,7 @@ export default [
     title: 'Torque, and why the tail rotor is canted',
     body: 'Spinning the rotor counter-clockwise (seen from above) twists the fuselage the other way. The tail rotor, 9.93 m behind the shaft, pushes the tail to starboard to cancel it; the pedals change its pitch to turn. Its shaft is canted 20° up, so it also lifts the tail — about 3 % of the weight — which widens the centre-of-gravity range. The bearingless rotor flaps and changes pitch by bending and twisting its two composite crossbeam spars. The pylon is ghosted here so the 42° and 90° gearboxes and the tail-rotor servo inside it show.',
     key: 'Hover at 9,979 kg: torque Q = P/Ω ≈ 70 kN·m, so the tail rotor needs Q / 9.93 m ≈ 7 kN of sideways thrust (≈ 9 % of the power).',
-    focus: [...TAILROTOR, 'Intermediate gearbox (42°)', 'Tail drive shaft, pylon section'], view: { dir: [-0.35, 0.3, 1], fill: 1.25 }, demo: 'surfaces',
+    focus: [...TAILROTOR, 'Intermediate gearbox (42°)', 'Tail drive shaft, pylon section'], view: { dir: [0.2, 0.55, 1], fill: 1.2 }, demo: 'surfaces',
   },
   {
     title: 'From turbines to rotors: engines and gearbox',
@@ -70,8 +71,8 @@ export default [
     body: 'The Black Hawk was the first helicopter designed from the outset to crash-survival standards. In a hard impact the oleos\' crash stage and the drag beams absorb energy first (the tail gear has its own strut), then the crushable belly; the cabin roof beams hold the gearbox up, and the pilots\' armoured seats and the hanging troop seats stroke downward to limit spinal loads. The two fuel cells survive a 20 m drop test, and breakaway valves seal every line that tears loose.',
     key: 'Design goal: a livable space and no post-crash fire in a vertical impact of about 11.6 m/s (38 ft/s).',
     focus: ['Main gear oleo (right)', 'Main gear oleo (left)', 'Main gear drag beam (right)', 'Main gear drag beam (left)', 'Keel beams & crushable belly', 'Cabin frames & roof beams', 'Armoured crashworthy pilot seats', 'Troop seats', 'Crew chief & gunner seats', 'Fuel cell (right)', 'Fuel cell (left)', 'Fuel lines & breakaway valves'],
-    // seen from the left front, the cockpit and its seat callout sit on the left of the screen, clear of the systems legend
-    mode: 'systems', view: { dir: [1.1, 0.75, -0.5], fill: 1.0 },
+    // studio mode: everything else ghosts, and no legend covers the seat and fuel-cell labels
+    view: { dir: [1.1, 0.75, -0.5], fill: 1.0 },
   },
   {
     title: 'The glass cockpit',

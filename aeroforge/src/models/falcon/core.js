@@ -92,7 +92,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   const lox = P('LOX tank', {
     system: 'Fuel', skin: true, material: 'Aluminium-lithium 2195, friction-stir welded monocoque barrel sections', mass: Math.round(4300 * k),
     desc: `Upper tank: ≈ 287 t of liquid oxygen, densified to −207 °C (66 K) so more fits in the same volume. It is a monocoque — the pressurised skin carries the load without stringers. Its forward skirt carries ${centre ? 'the interstage' : 'the forward section, grid fins and the forward attach fitting'}.`,
-    callout: !centre && attachSide > 0, anchor: [R + 0.02, 25, 0.3],
+    callout: !centre && attachSide > 0, anchor: [R + 0.02, 23.5, 0.3],
     explode: [0, 1.2, -6.5],
   }, [mesh(tankBarrel(Y.commonDome, Y.s1Top), skinMat), mesh(frames(Y.commonDome + 0.1, Y.s1Top), frameMat)]);
   lox.userData.part.thermalRole = 'lox';
@@ -186,7 +186,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   const dc = P('LOX downcomer', {
     system: 'Fuel', material: 'Aluminium alloy feed line with flexible joints', mass: 160,
     desc: 'The LOX feed line drops from the bottom of the LOX tank straight through the middle of the RP-1 tank to the engine bay — the shortest path for the denser propellant. Bellows joints let it grow and shrink with the tank.',
-    callout: centre, anchor: [0.25, 12.0, 0.25], explode: [0, 0, 2.6],
+    callout: centre, anchor: [0.25, 12.8, 0.25], explode: [0, 0, 2.6],
   }, mesh(merge(downcomer), FM.steelLine()));
   dc.userData.part.thermalRole = 'lox';
 
@@ -420,7 +420,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     const inter = P('interstage', {
       system: 'Separation', skin: true, material: 'Carbon-fibre / aluminium-honeycomb sandwich; black thermal layer painted white-grey on Falcon Heavy centre cores', mass: 2100,
       desc: 'Composite shroud between the stages (6.6 m long here; length estimated). It covers the Merlin Vacuum nozzle, carries the grid fins and cold-gas thrusters, and stays with the centre core at separation. On Falcon Heavy centre cores its black thermal layer is painted over in white-grey behind the Falcon Heavy logo.',
-      callout: true, anchor: [R + 0.05, 41.4, 0.3], explode: [0, 2.0, 0],
+      explode: [0, 2.0, 0],
     }, [mesh(barrel(R, Y.s1Top, Y.interTop, { rings: 3 }), FM.interstageWhite()), mesh(barrel(R - 0.03, Y.s1Top, Y.interTop), FM.compositeInner())]);
     inter.userData.part.thermalRole = 'ambient';
     const sep = [];
@@ -518,7 +518,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   const legs = P('landing legs', {
     system: 'Recovery', count: 4, material: 'Carbon fibre with aluminium honeycomb', mass: 4 * 520,
     desc: 'Folded against the skirt for ascent; in the last seconds of the landing burn they swing down to a stance about 18 m across. Block 5 legs can be stowed again after landing, speeding turnaround.',
-    callout: !centre && attachSide > 0, anchor: [polar(R + 0.35, 45)[0], 7.0, polar(R + 0.35, 45)[1]], explode: [0, -1.6, 0],
+    callout: !centre && attachSide > 0, anchor: [polar(R + 0.35, 45)[0], 8.0, polar(R + 0.35, 45)[1]], explode: [0, -1.6, 0],
   }, [mesh(merge(legGeos), FM.legCarbon()), mesh(merge(footGeos), FM.black())]);
   legs.userData.part.thermalRole = 'ambient';
   P('leg deployment pistons', {
@@ -560,7 +560,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   P('raceway', {
     system: 'Electrical', material: 'Composite cable tray cover', mass: 140,
     desc: 'External tunnel that carries power, data and flight-safety cables up the outside of the tanks between the engine bay and the forward avionics, so no wiring has to pass through the propellant.',
-    callout: !centre && attachSide > 0, anchor: at(R + 0.16, rwA, 31.0), explode: [0, 0, 1.6],
+    callout: !centre && attachSide > 0, anchor: at(R + 0.16, rwA, 30.0), explode: [0, 0, 1.6],
   }, mesh(merge(rw), FM.raceway()));
   const wh = [
     hoop(1.6, 0.025, Y.s1Top + 0.04, { seg: 64, tube: 4 }), hoop(1.66, 0.025, 2.9, { seg: 64, tube: 4 }),
