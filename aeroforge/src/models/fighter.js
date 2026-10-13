@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import { Assembly } from '../engine/assembly.js';
-import { decal, tailCode, stencilText, danger } from '../engine/decals.js';
+import { decal, tailCode, stencilText } from '../engine/decals.js';
 import { decalTexture } from '../engine/surface.js';
 import { vaporConeMaterial } from '../engine/effects.js';
 import { recoveryTemperature } from '../physics/atmosphere.js';
@@ -82,7 +82,6 @@ export function buildFighter() {
     add(`Vertical tail (${R})`, tailCode('FF', 'AF 05-4100'), { at, dir: n, size: [1.25, 1.25, 0.12] });
     // national insignia on the intake trunk sides
     add(`Caret inlet cowl (${R})`, usafInsignia(), { at: [X(7.75), -0.42, side * 1.72], dir: [0, -0.15, side], size: [0.9, 0.45, 0.25] });
-    add(`Caret inlet cowl (${R})`, danger('DANGER · INTAKE'), { at: [X(7.2), -0.12, side * 1.78], dir: [0, 0, side], size: [0.8, 0.25, 0.2], roughness: 0.5 });
     add(`Wing skin (${R})`, stencilText('NO STEP', 'rgba(30,34,38,0.85)', true), { at: [X(13.0), FR.wingY(3.2) + 0.12, side * 3.2], dir: [0, 1, 0], size: [0.6, 0.15, 0.3], angle: Math.PI / 2 });
   }
   add('Wing skin (left)', usafInsignia(), { at: [X(11.6), FR.wingY(4.4) + 0.12, -4.4], dir: [0, 1, 0], size: [1.4, 0.7, 0.3], angle: -Math.PI / 2 });

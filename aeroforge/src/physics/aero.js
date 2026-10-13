@@ -4,16 +4,17 @@
 
 import { isa, G0, recoveryTemperature } from './atmosphere.js';
 
+// F-22A Raptor reference data (USAF fact sheet, Lockheed Martin product card, P&W F119 data).
 export const FIGHTER = {
-  wingArea: 78.04,          // m²
-  span: 13.56,              // m
-  sweepHalfChord: 0.42,     // rad (~24°)
-  massCombat: 29300,        // kg
-  thrustMilSL: 2 * 116e3,   // N, dry
-  thrustMaxSL: 2 * 156e3,   // N, full afterburner
+  wingArea: 78.04,          // m² (840 ft²)
+  span: 13.56,              // m (44 ft 6 in)
+  sweepHalfChord: 0.288,    // rad (16.5°): from 42° LE / −17° TE sweep, AR 2.36, taper 0.169
+  massCombat: 29410,        // kg, typical combat / gross weight (64,840 lb)
+  thrustMilSL: 2 * 116e3,   // N, dry (2 × F119-PW-100, ≈ 26,000 lbf class)
+  thrustMaxSL: 2 * 156e3,   // N, full afterburner (2 × 35,000 lbf class)
   clMax: 1.65,
-  alphaStall: 26,           // deg
-  gLimit: 9,
+  alphaStall: 26,           // deg, wing alone; thrust vectoring lets the jet fly far beyond it
+  gLimit: 9,                // +9 / −3 g
 };
 
 const AR = (FIGHTER.span ** 2) / FIGHTER.wingArea;

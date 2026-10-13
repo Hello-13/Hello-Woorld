@@ -8,10 +8,8 @@ import { F } from './materials.js';
 import * as FR from './frame.js';
 import { merge } from './util.js';
 
-const { X, mono } = FR;
+const { X } = FR;
 
-// canopy height above the fuselage centre line along its length (apex ≈ 1.2 m above the chine)
-const CAN_H = [[3.45, 0], [3.62, 0.09], [3.9, 0.24], [4.3, 0.4], [4.75, 0.52], [5.25, 0.585], [5.65, 0.6], [6.05, 0.55], [6.4, 0.42], [6.7, 0.25], [6.92, 0.08], [7.02, 0]];
 
 /**
  * The transparency as a smooth parametric surface: an elliptical cross-section from sill to sill
@@ -25,7 +23,7 @@ function canopyGeometry(nu = 84, nv = 56) {
     const s = s0 + (s1 - s0) * (0.5 - 0.5 * Math.cos(Math.PI * u));
     const a = FR.sillW(s);
     const ys = FR.upperA(s, a) - 0.018;
-    const yt = FR.upperA(s, 0) + mono(CAN_H, s);
+    const yt = FR.canopyTop(s);
     const phi = Math.PI * (v - 0.5);
     return [X(s), ys + (yt - ys) * Math.cos(phi), a * Math.sin(phi)];
   };
