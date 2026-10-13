@@ -362,7 +362,7 @@ export function buildSystems(ctx) {
         const sec = FR.wingSection(z);
         patch(V(sec.le[0] - 0.9 * sec.chord, sec.le[1] + 0.012, side * z), V(0, 1, 0), 0.08, 0.14);
       }
-      for (const s of [1.8, 2.3, 4.0]) patch(V(X(s), FR.aYC(s) + 0.05, side * (FR.aW(s) - 0.05)), V(0, 1, side * 0.6));
+      for (const s of [1.8, 2.3, 4.0]) { const z = FR.aW(s) - 0.05; patch(V(X(s), FR.upperA(s, z) + 0.004, side * z), V(0, 1, side * 0.6)); }
       for (const s of [16.2, 17.0]) patch(V(X(s), FR.topAt(s, 1.4) + 0.004, side * 1.4), V(0, 1, side * 0.3));
       patch(V(X(17.2), -FR.bD(17.2) - 0.004, side * 1.0), V(0, -1, 0));
     }
@@ -416,7 +416,7 @@ export function buildSystems(ctx) {
       (side > 0 ? green : red).push(lens);
       form.push(new THREE.BoxGeometry(0.5, 0.006, 0.05).translate(le.x - 0.55 * chord, le.y + 0.03, le.z - side * 0.15));
     }
-    for (const side of [1, -1]) form.push(new THREE.BoxGeometry(0.6, 0.006, 0.05).rotateX(side * 0.5).translate(X(4.6), FR.aYC(4.6) + 0.05, side * (FR.aW(4.6) - 0.06)));
+    for (const side of [1, -1]) { const z = FR.aW(4.6) - 0.05; form.push(new THREE.BoxGeometry(0.6, 0.006, 0.05).rotateX(side * 0.5).translate(X(4.6), FR.upperA(4.6, z) + 0.006, side * z)); }
     white.push(new THREE.SphereGeometry(0.035, 10, 8).translate(X(18.62), -0.08, -1.52));
     // steady, modest intensities: these are small lamps, not light sources for the scene
     const lamp = (c, e, k) => new THREE.MeshStandardMaterial({ color: c, emissive: e, emissiveIntensity: k, roughness: 0.4 });

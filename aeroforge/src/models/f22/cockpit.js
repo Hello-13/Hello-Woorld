@@ -102,7 +102,7 @@ export function buildCockpit(ctx) {
     g.push(box(5.3, -0.06, 0, 3.2, 0.04, 0.9));                                     // floor
     for (const side of [1, -1]) {
       g.push(box(5.55, 0.12, side * 0.43, 1.7, 0.34, 0.16));                         // side consoles
-      g.push(box(5.5, 0.1, side * 0.47, 1.8, 0.34, 0.03));                           // tub walls (below the sills)
+      g.push(box(5.5, 0.17, side * 0.47, 1.8, 0.48, 0.03));                          // tub walls (below the sills)
     }
     // instrument panel (tilted back) and glare shield
     const panel = new THREE.BoxGeometry(0.06, 0.46, 0.62).rotateZ(-0.22).translate(X(4.05), 0.2, 0);

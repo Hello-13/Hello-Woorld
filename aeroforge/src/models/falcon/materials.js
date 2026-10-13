@@ -1,7 +1,9 @@
 // Falcon Heavy surface finishes. Block 5 livery: white-painted aluminium-lithium tanks with
 // friction-stir weld seams, black thermal-protection paint on the interstage and booster forward
 // sections, black carbon landing legs, bare cast titanium grid fins, white composite nose cones
-// and fairing. Roughness stays ≥ 0.3 on the big curved shells so highlights stay stable.
+// and fairing. The white is a matte paint (no clearcoat, albedo ≈ 0.7) so that under the pad's
+// floodlights it reads as painted white rather than glowing; roughness stays ≥ 0.3 on the big
+// curved shells so highlights stay stable.
 
 import * as THREE from 'three';
 import { tankSkin, carbonWeave, concrete } from '../../engine/surface.js';
@@ -27,7 +29,7 @@ function canvasTex(w, h, draw, { srgb = true } = {}) {
  * soot: fraction of the stage (from the base) darkened by re-entry and landing-burn soot.
  * word: { text, v0, v1, u } a vertical wordmark reading bottom-to-top.
  */
-export function stagePaint(key, { seams = [], soot = 0, streaks = 0, word = null, seed = 3, base = '#e2e5e7' } = {}) {
+export function stagePaint(key, { seams = [], soot = 0, streaks = 0, word = null, seed = 3, base = '#d9dcde' } = {}) {
   return once(`paint.${key}`, () => {
     const map = canvasTex(512, 2048, (ctx, w, h) => {
       ctx.fillStyle = base;
@@ -35,7 +37,7 @@ export function stagePaint(key, { seams = [], soot = 0, streaks = 0, word = null
       const r = rng(seed);
       // faint paint mottling between panels
       for (let i = 0; i < 60; i++) {
-        ctx.fillStyle = `rgba(${200 + r() * 30},${205 + r() * 30},${210 + r() * 30},0.08)`;
+        ctx.fillStyle = `rgba(${196 + r() * 26},${200 + r() * 26},${204 + r() * 26},0.08)`;
         ctx.fillRect(0, r() * h, w, 10 + r() * 60);
       }
       if (soot > 0) {
@@ -86,9 +88,9 @@ export function tankMaterial(paintMap, lengthM) {
   const sk = tankSkin();
   const normalMap = sk.normalMap.clone(); normalMap.repeat.set(10, lengthM / 3.4); normalMap.wrapT = THREE.RepeatWrapping; normalMap.needsUpdate = true;
   const roughnessMap = sk.roughnessMap.clone(); roughnessMap.repeat.set(4, lengthM / 6); roughnessMap.wrapT = THREE.RepeatWrapping; roughnessMap.needsUpdate = true;
-  return new THREE.MeshPhysicalMaterial({
+  return new THREE.MeshStandardMaterial({
     color: 0xffffff, map: paintMap, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.5, 0.5),
-    roughness: 0.85, metalness: 0.04, clearcoat: 0.3, clearcoatRoughness: 0.35,
+    roughness: 0.82, metalness: 0.02,
   });
 }
 
@@ -115,11 +117,11 @@ export const FM = {
     return new THREE.MeshPhysicalMaterial({ color: 0x9a9da2, map: c.map, normalMap: c.normalMap, roughness: 0.55, metalness: 0.2, clearcoat: 0.4, clearcoatRoughness: 0.4 });
   }),
   titanium: () => once('ti', () => new THREE.MeshStandardMaterial({ color: 0x8b8580, roughness: 0.5, metalness: 0.95 })),
-  whiteComposite: () => once('whiteComp', () => new THREE.MeshPhysicalMaterial({ color: 0xe3e5e7, roughness: 0.55, metalness: 0.02, clearcoat: 0.25, clearcoatRoughness: 0.4 })),
-  fairing: () => once('fairing', () => new THREE.MeshPhysicalMaterial({ color: 0xe5e7e8, roughness: 0.5, metalness: 0.02, clearcoat: 0.25, clearcoatRoughness: 0.4, side: THREE.DoubleSide })),
+  whiteComposite: () => once('whiteComp', () => new THREE.MeshStandardMaterial({ color: 0xd6d8da, roughness: 0.62, metalness: 0.02 })),
+  fairing: () => once('fairing', () => new THREE.MeshStandardMaterial({ color: 0xd8dadb, roughness: 0.6, metalness: 0.02, side: THREE.DoubleSide })),
   heatShield: () => once('heatShield', () => new THREE.MeshStandardMaterial({ color: 0x2a2826, roughness: 0.9, metalness: 0.05 })),
   boot: () => once('boot', () => new THREE.MeshStandardMaterial({ color: 0xb9b6b0, roughness: 0.95, metalness: 0.0, side: THREE.DoubleSide })),
-  raceway: () => once('raceway', () => new THREE.MeshStandardMaterial({ color: 0xe6e8ea, roughness: 0.6, metalness: 0.05 })),
+  raceway: () => once('raceway', () => new THREE.MeshStandardMaterial({ color: 0xd6d9db, roughness: 0.65, metalness: 0.05 })),
   alu: () => once('alu', () => new THREE.MeshStandardMaterial({ color: 0xb8bec4, roughness: 0.42, metalness: 0.9 })),
   aluDark: () => once('aluDark', () => new THREE.MeshStandardMaterial({ color: 0x80878e, roughness: 0.5, metalness: 0.85 })),
   domeAlu: () => once('domeAlu', () => new THREE.MeshStandardMaterial({ color: 0xaab1b7, roughness: 0.45, metalness: 0.85, side: THREE.DoubleSide })),
