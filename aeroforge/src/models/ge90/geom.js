@@ -78,10 +78,11 @@ export function cutLathe(profile, material, { seg = 64, caps = true, closed = tr
  */
 export function cutPair(build, material, cut = 'engine') {
   const group = new THREE.Group();
-  const keep = mesh(build(selector(cut, false)), material);
-  const rest = mesh(build(selector(cut, true)), material);
-  rest.visible = false;
-  group.add(keep, rest);
+  const gk = build(selector(cut, false)), gr = build(selector(cut, true));
+  // a side with no items gets no mesh (an empty geometry would break triangle counts)
+  if (gk.attributes.position) group.add(mesh(gk, material));
+  let rest = null;
+  if (gr.attributes.position) { rest = mesh(gr, material); rest.visible = false; group.add(rest); }
   group.userData.cutaway = { rest, caps: [] };
   return group;
 }
@@ -99,7 +100,7 @@ export function ccw(p) {
 export function setCut(group, on) {
   const c = group.userData.cutaway;
   if (!c) return;
-  c.rest.visible = !on;
+  if (c.rest) c.rest.visible = !on;
   for (const m of c.caps) m.visible = on;
 }
 
