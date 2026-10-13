@@ -127,6 +127,7 @@ async function start() {
     modes.apply(app.current, m, app.selected);
     legend.hidden = m !== 'thermal' && m !== 'pressure' && m !== 'systems';
     updateLegend();
+    updateViewShift();
     if (!quiet) log.push('VIEW', `${MODE_LABEL[m]} render mode`);
   }
   function updateLegend() {
@@ -179,6 +180,7 @@ async function start() {
     if (remember) app.looks[app.entry.id] = k;
     stage.env.applyLook(k);
     app.current.setLook?.(k);
+    polarLimit();
     modes.apply(app.current, app.mode, app.selected);
     for (const b of lookGroup.children) b.setAttribute('aria-checked', String(b.dataset.look === k));
     stage.frameVehicle(app.current);
@@ -271,7 +273,8 @@ async function start() {
   function updateViewShift() {
     if (narrow()) { stage.setViewShift(0); stage.frameCover = 0; stage.frameCoverY = 0; return; }
     const w = Math.max(1, stage.container.clientWidth), h = Math.max(1, stage.container.clientHeight);
-    const right = dossierOpen() ? dossier.offsetWidth / w : 0;
+    // the dossier, or else the colour legend (Systems / Thermal / Pressure) on the right
+    const right = dossierOpen() ? dossier.offsetWidth / w : !legend.hidden && legend.offsetWidth ? (legend.offsetWidth + 38) / w : 0;
     const left = tour.active ? 0.15 : dossierOpen() ? (app.orbit ? 0.13 : 0.07) : 0.14;
     // nav bar above; fleet index and view tools below
     const top = 68 / h, bottom = 156 / h;
@@ -493,13 +496,19 @@ async function start() {
     ].filter(Boolean));
   }
 
+  // In space (the orbit look, or the satellite lab's orbit mode) there is no floor, so the camera
+  // may go below the vehicle; elsewhere it stays above the floor.
+  function polarLimit() {
+    stage.controls.maxPolarAngle = app.orbit || app.look === 'orbit' ? Math.PI - 0.01 : Math.PI * 0.495;
+  }
+
   // ------------------------------------------------------------------ orbit mode (satellite lab)
   let orbitApi = null;
   function setOrbitMode(on) {
     app.orbit = on;
     stage.holder.visible = !on;
     stage.setHangarVisible(!on);
-    stage.controls.maxPolarAngle = on ? Math.PI : Math.PI * 0.495;
+    polarLimit();
     stage.controls.minDistance = on ? 3 : 2;
     callouts.setVisible(app.labels && !on);
     orbitNote.hidden = !on;
@@ -546,6 +555,7 @@ async function start() {
     stage.env.setOrbitView(f.orbit || null);
     stage.env.applyLook(app.look);
     v.setLook?.(app.look);
+    polarLimit();
     renderLooks();
     stage.setVehicle(v, { reveal: true });
     if (v._baseY == null) v._baseY = v.root.position.y;
