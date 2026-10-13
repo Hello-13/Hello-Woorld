@@ -1,7 +1,7 @@
 // Falcon Heavy surface finishes. Block 5 livery: white-painted aluminium-lithium tanks with
-// friction-stir weld seams, black thermal-protection paint on the interstage and booster forward
-// sections, black carbon landing legs, bare cast titanium grid fins, white composite nose cones
-// and fairing. The white is a matte paint (no clearcoat, albedo ≈ 0.7) so that under the pad's
+// friction-stir weld seams, black thermal-protection paint on the booster forward sections, the
+// landing legs and the first-stage raceways (Block 5), the centre-core interstage painted
+// white-grey on Falcon Heavy, bare cast titanium grid fins, white composite nose cones and fairing. The white is a matte paint (no clearcoat, albedo ≈ 0.7) so that under the pad's
 // floodlights it reads as painted white rather than glowing; roughness stays ≥ 0.3 on the big
 // curved shells so highlights stay stable.
 
@@ -128,6 +128,17 @@ export const FM = {
   }),
   /** Inside face of composite shells (seen through cutaways and from below). */
   compositeInner: () => once('compInner', () => new THREE.MeshStandardMaterial({ color: 0x3a3c40, roughness: 0.8, metalness: 0.1, side: THREE.BackSide })),
+  /** Block 5 landing legs and first-stage raceways: carbon / aluminium honeycomb under black thermal protection. */
+  legBlack: () => once('legBlack', () => {
+    const c = carbonSet(3, 14);
+    return new THREE.MeshStandardMaterial({ color: 0x1e1f21, normalMap: c.normalMap, normalScale: new THREE.Vector2(0.3, 0.3), roughness: 0.6, metalness: 0.12 });
+  }),
+  racewayBlack: () => once('racewayBlack', () => new THREE.MeshStandardMaterial({ color: 0x1c1d1f, roughness: 0.66, metalness: 0.1 })),
+  /** Aluminium-honeycomb crush core inside a leg piston. */
+  crushCore: () => once('crushCore', () => new THREE.MeshStandardMaterial({ color: 0xc9b98a, roughness: 0.55, metalness: 0.6 })),
+  /** Insulation lagging over the second-stage igniter lines. */
+  lagging: () => once('lagging', () => new THREE.MeshStandardMaterial({ color: 0xd8d2c0, roughness: 0.9, metalness: 0.0 })),
+  lens: () => once('lens', () => new THREE.MeshStandardMaterial({ color: 0x0b1420, roughness: 0.08, metalness: 0.6 })),
   legCarbon: () => once('legCarbon', () => {
     const c = carbonSet(3, 14);
     return new THREE.MeshPhysicalMaterial({ color: 0x9a9da2, map: c.map, normalMap: c.normalMap, roughness: 0.55, metalness: 0.2, clearcoat: 0.4, clearcoatRoughness: 0.4 });
