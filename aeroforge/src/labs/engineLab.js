@@ -37,6 +37,7 @@ export function mountEngineLab(root, ctx) {
   const sBpr = slider({ label: 'Bypass ratio', min: 3, max: 14, step: 0.1, value: p.bpr, format: (x) => x.toFixed(1), onInput: set('bpr') });
   const tCut = toggle({ label: 'Cutaway', value: true, onChange: (on) => v.setCutaway(on) });
   const tFlow = toggle({ label: 'Flow particles', value: true, onChange: (on) => v.setFlow(on) });
+  const tRev = toggle({ label: 'Thrust reverser', value: false, onChange: (on) => { v.setReverser?.(on); ctx.log(v.designation, on ? 'Reverser deployed · sleeves aft, blocker doors in the bypass duct' : 'Reverser stowed and locked', on ? 'warn' : 'info'); } });
   const showStations = (on) => { v.setStationPlanes(on); ctx.muteCallouts?.(on); };
   const tStations = toggle({ label: 'Station planes', value: false, onChange: (on) => { showStations(on); if (on) sideView(); } });
   // the classic station diagram: a side elevation with headroom above the nacelle for the labels
@@ -76,7 +77,7 @@ export function mountEngineLab(root, ctx) {
     section('Performance', ro.el),
     section('Cycle', ts.el),
     section('Stations', el('div', { class: 'table-wrap' }, table)),
-    section('Display', el('div', { class: 'btn-row' }, tCut.el, tFlow.el, tStations.el)),
+    section('Display', el('div', { class: 'btn-row' }, tCut.el, tFlow.el, tStations.el, tRev.el)),
   );
 
   let lastLimited = false;
@@ -151,7 +152,7 @@ export function mountEngineLab(root, ctx) {
 
   return {
     update() { if (dirty) { dirty = false; compute(); } },
-    dispose() { v.setStationPlanes(false); v.state.fromLab = false; },
+    dispose() { v.setStationPlanes(false); v.setReverser?.(false); v.state.fromLab = false; },
     api: {
       setDisplay({ flow, stations, cutaway } = {}) {
         if (flow != null) tFlow.set(flow);

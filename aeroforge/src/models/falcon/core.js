@@ -93,7 +93,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   if (centre) {
     const cd = P('common dome', {
       system: 'Fuel', material: 'Aluminium-lithium 2195 bulkhead', mass: 380,
-      desc: 'One bulkhead separates the LOX above from the RP-1 below, saving the length and mass of a separate intertank. It bulges down into the RP-1 tank because the LOX side carries the greater pressure head.',
+      desc: 'One bulkhead separates the LOX above from the RP-1 below, saving the length and mass of a separate intertank. Shown bulging into the RP-1 tank, so the weight and pressure of the LOX above load it in tension; its exact curvature is not published.',
       callout: true, anchor: [R * 0.7, Y.commonDome - 0.4, 0.4], explode: [0, 0.4, 0],
     }, mesh(common, FM.domeAlu()));
     cd.userData.part.thermalRole = 'lox';
@@ -156,7 +156,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     dc.userData.part.thermalRole = 'lox';
     P('engine feed manifolds', {
       system: 'Fuel', material: 'Stainless steel and aluminium lines, prevalves', mass: 420,
-      desc: 'Below the aft dome a LOX distribution ring and nine RP-1 lines split the flow to the nine turbopump inlets, each behind a prevalve.',
+      desc: 'Below the aft dome the LOX and RP-1 flows split to the nine turbopump inlets, each behind a prevalve. Shown as a LOX distribution ring and nine RP-1 lines; the real routing is not published.',
       explode: [0, -1.2, 2.6],
     }, mesh(merge(feedGeo), FM.steelLine()));
     // helium pressurisation and vent lines along the inside of the tank wall
@@ -218,7 +218,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   // hold-down fittings at the base of the skirt (gripped by the pad clamps)
   const hold = [0, 90, 180, 270].map((a) => { const [x, z] = polar(R - 0.12, a); return block(x, Y.heatShield + 0.12, z, 0.34, 0.26, 0.34, radialYaw(a)); });
   const hs = P('heat shield & engine boots', {
-    system: 'Thermal control', material: 'Ablative-coated heat shield, flexible high-temperature fabric boots', mass: 520,
+    system: 'Thermal control', material: 'High-temperature composite heat shield, flexible fabric engine boots (materials not published)', mass: 520,
     desc: 'Closes the bottom of the engine bay against the radiant heat of 27 plumes and the re-entry burn. Flexible boots seal around each nozzle while it gimbals.',
     explode: [0, -3.2, 0],
   }, [mesh(perforatedDisc(R - 0.005, holes, Y.heatShield, 0.06, 96), FM.heatShield()), mesh(merge(boots), FM.boot()), mesh(merge(hold), FM.aluDark())]);
@@ -261,7 +261,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     const E = (name, info, objs) => P(name, { ...info, system: info.system || 'Propulsion' }, objs);
     const ch = E('Merlin 1D thrust chamber & pintle injector', {
       material: 'Copper-alloy liner, Inconel jacket', mass: 140,
-      desc: 'Centre engine. RP-1 and LOX meet at a single pintle injector, which resists combustion instability; they burn at about 9.7 MPa and 3,400 K. Fuel flowing through channels in the chamber wall cools it before injection.',
+      desc: 'Centre engine. RP-1 and LOX meet at a single pintle injector, which resists combustion instability, and burn at about 9.7 MPa and roughly 3,600 K. Fuel flowing through channels in the chamber wall cools it before injection.',
       explode: [0, -2.3, 4.6],
     }, mesh(merlinChamber(48), FM.copper()));
     ch.userData.part.thermalRole = 'engineC';
@@ -278,7 +278,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     }, [mesh(merge(kit.pump), FM.pump())]);
     E('Merlin 1D gas generator', {
       material: 'Inconel combustor', mass: 18,
-      desc: 'Burns a small fuel-rich share of the propellants (≈ 3 %) to drive the turbine. In this open cycle the turbine gas is dumped overboard instead of entering the main chamber — simpler and lighter than staged combustion, at a few seconds of Isp.',
+      desc: 'Burns a few per cent of the propellants, fuel-rich and therefore cool enough for the turbine blades, to drive the turbine. In this open cycle the turbine gas is dumped overboard instead of entering the main chamber — simpler and lighter than staged combustion, at the cost of a few seconds of Isp.',
       explode: [1.3, -2.5, 5.3],
     }, mesh(merge(kit.gg), FM.inconel()));
     const td = E('Merlin 1D turbine exhaust duct', {
@@ -294,7 +294,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     }, [mesh(merge(kit.line), FM.steelLine()), mesh(merge(kit.valve), FM.gold())]);
     E('Merlin 1D gimbal & TVC actuators', {
       system: 'Flight controls', count: 2, material: 'Gimbal bearing block, hydraulic actuators (RP-1 working fluid)', mass: 40,
-      desc: 'The centre engine gimbals too: it is the one Merlin that relights alone for the landing burn, so it must steer.',
+      desc: 'The centre engine gimbals too: it is the Merlin that usually relights alone for the landing burn, so it must steer.',
       explode: [-0.8, -1.3, 5.3],
     }, mesh(merge(kit.act), FM.steelLine()));
   }
@@ -304,7 +304,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   if (centre) {
     const inter = P('interstage', {
       system: 'Separation', skin: true, material: 'Carbon-fibre / aluminium-honeycomb sandwich, black thermal paint', mass: 2100,
-      desc: 'Carbon-composite shroud between the stages, 6.6 m long. It covers the Merlin Vacuum nozzle and carries the grid fins and cold-gas thrusters, and stays with the centre core at separation.',
+      desc: 'Carbon-composite shroud between the stages (about 6.6 m long here; length estimated). It covers the Merlin Vacuum nozzle, carries the grid fins and cold-gas thrusters, and stays with the centre core at separation.',
       callout: true, anchor: [R + 0.05, 44.2, 0.3], explode: [0, 2.0, 0],
     }, [mesh(barrel(R, Y.s1Top, Y.interTop, { rings: 3 }), FM.blackTPS()), mesh(barrel(R - 0.03, Y.s1Top, Y.interTop), FM.compositeInner())]);
     inter.userData.part.thermalRole = 'ambient';
@@ -366,7 +366,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   gf.userData.part.thermalRole = 'ambient';
   P('grid-fin actuators', {
     system: 'Hydraulics', count: 4, material: 'Closed-loop hydraulic actuators in aerodynamic housings', mass: 4 * 35,
-    desc: 'Each fin rotates on a hydraulic actuator in a housing at its root, driven by the stage\'s hydraulic power unit.',
+    desc: 'Each fin rotates on a hydraulic actuator in a housing at its root. Block 5 uses a closed-loop hydraulic system; early Falcon 9 grid fins vented their hydraulic fluid overboard and could run out.',
     explode: centre ? [0, 2.7, 0] : [0, 2.7, 0],
   }, mesh(merge(finActs), FM.black()));
 
@@ -389,7 +389,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   }
   const legs = P('landing legs', {
     system: 'Recovery', count: 4, material: 'Carbon fibre with aluminium honeycomb', mass: 4 * 520,
-    desc: 'Folded against the skirt for ascent; for landing they swing down to a stance about 18 m across. Block 5 legs can be retracted after landing, which speeds turnaround.',
+    desc: 'Folded against the skirt for ascent; for landing they swing down to a stance about 18 m across. Block 5 legs were redesigned so they can be stowed again after landing, speeding turnaround.',
     callout: !centre && attachSide > 0, anchor: [polar(R + 0.35, 45)[0], 6.5, polar(R + 0.35, 45)[1]], explode: [0, -1.6, 0],
   }, [mesh(merge(legGeos), FM.legCarbon()), mesh(merge(footGeos), FM.black()), ...(centre ? [] : [mesh(merge(pistonGeos), FM.steelLine())])]);
   legs.userData.part.thermalRole = 'ambient';

@@ -73,7 +73,7 @@ export const HM = {
   }),
   /** Light shield blanket: panel seams run lengthwise, more weathering toward the aperture. */
   mliShield: () => once('mliShield', () => {
-    const n = mliSurface({ seed: 43 });
+    const n = mliSurface({ seed: 41 });
     const map = canvasTex(512, 512, mliAlbedo(9, { base: [190, 194, 199], seams: 3, patches: 6 }), { repeat: [8, 2] });
     const normalMap = n.normalMap.clone(); normalMap.repeat.set(16, 4); normalMap.needsUpdate = true;
     const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(10, 3); roughnessMap.needsUpdate = true;
@@ -117,6 +117,8 @@ export const HM = {
   grEp: () => once('grEp', () => new THREE.MeshStandardMaterial({ color: 0x24272b, roughness: 0.46, metalness: 0.35 })),
   /** Titanium fittings and the main ring. */
   ti: () => once('ti', () => new THREE.MeshStandardMaterial({ color: 0x9da4ab, roughness: 0.34, metalness: 0.92 })),
+  /** Matte titanium end fittings (small parts stay rough so they cannot sparkle). */
+  fitting: () => once('fitting', () => new THREE.MeshStandardMaterial({ color: 0x8a9096, roughness: 0.62, metalness: 0.6 })),
   /** Bare aluminium structure. */
   al: () => once('al', () => new THREE.MeshStandardMaterial({ color: 0xbcc2c8, roughness: 0.4, metalness: 0.9 })),
   /** Gold chromate-conversion (Iridite) electronics boxes. */

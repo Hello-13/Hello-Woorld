@@ -110,13 +110,18 @@ export function buildAppendages(P) {
     }
     const gim = [new THREE.BoxGeometry(0.22, 0.2, 0.22).translate(0, s * 0.1, 0), new THREE.CylinderGeometry(0.07, 0.07, 0.34, 14).rotateZ(Math.PI / 2).translate(0, s * 0.22, 0)];
     g2.add(mesh(dish, HM.dish()), mesh(merge(back), HM.grEp()), mesh(merge(feed), HM.al()));
-    gimbal.add(mesh(merge(gim), HM.box()));
+    // waveguide and cable run along the mast
+    pivot.add(mesh(merge([rod([0.09, s * 0.15, 0.05], [0.09, s * (HGA.mast - 0.1), 0.05], 0.018, 6), rod([-0.08, s * 0.15, -0.05], [-0.08, s * (HGA.mast - 0.1), -0.05], 0.012, 6)]), HM.kapton()));
     const hp = P(`High-gain antenna (${side})`, {
-      system: 'Communications', material: 'Parabolic graphite-epoxy reflector, S-band feed, two-axis gimbal', mass: 42, temp: 250,
+      system: 'Communications', material: 'Parabolic graphite-epoxy reflector with S-band feed', mass: 28, temp: 250,
       explode: [0, s * 0.8, 0],
       desc: 'Steerable dish (≈1.3 m, estimated) that sends science data to NASA\'s Tracking and Data Relay Satellites 36,000 km up, which relay it to White Sands. The two-axis gimbal tracks the relay satellite as Hubble circles the Earth.',
       callout: s > 0, anchor: [0.4, s * 0.5, 0.4],
     }, gimbal, tip);
+    P(`HGA gimbal (${side})`, {
+      system: 'Communications', material: 'Two-axis stepper-motor gimbal with rotary joints for the RF path', mass: 14, temp: 255, explode: [0, s * 0.35, 0],
+      desc: 'Points the dish through about ±90° on two axes so it can follow a TDRS satellite across the sky while Hubble holds its target. Rotary joints carry the S-band signal across both axes.',
+    }, mesh(merge(gim), HM.box()), gimbal);
     out.hgas.push({ s, pivot, gimbal, g2, mastPart: mp, dishPart: hp });
   }
 
@@ -190,7 +195,7 @@ export function buildAppendages(P) {
   }
   for (const s of [1, -1]) hz.push(rod([5.2, 0, s * 1.47], [SA.x, 0, s * 1.5], 0.02, 6), rod([5.2, s * 1.47, 0.1], [HGA.x, s * 1.5, 0.1], 0.02, 6));
   P('Electrical harness', {
-    system: 'Electrical', material: 'Shielded copper wiring bundles, connectors and waveguide', mass: 260, temp: 285, explode: [0, 0, 0],
+    system: 'Electrical', material: 'Shielded copper wiring bundles, connectors and waveguide', mass: 300, temp: 285, explode: [0, 0, 0],
     desc: 'Many kilometres of wire tie the equipment bays to the instruments, sensors, drives and antennas through hundreds of connectors — the reason servicing tools were designed to be worked in pressure gloves. Routing simplified.',
   }, mesh(merge(hz), new THREE.MeshStandardMaterial({ color: 0x5a5148, roughness: 0.7, metalness: 0.2 })));
 

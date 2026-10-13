@@ -8,8 +8,10 @@ const once = (k, make) => { if (!cache.has(k)) cache.set(k, make()); return cach
 const std = (k, p) => once(k, () => new THREE.MeshStandardMaterial(p));
 
 export const F = {
-  skin: () => SKIN.stealth(),
-  wing: () => SKIN.stealthWing(),
+  // F-22 low-observable coating: medium "haze" grey (FS 36170 class), fairly matte. Clones of the
+  // shared skins (same procedural maps) with less clearcoat so broad panels read as grey, not black.
+  skin: () => once('f22.skin', () => { const m = SKIN.stealth().clone(); m.color.set(0x5b6269); m.metalness = 0.18; m.clearcoat = 0.16; m.clearcoatRoughness = 0.42; return m; }),
+  wing: () => once('f22.wing', () => { const m = SKIN.stealthWing().clone(); m.color.set(0x555c63); m.metalness = 0.18; m.clearcoat = 0.16; m.clearcoatRoughness = 0.42; return m; }),
   /**
    * One-piece canopy: polycarbonate with a gold-tinted indium-tin-oxide film. Roughness is held
    * above ~0.1 on both lobes so the large curved bubble carries broad, steady highlights.

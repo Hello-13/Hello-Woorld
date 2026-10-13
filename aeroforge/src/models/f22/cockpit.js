@@ -77,7 +77,7 @@ export function buildCockpit(ctx) {
   const can = mesh(canopyGeometry(), F.canopy(), { cast: false, receive: false });
   can.renderOrder = 2;
   P('Canopy', {
-    system: 'Crew systems', material: 'Monolithic polycarbonate (two 3/8 in sheets fusion-bonded), gold indium-tin-oxide coating', mass: 163,
+    system: 'Crew systems', skin: true, material: 'Monolithic polycarbonate (two 3/8 in sheets fusion-bonded), gold indium-tin-oxide coating', mass: 163,
     explode: [0, 2.2, 0], callout: true, anchor: [X(5.4), 1.3, 0],
     desc: 'A single frameless bubble about 3.6 m long, among the largest monolithic polycarbonate parts ever formed (about 360 lb). Its thin gold indium-tin-oxide film conducts, so radar energy reflects off the canopy instead of entering the cockpit and bouncing off the pilot\'s helmet.',
   }, can);
@@ -88,10 +88,9 @@ export function buildCockpit(ctx) {
       for (let s = FR.CANOPY_S0 + 0.06; s <= FR.CANOPY_S1 - 0.04; s += 0.12) pts.push([s, FR.upperA(s, FR.sillW(s)) - 0.005, side * (FR.sillW(s) + 0.012)]);
       g.push(FR.pipe(pts, 0.022, 6, 60));
     }
-    // aft arch, hinge and the electro-mechanical actuator behind the seat
-    g.push(FR.pipe([[6.9, FR.upperA(6.9, 0.2), -0.2], [6.95, FR.upperA(6.95, 0) + 0.07, 0], [6.9, FR.upperA(6.9, 0.2), 0.2]], 0.03, 6, 12));
-    g.push(FR.pipe([[6.75, 0.25, 0], [6.88, 0.66, 0]], 0.035, 8, 4));
-    g.push(box(6.92, 0.7, 0, 0.12, 0.06, 0.3));
+    // aft hinge and the electro-mechanical actuator behind the seat
+    g.push(FR.pipe([[6.62, 0.2, 0], [6.8, 0.58, 0]], 0.035, 8, 4));
+    g.push(box(6.86, 0.6, 0, 0.12, 0.05, 0.26));
     P('Canopy frame & actuator', {
       system: 'Crew systems', material: 'Titanium sill frame, electro-mechanical actuator', mass: 60,
       explode: [0, 1.65, 0],
@@ -105,12 +104,12 @@ export function buildCockpit(ctx) {
     g.push(box(5.3, -0.06, 0, 3.2, 0.04, 0.9));                                     // floor
     for (const side of [1, -1]) {
       g.push(box(5.55, 0.15, side * 0.43, 1.9, 0.36, 0.18));                         // side consoles
-      g.push(box(5.4, 0.25, side * 0.53, 2.6, 0.6, 0.03));                           // tub walls
+      g.push(box(5.35, 0.12, side * 0.5, 2.4, 0.36, 0.03));                          // tub walls (below the sills)
     }
     // instrument panel (tilted back) and glare shield
-    const panel = new THREE.BoxGeometry(0.06, 0.5, 0.95).rotateZ(-0.22).translate(X(4.05), 0.26, 0);
+    const panel = new THREE.BoxGeometry(0.06, 0.46, 0.62).rotateZ(-0.22).translate(X(4.05), 0.2, 0);
     g.push(panel);
-    g.push(box(3.95, 0.5, 0, 0.36, 0.04, 0.9));
+    g.push(box(4.0, 0.42, 0, 0.3, 0.04, 0.56));
     // rudder pedals
     for (const side of [1, -1]) g.push(new THREE.BoxGeometry(0.05, 0.22, 0.1).rotateZ(0.4).translate(X(4.3), 0.04, side * 0.16));
     P('Cockpit tub & consoles', {
@@ -177,21 +176,21 @@ export function buildCockpit(ctx) {
 
   // ------------------------------------------------------------------ HUD, up-front controls and displays
   {
-    const body = [box(4.05, 0.56, 0, 0.22, 0.1, 0.26)];
-    const comb = new THREE.BoxGeometry(0.01, 0.2, 0.22).rotateZ(0.55).translate(X(4.12), 0.72, 0);
-    const icp = [box(3.98, 0.42, 0, 0.06, 0.12, 0.26)];
+    const body = [box(4.08, 0.48, 0, 0.2, 0.08, 0.24)];
+    const comb = new THREE.BoxGeometry(0.01, 0.18, 0.2).rotateZ(0.55).translate(X(4.16), 0.62, 0);
+    const icp = [box(4.0, 0.34, 0, 0.06, 0.1, 0.24)];
     const ufd = [];
-    for (const side of [1, -1]) ufd.push(new THREE.BoxGeometry(0.02, 0.1, 0.13).rotateZ(-0.22).translate(X(4.0), 0.41, side * 0.22));
+    for (const side of [1, -1]) ufd.push(new THREE.BoxGeometry(0.02, 0.09, 0.12).rotateZ(-0.22).translate(X(4.02), 0.34, side * 0.2));
     P('HUD & up-front controls', {
       system: 'Crew systems', material: 'Holographic combiner, integrated control panel, two up-front displays', mass: 22,
       explode: [0.6, 1.4, 0],
       desc: 'The head-up display projects flight and targeting symbols focused at infinity on a glass combiner. Below it sit the integrated control panel for data entry and two small up-front displays for communication, navigation and warnings.',
     }, [mesh(merge([...body, ...icp]), F.panel()), mesh(comb, F.hud(), { cast: false }), mesh(merge(ufd), F.displayAmber())]);
     const scr = [];
-    const at = (y, z, w, h) => new THREE.BoxGeometry(0.02, h, w).rotateZ(-0.22).translate(X(4.02) + (y - 0.25) * 0.22, y, z);
-    scr.push(at(0.24, 0, 0.21, 0.21));                     // primary MFD, 8 × 8 in
-    for (const side of [1, -1]) scr.push(at(0.26, side * 0.27, 0.165, 0.165));   // secondary MFDs, 6.25 × 6.25 in
-    scr.push(at(0.04, 0, 0.165, 0.165));
+    const at = (y, z, w, h) => new THREE.BoxGeometry(0.02, h, w).rotateZ(-0.22).translate(X(4.02) + (y - 0.2) * 0.22, y, z);
+    scr.push(at(0.17, 0, 0.2, 0.2));                       // primary MFD, 8 × 8 in
+    for (const side of [1, -1]) scr.push(at(0.19, side * 0.22, 0.16, 0.16));    // secondary MFDs, 6.25 × 6.25 in
+    scr.push(at(-0.01, 0, 0.16, 0.16));
     P('Multifunction displays', {
       system: 'Crew systems', material: 'Colour active-matrix LCDs', mass: 26,
       explode: [0.9, 1.25, 0],

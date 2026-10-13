@@ -14,7 +14,7 @@ const P_SL = 101325;
 export function mountRocketLab(root, ctx) {
   const v = ctx.vehicle;
   const stage = ctx.stage;
-  const p = { payload: 15000, kick: 14, target: 200 };
+  const p = { payload: 15000, kick: 16, target: 200 };
   let warp = 5;
   let sim = null;
   let flight = null;     // { t, phaseIdx, logged:Set }

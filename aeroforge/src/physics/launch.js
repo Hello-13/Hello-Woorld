@@ -112,7 +112,7 @@ export function planarElements(r, vr, vt) {
  */
 export function simulateAscent({
   payload = 15000,
-  kickAngle = 14,       // deg, pitch-over angle at the end of the kick manoeuvre
+  kickAngle = 16,       // deg, pitch-over angle at the end of the kick manoeuvre
   targetAltitude = 200e3,
   vehicle = FALCON_HEAVY,
   dt = 0.05,
@@ -190,7 +190,7 @@ export function simulateAscent({
       const B = (-12 * (dh - (vr * tGo) / 2)) / (tGo ** 3);
       const A = -vr / tGo - (B * tGo) / 2;
       const need = A + g - (vt * vt) / r;
-      const s = Math.max(-0.7, Math.min(0.9, need / aT));
+      const s = Math.max(-0.4, Math.min(0.9, need / aT));      // never more than ≈ 24° nose-down
       pitch = Math.PI / 2 - Math.asin(s);
     } else if (t < 7) {
       pitch = 0;

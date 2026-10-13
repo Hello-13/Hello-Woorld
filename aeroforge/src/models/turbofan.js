@@ -25,6 +25,9 @@ import { buildAccessories } from './ge90/accessories.js';
 const H = 2.6;                         // engine centreline height above the floor, m
 const N1_RPM = 2355, N2_RPM = 9332;    // 100 % speeds (FAA TCDS E00049EN)
 const SHOW = 0.02;                     // spools are shown turning at 1/50 of real speed
+const DRY_MASS = 8283;                 // kg, 18,260 lb (GE / TCDS)
+// Boeing installation hardware and the display cradle, which the engine's dry mass excludes
+const NOT_ENGINE = new Set(['Inlet cowl', 'Fan cowl doors', 'Thrust reverser translating sleeves', 'Thrust reverser cascades', 'Blocker doors & drag links', 'Thrust reverser actuators', 'Core cowl & bifurcations', 'Pylon (strut) stub', 'Display cradle']);
 
 export function buildTurbofan() {
   const A = new Assembly();
@@ -129,7 +132,17 @@ export function buildTurbofan() {
   // ------------------------------------------------------------------ station planes (SAE ARP755) with live labels
   const stationGroup = new THREE.Group();
   stationGroup.visible = false;
-  const order = [...STATIONS].sort((a, b) => b[1] - a[1]).map((s) => s[0]);
+  // labels sit above the nacelle (world up = lathe −x) in rows: each label takes the lowest row
+  // whose last label is at least GAP metres further forward, so neighbours never overlap
+  const GAP = 1.6, ROW = 0.6;
+  const rowOf = {};
+  const rowLast = [];
+  for (const [id, y] of [...STATIONS].sort((a, b) => b[1] - a[1])) {
+    let k = 0;
+    while (rowLast[k] != null && rowLast[k] - y < GAP) k++;
+    rowLast[k] = y;
+    rowOf[id] = k;
+  }
   const leaderMat = new THREE.LineBasicMaterial({ color: 0xcfd8e2, transparent: true, opacity: 0.55, depthTest: false });
   const stationViz = STATIONS.map(([id, y, r0, r1]) => {
     const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.34, side: THREE.DoubleSide, depthWrite: false });
@@ -138,7 +151,7 @@ export function buildTurbofan() {
     const edge = new THREE.Mesh(new THREE.TorusGeometry(r1, 0.008, 6, 128).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff }));
     edge.position.y = y;
     for (const o of [ringMesh, edge]) { o.userData.fx = true; o.userData.noAO = true; o.userData.keepInModes = true; o.renderOrder = 12; }
-    const top = NACELLE.maxR + 0.75 + (order.indexOf(id) % 3) * 0.42;
+    const top = NACELLE.maxR + 0.7 + rowOf[id] * ROW;
     const leader = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-r1, y, 0), new THREE.Vector3(-top, y, 0)]), leaderMat);
     leader.renderOrder = 13;
     leader.userData.fx = true; leader.userData.noAO = true; leader.userData.keepInModes = true;
@@ -155,9 +168,16 @@ export function buildTurbofan() {
   });
   eng.add(stationGroup);
 
+  // Part masses are estimates from size and material; scale the engine's so they add up to the
+  // published dry mass (massSource stays unset, so the UI still marks each one as an estimate)
+  const engineParts = A.parts.filter((p) => !NOT_ENGINE.has(p.userData.part.name));
+  const sum = engineParts.reduce((a, p) => a + (p.userData.part.mass || 0), 0);
+  for (const p of engineParts) if (p.userData.part.mass) p.userData.part.mass = Math.max(1, Math.round((p.userData.part.mass * DRY_MASS) / sum));
+
   A.finalize();
 
-  const state = { throttle: 1, n1: 100, n2: 100, cutaway: true, flow: false, a1: 0, a2: 0, fromLab: false };
+  const state = { throttle: 1, n1: 100, n2: 100, cutaway: true, flow: false, a1: 0, a2: 0, fromLab: false, reverser: 0, reverserTarget: 0 };
+  ctx.reverser.set(0);
   const applyCut = (on) => { state.cutaway = on; cutGroups.forEach((g) => setCut(g, on)); };
   applyCut(true);
   const burnerMat = ctx.burnerMat;
@@ -214,6 +234,10 @@ export function buildTurbofan() {
       for (const v of stationViz) v.label.visible = on;
     },
     setCutaway: applyCut,
+    /** Thrust reverser: true deploys (sleeves aft, blocker doors down), false stows. */
+    setReverser(on) { state.reverserTarget = on ? 1 : 0; },
+    // the guided tour's 'bay' demonstration opens whatever the vehicle opens: here, the reverser
+    setBay(on) { state.reverserTarget = on ? 1 : 0; },
     setFlow(on) { state.flow = on; flow.visible = on; },
     temperatureOf(info) {
       if (info.stationTemp) return T[info.stationTemp];
@@ -229,6 +253,13 @@ export function buildTurbofan() {
       for (const g of spin.n1) g.rotation.y = state.a1;
       for (const g of spin.n2) g.rotation.y = state.a2;
       burnerMat.emissiveIntensity = 0.8 + thr * 4.6 * Math.max(0, (T['4'] - 900) / 900);
+      if (state.reverser !== state.reverserTarget) {
+        // about 2 s end to end, eased (the real deploy takes roughly that long)
+        const step = dt / 2;
+        state.reverser = state.reverserTarget > state.reverser ? Math.min(state.reverserTarget, state.reverser + step) : Math.max(state.reverserTarget, state.reverser - step);
+        const x = state.reverser;
+        ctx.reverser.set(x * x * (3 - 2 * x));
+      }
       if (!state.flow) return;
       const speed = 0.35 + thr * 1.1;
       for (let i = 0; i < FLOW; i++) {

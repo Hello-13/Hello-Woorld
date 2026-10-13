@@ -78,6 +78,6 @@ export default [
     title: 'Wheels and control surfaces',
     body: 'Trailing-arm main legs and a steerable nose leg retract into the fuselage. Electric servos drive the ailerons, flaps, the two ruddervators and the ventral rudder. Watch the demonstration: roll, then pitch, then yaw, the ruddervators moving together for pitch and apart for yaw.',
     key: 'Ruddervator mixing: δ_left,right = δ_pitch ± δ_yaw.',
-    focus: [...CONTROLS, 'Main gear leg (starboard)', 'Main gear leg (port)', 'Nose landing gear'], view: { dir: [-0.8, 0.6, 1] }, demo: 'surfaces',
+    focus: [...CONTROLS, 'Main gear leg (starboard)', 'Main gear leg (port)', 'Nose landing gear'], view: { dir: [-1, 0.75, 0.6], fill: 0.7 }, demo: 'surfaces',
   },
 ];

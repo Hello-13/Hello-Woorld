@@ -50,7 +50,7 @@ test('ideal Δv budget exceeds the ≈ 9.4 km/s a LEO ascent needs, split over t
 });
 
 test('Falcon Heavy reaches a near-circular 200 km LEO with the default mission', () => {
-  const { result, events, samples } = simulateAscent({ payload: 15000, kickAngle: 14 });
+  const { result, events, samples } = simulateAscent({ payload: 15000, kickAngle: 16 });
   assert.ok(result.success, 'orbit achieved');
   close(result.perigee / 1000, 200, 12, 'perigee km');
   close(result.apogee / 1000, 205, 20, 'apogee km');

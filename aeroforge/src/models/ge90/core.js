@@ -101,7 +101,7 @@ export function buildCore(ctx) {
     system: 'Propulsion', material: 'Titanium front disks, nickel-alloy rear disks', mass: 360,
     explode: [0, -0.7, 0], temp: 650,
     desc: 'The rotating drum that carries all nine HPC rotor stages. The HP turbine drives it through the compressor-discharge seal drum at the back; the whole HP spool turns at N2.',
-    callout: true, anchor: [-0.3, -2.6, 0.02],
+    callout: true, anchor: [-0.42, -2.5, 0.05],
   }, hpcSpool).userData.part.stationTemp = '3';
 
   // HPC casing with stage flanges and the variable-vane trunnion bosses
@@ -144,7 +144,6 @@ export function buildCore(ctx) {
     system: 'Propulsion', material: 'Steel unison rings and levers, fuel-powered actuators', mass: 48, count: 2,
     explode: [-0.85, -0.7, 0.25], temp: 380,
     desc: 'Two actuators, powered by high-pressure fuel from the hydromechanical unit, swing a crank shaft that turns every unison ring; each ring rotates all the vanes of its row through small lever arms. This keeps the front stages away from stall and surge across the whole speed range.',
-    callout: true, anchor: [0.15, -2.3, 0.64],
   }, vsvGrp);
 
   // ====================================================================== compressor rear frame
@@ -334,7 +333,7 @@ export function buildCore(ctx) {
     system: 'Propulsion', material: 'Nickel-alloy disks on a bolted drum', mass: 640,
     explode: [0, -1.55, 0], temp: 800,
     desc: 'Six disks bolted into one drum, joined to the LP shaft by a cone behind stage 4. All the power for the fan and booster — roughly 90 MW at take-off (modelled) — passes through this joint.',
-    callout: true, anchor: [-0.4, -4.6, 0.02],
+    callout: true, anchor: [0.0, -4.8, 0.56],
   }, lptRotor).userData.part.stationTemp = '5';
   const lptCase = [lineWall(-4.12, -5.13, 0.006, 0.026, 1)];
   for (const y of [-4.12, -4.52, -4.85, -5.13]) { const t = coreAt(y)[1]; lptCase.push(rect(t + 0.02, t + 0.065, y + 0.012, y - 0.012)); }

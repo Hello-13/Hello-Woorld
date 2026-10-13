@@ -62,7 +62,7 @@ export function buildFan(ctx) {
     system: 'Propulsion', material: 'Carbon-fibre / toughened-epoxy composite, titanium leading-edge sheath', mass: 480, count: 22,
     explode: [0, 2.3, 0],
     desc: '22 wide-chord swept composite blades, each about 1.2 m long and under 23 kg; the fan is 3.25 m (128 in) across. At take-off the tips run supersonic, and the fan alone makes roughly four fifths of the thrust. A titanium sheath protects each leading edge from birds, hail and erosion.',
-    callout: true, anchor: [-1.15, -0.1, 0.25],
+    callout: true, anchor: [-1.2, -0.05, 0.3],
   }, spinFan).userData.part.stationTemp = '13';
 
   // ------------------------------------------------------------------ fan disk & platforms
@@ -95,7 +95,7 @@ export function buildFan(ctx) {
     system: 'Structure', material: 'Aluminium case wrapped in Kevlar fabric, abradable rub strip', mass: 1150,
     explode: [0, 1.15, 0], temp: 290,
     desc: 'If a blade ever breaks off at full power, the many layers of Kevlar wound round the case stretch and catch it — certification requires a deliberate blade-off test at take-off speed. The case also carries the fan cowls, the accessory gearbox, FADEC and oil tank.',
-    callout: true, anchor: [0.05, -0.3, 1.75],
+    callout: true, anchor: [0.9, 0.0, 1.5],
   }, [caseGrp, kevlar, ribs, rub, acoustic]);
 
   // ------------------------------------------------------------------ outlet guide vanes

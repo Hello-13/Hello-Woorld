@@ -9,7 +9,7 @@
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
-import { loftRings, orientOutward, airfoilLoop } from '../../engine/geometry.js';
+import { loftRings, orientOutward, airfoilLoop, lathe } from '../../engine/geometry.js';
 import { MAT, DEG, V3, merge, box, cyl, tube, place, unitRod, aimRod, canvasTex } from './common.js';
 
 export const HUB = { x: 0, y: 3.33, tilt: 3 * DEG };
@@ -17,7 +17,7 @@ const E = 0.381;          // hinge offset (elastomeric-bearing focal point), m
 const R = 8.18;           // rotor radius, m
 const CHORD = 0.58;       // wide-chord blade (estimate, see physics/rotor.js)
 const TWIST = -18 * DEG;  // root-to-tip twist, referenced to 0.75 R
-const HORN = { x: 0.47, y: -0.065, z: -0.25 };   // pitch-horn ball end (leading side), hub coordinates
+const HORN = { x: 0.5, y: -0.08, z: -0.27 };     // pitch-horn ball end (leading side), hub coordinates
 const LH = -HORN.z;                              // horn arm about the feathering axis
 const PHI_H = Math.atan2(-HORN.z, HORN.x);        // link lead ahead of the blade (~28°)
 const RS = Math.hypot(HORN.x, HORN.z);            // pitch-link radius on the rotating swashplate
@@ -61,15 +61,15 @@ function bladeMaterial() {
   // u runs root → tip, v around the section (LE at v ≈ 0.5): paint, nickel erosion strip, tip cap
   const uTip = (7.61 - 0.92) / (R - 0.92), uRoot = (1.3 - 0.92) / (R - 0.92);
   const map = canvasTex('uh60.blade', 512, 128, (ctx, w, h) => {
-    ctx.fillStyle = '#2e3230'; ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#383d3a'; ctx.fillRect(uTip * w, 0, w, h);
-    ctx.fillStyle = '#8f969b'; ctx.fillRect(0, h * 0.455, w, h * 0.09);
-    ctx.fillStyle = '#6e7377'; ctx.fillRect(0, 0, uRoot * w, h);
+    ctx.fillStyle = '#1b1e1d'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#232725'; ctx.fillRect(uTip * w, 0, w, h);
+    ctx.fillStyle = '#7d8388'; ctx.fillRect(0, h * 0.46, w, h * 0.08);
+    ctx.fillStyle = '#5a5f62'; ctx.fillRect(0, 0, uRoot * w, h);
     ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(uTip * w - 1, 0, 2, h);
   });
   const orm = canvasTex('uh60.bladeOrm', 512, 128, (ctx, w, h) => {
-    ctx.fillStyle = 'rgb(255,160,20)'; ctx.fillRect(0, 0, w, h);          // G roughness 0.63, B metal 0.08
-    ctx.fillStyle = 'rgb(255,80,240)'; ctx.fillRect(0, h * 0.455, w, h * 0.09);
+    ctx.fillStyle = 'rgb(255,195,12)'; ctx.fillRect(0, 0, w, h);          // G roughness 0.76, B metal 0.05
+    ctx.fillStyle = 'rgb(255,100,230)'; ctx.fillRect(0, h * 0.46, w, h * 0.08);
     ctx.fillStyle = 'rgb(255,100,220)'; ctx.fillRect(0, 0, uRoot * w, h);
   }, { srgb: false });
   return new THREE.MeshStandardMaterial({ map, roughnessMap: orm, metalnessMap: orm, roughness: 1, metalness: 1 });
@@ -77,12 +77,13 @@ function bladeMaterial() {
 
 /** Elastomeric bearing: alternating rubber and steel laminates along the blade axis. */
 function bearing(rubber, steel) {
-  for (let k = 0; k < 11; k++) {
-    const x = 0.336 + k * 0.009;
-    const r = 0.074 - Math.abs(k - 5) * 0.0025;
-    (k % 2 ? steel : rubber).push(cyl(r, r, 0.009, [x, 0, 0], 'x', 20));
+  // spherical laminate: the layers follow a sphere centred on the focal point (x = E)
+  for (let k = 0; k < 13; k++) {
+    const x = 0.33 + k * 0.009;
+    const r = 0.105 - Math.abs(k - 6) * 0.003;
+    (k % 2 ? steel : rubber).push(cyl(r, r, 0.009, [x, 0, 0], 'x', 24));
   }
-  steel.push(cyl(0.078, 0.078, 0.014, [0.33, 0, 0], 'x', 20), cyl(0.078, 0.078, 0.014, [0.44, 0, 0], 'x', 20));
+  steel.push(cyl(0.11, 0.11, 0.016, [0.322, 0, 0], 'x', 24), cyl(0.112, 0.112, 0.018, [0.452, 0, 0], 'x', 24));
 }
 
 export function buildMainRotor({ A, parent }) {
@@ -96,7 +97,7 @@ export function buildMainRotor({ A, parent }) {
   head.add(swash);
   const swashSpin = new THREE.Group();
   swash.add(swashSpin);
-  const UPX = 2.6;                                // exploded view: the whole head rises this far
+  const UPX = 2.1;                                // exploded view: the whole head rises this far
   const P = (name, info, objs, par = spin) => A.part(name, { system: 'Rotor system', ...info }, objs, par);
   const blades = [0, 1, 2, 3];
   const chains = [];                              // per part: four replicated blade chains
@@ -117,7 +118,7 @@ export function buildMainRotor({ A, parent }) {
   for (const i of blades) {
     const holder = new THREE.Group();
     P(`Main rotor blade ${i + 1}`, {
-      material: 'Composite (graphite/glass) spar, Nomex core, nickel erosion strip, heater mats', mass: 120, explode: [2.0, UPX + 0.4, 0],
+      material: 'Composite (graphite/glass) spar, Nomex core, nickel erosion strip, heater mats', mass: 120, explode: [1.4, UPX + 0.4, 0],
       desc: i === 0
         ? 'Wide-chord blade of the M model: new high-lift airfoils and a swept, tapered tip with anhedral that lift about 230 kg more than the UH-60L blade. 7.8 m long with −18° of twist; heater mats in the leading edge de-ice it. (Spar material per NASA test reports: graphite/glass composite; earlier UH-60A/L blades used a titanium spar.)'
         : `One of four identical blades, 90° apart. At 258 rpm the tip moves at 221 m/s — Mach 0.65 in the hover and about Mach 0.88 on the advancing side at 150 kt.`,
@@ -134,45 +135,39 @@ export function buildMainRotor({ A, parent }) {
   }
 
   // ------------------------------------------------------------------ hub
-  const plate = (() => {
-    const s = new THREE.Shape();
-    const arm = 0.15, core = 0.2, tipR = 0.5;
-    const pts = [];
-    for (let k = 0; k < 4; k++) {
-      const a = (k * Math.PI) / 2;
-      const rot = (x, y) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
-      pts.push(rot(core, -arm), rot(tipR - 0.04, -arm), rot(tipR, -arm + 0.04), rot(tipR, arm - 0.04), rot(tipR - 0.04, arm), rot(core, arm));
-    }
-    s.moveTo(...pts[0]);
-    for (const p of pts.slice(1)) s.lineTo(...p);
-    s.closePath();
-    for (let k = 0; k < 4; k++) {
-      const a = (k * Math.PI) / 2;
-      const hole = new THREE.Path();
-      const rot = (x, y) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
-      const q = [rot(0.25, -0.085), rot(0.43, -0.085), rot(0.43, 0.085), rot(0.25, 0.085)];
-      hole.moveTo(...q[0]); for (const p of q.slice(1)) hole.lineTo(...p); hole.closePath();
-      s.holes.push(hole);
-    }
-    const g = new THREE.ExtrudeGeometry(s, { depth: 0.036, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 1, curveSegments: 4 });
-    g.rotateX(-Math.PI / 2);   // shape x → x, shape y → −z
-    return g;
+  // one forging: a thick central body and four box-section arms; each arm's cheeks enclose an
+  // elastomeric bearing (visible through the window between the top rails), the spindle exits
+  // through the outboard bridge
+  const cheek = (() => {
+    const sh = new THREE.Shape();
+    const x0 = 0.2, x1 = 0.53, y0 = -0.13, y1 = 0.15, rr = 0.07;
+    sh.moveTo(x0, y0); sh.lineTo(x1 - rr, y0); sh.quadraticCurveTo(x1, y0, x1, y0 + rr);
+    sh.lineTo(x1, y1 - rr); sh.quadraticCurveTo(x1, y1, x1 - rr, y1); sh.lineTo(x0, y1); sh.closePath();
+    return new THREE.ExtrudeGeometry(sh, { depth: 0.04, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 2, curveSegments: 6 });
   })();
-  const hubParts = [place(plate.clone(), [0, 0.085, 0]), place(plate.clone(), [0, -0.127, 0])];
-  hubParts.push(cyl(0.18, 0.18, 0.2, [0, 0, 0], 'y', 28));
+  const hubParts = [
+    place(lathe([[0.001, -0.2], [0.13, -0.2], [0.16, -0.15], [0.27, -0.13], [0.29, -0.1], [0.29, 0.12], [0.26, 0.15], [0.2, 0.17], [0.001, 0.17]], 40), [0, 0, 0]),
+  ];
+  for (let k = 0; k < 12; k++) {          // hub-to-shaft bolts on the top flange
+    const a = (k / 12) * Math.PI * 2;
+    hubParts.push(cyl(0.016, 0.016, 0.03, [0.17 * Math.cos(a), 0.18, 0.17 * Math.sin(a)], 'y', 8));
+  }
   for (const i of blades) {
     const a = (i * Math.PI) / 2;
-    const bridge = box(0.05, 0.24, 0.3, [0.475, 0, 0]);
-    bridge.rotateY(a);
-    hubParts.push(bridge);
-    // damper lug on the leading side of each arm
-    const lug = box(0.07, 0.06, 0.07, [0.22, 0, -0.2]); lug.rotateY(a); hubParts.push(lug);
+    const parts = [
+      cheek.clone().translate(0, 0, 0.12), cheek.clone().translate(0, 0, -0.16),
+      box(0.05, 0.27, 0.32, [0.5, 0.01, 0]),                                       // outboard bridge
+      box(0.3, 0.035, 0.07, [0.37, 0.135, 0.105]), box(0.3, 0.035, 0.07, [0.37, 0.135, -0.105]),   // top rails
+      box(0.32, 0.035, 0.3, [0.37, -0.125, 0]),                                    // bottom plate
+      box(0.08, 0.07, 0.08, [0.26, 0.0, -0.21]),                                   // damper lug (leading side)
+    ];
+    for (const g of parts) { g.rotateY(a); hubParts.push(g); }
   }
   P('Main rotor hub', {
     material: 'One-piece forged titanium hub', mass: 270, explode: [0, UPX + 0.5, 0],
-    desc: 'A single titanium forging with four arms. Each arm holds one elastomeric bearing, so the hub has no flapping or lagging hinge pins to lubricate — about 60 % fewer parts than a conventional articulated head.',
+    desc: 'A single titanium forging with four box-section arms. Each arm holds one elastomeric bearing, so the hub has no flapping or lagging hinge pins to lubricate — far fewer parts than a conventional fully articulated head.',
     callout: true, anchor: [0, 0.35, 0],
-  }, [mesh(merge(hubParts), MAT.titanium())]);
+  }, [mesh(merge(hubParts), MAT.hubTi())]);
 
   const rubber = [], steel = [];
   for (const i of blades) {
@@ -183,16 +178,17 @@ export function buildMainRotor({ A, parent }) {
   }
   P('Elastomeric bearings', {
     material: 'Laminated natural rubber and steel shims', mass: 18, count: 4, explode: [0, UPX + 0.15, 0],
-    desc: 'Each bearing is a stack of thin rubber layers bonded between curved steel shims. The rubber shears to let the blade flap, lead-lag and change pitch about one focal point 0.381 m from the shaft, while the stack carries the blade\'s ~30-tonne centrifugal pull in compression.',
+    desc: 'Each bearing is a stack of thin rubber layers bonded between curved steel shims. The rubber shears to let the blade flap, lead-lag and change pitch about one focal point 0.381 m from the shaft, while the stack carries the blade\'s centrifugal pull — about 360 kN (≈ 37 tonnes-force) at 258 rpm — in compression.',
   }, [mesh(merge(rubber), MAT.elastomer()), mesh(merge(steel), MAT.steel())]);
 
   // spindles & cuffs (move with the blade)
   const spindleParts = [
-    cyl(0.07, 0.07, 0.05, [0.3 - E, 0, 0], 'x', 16),                         // inboard flange inside the arm window
-    cyl(0.056, 0.05, 0.4, [0.5 - E, 0, 0], 'x', 16),                        // spindle through the bridge
-    cyl(0.07, 0.07, 0.07, [0.7 - E, 0, 0], 'x', 16),
-    box(0.3, 0.028, 0.2, [0.83 - E, 0.06, 0]), box(0.3, 0.028, 0.2, [0.83 - E, -0.06, 0]),   // cuff clevis
-    cyl(0.02, 0.02, 0.15, [0.78 - E, 0, 0], 'y', 10), cyl(0.02, 0.02, 0.15, [0.9 - E, 0, 0], 'y', 10),  // blade (fold) pins
+    cyl(0.09, 0.09, 0.04, [0.305 - E, 0, 0], 'x', 20),                        // inboard flange on the bearing's inner race
+    cyl(0.066, 0.06, 0.42, [0.52 - E, 0, 0], 'x', 20),                        // spindle through the bridge
+    cyl(0.085, 0.085, 0.08, [0.72 - E, 0, 0], 'x', 20),
+    box(0.36, 0.045, 0.27, [0.9 - E, 0.075, 0]), box(0.36, 0.045, 0.27, [0.9 - E, -0.075, 0]),   // cuff clevis
+    box(0.1, 0.19, 0.24, [0.76 - E, 0, 0]),
+    cyl(0.03, 0.03, 0.22, [0.84 - E, 0, 0.06], 'y', 12), cyl(0.03, 0.03, 0.22, [0.98 - E, 0, -0.06], 'y', 12),  // blade retention / fold pins
   ];
   const spindleG = merge(spindleParts);
   const spindlePart = P('Blade spindles & cuffs', {
@@ -202,9 +198,9 @@ export function buildMainRotor({ A, parent }) {
   for (const c of makeChains(spindlePart)) c.feather.add(mesh(spindleG, MAT.titanium()));
 
   const hornG = merge([
-    tube([0.55 - E, 0, -0.04], [HORN.x - E, HORN.y, HORN.z], 0.024, 10),
-    cyl(0.03, 0.03, 0.05, [HORN.x - E, HORN.y, HORN.z], 'y', 12),
-    box(0.06, 0.06, 0.12, [0.55 - E, 0, -0.06]),
+    tube([0.6 - E, 0, -0.06], [HORN.x - E, HORN.y, HORN.z], 0.03, 12),
+    cyl(0.036, 0.036, 0.06, [HORN.x - E, HORN.y, HORN.z], 'y', 12),
+    box(0.1, 0.09, 0.14, [0.6 - E, 0, -0.07]),
   ]);
   const hornPart = P('Pitch horns', {
     material: 'Forged steel horns', mass: 4, count: 4, explode: [0, UPX - 0.35, 0],
@@ -214,8 +210,9 @@ export function buildMainRotor({ A, parent }) {
 
   // droop stops and flap restrainers (static on the hub, beneath/above each spindle)
   const stops = [];
+  stops.push(new THREE.TorusGeometry(0.31, 0.022, 8, 40).rotateX(Math.PI / 2).translate(0, -0.2, 0));
   for (const i of blades) {
-    for (const g of [box(0.07, 0.04, 0.09, [0.29, -0.155, 0]), box(0.06, 0.035, 0.08, [0.29, 0.14, 0]), cyl(0.02, 0.02, 0.1, [0.29, -0.13, 0.05], 'z', 8)]) { g.rotateY((i * Math.PI) / 2); stops.push(g); }
+    for (const g of [box(0.12, 0.05, 0.1, [0.62, -0.12, 0]), box(0.1, 0.04, 0.09, [0.62, 0.115, 0]), cyl(0.024, 0.024, 0.12, [0.33, -0.2, 0], 'x', 8)]) { g.rotateY((i * Math.PI) / 2); stops.push(g); }
   }
   P('Droop stops & flap restrainers', {
     material: 'Steel stops with centrifugal-weight latches', mass: 8, count: 4, explode: [0, UPX + 0.05, 0.0],
@@ -228,16 +225,16 @@ export function buildMainRotor({ A, parent }) {
     desc: 'One hydraulic damper per blade restrains the lead-lag motion. Without them the in-plane blade motion could couple with the fuselage rocking on its gear in the destructive instability called ground resonance.',
   }, []);
   const dampers = blades.map((i) => {
-    const body = mesh(unitRod(14), MAT.hydraulic());
+    const body = mesh(unitRod(16), MAT.hydraulic());
     const rod = mesh(unitRod(10), MAT.steel());
     damperPart.add(body, rod);
     const a = (i * Math.PI) / 2;
-    const hubEnd = V3(0.22, 0, -0.2).applyAxisAngle(V3(0, 1, 0), a);
-    return { i, body, rod, hubEnd, local: V3(0.68 - E, 0, -0.1) };
+    const hubEnd = V3(0.27, 0, -0.23).applyAxisAngle(V3(0, 1, 0), a);
+    return { i, body, rod, hubEnd, local: V3(0.78 - E, 0, -0.15) };
   });
 
   // bifilar vibration absorber
-  const bifBase = [cyl(0.15, 0.13, 0.08, [0, 0.16, 0], 'y', 24), cyl(0.1, 0.1, 0.1, [0, 0.25, 0], 'y', 20)];
+  const bifBase = [cyl(0.21, 0.19, 0.08, [0, 0.21, 0], 'y', 28), cyl(0.12, 0.12, 0.1, [0, 0.29, 0], 'y', 24)];
   const bifMasses = [];
   const bifPart = P('Bifilar vibration absorber', {
     material: 'Steel arms and tuned tungsten-alloy masses on bifilar pins', mass: 110, explode: [0, UPX + 1.2, 0],
@@ -246,11 +243,12 @@ export function buildMainRotor({ A, parent }) {
   }, []);
   for (const i of blades) {
     const a = (i * Math.PI) / 2 + Math.PI / 4;
-    const arm = box(0.34, 0.06, 0.09, [0.25, 0.2, 0]); arm.rotateY(a); bifBase.push(arm);
+    const arm = box(0.36, 0.07, 0.11, [0.3, 0.24, 0]); arm.rotateY(a); bifBase.push(arm);
+    const fork = box(0.1, 0.16, 0.2, [0.5, 0.22, 0]); fork.rotateY(a); bifBase.push(fork);
     const pivot = new THREE.Group();
-    pivot.position.set(0.42 * Math.cos(a), 0.2, -0.42 * Math.sin(a));
+    pivot.position.set(0.52 * Math.cos(a), 0.22, -0.52 * Math.sin(a));
     pivot.rotation.y = a;
-    const massG = merge([cyl(0.075, 0.075, 0.17, [0.03, -0.01, 0], 'z', 18), cyl(0.016, 0.016, 0.2, [0, 0.02, 0.045], 'y', 8), cyl(0.016, 0.016, 0.2, [0, 0.02, -0.045], 'y', 8)]);
+    const massG = merge([cyl(0.09, 0.09, 0.24, [0.07, -0.02, 0], 'z', 22), cyl(0.06, 0.06, 0.3, [0.07, -0.02, 0], 'z', 16), cyl(0.018, 0.018, 0.2, [0.02, 0.02, 0.055], 'y', 8), cyl(0.018, 0.018, 0.2, [0.02, 0.02, -0.055], 'y', 8)]);
     pivot.add(mesh(massG, MAT.darkMetal()));
     bifPart.add(pivot);
     bifMasses.push(pivot);
@@ -260,7 +258,7 @@ export function buildMainRotor({ A, parent }) {
   P('Blade de-ice slip ring & distributor', {
     system: 'Electrical', material: 'Slip-ring assembly and timer-distributor', mass: 14, explode: [0, UPX + 1.7, 0],
     desc: 'Carries de-ice power from the airframe into the turning rotor and switches it through the blade heater mats in sequence, shedding ice in small pieces. Main and tail rotor de-ice are standard on the UH-60M.',
-  }, [mesh(merge([cyl(0.085, 0.09, 0.09, [0, 0.345, 0], 'y', 20), cyl(0.05, 0.075, 0.04, [0, 0.41, 0], 'y', 20)]), MAT.casting())]);
+  }, [mesh(merge([cyl(0.09, 0.1, 0.07, [0, 0.375, 0], 'y', 22), cyl(0.05, 0.08, 0.04, [0, 0.43, 0], 'y', 20)]), MAT.casting())]);
 
   P('Main rotor shaft', {
     system: 'Drive system', material: 'Steel shaft splined to the transmission output', mass: 90, explode: [0, UPX - 0.9, 0],
@@ -370,8 +368,8 @@ export function buildMainRotor({ A, parent }) {
       const c = bladeChains[d.i];
       toSpin(c, d.local, tmp2);
       const mid = tmp.copy(d.hubEnd).lerp(tmp2, 0.6);
-      aimRod(d.body, d.hubEnd, mid, 0.042);
-      aimRod(d.rod, mid, tmp2, 0.016);
+      aimRod(d.body, d.hubEnd, mid, 0.05);
+      aimRod(d.rod, mid, tmp2, 0.02);
     }
     for (const sv of servos) {
       const x = RV * Math.cos(sv.a), z = -RV * Math.sin(sv.a);

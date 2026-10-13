@@ -115,7 +115,7 @@ export function buildDrive({ A, P, roofY }) {
     P(side > 0 ? 'Inlet particle separator (right)' : 'Inlet particle separator (left)', {
       system: 'Propulsion', material: 'Steel swirl vanes, aluminium scroll case, electric-free scavenge blower', mass: 14, explode: [0.8, 1.1, 1.7 * s],
       desc: 'Built into the T700\'s front frame: swirl vanes spin the incoming air so sand and dust are flung outward into a scroll and blown overboard by a blower, removing roughly 85 % of sand before it can erode the compressor.',
-    }, [mesh(merge(ipsG), MAT.steel())]);
+    }, [mesh(merge(ipsG), MAT.darkMetal())]);
 
     // exhaust IR suppressor (HIRSS): duct angled aft and outboard, mixing cool air into the plume
     const stations = [];

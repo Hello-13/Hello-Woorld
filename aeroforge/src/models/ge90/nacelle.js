@@ -53,11 +53,12 @@ export function buildNacelle(ctx) {
     [[bypassAt(cavityAft)[1] + 0.035, cavityAft], [1.92, cavityAft], [1.92, cavityAft - 0.015], [bypassAt(cavityAft)[1] + 0.035, cavityAft - 0.015]],
     [[1.49, FAN_NOZZLE_Y], [1.545, FAN_NOZZLE_Y], [1.55, FAN_NOZZLE_Y + 0.03], [1.5, FAN_NOZZLE_Y + 0.03]],
   ];
+  const sleeveGrp = cut(cutLathe(sleeve, nac, N));
   P('Thrust reverser translating sleeves', {
     system: 'Skin & fairings', skin: true, material: 'Composite outer skin, acoustic inner skin', mass: 620, count: 2,
     explode: [-0.6, -1.0, -1.2], temp: 300,
-    desc: 'The aft nacelle. For reverse thrust the two sleeves slide about half a metre aft, opening a gap over the cascades, while blocker doors fold into the duct. Its trailing edge is the fan nozzle, the exit for the bypass air.',
-  }, cut(cutLathe(sleeve, nac, N)));
+    desc: 'The aft nacelle. For reverse thrust the two sleeves slide aft (0.6 m here; the real stroke is not published), uncovering the cascades while blocker doors fold into the duct. Its trailing edge is the fan nozzle, the exit for the bypass air.',
+  }, sleeveGrp);
 
   // cascades: rings of forward-turning vanes between axial strongbacks, behind the torque box
   const torqueBox = [[FAN.caseR + 0.01, NACELLE.fanCowlAftY], [1.95, NACELLE.fanCowlAftY], [1.95, sleeveFwd], [FAN.caseR, sleeveFwd]];
@@ -80,41 +81,92 @@ export function buildNacelle(ctx) {
     callout: true, anchor: [-1.78, -2.0, -0.08],
   }, [cascRings, rails]);
 
-  // blocker doors flush in the sleeve's inner wall, each tied to the core cowl by a drag link
-  const doors = cut(cutPair((keep) => {
-    const list = [];
-    const n = 16;
-    for (let i = 0; i < n; i++) {
-      const phi = ((i + 0.5) / n) * TAU;
-      if (!keep(phi)) continue;
-      const d = sector(FAN.caseR + 0.002, FAN.caseR + 0.02, sleeveFwd - 0.03, cavityAft + 0.04, phi - Math.PI / n + 0.015, phi + Math.PI / n - 0.015, 4);
-      list.push(d);
-      list.push(new THREE.CylinderGeometry(0.012, 0.012, 1, 6).applyMatrix4(linkMatrix(P3(FAN.caseR, cavityAft + 0.1, phi), P3(1.055, -2.7, phi))));
+  // blocker doors: hinged at their forward edge to the sleeve and flush with its inner wall when
+  // stowed. A drag link of fixed length ties each door to the core cowl, so when the sleeve slides
+  // aft the link pulls the door's aft end down into the duct.
+  const NDOOR = 16, HINGE_R = FAN.caseR + 0.002, HINGE_Y = sleeveFwd - 0.03, DOOR_L = 0.63, LINK_A = 0.3;
+  const ANCHOR = [1.0, -1.85];                       // drag-link pick-up on the core cowl (r, y)
+  const TRAVEL = 0.6;                                // sleeve travel, m (modelled)
+  const linkLen = Math.hypot(HINGE_R - ANCHOR[0], HINGE_Y - LINK_A - ANCHOR[1]);
+  const doorAt = (theta, s) => [HINGE_R - LINK_A * Math.sin(theta), HINGE_Y - s - LINK_A * Math.cos(theta)];
+  const doorAngle = (s) => {
+    let lo = 0, hi = 1.5;
+    for (let i = 0; i < 30; i++) {
+      const mid = (lo + hi) / 2;
+      const [r, y] = doorAt(mid, s);
+      if (Math.hypot(r - ANCHOR[0], y - ANCHOR[1]) > linkLen) lo = mid; else hi = mid;
     }
-    return merge(list);
-  }, GM.casingDark(), 'nacelle'));
+    return lo;
+  };
+  const doorGeo = new THREE.BoxGeometry(0.018, DOOR_L, (TAU * HINGE_R) / NDOOR - 0.03).translate(0.009, -DOOR_L / 2, 0);
+  const linkGeo = new THREE.CylinderGeometry(0.012, 0.012, 1, 6);
+  const doorMat = GM.casingDark(), linkMat = GM.steel();
+  const doorKeep = new THREE.Group(), doorRest = new THREE.Group();
+  const doorItems = [];
+  for (let i = 0; i < NDOOR; i++) {
+    const phi = ((i + 0.5) / NDOOR) * TAU;
+    const holder = new THREE.Group();
+    holder.rotation.y = phi - Math.PI / 2;
+    const pivot = new THREE.Group();
+    pivot.position.set(HINGE_R, HINGE_Y, 0);
+    const door = new THREE.Mesh(doorGeo, doorMat);
+    door.castShadow = true; door.receiveShadow = true;
+    pivot.add(door);
+    holder.add(pivot);
+    const link = new THREE.Mesh(linkGeo, linkMat);
+    link.matrixAutoUpdate = false;
+    (kept(phi, 'nacelle') ? doorKeep : doorRest).add(holder, link);
+    doorItems.push({ phi, pivot, link });
+  }
+  doorRest.visible = false;
+  const doors = new THREE.Group();
+  doors.add(doorKeep, doorRest);
+  doors.userData.cutaway = { rest: doorRest, caps: [] };
+  cut(doors);
   P('Blocker doors & drag links', {
     system: 'Propulsion', material: 'Composite doors, steel drag links (count estimated)', mass: 160, count: 16,
     explode: [-0.4, -0.85, -1.0], temp: 300,
     desc: 'Stowed, the doors form part of the bypass duct wall. As the sleeve moves aft, the drag links — which cross the duct to the core cowl — pull each door down into the airstream to block it.',
   }, doors);
 
-  const actuators = cut(cutPair((keep) => {
+  const cylinders = cut(cutPair((keep) => {
     const list = [];
     for (const phi of [-0.95, 0, 0.95, Math.PI - 0.95, Math.PI, Math.PI + 0.95]) {
       if (!keep(phi)) continue;
-      list.push(axialCyl(1.895, -1.9, phi, 0.034, 0.62, 14), axialCyl(1.895, -2.3, phi, 0.014, 0.36, 8), boxAt(1.895, -1.6, phi, [0.08, 0.06, 0.1]));
+      list.push(axialCyl(1.895, -1.9, phi, 0.034, 0.62, 14), boxAt(1.895, -1.6, phi, [0.08, 0.06, 0.1]));
     }
     return merge(list);
   }, GM.steel(), 'nacelle'));
+  // piston rods, built one metre long from the cylinder end and scaled to the sleeve position
+  const rods = cut(cutPair((keep) => merge([-0.95, 0, 0.95, Math.PI - 0.95, Math.PI, Math.PI + 0.95].filter((phi) => keep(phi)).map((phi) => axialCyl(1.895, -0.5, phi, 0.014, 1, 8))), GM.bearing(), 'nacelle'));
+  const ROD_Y = -2.21, ROD_L = 0.27;
+  rods.position.y = ROD_Y;
+  rods.scale.y = ROD_L;
   P('Thrust reverser actuators', {
     system: 'Hydraulics', material: 'Hydraulic locking actuators', mass: 60, count: 6,
     explode: [-0.55, -0.55, -1.0], temp: 300,
     desc: 'Three hydraulic actuators per reverser half drive the sleeve. Locks hold the reverser stowed in flight; the FADEC and aircraft both have to agree before it can deploy, and only on the ground.',
-  }, actuators);
+  }, [cylinders, rods]);
+
+  // deploy the reverser: 0 stowed … 1 deployed
+  ctx.reverser = {
+    set(d) {
+      const s = TRAVEL * d;
+      sleeveGrp.position.y = -s;
+      rods.scale.y = ROD_L + s;
+      const theta = d > 0 ? doorAngle(s) : 0;
+      const [rp, yp] = doorAt(theta, s);
+      for (const it of doorItems) {
+        it.pivot.position.y = HINGE_Y - s;
+        it.pivot.rotation.z = -theta;
+        it.link.matrix.copy(linkMatrix(P3(rp, yp, it.phi), P3(ANCHOR[0], ANCHOR[1], it.phi)));
+        it.link.matrixWorldNeedsUpdate = true;
+      }
+    },
+  };
 
   // ------------------------------------------------------------------ core cowl and bifurcations
-  const ifs = wall([[-1.95, 1.0], [-2.6, 1.05], [-3.2, 1.06], [FAN_NOZZLE_Y, 1.04], [-4.5, 1.015], [-5.1, 0.983]], -0.02);
+  const ifs = wall([[-1.82, 0.99], [-2.6, 1.05], [-3.2, 1.06], [FAN_NOZZLE_Y, 1.04], [-4.5, 1.015], [-5.1, 0.983]], -0.02);
   const bif = cut(cutPair((keep) => {
     const list = [];
     for (const phi of [UP, DOWN]) {

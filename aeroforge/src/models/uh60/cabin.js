@@ -147,11 +147,13 @@ export function buildCabin({ A, P, surfPoint, surfNormal }) {
 
   // ------------------------------------------------------------------ wire-strike protection
   const roofP = surfPoint(2.95, Math.PI / 2);
+  // upper cutter: a serrated blade leaning forward from a base on the roof, braced from behind
   const ws = [
-    place(new THREE.BoxGeometry(0.42, 0.04, 0.03), [roofP.x + 0.05, roofP.y + 0.2, 0], [0, 0, -0.75]),
-    tube([roofP.x - 0.1, roofP.y, 0], [roofP.x + 0.15, roofP.y + 0.32, 0], 0.02, 6),
-    box(0.06, 0.06, 0.1, [roofP.x - 0.1, roofP.y + 0.02, 0]),
+    place(new THREE.BoxGeometry(0.05, 0.46, 0.022), [roofP.x + 0.12, roofP.y + 0.2, 0], [0, 0, -0.62]),
+    tube([roofP.x - 0.16, roofP.y + 0.01, 0], [roofP.x + 0.05, roofP.y + 0.3, 0], 0.016, 6),
+    box(0.3, 0.05, 0.1, [roofP.x, roofP.y + 0.015, 0]),
   ];
+  for (let k = 0; k < 5; k++) ws.push(place(new THREE.BoxGeometry(0.03, 0.03, 0.018), [roofP.x + 0.04 + k * 0.045, roofP.y + 0.08 + k * 0.06, 0], [0, 0, 0.6]));
   const post = [];
   for (let i = 0; i <= 8; i++) post.push(surfPoint(3.4 + i * 0.09, Math.PI / 2, 0.025));
   ws.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(post), 16, 0.012, 5));

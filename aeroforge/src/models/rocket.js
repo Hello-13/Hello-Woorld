@@ -44,12 +44,12 @@ export function buildRocket() {
 
   // exploded view: the vehicle rises off the mount and steps forward (+z) clear of the
   // transporter-erector; skins pull back toward their original place to bare the internals
-  const centre = buildCore(A, coreG, { kind: 'centre', prefix: 'Centre core', explodeBase: [0, 3, 6], paint: { soot: 0.05, streaks: 6, seed: 5 } });
+  const centre = buildCore(A, coreG, { kind: 'centre', prefix: 'Centre core', explodeBase: [0, 6, 6], paint: { soot: 0.05, streaks: 6, seed: 5 } });
   const boosters = [
-    buildCore(A, boosterG[0], { kind: 'booster', prefix: 'Side booster A', explodeBase: [7.0, 3, 6], paint: { soot: 0.2, streaks: 36, seed: 9 }, attachSide: 1 }),
-    buildCore(A, boosterG[1], { kind: 'booster', prefix: 'Side booster B', explodeBase: [-7.0, 3, 6], paint: { soot: 0.22, streaks: 40, seed: 13 }, attachSide: -1 }),
+    buildCore(A, boosterG[0], { kind: 'booster', prefix: 'Side booster A', explodeBase: [7.0, 6, 6], paint: { soot: 0.2, streaks: 36, seed: 9 }, attachSide: 1 }),
+    buildCore(A, boosterG[1], { kind: 'booster', prefix: 'Side booster B', explodeBase: [-7.0, 6, 6], paint: { soot: 0.22, streaks: 40, seed: 13 }, attachSide: -1 }),
   ];
-  const upper = buildUpper(A, upperG, { explodeBase: [0, 14, 6] });
+  const upper = buildUpper(A, upperG, { explodeBase: [0, 16.5, 6] });
   const pad = buildPad(A, site, base);
 
   // ----------------------------------------------------------------- exhaust (effects, not parts)
@@ -203,18 +203,18 @@ export function buildRocket() {
         const side = i === 0 ? 1 : -1;
         if (sep.booster == null) { g.position.set(side * BOOSTER_X, 0, 0); g.rotation.set(0, 0, 0); g.visible = true; setFins(boosters[i].fins, 0); return; }
         const t = sep.booster;
-        g.position.set(side * (BOOSTER_X + t * 1.3 + t * t * 0.22), -t * t * 1.25, 0);
-        g.rotation.z = -side * Math.min(0.9, t * 0.045 + t * t * 0.004);
-        g.visible = t < 30;
+        g.position.set(side * (BOOSTER_X + t * 0.9 + t * t * 0.12), -t * t * 0.6, 0);
+        g.rotation.z = -side * Math.min(0.9, t * 0.03 + t * t * 0.003);
+        g.visible = t < 40;
         setFins(boosters[i].fins, (t - 3) / 3);
       });
       // centre core: the interstage pushers drive it back; it drops away below the second stage
       if (sep.core == null) { coreG.position.set(0, 0, 0); coreG.rotation.set(0, 0, 0); coreG.visible = true; setFins(centre.fins, 0); }
       else {
         const t = sep.core;
-        coreG.position.set(-t * 0.18, -(t * 1.6 + t * t * 1.05), 0);
-        coreG.rotation.z = Math.min(0.5, t * t * 0.006);
-        coreG.visible = t < 30;
+        coreG.position.set(-t * 0.12, -(t * 1.0 + t * t * 0.5), 0);
+        coreG.rotation.z = Math.min(0.5, t * t * 0.004);
+        coreG.visible = t < 40;
         setFins(centre.fins, (t - 2) / 3);
       }
       // fairing halves swing open about their base hinges, then drift clear

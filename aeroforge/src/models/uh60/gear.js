@@ -82,7 +82,7 @@ export function buildGear({ A, P }) {
   // tail gear
   const tw = { x: -6.62, y: 0.22 };
   const tTop = V3(-6.22, 1.3, 0), tBot = V3(-6.5, 0.4, 0);
-  const tg = [tube(tTop, tBot, 0.05, 14), box(0.16, 0.1, 0.16, [tTop.x, tTop.y, 0]), tube(tBot, V3(tw.x, tw.y, 0.1), 0.03, 10), tube(tBot, V3(tw.x, tw.y, -0.1), 0.03, 10), cyl(0.03, 0.03, 0.24, [tw.x, tw.y, 0], 'z', 10)];
+  const tg = [tube(tTop, tTop.clone().lerp(tBot, 0.6), 0.075, 16), tube(tTop.clone().lerp(tBot, 0.5), tBot, 0.05, 14), box(0.2, 0.12, 0.2, [tTop.x, tTop.y, 0]), tube(tBot, V3(tw.x, tw.y, 0.1), 0.035, 10), tube(tBot, V3(tw.x, tw.y, -0.1), 0.035, 10), box(0.1, 0.08, 0.26, [tBot.x, tBot.y, 0]), cyl(0.03, 0.03, 0.24, [tw.x, tw.y, 0], 'z', 10)];
   const ttire = tire(0.22, 0.15).translate(tw.x, tw.y, 0);
   P('Tail landing gear', {
     system: 'Landing gear', material: 'Steel yoke and oleo, castoring wheel with lock', mass: 40, explode: [0, -1.0, 0],

@@ -133,7 +133,7 @@ export function buildOTA(P) {
     system: 'Structure', material: 'Graphite-epoxy tubes, titanium end fittings', mass: 114, temp: 292, explode: [0, 0, 0],
     desc: 'A 5.3 m cylindrical truss, 2.9 m across, that holds the secondary mirror 4.906 m in front of the primary. Graphite-epoxy barely expands with temperature, but it slowly sheds absorbed water, so the secondary has been refocused by a few micrometres over the years. Strut layout simplified.',
     callout: true, anchor: [6.7, 1.5, 0.2],
-  }, [mesh(merge(struts), HM.grEp()), mesh(merge(fittings), HM.ti())]);
+  }, [mesh(merge(struts), HM.grEp()), mesh(merge(fittings), HM.fitting())]);
 
   // ------------------------------------------------------------------ baffles
   const mb = [tube(1.31, 4.3, 7.75, { seg: 72 })];

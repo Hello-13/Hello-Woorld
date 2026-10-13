@@ -187,7 +187,7 @@ export function buildPad(A, site, base) {
   }
   G('Tail service masts', {
     count: 2, material: 'Steel masts with retracting umbilical plates', mass: null,
-    desc: 'Feed RP-1, LOX, helium and power into the base of each side booster until T-0, then retract and close a protective hood against the exhaust. Arrangement simplified.',
+    desc: 'Feed RP-1, LOX, helium and power into the base of each side booster until T-0, then retract and close a protective hood against the exhaust. The layout of the Falcon Heavy mount\'s side-booster umbilicals is not documented publicly; shown simplified.',
   }, mesh(merge(tsm), FM.teWhite()), base);
 
   // ------------------------------------------------------------------ transporter-erector

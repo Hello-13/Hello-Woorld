@@ -54,7 +54,7 @@ export default [
     body: 'Two rigid SA3 wings, each 7.1 × 2.6 m of gallium-arsenide cells, produce roughly 5 kW in sunlight and turn on their drives to face the Sun. For the 36 minutes of each orbit spent in Earth\'s shadow, six nickel–hydrogen batteries in bays 2 and 3 carry the load. Watch the arrays and antenna masts swing out and unfold as they did after release.',
     key: 'A 95-minute orbit spends up to 36 minutes in Earth\'s shadow, so the batteries cycle every orbit — about 5,500 times a year.',
     focus: ['Solar array wing (+V2)', 'Solar array wing (−V2)', 'Solar array drive & mast (+V2)', 'Solar array drive & mast (−V2)', 'Battery module 1 (bay 2)', 'Battery module 2 (bay 3)', 'Power control unit', 'Power distribution units', 'Solar array drive electronics', 'High-gain antenna mast (+V3)', 'High-gain antenna mast (−V3)'],
-    demo: 'deploy', view: { dir: [0.45, 1, 0.55], fill: 0.95 },
+    demo: 'deploy', view: { dir: [0.5, 0.8, 0.75], fill: 0.72 },
   },
   {
     title: 'Talking through a relay',

@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import { Assembly } from '../engine/assembly.js';
-import { decal, tailCode, stencilText, danger, rescue } from '../engine/decals.js';
+import { decal, tailCode, stencilText, danger } from '../engine/decals.js';
 import { decalTexture } from '../engine/surface.js';
 import { vaporConeMaterial } from '../engine/effects.js';
 import { recoveryTemperature } from '../physics/atmosphere.js';
@@ -83,7 +83,6 @@ export function buildFighter() {
     // national insignia on the intake trunk sides
     add(`Caret inlet cowl (${R})`, usafInsignia(), { at: [X(7.75), -0.42, side * 1.72], dir: [0, -0.15, side], size: [0.9, 0.45, 0.25] });
     add(`Caret inlet cowl (${R})`, danger('DANGER · INTAKE'), { at: [X(7.2), -0.12, side * 1.78], dir: [0, 0, side], size: [0.8, 0.25, 0.2], roughness: 0.5 });
-    add('Forward fuselage skin', rescue(), { at: [X(6.3), FR.upperA(6.3, 0.7) + 0.02, side * 0.7], dir: [0, 0.7, side * 0.72], size: [0.48, 0.24, 0.25] });
     add(`Wing skin (${R})`, stencilText('NO STEP', 'rgba(30,34,38,0.85)', true), { at: [X(13.0), FR.wingY(3.2) + 0.12, side * 3.2], dir: [0, 1, 0], size: [0.6, 0.15, 0.3], angle: Math.PI / 2 });
   }
   add('Wing skin (left)', usafInsignia(), { at: [X(11.6), FR.wingY(4.4) + 0.12, -4.4], dir: [0, 1, 0], size: [1.4, 0.7, 0.3], angle: -Math.PI / 2 });
@@ -230,15 +229,18 @@ export function buildFighter() {
       }
 
       // engines: plumes, afterburner and the turbine glow seen up the nozzle
+      // engines run in the lab's flight mode, or on the ground when the lab asks for afterburner
       const thr = state.throttle;
       const ab = Math.max(0, (thr - 0.8) / 0.2);
+      state.running = approach(state.running || 0, air > 0.05 || thr > 0.85 ? 1 : 0, 1.5, dt);
+      const run = state.running;
       for (let i = 0; i < anim.plumes.length; i++) {
         const pm = anim.plumes[i];
         pm.uniforms.time.value = t;
         const isCore = i % 2 === 1;
-        pm.uniforms.intensity.value = isCore ? (thr > 0.04 ? 0.05 + thr * 0.35 + ab * 0.6 : 0) : ab * 1.1;
+        pm.uniforms.intensity.value = run * (isCore ? (thr > 0.04 ? 0.05 + thr * 0.35 + ab * 0.6 : 0) : ab * 1.1);
       }
-      anim.turbine.emissiveIntensity = 0.35 + thr * 2.6 + ab * 2.2;
+      anim.turbine.emissiveIntensity = 0.2 + run * (thr * 2.4 + ab * 2.2);
 
       // transonic vapour cone in humid air
       const m = state.mach;

@@ -17,6 +17,7 @@ export default [
     title: 'Two streams of air',
     body: 'At take-off the GE90-115B swallows about 1.6 tonnes of air a second, and only about one kilogram in eight goes through the core. The other seven are pushed by the fan alone down the bypass duct and out of the fan nozzle at about 305 m/s. Accelerating a lot of air a little wastes less energy in the jet than accelerating a little air a lot, so the bypass stream makes roughly four fifths of the thrust (modelled).',
     key: 'Thrust F = ṁ_core·V₉ + ṁ_bypass·V₁₉ − ṁ·V₀, and propulsive efficiency η_p ≈ 2 / (1 + V_jet / V_flight).',
+    focus: ['Fan blades', 'Fan outlet guide vanes', 'Booster casing & splitter', 'Inlet cowl', 'Core cowl & bifurcations', 'Thrust reverser translating sleeves', 'Core exhaust nozzle', 'Centre plug', 'Spinner'],
     view: { dir: [0.9, 0.35, 1.1] },
   },
   {
@@ -63,9 +64,9 @@ export default [
   },
   {
     title: 'The thrust reverser',
-    body: 'On landing, six hydraulic actuators drive the two translating sleeves about half a metre aft. Drag links pull the blocker doors down into the bypass duct, and the trapped fan air escapes forward through the cascade vanes. Only the fan stream is reversed — the core keeps pushing forward — and the nacelle and reverser are Boeing\'s, not GE\'s.',
+    body: 'On landing, six hydraulic actuators drive the two translating sleeves aft. Drag links pull the blocker doors down into the bypass duct, and the trapped fan air escapes forward through the cascade vanes, which are now uncovered. Only the fan stream is reversed — the core keeps pushing forward — and the nacelle and reverser are Boeing\'s, not GE\'s.',
     key: 'Reverse thrust is momentum turned round: the fan stream\'s ṁ·V aimed forward pushes the aircraft back.',
-    focus: REVERSER, view: { dir: [-0.45, 0.45, 1] },
+    focus: REVERSER, demo: 'bay', view: { dir: [-0.35, 0.3, 1] },
   },
   {
     title: 'Accessories and the FADEC',

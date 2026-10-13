@@ -36,7 +36,7 @@ export function buildHubble() {
   A.finalize();
 
   // ------------------------------------------------------------------ state and animation
-  const state = { deploy: 1, deployTarget: 1, door: 1, doorTarget: 1, lightPath: false, wheelSpin: 0 };
+  const state = { deploy: 1, deployTarget: 1, door: 1, doorTarget: 1, lightPath: false, redeploy: 0 };
   const applyDeploy = (f) => {
     const mast = smooth(0, 0.4, f);          // array masts and antenna masts swing out
     const turn = smooth(0.35, 0.65, f);      // wings rotate from edge-on to face the Sun
@@ -86,19 +86,24 @@ export function buildHubble() {
     root: A.root,
     body,
     parts: A.parts,
-    view: { dir: [0.62, 0.42, 1.0], fill: 0.92 },
+    view: { dir: [0.6, 0.58, 1.0], fill: 0.84 },
     displaySize: 11,
-    thermalRange: [60, 340],
+    thermalRange: [120, 340],
     state,
     lightPath: ota.lightPath,
 
-    /** Tour 'deploy' hook: going down snaps (stowed for launch), going up animates the release. */
+    /**
+     * Tour 'deploy' hook: a lower value snaps to the stowed launch configuration and the release
+     * then plays by itself after 1.5 s (even if a slow frame skips the tour's own trigger); a
+     * higher value animates the release.
+     */
     setDeploy(d) {
-      if (d < state.deploy - 0.05) { state.deploy = d; applyDeploy(d); }
+      if (d < state.deploy - 0.05) { state.deploy = d; applyDeploy(d); state.redeploy = 1.5; }
+      else state.redeploy = 0;
       state.deployTarget = d;
     },
     /** Animate the arrays and antenna masts to d (0 stowed … 1 deployed). */
-    animateDeploy(d) { state.deployTarget = d; },
+    animateDeploy(d) { state.redeploy = 0; state.deployTarget = d; },
     /** Open (true) or close the aperture door. */
     setAperture(open) { state.doorTarget = open ? 1 : 0; },
     /** Force the light-path overlay on in every render mode. */
@@ -115,6 +120,7 @@ export function buildHubble() {
     },
 
     update(dt, t) {
+      if (state.redeploy > 0 && (state.redeploy -= dt) <= 0) state.deployTarget = 1;
       if (Math.abs(state.deploy - state.deployTarget) > 1e-4) {
         const step = dt * 0.28;
         state.deploy += Math.sign(state.deployTarget - state.deploy) * Math.min(step, Math.abs(state.deployTarget - state.deploy));

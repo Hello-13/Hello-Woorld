@@ -418,10 +418,13 @@ export function buildSystems(ctx) {
     }
     for (const side of [1, -1]) form.push(new THREE.BoxGeometry(0.6, 0.006, 0.05).rotateX(side * 0.5).translate(X(4.6), FR.aYC(4.6) + 0.05, side * (FR.aW(4.6) - 0.06)));
     white.push(new THREE.SphereGeometry(0.035, 10, 8).translate(X(18.62), -0.08, -1.52));
-    const navG = mesh(merge(green), M.navGreen(), { cast: false });
-    const navR = mesh(merge(red), M.navRed(), { cast: false });
-    const navW = mesh(merge(white), new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xffffff, emissiveIntensity: 2.5 }), { cast: false });
-    const strips = mesh(merge(form), M.formation(), { cast: false });
+    // steady, modest intensities: these are small lamps, not light sources for the scene
+    const lamp = (c, e, k) => new THREE.MeshStandardMaterial({ color: c, emissive: e, emissiveIntensity: k, roughness: 0.4 });
+    const navG = mesh(merge(green), lamp(0x002200, 0x2bff6a, 2.2), { cast: false });
+    const navR = mesh(merge(red), lamp(0x220000, 0xff2a1a, 2.2), { cast: false });
+    const navW = mesh(merge(white), lamp(0x222222, 0xffffff, 1.6), { cast: false });
+    const strips = mesh(merge(form), lamp(0x0c1a10, 0x7dffa0, 0.8), { cast: false });
+    anim.lamps = [navG.material, navR.material, navW.material, strips.material];
     P('Navigation & formation lights', {
       system: 'Electrical', material: 'LED position lights, electroluminescent formation strips', mass: 5,
       explode: [0, 0.6, 0],

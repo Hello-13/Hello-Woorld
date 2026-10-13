@@ -136,8 +136,8 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   const ext = mesh(mvacExtension(96), FM.niobium()); ext.position.y = ex;
   const flange = mesh(hoop(MVAC.jointR + 0.02, 0.035, MVAC.jointY + ex, { seg: 64, tube: 6 }), M.darkMetal());
   const c3 = V('MVac niobium nozzle extension', {
-    material: 'Niobium alloy (C-103) sheet, radiatively cooled', mass: 160,
-    desc: 'The large bell expands the exhaust 165 : 1 to a ≈ 3 m exit, lifting Isp to 348 s. Uncooled niobium glows orange-hot in vacuum; at sea level this bell would over-expand and the flow would separate.',
+    material: 'Niobium-alloy sheet, radiatively cooled', mass: 160,
+    desc: 'The large bell expands the exhaust 165 : 1 (exit ≈ 3 m here, estimated from that ratio), lifting Isp to 348 s. The uncooled niobium glows orange-hot in vacuum; at sea level this bell would over-expand and the flow would separate.',
     callout: true, anchor: [1.45, ex + 0.6, 0.3], explode: [0, -2.0, 0],
   }, [ext, flange]);
   c3.userData.part.thermalRole = 'mvacExt';

@@ -62,7 +62,7 @@ export function mountHubbleLab(root, ctx) {
   const roD = readouts([
     { key: 'band', label: 'Band' }, { key: 'hst', label: 'Hubble diffraction limit', unit: '″' },
     { key: 'seeing', label: 'Ground seeing at this λ', unit: '″' }, { key: 'gain', label: 'Hubble sharper by' },
-    { key: 'jwst', label: 'JWST (6.5 m) limit', unit: '″' }, { key: 'airy', label: 'Airy disk at Hubble\'s focus', unit: 'µm' },
+    { key: 'jwst', label: 'JWST limit (6.5 m, ≥ 600 nm)', unit: '″' }, { key: 'airy', label: 'Airy disk at Hubble\'s focus', unit: 'µm' },
   ]);
   const instr = el('p', { class: 'lab-note' });
   const atm = el('p', { class: 'lab-status', role: 'status' });
@@ -77,7 +77,7 @@ export function mountHubbleLab(root, ctx) {
   const roA = readouts([
     { key: 'area', label: 'Collecting area', unit: 'm²' }, { key: 'eye', label: 'Light gathered vs the eye' },
     { key: 'mag', label: 'Fainter stars than the eye by', unit: 'mag' }, { key: 'theta', label: 'Diffraction limit at λ', unit: '″' },
-    { key: 'limit', label: 'From the ground it is' },
+    { key: 'limit', label: 'On the ground, limited by' },
   ]);
   const bars = el('div', { class: 'meter-list', style: 'display:grid;gap:10px' });
   const eyeArea = collectingArea(0.007);
@@ -152,7 +152,7 @@ export function mountHubbleLab(root, ctx) {
     roD.set('hst', th.toFixed(3));
     roD.set('seeing', see.toFixed(2));
     roD.set('gain', `${fmt.n(see / th, 0)} ×`, see / th > 1 ? 'ok' : 'warn');
-    roD.set('jwst', lam >= 600 ? thJ.toFixed(3) : `${thJ.toFixed(3)} (JWST starts at 600 nm)`);
+    roD.set('jwst', lam >= 600 ? thJ.toFixed(3) : '—');
     roD.set('airy', fmt.n(airyDiskDiameter(lam * 1e-9, design.N) * 1e6, 1));
     const cover = INSTRUMENTS.filter(([, a, b]) => lam >= a && lam <= b).map(([n]) => n);
     instr.textContent = cover.length ? `Instruments covering ${fmt.n(lam)} nm: ${cover.join(', ')}.` : 'No current Hubble instrument covers this wavelength.';
@@ -176,8 +176,7 @@ export function mountHubbleLab(root, ctx) {
     roA.set('mag', fmt.n(magnitudeGain(D, 0.007), 1));
     const thD = rayleighArcsec(lam, D);
     roA.set('theta', thD < 1 ? thD.toFixed(3) : fmt.n(thD, 1));
-    const limitedBy = thD > see ? 'diffraction-limited (seeing is smaller)' : `seeing-limited: ${fmt.n(see / thD, 0)} × worse than its diffraction limit`;
-    roA.set('limit', limitedBy, thD > see ? 'ok' : 'warn');
+    roA.set('limit', thD > see ? 'diffraction' : `seeing (${fmt.n(see / thD, 0)} ×)`, thD > see ? 'ok' : 'warn');
 
     // ---------------- design and flaw
     roR.set('m', design.m.toFixed(2));

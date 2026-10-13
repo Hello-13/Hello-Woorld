@@ -20,8 +20,16 @@ const K = {
 };
 export const NOSE_X = 4.81, TAIL_X = -9.35;
 
+const sectionCache = new Map();
 export function section(x) {
-  return { yB: pchip(K.yB, x), yT: pchip(K.yT, x), hw: pchip(K.hw, x), yW: pchip(K.yW, x), nUp: pchip(K.nUp, x), nLo: pchip(K.nLo, x) };
+  const key = Math.round(x * 1e5);
+  let s = sectionCache.get(key);
+  if (!s) {
+    s = { yB: pchip(K.yB, x), yT: pchip(K.yT, x), hw: pchip(K.hw, x), yW: pchip(K.yW, x), nUp: pchip(K.nUp, x), nLo: pchip(K.nLo, x) };
+    if (sectionCache.size > 60000) sectionCache.clear();
+    sectionCache.set(key, s);
+  }
+  return s;
 }
 
 /** Surface point at station x and section angle a (see header), optionally offset along the normal. */
@@ -158,6 +166,38 @@ function outline(r, off = 0.004, rad = 0.014) {
   pts.push(pts[0].clone());
   const curve = new THREE.CatmullRomCurve3(pts, true, 'catmullrom', 0.1);
   return new THREE.TubeGeometry(curve, 80, rad, 5, true);
+}
+
+/**
+ * Painted marking as a thin patch of the surface itself (no projection needed): the texture is
+ * mapped over stations [x0, x1] and angles [a0, a1] on the right side, mirrored for side −1 so
+ * the lettering reads nose-first on both sides. Studio-only, like a decal.
+ */
+export function stencil(texture, { x0, x1, a0, a1, side = 1, off = 0.004, nx = 16, na = 6 }) {
+  const pos = [], nrm = [], uv = [], idx = [];
+  for (let i = 0; i <= nx; i++) {
+    const x = x0 + ((x1 - x0) * i) / nx;
+    for (let j = 0; j <= na; j++) {
+      const ar = a0 + ((a1 - a0) * j) / na;
+      const a = side > 0 ? ar : Math.PI - ar;
+      const p = surfPoint(x, a, off), n = surfNormal(x, a);
+      pos.push(p.x, p.y, p.z); nrm.push(n.x, n.y, n.z);
+      uv.push(side > 0 ? i / nx : 1 - i / nx, j / na);
+    }
+  }
+  for (let i = 0; i < nx; i++) for (let j = 0; j < na; j++) {
+    const a = i * (na + 1) + j, b = a + 1, c = a + na + 1, d = c + 1;
+    if (side > 0) idx.push(a, c, b, b, c, d); else idx.push(a, b, c, b, d, c);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: texture, transparent: true, depthWrite: false, roughness: 0.8, metalness: 0.02, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  m.userData.decal = true;
+  m.raycast = () => {};
+  return m;
 }
 
 /** Interior lining: the same patch seen from inside (studio only, so X-ray stays clean). */

@@ -265,7 +265,7 @@ export function buildUAV() {
     P(`Wing fuel tank (${sn})`, {
       system: 'Fuel', material: 'Sealed integral bay / bladder (est.)', mass: 20, explode: [0, -0.35, 1.9 * side],
       desc: 'Fuel in the wing box between the spars, from the root to about 8.4 m out: ≈ 750 L per wing in this model (the real split is not published). Wing fuel sits where the lift is, so it relieves wing bending and barely moves the centre of gravity as it burns.',
-      callout: side > 0, anchor: wpt(3.4, 0.42, 1, -0.04).map((v, i) => (i === 2 ? v * side : v)),
+      callout: side > 0, anchor: wpt(6.6, 0.42, 1, -0.04).map((v, i) => (i === 2 ? v * side : v)),
     }, L(f(tankG), m.fuel));
 
     // trailing-edge surfaces
@@ -331,7 +331,7 @@ export function buildUAV() {
     storeParts.gbu.push(P(`GBU-12 Paveway II (${sn})`, {
       system: 'Weapons', material: 'Mk 82 steel bomb body, laser guidance kit', mass: 230, massSource: 'Published GBU-12 figure (≈ 230 kg)', explode: [0, -1.1, 2.1 * side],
       desc: 'A 500 lb-class Mk 82 bomb with a laser seeker and steering canards on the nose and folding wings at the tail: 3.27 m long, 0.27 m across. It steers toward laser energy reflected from a marked spot.',
-      callout: side > 0, anchor: [gx + 1.2, gy - 0.12, gb.z * side],
+      callout: side > 0, anchor: [gx - 1.25, gy - 0.1, gb.z * side],
     }, [L(place(g.body), m.olive), L(place(g.guidance), m.seeker), L(place(g.dome), m.glass), L(place(g.band), m.yellow)]));
 
     // two Hellfires on a two-rail launcher, middle station
@@ -348,7 +348,7 @@ export function buildUAV() {
     storeParts.hellfire.push(P(`AGM-114 Hellfire pair (${sn})`, {
       system: 'Weapons', material: 'Steel/aluminium airframe, semi-active laser seeker', mass: 98, massSource: 'Published AGM-114 figure (45–49 kg each)', count: 2, explode: [0, -1.2, 2.0 * side],
       desc: 'Two laser-guided Hellfire missiles, each 1.63 m long and 0.18 m in diameter. The seeker under the nose dome homes on a laser spot with a matching pulse code.',
-      callout: side < 0, anchor: [lx + 0.8, hy - 0.1, (md.z + 0.12) * side],
+      callout: side > 0, anchor: [lx - 0.6, hy - 0.1, (md.z + 0.12) * side],
     }, [L(pair(hf.body), m.olive), L(pair(hf.dome), m.glass), L(pair(hf.band), m.yellow), L(pair(hf.motor), m.brown)]));
   }
   // wing root fairings (both sides)
@@ -430,7 +430,7 @@ export function buildUAV() {
   rudH.mesh.castShadow = true;
   P('Ventral rudder', {
     system: 'Flight controls', material: 'Composite (est.)', mass: 3, explode: [-0.6, 0, 0.75],
-    desc: 'A rudder on the ventral fin, as on other Predator-family aircraft (shown on photographs; its exact role in the control mixing is not public). It adds yaw authority for crosswind landings.',
+    desc: 'Predator-family aircraft carry a rudder on the ventral fin, and one is modelled here; public MQ-9A fact sheets do not describe it or how it is mixed with the ruddervators. A ventral rudder adds yaw authority for crosswind landings.',
   }, rudH.pivot, fin);
   surf.rud = rudH;
   const tipZ = vfTip.le[2] + 0.02;
@@ -443,7 +443,7 @@ export function buildUAV() {
   const tb = turbineGeo();
   role(P('TPE331 turbine section', {
     system: 'Propulsion', material: 'Nickel-alloy combustor and turbine, steel casing', mass: 60, explode: [0.35, 1.0, 0],
-    desc: 'The reverse-flow annular combustor wraps around a three-stage axial turbine that drives the compressor and, through the gearbox, the propeller. Turbine inlet temperatures run near 1,000 °C at full power.',
+    desc: 'The reverse-flow annular combustor wraps around a three-stage axial turbine that drives the compressor and, through the gearbox, the propeller. Gas entering the turbine is around 1,000 °C at full power, typical for an engine of this class.',
     callout: true, anchor: [X(8.25), ENGINE_Y + 0.25, 0.22],
   }, [L(tb.hot, m.hot), L(tb.fittings, m.pipe)]), 'turbine');
   const cp = compressorGeo();
@@ -478,7 +478,7 @@ export function buildUAV() {
   }, L(merge([cylX(X(8.95), X(8.62), 0.06, 0.06, 1.43, -0.24, 16), cylX(X(8.7), X(8.66), 0.025, 0.025, 1.5, -0.24, 8)]), m.alu)), 'oil');
   role(P('Fuel control unit', {
     system: 'Propulsion', material: 'Engine-driven fuel pump and metering unit', mass: 6, explode: [0.3, 0.55, 0.55],
-    desc: 'The engine-driven high-pressure pump and fuel metering unit at the end of the feed line. The DEEC trims how much fuel it meters to the ten combustor nozzles (position approximate).',
+    desc: 'The engine-driven high-pressure pump and fuel metering unit at the end of the feed line. The DEEC trims how much fuel it meters to the combustor’s fuel nozzles (ten shown; count and position approximate).',
   }, L(merge([lru(0.16, 0.11, 0.1, [X(8.15), ENGINE_Y - 0.1, 0.26]), tubeBetween([X(8.15), ENGINE_Y - 0.04, 0.24], [X(8.4), ENGINE_Y + 0.02, 0.22], 0.008, 6)]), m.darkMetal)), 'compressor');
   P('Propeller governor', {
     system: 'Propulsion', material: 'Flyweight governor and oil pump on the gearbox', mass: 3, explode: [-0.6, 0.85, 0.3],
@@ -507,7 +507,7 @@ export function buildUAV() {
   propPart.userData.part.anchor.set(PROP_X, SHAFT_Y + 0.9, 0.25);
   P('Propeller hub & pitch control', {
     system: 'Propulsion', material: 'Aluminium hub, oil-operated pitch change', mass: 20, explode: [-1.75, 0, 0],
-    desc: 'Holds the blade roots and twists them: oil pressure moves a piston in the dome to change pitch, keeping the engine at constant speed and allowing reverse thrust for landing.',
+    desc: 'Holds the blade roots and twists them: oil pressure moves a piston in the dome to change pitch, which keeps the engine at constant speed as power and airspeed change.',
   }, hubSpin);
   hubSpin.add(L(hubGeo(3), m.darkMetal));
   P('Spinner', {
@@ -536,7 +536,7 @@ export function buildUAV() {
   P('Fuselage fuel tank', {
     system: 'Fuel', material: 'Crash-resistant bladder cell (est.)', mass: 28, explode: [0, -0.9, 0],
     desc: 'The main tank sits at the centre of gravity under and ahead of the wing box (≈ 670 L in this model). With the wing bays the modelled tanks hold ≈ 2,200 L, about 1,760 kg of JP-8: GA-ASI quotes 3,900 lb (1,769 kg), the USAF 4,000 lb (602 US gal).',
-    callout: true, anchor: [X(3.8), 1.0, 0.36],
+
   }, L(applyOut(ftGeo), m.fuel));
   const coll = [lru(0.42, 0.2, 0.34, [X(6.55), 1.36, 0], 0.03), cylX(X(6.7), X(6.48), 0.035, 0.035, 1.24, 0.09, 10), cylX(X(6.7), X(6.48), 0.035, 0.035, 1.24, -0.09, 10)];
   P('Collector tank & boost pumps', {
@@ -576,7 +576,7 @@ export function buildUAV() {
   P('Flight control computers', {
     system: 'Flight controls', material: 'Redundant flight computers', mass: 12, count: 3, explode: [0.9, 0.9, -0.3],
     desc: 'Redundant computers fly the aircraft: they hold attitude, altitude and speed, mix ruddervator commands and can land automatically. GA-ASI describes the avionics as triple-redundant with a fault-tolerant flight control system.',
-    callout: true, anchor: [X(2.175), 1.62, -0.1],
+
   }, L(merge(fcc), m.lru));
   A.root.updateMatrixWorld(true);
   const tailServo = [];
@@ -634,8 +634,8 @@ export function buildUAV() {
     ];
     const legPart = P(`Main gear leg (${sn(side)})`, {
       system: 'Landing gear', material: 'Steel strut, trailing arm, maintenance-free shock absorber', mass: 50, explode: [0, -0.95, 0.75 * side],
-      desc: 'A trailing-arm main leg. GA-ASI’s heavy-weight trailing-arm gear (2011) raised landing-weight capacity by over 30 % and uses a shock absorber that needs no nitrogen servicing. It retracts into the fuselage (retraction path approximate).',
-      callout: side > 0, anchor: [X(5.05), 0.65, 0.95],
+      desc: 'A trailing-arm main leg. GA-ASI’s heavy-weight trailing-arm gear (announced 2012) raised landing-weight capacity by over 30 % and uses a shock absorber that needs no nitrogen servicing. It retracts into the fuselage (retraction path approximate).',
+
     }, piv);
     piv.add(L(merge(leg), m.alu));
     const w = [new THREE.TorusGeometry(0.2, 0.08, 14, 32), new THREE.CylinderGeometry(0.15, 0.15, 0.13, 24).rotateX(Math.PI / 2), new THREE.CylinderGeometry(0.12, 0.12, 0.03, 20).rotateX(Math.PI / 2).translate(0, 0, -0.07 * side)];
@@ -750,7 +750,7 @@ export function buildUAV() {
   dishG.add(L(merge([new THREE.CylinderGeometry(0.03, 0.05, 0.42, 12).translate(0, -0.24, 0), new THREE.CylinderGeometry(0.12, 0.12, 0.04, 20).translate(0, -0.43, 0)]), m.darkMetal));
   P('Ku-band SATCOM antenna', {
     system: 'Communications', material: 'Steerable reflector on a two-axis pedestal', mass: 30, explode: [1.45, 2.05, 0],
-    desc: 'Tracks a geostationary satellite to carry control and sensor video beyond line of sight. The round trip via a satellite 35,786 km up adds well over half a second, so crews in the US can fly aircraft overseas, but not land them.',
+    desc: 'Tracks a geostationary satellite to carry control and sensor video beyond line of sight. The round trip via a satellite 35,786 km up adds about half a second of delay, so crews in the US can fly aircraft overseas, but not land them.',
     callout: true, anchor: [X(1.15), 1.75, 0.3],
   }, dishG);
   P('Ku-band SATCOM modem', {
@@ -763,7 +763,7 @@ export function buildUAV() {
   }, L(lru(0.24, 0.12, 0.2, [X(1.7), 1.415, 0.18]), m.lru));
   P('Mission computer', {
     system: 'Avionics', material: 'Mission computer', mass: 9, explode: [0.75, 0.9, 0.55],
-    desc: 'Manages the payloads, weapons and data links, separate from the flight-critical computers so a payload fault cannot affect control of the aircraft.',
+    desc: 'Manages the payloads, weapons and data links. It is shown separate from the flight-critical computers, the usual way to keep a payload fault from affecting control (internal partitioning not public).',
   }, L(lru(0.42, 0.24, 0.15, [X(2.175), 1.474, 0.25]), m.lru));
   P('Embedded GPS/INS', {
     system: 'Avionics', material: 'Ring-laser-gyro inertial units with GPS receivers', mass: 10, count: 2, explode: [0.55, 1.0, 0],
@@ -808,7 +808,7 @@ export function buildUAV() {
   }, L(cylX(X(9.65), X(9.65) - 0.22, 0.07, 0.07, 1.64, -0.12, 18), m.darkMetal)), 'generator');
   role(P('Main batteries', {
     system: 'Electrical', material: 'Sealed rechargeable batteries (est.)', mass: 28, count: 2, explode: [0.3, -0.6, 0.45],
-    desc: 'Carry the flight-critical loads long enough to glide to a recovery site if both generators fail, and power the avionics before engine start.',
+    desc: 'Keep the flight-critical systems running if both generators fail, and power the avionics before engine start (type and capacity not published).',
   }, L(merge([lru(0.36, 0.17, 0.16, [X(3.19), 1.2, 0.18]), lru(0.36, 0.17, 0.16, [X(3.19), 1.2, -0.18])]), m.lruOlive)), 'battery');
   P('Power distribution units', {
     system: 'Electrical', material: 'Solid-state power controllers', mass: 12, count: 2, explode: [0, 0.8, 0.6],
@@ -833,7 +833,7 @@ export function buildUAV() {
   const lensBot = L(new THREE.SphereGeometry(0.03, 14, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2).scale(1.2, 0.9, 1).translate(X(3.7), prof(3.7).bot - 0.015, 0), m.beacon, { cast: false });
   P('Anti-collision beacons', {
     system: 'Electrical', material: 'LED beacons', mass: 1, count: 2, explode: [0, 0.5, 0],
-    desc: 'Red beacons above and below the fuselage make the aircraft visible to other traffic from any angle, required for flight in civil airspace.',
+    desc: 'Beacons above and below the fuselage make the aircraft visible to other traffic from any angle, as required in civil airspace (positions and colour approximate).',
   }, [beaconTop, lensTop, beaconBot, lensBot]);
 
   // ============================================================== environmental control

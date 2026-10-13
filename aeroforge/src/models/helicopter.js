@@ -13,10 +13,9 @@
 
 import * as THREE from 'three';
 import { Assembly } from '../engine/assembly.js';
-import { decal, stencilText, danger } from '../engine/decals.js';
 import { decalTexture } from '../engine/surface.js';
 import { DEG } from './uh60/common.js';
-import { buildFuselage, surfNormal } from './uh60/fuselage.js';
+import { buildFuselage, surfNormal, stencil } from './uh60/fuselage.js';
 import { buildMainRotor } from './uh60/mainRotor.js';
 import { buildDrive } from './uh60/drive.js';
 import { buildTail } from './uh60/tail.js';
@@ -56,17 +55,9 @@ export function buildHelicopter() {
   role(['AC generators', 'Hydraulic pump modules (No. 1 & No. 2)', 'Backup hydraulic pump', 'Primary servos', 'Tail rotor servo'], 'equipment');
   role(['Flight management & display computers', 'Embedded GPS/INS units', 'Digital AFCS computers', 'Communication radios & IFF', 'Health monitoring & data recorders', 'Power distribution & converters', 'Instrument panel & multifunction displays'], 'avionics');
 
-  // markings
-  A.root.updateMatrixWorld(true);
+  // markings: painted straight onto the tail-cone surface
   const tc = byName('Tail cone skin');
-  const tcMesh = tc.children.find((o) => o.isMesh);
-  for (const side of [1, -1]) {
-    tc.add(decal(tcMesh, armyText(), { at: [-5.3, 1.66, 0.47 * side], dir: [0, 0.05, side], size: [1.7, 0.27, 0.4], roughness: 0.8 }));
-    tc.add(decal(tcMesh, danger('DANGER · TAIL ROTOR'), { at: [-8.2, 1.73, 0.3 * side], dir: [0, 0, side], size: [0.9, 0.28, 0.3], roughness: 0.7 }));
-  }
-  const cs = byName('Cabin skin');
-  const csMesh = cs.children.find((o) => o.isMesh);
-  for (const side of [1, -1]) cs.add(decal(csMesh, stencilText('NO STEP', 'rgba(14,16,14,0.85)', true), { at: [-1.2, 2.2, 0.62 * side], dir: [0, 1, 0.5 * side], size: [0.42, 0.12, 0.3] }));
+  for (const side of [1, -1]) tc.add(stencil(armyText(), { x0: -6.15, x1: -4.45, a0: -0.12, a1: 0.42, side }));
 
   A.finalize();
 
