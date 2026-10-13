@@ -236,17 +236,20 @@ export class Showroom {
 
     // mirror floor (High / Ultra) and a plain polished floor (Balanced / Performance)
     this.reflector = new Reflector(geo, {
-      textureWidth: 512, textureHeight: 512, multisample: 4, color: SHOWROOM_COLORS.deck,
+      textureWidth: 512, textureHeight: 512, multisample: 0, color: SHOWROOM_COLORS.deck,   // blurred: MSAA would be wasted
       shader: { name: 'ShowroomFloor', uniforms: floorUniforms(), vertexShader: floorVert, fragmentShader: floorFrag },
     });
     this.reflector.material.defines = { REFLECT: '' };
     const rt = this.reflector.getRenderTarget();
     rt.texture.generateMipmaps = true;
     rt.texture.minFilter = THREE.LinearMipmapLinearFilter;
-    // reflect only during the main beauty render, never during AO / outline / shadow sub-passes
+    // reflect only during the main beauty render, never during AO / outline / shadow sub-passes;
+    // at high frame rates every other frame (the blurred image lags ~4 ms, which nobody can see)
     const reflect = this.reflector.onBeforeRender;
     this.reflector.onBeforeRender = (renderer, scene, camera, ...rest) => {
       if (scene.overrideMaterial || camera !== stage.camera) return;
+      if (stage.highRate && this.reflected && (stage.frameNo & 1)) return;
+      this.reflected = true;
       reflect(renderer, scene, camera, ...rest);
     };
     this.plain = new THREE.Mesh(geo, new THREE.ShaderMaterial({
@@ -279,9 +282,12 @@ export class Showroom {
 
   resize() {
     if (!this.reflectScale) return;
-    const r = this.stage.renderer, c = r.domElement;
-    const w = Math.max(64, Math.round(c.width * this.reflectScale));
-    const h = Math.max(64, Math.round(c.height * this.reflectScale));
+    const c = this.stage.renderer.domElement;
+    // the floor blurs its reflection, so past ~1.2 MP extra resolution is invisible
+    const k = Math.min(this.reflectScale, Math.sqrt(1.2e6 / Math.max(1, c.width * c.height)));
+    const w = Math.max(64, Math.round(c.width * k));
+    const h = Math.max(64, Math.round(c.height * k));
+    this.reflected = false;
     this.reflector.getRenderTarget().setSize(w, h);
     this.reflector.material.uniforms.texel.value.set(1 / w, 1 / h);
   }
@@ -292,6 +298,7 @@ export class Showroom {
     this.dome.position.copy(camera.position);
     camera.getWorldDirection(this.dome.material.uniforms.fwd.value);
     if (!this.group.visible || !this.contact.plane.visible) return;
-    if (this.frame++ % this.contactEvery === 0) this.contact.update(this.stage.renderer, this.stage.holder);
+    const every = this.contactEvery * (this.stage.highRate ? 2 : 1);
+    if (this.frame++ % every === 0) this.contact.update(this.stage.renderer, this.stage.holder);
   }
 }

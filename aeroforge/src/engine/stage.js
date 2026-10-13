@@ -4,12 +4,13 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
+import { CopyShader } from 'three/addons/shaders/CopyShader.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { Environment } from './environment.js';
 
@@ -19,13 +20,21 @@ import { Environment } from './environment.js';
 // showroom.contact: contact-shadow map size; contactEvery: refresh every n frames
 export const UHD = 3840 * 2160;
 export const QUALITY = {
-  '4k': { label: '4K', dpr: 4, minPixels: UHD, msaa: 2, ao: 1, shadow: 4096, showroom: { reflect: 0.5, contact: 2048, contactEvery: 1 } },
+  '4k': { label: '4K', dpr: 4, minPixels: UHD, msaa: 2, ao: 1, shadow: 4096, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
   ultra: { label: 'Ultra', dpr: 3, msaa: 4, ao: 1, shadow: 4096, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
   high: { label: 'High', dpr: 2, msaa: 4, ao: 0.5, shadow: 2048, showroom: { reflect: 0.38, contact: 512, contactEvery: 1 } },
   balanced: { label: 'Balanced', dpr: 1.5, msaa: 4, ao: 0, shadow: 2048, showroom: { reflect: 0, contact: 512, contactEvery: 2 } },
   performance: { label: 'Performance', dpr: 1, msaa: 0, ao: 0, shadow: 1024, showroom: { reflect: 0, contact: 256, contactEvery: 3 } },
 };
 const ORDER = ['4k', 'ultra', 'high', 'balanced', 'performance'];
+
+// Effects that are smooth by nature stop gaining from resolution well before 4K: ambient
+// occlusion is computed at no more than ~2.4 MP and bloom from no more than a 1440p frame,
+// then upsampled. Above this frame rate (a 120 Hz+ display keeping up), the shadow map,
+// contact shadow and floor reflection refresh every other frame.
+const AO_MAX_PIXELS = 2.4e6;
+const BLOOM_MAX_PIXELS = 2560 * 1440;
+const HIGH_RATE = 90;
 
 /** World-space bounds of the solid (non-effect, visible) meshes under an object. */
 export function solidBounds(root) {
@@ -57,7 +66,55 @@ class SceneAOPass extends GTAOPass {
       if (o.userData.noAO || (m && !Array.isArray(m) && m.blending === THREE.AdditiveBlending)) o.visible = false;
     });
   }
-  setSize(w, h) { super.setSize(Math.max(1, Math.round(w * this.resScale)), Math.max(1, Math.round(h * this.resScale))); }
+  setSize(w, h) {
+    const k = Math.min(this.resScale, Math.sqrt(AO_MAX_PIXELS / Math.max(1, w * h)));
+    super.setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
+  }
+}
+
+/** Bloom from a frame of at most BLOOM_MAX_PIXELS, so its glow keeps the same size on screen at 4K. */
+class SoftBloomPass extends UnrealBloomPass {
+  setSize(w, h) {
+    const k = Math.min(1, Math.sqrt(BLOOM_MAX_PIXELS / Math.max(1, w * h)));
+    super.setSize(Math.max(2, Math.round(w * k)), Math.max(2, Math.round(h * k)));
+  }
+}
+
+/** The scene render, multisampled in a target of its own and resolved once into the composer's
+ *  single-sample buffers, so the passes after it never pay for multisampled storage and resolves. */
+class BeautyPass extends Pass {
+  constructor(scene, camera) {
+    super();
+    this.scene = scene;
+    this.camera = camera;
+    this.needsSwap = false;
+    this.samples = 0;
+    this.rt = null;
+    this.size = [2, 2];
+    this.copy = new THREE.ShaderMaterial({
+      uniforms: THREE.UniformsUtils.clone(CopyShader.uniforms),
+      vertexShader: CopyShader.vertexShader, fragmentShader: CopyShader.fragmentShader,
+      depthTest: false, depthWrite: false,
+    });
+    this.quad = new FullScreenQuad(this.copy);
+  }
+  setSamples(n) {
+    if (n === this.samples) return;
+    this.samples = n;
+    this.rt?.dispose();
+    this.rt = n ? new THREE.WebGLRenderTarget(this.size[0], this.size[1], { type: THREE.HalfFloatType, samples: n }) : null;
+  }
+  setSize(w, h) { this.size = [w, h]; this.rt?.setSize(w, h); }
+  render(renderer, writeBuffer, readBuffer) {
+    renderer.setRenderTarget(this.rt || readBuffer);
+    renderer.clear();
+    renderer.render(this.scene, this.camera);
+    if (!this.rt) return;
+    this.copy.uniforms.tDiffuse.value = this.rt.texture;
+    renderer.setRenderTarget(readBuffer);
+    this.quad.render(renderer);
+  }
+  dispose() { this.rt?.dispose(); this.copy.dispose(); this.quad.dispose(); }
 }
 
 // One NaN/Inf pixel in the HDR buffer is enough for bloom's blur chain to smear it into a black
@@ -161,9 +218,14 @@ export class Stage {
     this.resize();
 
     this.fps = 60;
+    this.frameNo = 0;
+    this.highRate = false;
     this._fpsAcc = 0; this._fpsN = 0;
     this._slow = 0;
     this.onQualityChange = null;
+    // GPU time per frame, where the browser exposes timer queries (Chromium on desktop)
+    this.gpuMs = null;
+    this._timer = renderer.getContext().getExtension('EXT_disjoint_timer_query_webgl2');
     renderer.setAnimationLoop(() => this.frame());
   }
 
@@ -179,6 +241,14 @@ export class Stage {
       r = Math.min(q.dpr, Math.max(r, Math.sqrt(q.minPixels / (w * h))));
     }
     return r;
+  }
+
+  /** Multisampling for a preset at the current frame size: none when the frame is supersampled
+   *  (every edge is already averaged over several pixels), at most 2× above ~6 MP. */
+  msaaFor(q) {
+    if (this.renderer.getPixelRatio() / (window.devicePixelRatio || 1) >= 1.4) return 0;
+    const { width, height } = this.renderSize;
+    return width * height > 6e6 ? Math.min(q.msaa, 2) : q.msaa;
   }
 
   /** Size of the frame actually being drawn, in device pixels. */
@@ -199,10 +269,11 @@ export class Stage {
     if (this.composer) { for (const p of this.composer.passes) p.dispose?.(); this.composer.dispose(); }
     this.env.showroom.setQuality(q.showroom);
     this._grace = (this.time || 0) + 4;     // shader compiles after a rebuild are not a slow frame rate
-    const rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples: q.msaa });
+    const rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType });
     const composer = new EffectComposer(this.renderer, rt);
     this.composer = composer;
-    composer.addPass(new RenderPass(this.scene, this.camera));
+    this.beauty = new BeautyPass(this.scene, this.camera);
+    composer.addPass(this.beauty);
     this.ao = null;
     if (q.ao) {
       const ao = new SceneAOPass(this.scene, this.camera, 2, 2);
@@ -222,7 +293,7 @@ export class Stage {
     if (this._outlined) this.outline.selectedObjects = this._outlined;
     composer.addPass(this.outline);
     composer.addPass(new ShaderPass(SanitizeShader));     // before bloom, the pass that spreads pixels
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(2, 2), 0.38, 0.45, 1.9);
+    this.bloom = new SoftBloomPass(new THREE.Vector2(2, 2), 0.38, 0.45, 1.9);
     composer.addPass(this.bloom);
     composer.addPass(new OutputPass());
     this.grade = new ShaderPass(GradeShader);
@@ -230,16 +301,53 @@ export class Stage {
     if (this.container) this.resize();
   }
 
-  setQuality(name, { manual = true } = {}) {
+  /** info is passed on to onQualityChange: { trial } for a 4K trial, { reverted, base, got } after one fails. */
+  setQuality(name, { manual = true, info = {} } = {}) {
     if (!QUALITY[name] || name === this.quality) return;
     const up = ORDER.indexOf(name) < ORDER.indexOf(this.quality);
     this.quality = name;
     if (manual) {
       this.autoQuality = false;
+      this._trial = null;
       try { localStorage.setItem('aeroforge.quality', name); } catch { /* storage blocked */ }
     }
     this.buildComposer();
-    this.onQualityChange?.(name, manual, up);
+    this.onQualityChange?.(name, manual, up, info);
+  }
+
+  /** Automatic quality, once per 0.5 s reading. Steps down after ~3 s below 26 fps. Steps Ultra up
+   *  to 4K supersampling after ~4 s above 50 fps as a trial: if 4K costs more than 15 % of the
+   *  frame rate (on a fast display, typically halving it from 240 to 120 Hz), it goes back. */
+  autoStep() {
+    const fps = this.fps;
+    if (this._trial) {
+      const tr = this._trial;
+      tr.sum += fps;
+      if (++tr.n < 3) return;
+      this._trial = null;
+      this._noUpgrade = true;
+      const got = tr.sum / tr.n;
+      if (got < tr.base * 0.85) this.setQuality(tr.from, { manual: false, info: { reverted: true, base: tr.base, got } });
+      return;
+    }
+    this._slow = fps < 26 ? this._slow + 1 : 0;
+    if (fps > 50) { this._fast = (this._fast || 0) + 1; this._fastSum = (this._fastSum || 0) + fps; }
+    else { this._fast = 0; this._fastSum = 0; }
+    if (this._slow >= 6) {
+      const i = ORDER.indexOf(this.quality);
+      if (i < ORDER.length - 1) this.setQuality(ORDER[i + 1], { manual: false });
+      this._slow = 0;
+      this._noUpgrade = true;
+    } else if (this._fast >= 8 && !this._noUpgrade && this.quality === 'ultra') {
+      const { width, height } = this.renderSize;
+      if (width * height < UHD * 0.95) {
+        const base = this._fastSum / this._fast;
+        this.setQuality('4k', { manual: false, info: { trial: true, base } });
+        this._trial = { from: 'ultra', base, sum: 0, n: 0 };
+        this._grace = this.time + 1.5;   // the passes are cached programs; only targets reallocate
+      } else this._noUpgrade = true;
+      this._fast = 0; this._fastSum = 0;
+    }
   }
 
   setOutlined(objects) {
@@ -257,6 +365,7 @@ export class Stage {
       this.composer.setPixelRatio(r);
     }
     this.renderer.setSize(w, h, false);
+    this.beauty.setSamples(this.msaaFor(QUALITY[this.quality]));
     this.composer.setSize(w, h);
     this.labels.setSize(w, h);
     this.env.showroom.resize();
@@ -314,35 +423,50 @@ export class Stage {
     if (this._fpsAcc > 0.5) {
       this.fps = this._fpsN / this._fpsAcc;
       this._fpsAcc = 0; this._fpsN = 0;
-      // adaptive quality: step down after ~3 s below 26 fps; step Ultra up to 4K supersampling
-      // after ~4 s above 50 fps, unless the screen is already 4K or a step down has happened
-      if (this.autoQuality && document.visibilityState === 'visible' && this.time > this._grace) {
-        this._slow = this.fps < 26 ? this._slow + 1 : 0;
-        this._fast = this.fps > 50 ? (this._fast || 0) + 1 : 0;
-        if (this._slow >= 6) {
-          const i = ORDER.indexOf(this.quality);
-          if (i < ORDER.length - 1) this.setQuality(ORDER[i + 1], { manual: false });
-          this._slow = 0;
-          this._noUpgrade = true;
-        } else if (this._fast >= 8 && !this._noUpgrade && this.quality === 'ultra') {
-          const { width, height } = this.renderSize;
-          if (width * height < UHD * 0.95) this.setQuality('4k', { manual: false });
-          else this._noUpgrade = true;
-          this._fast = 0;
-        }
-      }
+      this.highRate = this.fps > HIGH_RATE;
+      if (this.autoQuality && document.visibilityState === 'visible' && this.time > this._grace) this.autoStep();
     }
+    this.frameNo++;
     this.stepViewShift(dt);
     if (this.tween) this.stepTween(dt);
     for (const fn of this.frameHooks) fn(dt, this.time);
     this.controls.update();
-    // shadow maps render once per frame, in the beauty pass, not again in AO / outline sub-passes
+    // shadow maps render in the beauty pass only, not again in AO / outline sub-passes; at high
+    // frame rates every other frame (the key light is fixed, so only moving parts lag, by ~4 ms)
     this.renderer.shadowMap.autoUpdate = false;
-    this.renderer.shadowMap.needsUpdate = true;
-    this.env.update(dt, this.camera);
-    this.grade.uniforms.time.value = this.time;
-    this.composer.render();
+    this.renderer.shadowMap.needsUpdate = !this.highRate || (this.frameNo & 1) === 0;
+    const query = this.beginGpuTimer();
+    try {
+      this.env.update(dt, this.camera);
+      this.grade.uniforms.time.value = this.time;
+      this.composer.render();
+    } finally { this.endGpuTimer(query); }
     this.labels.render(this.scene, this.camera);
+  }
+
+  /** One timer query in flight at a time; its result is read a few frames later, never waited on. */
+  beginGpuTimer() {
+    const ext = this._timer;
+    if (!ext) return null;
+    const gl = this.renderer.getContext();
+    if (this._query) {
+      if (!gl.getQueryParameter(this._query, gl.QUERY_RESULT_AVAILABLE)) return null;
+      if (!gl.getParameter(ext.GPU_DISJOINT_EXT)) {
+        const ms = gl.getQueryParameter(this._query, gl.QUERY_RESULT) / 1e6;
+        this.gpuMs = this.gpuMs == null ? ms : this.gpuMs * 0.85 + ms * 0.15;
+      }
+      gl.deleteQuery(this._query);
+      this._query = null;
+    }
+    const q = gl.createQuery();
+    gl.beginQuery(ext.TIME_ELAPSED_EXT, q);
+    return q;
+  }
+
+  endGpuTimer(q) {
+    if (!q) return;
+    this.renderer.getContext().endQuery(this._timer.TIME_ELAPSED_EXT);
+    this._query = q;
   }
 
   /** Mount a vehicle: scale to display size, seat it on the deck and frame the camera. */

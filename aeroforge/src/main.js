@@ -176,10 +176,12 @@ async function start() {
   for (const [k, q] of Object.entries(QUALITY)) qualitySel.append(el('option', { value: k, text: q.label }));
   qualitySel.value = stage.quality;
   qualitySel.addEventListener('change', () => { stage.setQuality(qualitySel.value); log.push('VIEW', `Render quality: ${QUALITY[qualitySel.value].label}`); });
-  stage.onQualityChange = (k, manual, up) => {
+  stage.onQualityChange = (k, manual, up, info = {}) => {
     qualitySel.value = k;
     if (manual) return;
-    if (up) log.push('VIEW', `Graphics raised to ${QUALITY[k].label}: this GPU has headroom, so frames are now supersampled`, 'ok');
+    if (info.reverted) log.push('VIEW', `4K supersampling would cut the frame rate from ${Math.round(info.base)} to ${Math.round(info.got)} fps, so graphics stay at ${QUALITY[k].label}`, 'ok');
+    else if (info.trial) log.push('VIEW', `Trying ${QUALITY[k].label} supersampling: Ultra runs at ${Math.round(info.base)} fps, so this GPU may have headroom`, 'ok');
+    else if (up) log.push('VIEW', `Graphics raised to ${QUALITY[k].label}`, 'ok');
     else log.push('VIEW', `Graphics lowered to ${QUALITY[k].label} to keep the frame rate up`, 'warn');
   };
 
@@ -555,6 +557,23 @@ async function start() {
     log.push('SYS', `${v.designation} ${v.name} on deck · ${v.parts.length} parts · ${fmt.n(f.tris)} triangles`, 'ok');
   }
 
+  // ------------------------------------------------------------------ full screen
+  // In a 16:9 full-screen window the 4K preset draws exactly 3840 × 2160.
+  const fullBtn = $('fullscreen');
+  const toggleFull = () => {
+    const req = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+    req?.catch?.(() => log.push('VIEW', 'Full screen is not available in this view; open the page in its own browser tab', 'warn'));
+  };
+  if (document.fullscreenEnabled) {
+    fullBtn.hidden = false;
+    fullBtn.addEventListener('click', toggleFull);
+    document.addEventListener('fullscreenchange', () => {
+      const on = !!document.fullscreenElement;
+      fullBtn.setAttribute('aria-pressed', String(on));
+      fullBtn.textContent = on ? 'Exit full screen' : 'Full screen';
+    });
+  }
+
   // ------------------------------------------------------------------ keyboard
   window.addEventListener('keydown', (e) => {
     if (e.target.closest?.('input[type="text"], textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -571,6 +590,7 @@ async function start() {
     else if (k === 'x') setExplode(app.explodeTarget > 0.5 ? 0 : 1);
     else if (k === 'l') labelsBtn.click();
     else if (k === 'r') resetBtn.click();
+    else if (k === 'f' && document.fullscreenEnabled) toggleFull();
     else if (e.key === 'Escape') {
       if (app.selected) { isolate(false); selectPart(null); } else if (dossierOpen() && !narrow()) setDossier(false);
     }
@@ -596,9 +616,16 @@ async function start() {
     if (clockAcc > 0.5) {
       clockAcc = 0;
       $('utc').textContent = new Date().toISOString().slice(11, 19);
-      $('fps').textContent = Math.round(stage.fps);
+      const fps = Math.round(stage.fps);
+      $('fps').textContent = fps;
       const { width, height } = stage.renderSize;
+      const mp = (width * height) / 1e6;
       $('res').textContent = `${width} × ${height}`;
+      $('mp').textContent = `${mp.toFixed(1)} MP`;
+      const gpu = stage.gpuMs != null ? ` The GPU spends ${stage.gpuMs.toFixed(1)} ms on each frame.` : '';
+      $('perf').title = `Drawing ${mp.toFixed(1)} million pixels per frame${mp >= 8.2 ? ', the pixel count of 4K (3840 × 2160 = 8.3 MP) in the shape of your window' : ''}.${gpu} `
+        + 'Frames are paced to the display: a frame that misses one refresh waits for the next, so the rate steps down in whole divisions (240 → 120 → 80 fps on a 240 Hz display). '
+        + 'Each refresh allows 4.2 ms at 240 Hz, 6.9 ms at 144 Hz, 8.3 ms at 120 Hz and 16.7 ms at 60 Hz.';
     }
   });
 

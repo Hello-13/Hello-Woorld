@@ -82,6 +82,14 @@ button, input, output, select { font: inherit; color: inherit; }
 .nav-fps { font: 11px/1 var(--font-data); color: var(--muted); letter-spacing: 0.06em; white-space: nowrap; }
 .nav-fps b { color: var(--soft); font-weight: 500; font-variant-numeric: tabular-nums; }
 .nav-sep { margin: 0 8px; color: var(--line-strong); }
+.nav-mp { color: var(--muted); }
+.nav-fps { cursor: help; }
+.nav-full {
+  background: rgba(8, 12, 18, 0.6); border: 1px solid var(--line); border-radius: 2px; padding: 6px 10px; cursor: pointer;
+  font: 500 11px/1 var(--font-ui); letter-spacing: 0.1em; text-transform: uppercase; color: var(--soft); white-space: nowrap;
+  transition: color 0.2s, border-color 0.2s;
+}
+.nav-full:hover, .nav-full[aria-pressed="true"] { color: var(--text); border-color: var(--line-strong); }
 
 /* ------------------------------------------------------------------ stage */
 .stage { position: fixed; inset: 0; z-index: 0; background: var(--ground); overflow: hidden; }
@@ -538,7 +546,7 @@ body.is-touring #tour-start { background: transparent; color: var(--text); borde
   html, body { height: auto; }
   body { overflow: auto; }
   .nav { background: rgba(4, 6, 10, 0.92); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
-  .nav-links, .nav-fps, .quality-label { display: none; }
+  .nav-links, .nav-fps, .quality-label, .nav-full { display: none; }
   .brand-name { font-size: 13px; letter-spacing: 0.28em; }
 
   .stage {
