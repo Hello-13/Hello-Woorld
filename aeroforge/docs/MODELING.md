@@ -17,12 +17,28 @@ major component where it really is, named and described correctly.
   material and comparable parts and leave `massSource` unset (the UI then labels them
   "≈ … (estimate)"). Only set `massSource` for a published figure. If a count or layout is
   genuinely uncertain, say so in the part's `desc` rather than inventing precision.
-- **Depth.** 80–150 parts per vehicle, covering every major subsystem, inside and out:
-  structure, skins, propulsion and its modules, fuel, flight controls and actuators, landing
-  gear, hydraulics, electrical, avionics, sensors, crew systems, environmental control,
-  weapons/payload, and anything specific to the type (rotor and drive systems, separation
-  hardware, optics, attitude control …). Internal parts are modelled where they really sit,
-  at real size, so X-ray, Blueprint, Systems and Exploded views show a credible interior.
+- **Depth: system → subsystem → component.** The model is the product, and the small details are
+  what a student remembers. Break every system into its real subsystems, and every subsystem into
+  the components a maintainer would name, placed where they really sit, at real size. Aim for
+  150–250 parts. For example, landing gear is not one part but: shock strut (oleo), torque links,
+  drag and side braces, retraction actuator, uplock and downlock, wheels, tyres, carbon brakes,
+  steering actuator (nose), gear doors and their actuators, plus the hydraulic lines that serve
+  them. An engine is not one part but its fan / compressor / combustor / turbine stages, shafts and
+  bearings, gearbox and accessories, fuel control, igniters, sensors, mounts and nacelle doors.
+- **Small details matter.** Model what a museum cutaway or a maintenance manual shows: access
+  panels and their fasteners, plumbing and wiring runs between the units they connect, actuators
+  at every moving surface, probes and sensors, antennas, lights, drains and vents, hinges, placard
+  locations, seals. Where something is too small to model, mention it in the nearest part's desc.
+- **Connected, not floating.** Systems connect: fuel lines run from tanks to pumps to the engine
+  feed; hydraulic lines from pumps to actuators; wiring from generators through distribution to
+  loads; ducts from intakes to engines. Model the main runs so a student can trace a system
+  end to end in the Systems view.
+- **Coverage.** Every major system, inside and out: structure, skins, propulsion and its modules,
+  fuel, flight controls and actuators, landing gear, hydraulics, electrical, avionics, sensors,
+  crew systems, environmental control, weapons/payload, and anything specific to the type (rotor
+  and drive systems, separation hardware, optics, attitude control …). Internal parts are modelled
+  where they really sit, at real size, so X-ray, Blueprint, Systems and Exploded views show a
+  credible interior.
 - **Every part teaches.** `desc` is 1–3 plain sentences: what it is, what it does, and one real
   number or fact (a pressure, a count, a temperature, a material reason).
 
@@ -65,7 +81,8 @@ A.finalize();                      // after every part is placed
 
 ## Budget
 
-- ≤ 450 k triangles and ≤ 700 meshes per vehicle (the event log prints parts and triangles
+- ≤ 700 k triangles and ≤ 1,000 meshes per vehicle (a 4K frame of the current fleet costs about
+  2 ms on a desktop GPU, so there is room for detail; merge static geometry within a part) (the event log prints parts and triangles
   when a vehicle comes on deck). Spend triangles where students look (silhouette, blades,
   gear, cockpit) and keep hidden internals simple but correctly sized and placed.
 - Boot cost: a vehicle should build in well under a second.
