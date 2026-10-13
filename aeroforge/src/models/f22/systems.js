@@ -25,6 +25,13 @@ function ductTop(s, z) {
   return yc + (h / 2) * Math.pow(1 - Math.pow(u, 3), 1 / 3);
 }
 
+/** Outward normal of the forward-fuselage upper surface at (s, z) (z signed). */
+function normalA(s, z) {
+  const az = Math.abs(z), e = 0.01;
+  const dy = (FR.upperA(s, az + e) - FR.upperA(s, az - e)) / (2 * e);
+  return V(0, 1, -dy * Math.sign(z)).normalize();
+}
+
 /** Closed tank loft from a list of [z, y] right-half outlines (top centre → … → bottom centre). */
 function tankLoft(st, outline) {
   const rings = st.map((s) => {
@@ -362,7 +369,7 @@ export function buildSystems(ctx) {
         const sec = FR.wingSection(z);
         patch(V(sec.le[0] - 0.9 * sec.chord, sec.le[1] + 0.012, side * z), V(0, 1, 0), 0.08, 0.14);
       }
-      for (const s of [1.8, 2.3, 4.0]) { const z = FR.aW(s) - 0.05; patch(V(X(s), FR.upperA(s, z) + 0.004, side * z), V(0, 1, side * 0.6)); }
+      for (const s of [1.8, 2.3, 4.0]) { const z = FR.aW(s) - 0.07; patch(V(X(s), FR.upperA(s, z) + 0.003, side * z), normalA(s, side * z), 0.12, 0.04); }
       for (const s of [16.2, 17.0]) patch(V(X(s), FR.topAt(s, 1.4) + 0.004, side * 1.4), V(0, 1, side * 0.3));
       patch(V(X(17.2), -FR.bD(17.2) - 0.004, side * 1.0), V(0, -1, 0));
     }
@@ -381,7 +388,7 @@ export function buildSystems(ctx) {
       g.push(geo);
     };
     for (const side of [1, -1]) {
-      eye(V(X(3.2), FR.upperA(3.2, 0.45) + 0.004, side * 0.45), V(0, 1, side * 0.9));
+      eye(V(X(3.2), FR.upperA(3.2, 0.45) + 0.004, side * 0.45), normalA(3.2, side * 0.45));
       eye(V(X(3.4), FR.bottomAt(3.4, 0.35) - 0.004, side * 0.35), V(0, -1, side * 0.6));
       eye(V(X(16.8), -FR.bD(16.8) * 0.6, side * (FR.bW(16.8) - 0.05)), V(0, -0.3, side));
     }
@@ -416,7 +423,7 @@ export function buildSystems(ctx) {
       (side > 0 ? green : red).push(lens);
       form.push(new THREE.BoxGeometry(0.5, 0.006, 0.05).translate(le.x - 0.55 * chord, le.y + 0.03, le.z - side * 0.15));
     }
-    for (const side of [1, -1]) { const z = FR.aW(4.6) - 0.05; form.push(new THREE.BoxGeometry(0.6, 0.006, 0.05).rotateX(side * 0.5).translate(X(4.6), FR.upperA(4.6, z) + 0.006, side * z)); }
+    for (const side of [1, -1]) { const pts = []; for (let s = 4.3; s <= 4.91; s += 0.15) { const z = FR.aW(s) - 0.07; pts.push([s, FR.upperA(s, z) + 0.004, side * z]); } form.push(FR.pipe(pts, 0.011, 6, 8)); }
     white.push(new THREE.SphereGeometry(0.035, 10, 8).translate(X(18.62), -0.08, -1.52));
     // steady, modest intensities: these are small lamps, not light sources for the scene
     const lamp = (c, e, k) => new THREE.MeshStandardMaterial({ color: c, emissive: e, emissiveIntensity: k, roughness: 0.4 });

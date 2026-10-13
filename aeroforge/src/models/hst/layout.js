@@ -1,12 +1,14 @@
 // Hubble Space Telescope layout: the stations and radii every hst/ module builds against.
 //
-// Axes: optical axis along +x with the aperture door forward (+x); y up (= +V3, the Sun side);
-// z right (= +V2, the solar-array axis). Metres, x = 0 at the aft face of the aft bulkhead.
+// Axes: optical axis along +x (= +V1) with the aperture door forward; y up (= +V3, the Sun side,
+// where the door hinges); z right as seen looking forward from behind (= −V2, since the V1–V2–V3
+// frame is right-handed). Metres, x = 0 at the aft face of the aft bulkhead.
 //
-// Station plan (NASA media guides: 13.2 m overall, 4.2 m maximum diameter; light shield ≈ 4 m
-// long and 3 m inside diameter; primary–secondary separation 4.906 m; focus 1.5 m behind the
-// primary vertex). The split of the remaining length between forward shell, equipment section
-// and aft shroud is estimated from drawings.
+// Station plan from the NASA/Lockheed SM3A Media Reference Guide (1999), section 5: light shield
+// 4 m long, 3 m inside diameter; forward shell 4 m long, 3.1 m across; equipment section a ring of
+// 1.5 m-deep bays; aft shroud 3.5 m long, 4.2–4.3 m across; together 13.1 m to the door hinge
+// (13.2 m published overall). Optics: primary–secondary separation 4.906 m, focus 1.5 m behind the
+// primary vertex, 60 cm hole through the primary.
 
 import * as THREE from 'three';
 import { HST_OTA, hubbleDesign, conicSag } from '../../physics/optics.js';
@@ -24,17 +26,16 @@ export const ST = {
 
 export const RAD = {
   big: 2.1,            // aft shroud radius; equipment-section circumradius (4.2 m maximum diameter)
-  bayFace: 2.0,        // equipment-section bay-door plane (decagon apothem)
-  shell: 1.55,         // forward shell / light shield outer radius over the blankets
+  shell: 1.55,         // forward shell / light shield outer radius over the blankets (3.1 m)
   inner: 1.5,          // light shield inside radius (3.0 m)
-  truss: 1.45,         // metering truss radius (2.9 m diameter)
+  truss: 1.36,         // metering truss radius (2.7 m diameter, SM3A guide)
 };
 
 const D = hubbleDesign();
 export const OPT = {
   xPM: 4.15,                          // primary mirror vertex
   rPM: HST_OTA.D / 2,                 // 1.2 m
-  rHole: 0.3,                         // primary central hole radius (estimate)
+  rHole: 0.3,                         // primary central hole radius (23.5 in / 60 cm hole, SM3A guide)
   tPM: 0.305,                         // mirror thickness (~12 in)
   R1: HST_OTA.R1, K1: D.K1,
   xSM: 4.15 + HST_OTA.d,              // secondary mirror vertex (9.056)
