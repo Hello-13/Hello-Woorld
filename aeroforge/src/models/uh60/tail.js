@@ -149,7 +149,7 @@ export function buildTail({ A, P, air, roofY }) {
   P('Stabilator', {
     system: 'Flight controls', material: 'Aluminium/composite all-moving surface, 4.38 m span', mass: 50, explode: [-3.2, -0.6, 0],
     desc: 'An all-moving tailplane whose incidence is scheduled by computer: about 40° trailing edge down in the hover so the rotor downwash does not pitch the nose up, flattening out as airspeed builds. It also adds pitch stability in cruise.',
-    callout: true, anchor: [0, 0.1, 1.9],
+    callout: true, anchor: [-9.75, 1.72, 1.9],
   }, sPivot);
   P('Stabilator actuators', {
     system: 'Flight controls', material: 'Dual electromechanical jackscrew actuators', mass: 12, count: 2, explode: [-3.0, -0.2, 0.4],
@@ -230,6 +230,9 @@ export function buildTail({ A, P, air, roofY }) {
     desc: 'Red anti-collision beacons on the pylon tip and belly, red and green position lights on the cabin sides, a white tail light, and low-intensity green formation strips for flying in close formation at night.',
   }, [mesh(new THREE.SphereGeometry(0.05, 12, 8).translate(tip.le[0] - 0.45, 4.05, pylonLean(4.05)), strobe, { cast: false }),
     mesh(new THREE.SphereGeometry(0.035, 10, 8).translate(-10.02, 2.2, pylonLean(2.2)), MAT.navWhite(), { cast: false }),
+    mesh(new THREE.SphereGeometry(0.045, 12, 8).translate(-0.8, 0.45, 0), strobe, { cast: false }),
+    mesh(new THREE.SphereGeometry(0.04, 10, 8).translate(-1.05, 2.12, 1.12), MAT.navGreen(), { cast: false }),
+    mesh(new THREE.SphereGeometry(0.04, 10, 8).translate(-1.05, 2.12, -1.12), MAT.navRed(), { cast: false }),
     mesh(merge([box(0.5, 0.05, 0.012, [-6.0, 1.75, 0.395]), box(0.5, 0.05, 0.012, [-6.0, 1.75, -0.395]), box(0.6, 0.012, 0.06, [-9.5, 3.4, pylonLean(3.4) + 0.09])]), MAT.formation(), { cast: false })]);
 
   const trSt = { phi: 0, pitch: 12 * DEG };
@@ -238,7 +241,7 @@ export function buildTail({ A, P, air, roofY }) {
     trSt.phi = phi; trSt.pitch = pitch;
     for (const s of spins) s.rotation.y = phi;
     for (const f of feathers) f.rotation.x = pitch;
-    spider.position.y = 0.16 - pitch * 0.12;
+    spider.position.y = 0.11 + 0.075 * Math.sin(pitch);
     for (const l of links) {
       const a = (l.i * Math.PI) / 2;
       const ca = Math.cos(a - lead), sa = Math.sin(a - lead);
