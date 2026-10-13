@@ -454,10 +454,13 @@ function renderHome(app) {
       <h1>Chem Bench</h1>
       <p class="lede">One hands-on lab for every chapter of your course. Build atoms, balance equations, squeeze gases and titrate acids, then practice with fresh problems until each topic sticks.</p>
     </div>
-    <div class="hero-stats">
-      <div><b>${LABS.length}</b><span>labs</span></div>
-      <div><b>${solved}</b><span>problems solved</span></div>
-      <div><b>${mastered}</b><span>mastered</span></div>
+    <div class="hero-side">
+      <figure class="hero-visual"><div id="hero-vis"></div><figcaption>CH<sub>4</sub> + 2 O<sub>2</sub> → CO<sub>2</sub> + 2 H<sub>2</sub>O, atom by atom</figcaption></figure>
+      <div class="hero-stats">
+        <div><b>${LABS.length}</b><span>labs</span></div>
+        <div><b>${solved}</b><span>problems solved</span></div>
+        <div><b>${mastered}</b><span>mastered</span></div>
+      </div>
     </div>
   </section>
   <section aria-label="Labs by chapter">
@@ -477,6 +480,7 @@ function renderHome(app) {
     <div><h2>Key ideas</h2><p>The rules and formulas for the chapter, written short enough to review in a minute.</p></div>
     <div><h2>Practice</h2><p>Endless randomized problems with worked solutions. Filter by problem type to drill one skill.</p></div>
   </section>`;
+  if (typeof Storyboard !== 'undefined') { try { cleanup = Storyboard(document.getElementById('hero-vis'), reactionFrames(), { compact: true, loop: true, hold: 1700, tween: 1300 }); } catch (err) { console.error(err); } }
 }
 function renderLab(app, lab) {
   const i = LABS.indexOf(lab), prev = LABS[i - 1], nextL = LABS[i + 1];
@@ -489,6 +493,7 @@ function renderLab(app, lab) {
       <p class="lede">${lab.blurb}</p>
     </div>
   </div>
+  ${typeof STORIES !== 'undefined' && STORIES[lab.id] ? `<section class="watch" id="watch" aria-labelledby="watch-h"><h2 id="watch-h">Watch it <span class="story-title"></span></h2><div class="story-body"></div></section>` : ''}
   <div class="lab-grid">
     <section class="bench" aria-labelledby="bench-h"><h2 id="bench-h">Bench</h2><div id="bench"></div></section>
     <div class="rail">
@@ -502,7 +507,10 @@ function renderLab(app, lab) {
     ${nextL ? `<a href="#${nextL.id}" class="nx"><span>Ch ${nextL.ch} →</span>${nextL.title}</a>` : '<span></span>'}
   </nav>`;
   const benchEl = document.getElementById('bench');
-  try { cleanup = lab.bench(benchEl) || null; } catch (err) { console.error(err); benchEl.innerHTML = '<p>The bench failed to load.</p>'; }
+  let benchStop = null, storyStop = null;
+  try { benchStop = lab.bench(benchEl) || null; } catch (err) { console.error(err); benchEl.innerHTML = '<p>The bench failed to load.</p>'; }
+  if (typeof mountStory !== 'undefined') storyStop = mountStory(document.getElementById('watch'), lab.id);
+  cleanup = () => { benchStop && benchStop(); storyStop && storyStop(); };
   mountPractice(document.getElementById('practice'), lab);
   if (typeof Tutor !== 'undefined') Tutor.chat(document.getElementById('ask'), lab);
 }
@@ -517,6 +525,7 @@ function route() {
   else if (page) { try { cleanup = page.render(app) || null; } catch (err) { console.error(err); app.innerHTML = '<p>This page failed to load.</p>'; } document.title = `${page.title} · Chem Bench`; }
   else { renderHome(app); document.title = 'Chem Bench'; }
   window.scrollTo(0, 0);
+  app.classList.remove('route-in'); void app.offsetWidth; app.classList.add('route-in');
 }
 function start() {
   Store.load();

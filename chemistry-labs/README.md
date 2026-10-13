@@ -4,7 +4,9 @@ Interactive labs for every chapter of an introductory chemistry course (organize
 
 Open `index.html` in any browser. No install or build step. Progress is saved in your browser.
 
-Each lab has three parts:
+Each lab has these parts:
+
+- **Watch it** (12 labs): a captioned, step-by-step animation at the particle level, or a live simulation. Every atom keeps its identity, so you can follow it as bonds break and form: methane burning, an ionic bond forming, salt dissolving, an electron emitting light, covalent sharing in H₂ and H₂O, a limiting reactant running out, strong vs. weak acids, zinc reducing copper, alpha and beta decay, and more. Ch 12 has a live states-of-matter simulation (real particle physics) and Ch 15 a live dynamic-equilibrium simulation.
 
 - **Bench**: interactive models you can change and watch respond.
 - **Key ideas**: the chapter's rules and formulas, short enough to review in a minute.
@@ -49,6 +51,9 @@ Study tools (top navigation):
 - `js/labs-states.js`: Ch 11–14, 17
 - `js/labs-life.js`: Ch 18–19
 - `js/tools.js`: periodic table, flashcards, test mode
+- `js/story.js`: storyboard animation engine (tweened atoms, bonds that break and form, orbiting electrons, photons)
+- `js/stories.js`: the Watch it storyboards for each lab
+- `js/sims.js`: live simulations (states of matter, dynamic equilibrium)
 - `js/tutor.js`: Ask Claude hints, explanations and chat (claude.ai Artifact runtime only)
 
 To add a lab, call `registerLab({ id, ch, sym, fam, title, chapter, blurb, ideas, bench(el), problems })` in any lab file.
