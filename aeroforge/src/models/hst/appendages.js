@@ -67,13 +67,11 @@ export function buildAppendages(P) {
     wingRoot.add(track);
     const wp = P(`Solar array wing (${side})`, {
       system: 'Power', material: 'Gallium-arsenide cells on rigid aluminium-honeycomb panels (Iridium-derived)', mass: 230, temp: 330,
-      explode: [0, 0, s * 1.6], count: 4,
+      explode: [0, 0, s * 1.6],
       desc: 'The third set of arrays, fitted in 2002: 7.1 × 2.6 m, rigid instead of the roll-up blankets that flexed and jittered the telescope as they crossed between sunlight and shadow. A third smaller than the old wings yet about 20 % more powerful; together roughly 5 kW. Fold scheme simplified.',
       callout: s > 0, anchor: [0.3, 0.4, s * 5.0],
-    }, track);
+    }, track, wingRoot);
     wp.userData.part.thermalRole = 'array';
-    // re-parent: the wing part must sit inside the rotating mast so it follows deployment
-    wingRoot.add(wp);
     out.arrays.push({ s, pivot, hinge: hingeG, track, drivePart: dp, wingPart: wp });
   }
 
@@ -85,7 +83,7 @@ export function buildAppendages(P) {
     base.push(new THREE.CylinderGeometry(0.08, 0.08, 0.42, 16).rotateX(Math.PI / 2).translate(HGA.x, s * (RAD.shell + 0.14), 0));
     const pivot = new THREE.Group();
     pivot.position.set(HGA.x, s * (RAD.shell + 0.14), 0);
-    pivot.add(mesh(merge([rod([0, 0, 0], [0, s * HGA.mast, 0], 0.065, 16), rod([0, s * 0.1, 0.0], [0.0, s * 0.1, 0.0], 0.1, 16)]), HM.al()));
+    pivot.add(mesh(merge([rod([0, 0, 0], [0, s * HGA.mast, 0], 0.065, 16), new THREE.CylinderGeometry(0.11, 0.11, 0.2, 16).rotateX(Math.PI / 2)]), HM.al()));
     const mp = P(`High-gain antenna mast (${side})`, {
       system: 'Communications', material: 'Aluminium/graphite boom with root deployment hinge, waveguide and cabling', mass: 30, temp: 255, explode: [0, s * 4.4, 0],
       desc: 'Holds its antenna clear of the telescope so the dish can see a TDRS relay over most of the sky. Folded flat along the forward shell for launch, it swung out 90° after release in 1990. Length estimated.',
@@ -118,8 +116,7 @@ export function buildAppendages(P) {
       explode: [0, s * 0.8, 0],
       desc: 'Steerable dish (≈1.3 m, estimated) that sends science data to NASA\'s Tracking and Data Relay Satellites 36,000 km up, which relay it to White Sands. The two-axis gimbal tracks the relay satellite as Hubble circles the Earth.',
       callout: s > 0, anchor: [0.4, s * 0.5, 0.4],
-    }, gimbal);
-    tip.add(hp);
+    }, gimbal, tip);
     out.hgas.push({ s, pivot, gimbal, g2, mastPart: mp, dishPart: hp });
   }
 
@@ -148,8 +145,8 @@ export function buildAppendages(P) {
     for (const x of [9.75, 12.05]) bar.push(new THREE.BoxGeometry(0.14, 0.18, 0.18).translate(0, RAD.shell + 0.1, 0).rotateX(p).translate(x, 0, 0));
     for (const x of [9.65, 12.15]) bar.push(new THREE.CylinderGeometry(0.075, 0.075, 0.06, 16).rotateZ(Math.PI / 2).translate(x, 0, 0).translate(0, ...az(p, RAD.shell + 0.16).slice(1)));
     P(`Magnetic torquer bar ${n}`, {
-      system: 'Attitude control', material: 'Permalloy-core electromagnet, about 2.5 m long, under a protective cover', mass: 25, temp: 250,
-      explode: az(p, 0.9, 0.6), desc: 'Pushes against the Earth\'s magnetic field to bleed off momentum the reaction wheels build up from gravity-gradient and aerodynamic torques — Hubble carries no thrusters. Two of the four have redundant windings that failed and were covered with new electronics in 1999.',
+      system: 'Attitude control', material: 'Ferromagnetic-core electromagnet with redundant windings, about 2.5 m long', mass: 25, temp: 250,
+      explode: az(p, 0.9, 0.6), desc: 'Pushes against the Earth\'s magnetic field to bleed off the momentum the reaction wheels build up from gravity-gradient and aerodynamic torques. Hubble carries no thrusters at all: wheels and torquers do every bit of attitude work.',
       callout: n === 1, anchor: az(p, RAD.shell + 0.3, 10.9),
     }, mesh(merge(bar), HM.mtb()));
   }
