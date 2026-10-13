@@ -8,7 +8,7 @@ import { lathe } from '../../engine/geometry.js';
 import { M, SKIN } from '../../engine/materials.js';
 import { GM } from './materials.js';
 import { FAN, ROWS, coreAt, bypassAt } from './layout.js';
-import { cutLathe, cutPair, bladeGeometry, ring, wall, sector, boxAt, kept, merge } from './geom.js';
+import { cutLathe, cutPair, bladeGeometry, ring, wall, boxAt, kept, merge, ccw, flipFaces } from './geom.js';
 
 const D2R = Math.PI / 180;
 
@@ -26,6 +26,13 @@ function fanBlade(sheath = false) {
     stations: 10, n: sheath ? 5 : 14,
     ...(sheath ? { c0: 0, c1: 0.1, scale: 1.18 } : {}),
   });
+}
+
+/** A closed [r, y] section swept between angles p0 and p1, with end faces (a tilted sector). */
+function slab(loop, p0, p1, seg = 6) {
+  const l = ccw(loop);
+  const shape = new THREE.Shape(l.map(([r, y]) => new THREE.Vector2(r, y)));
+  return merge([lathe(l.concat([l[0]]), seg, p0, p1 - p0), new THREE.ShapeGeometry(shape).rotateY(p0 - Math.PI / 2), flipFaces(new THREE.ShapeGeometry(shape)).rotateY(p1 - Math.PI / 2)]);
 }
 
 /** A blade row sized to the core annulus at y. Rotors leave a tip gap, stators a hub gap. */
@@ -213,9 +220,9 @@ export function buildFan(ctx) {
     for (let i = 0; i < 12; i++) {
       const phi = Math.PI / 2 + ((i + 0.5) / 12) * Math.PI * 2;
       if (!keep(phi)) continue;
-      // door hinged at its aft edge, cracked open into the duct wall
-      const door = sector(0.735, 0.752, -1.64, -1.76, phi - 0.16, phi + 0.16, 6);
-      list.push(door);
+      // door hinged at its aft edge with its forward edge swung inward into the flow, so that,
+      // open, it scoops the air and debris running along the outer wall out through the hole
+      list.push(slab([[0.703, -1.645], [0.718, -1.645], [0.752, -1.76], [0.737, -1.76]], phi - 0.16, phi + 0.16, 6));
       // chute through the frame that dumps the bled air into the bypass stream
       list.push(boxAt(0.86, -1.72, phi, [0.2, 0.08, 0.12]));
       list.push(boxAt(0.81, -1.67, phi + 0.11, [0.14, 0.02, 0.02]));
@@ -228,7 +235,7 @@ export function buildFan(ctx) {
   P('Variable bleed valves', {
     system: 'Propulsion', material: 'Steel doors, unison ring and fuel-powered actuators (count estimated)', mass: 70, count: 12,
     explode: [-0.4, 0.25, 0.35], temp: 330,
-    desc: 'Doors in the duct between booster and HP compressor. At low power and during rapid throttle changes the booster pumps more air than the core can swallow; the FADEC opens these doors to dump the excess into the bypass and keep the booster from stalling.',
+    desc: 'Doors in the duct between booster and HP compressor. At low power and during rapid throttle changes the booster pumps more air than the core can swallow; the FADEC opens these doors to dump the excess into the bypass and keep the booster from stalling. The GE90 introduced doors that open inward into the flow, so they also scoop out sand, hail and ice flung to the outer wall — GE calls it a FOD-free core.',
     callout: true, anchor: [0.02, -1.7, 0.77],
   }, vbvGrp).userData.part.stationTemp = '25';
 

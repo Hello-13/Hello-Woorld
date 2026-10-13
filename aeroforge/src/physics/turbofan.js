@@ -15,14 +15,14 @@ const R_C = CP_C * (GAMMA_C - 1) / GAMMA_C;
 const R_T = CP_T * (GAMMA_T - 1) / GAMMA_T;
 const H_FUEL = 43.1e6;                  // J/kg, Jet-A lower heating value
 
-/** Published GE90-115B figures used by the model (FAA/EASA TCDS, GE, Aircraft Commerce). */
+/** Published GE90-115B figures used by the model (EASA TCDS IM.E.002, GE, Aircraft Commerce). */
 export const GE90 = {
   name: 'GE90-115B',
   // Take-off airflow is not published; ≈ 3,530 lb/s is an estimate from the 3.25 m fan
   // annulus at a fan-face Mach number of about 0.6.
   massFlowSL: 1600,       // kg/s total airflow at sea-level static, take-off
   fanDiameter: 3.25,      // m (128 in)
-  ratedThrust: 513e3,     // N (115,300 lbf certified take-off)
+  ratedThrust: 513.95e3,  // N (51,395 daN = 115,540 lbf certified take-off, EASA TCDS IM.E.002)
   n1Rpm100: 2355,         // rpm at 100 % N1 (TCDS)
   n2Rpm100: 9332,         // rpm at 100 % N2 (TCDS)
   egtLimitK: 1363,        // K, take-off EGT (T49) limit 1,090 °C (TCDS)
@@ -35,7 +35,7 @@ export const DEFAULT_CYCLE = {
   // fan tip PR, booster PR (fan hub + 4 booster stages), overall PR, combustor exit T, BPR
   // GE90-115B take-off: OPR 42 (GE). BPR 7.2 (Aircraft Commerce, -115B); the 8–9 often quoted
   // belongs to the earlier -76B…-94B. Fan PR, booster PR and combustor exit temperature are
-  // not published — they are chosen so 513 kN and a T49 (EGT) under the 1,090 °C limit result.
+  // not published — they are chosen so 514 kN and a T49 (EGT) under the 1,090 °C limit result.
   fpr: 1.7, lpcpr: 2.3, opr: 42, tit: 1680, bpr: 7.2,
   eff: { inlet: 0.995, fan: 0.92, lpc: 0.89, comp: 0.88, burner: 0.995, burnerPR: 0.955, hpt: 0.91, lpt: 0.93, mech: 0.99, nozzle: 0.98 },
 };

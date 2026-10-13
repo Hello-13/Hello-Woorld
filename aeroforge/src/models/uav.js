@@ -188,6 +188,39 @@ export function buildUAV() {
     system: 'Structure', material: 'Aluminium honeycomb panel (est.)', mass: 14, explode: [0.6, 0.15, 0],
     desc: 'A floor for the avionics racks above a boxed well that the nose gear retracts into. Keeping the electronics above the well keeps them clear of runway spray.',
   }, L(merge(shelf), m.primer));
+  // main-gear wells behind the wing box: roof, inner (keel) wall and aft wall on each side; the
+  // front is closed by the fuselage tank's aft face and the outer wall is the fuselage side
+  const BAY = [5.06, 6.28], ROOF = 1.42;
+  const keelWall = (zc) => {
+    const sh = new THREE.Shape([
+      new THREE.Vector2(X(BAY[0]), prof(BAY[0]).bot + 0.02), new THREE.Vector2(X(BAY[1]), prof(BAY[1]).bot + 0.02),
+      new THREE.Vector2(X(BAY[1]), ROOF), new THREE.Vector2(X(BAY[0]), ROOF),
+    ]);
+    return new THREE.ExtrudeGeometry(sh, { depth: 0.01, bevelEnabled: false }).translate(0, 0, zc - 0.005);
+  };
+  // aft wall: the section between the keel wall and the skin, below the roof (shape in z–y, extruded along x)
+  const aftWall = (zs) => {
+    const pts = [new THREE.Vector2(0.05, ROOF)];
+    for (let i = 0; i <= 24; i++) {
+      const p = fusePoint(BAY[1], -Math.PI / 2 + (i / 24) * (Math.PI / 2), 0.02);
+      if (p[1] <= ROOF && p[2] >= 0.05) pts.push(new THREE.Vector2(p[2], p[1]));
+    }
+    pts.push(new THREE.Vector2(0.05, prof(BAY[1]).bot + 0.02));
+    const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts.reverse()), { depth: 0.01, bevelEnabled: false, curveSegments: 1 });
+    applyMat(g, new THREE.Matrix4().set(0, 0, 1, X(BAY[1]) - 0.005, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1));
+    return zs > 0 ? g : mirror(g);
+  };
+  const bays = [];
+  for (const zs of [1, -1]) {
+    const zOut = prof((BAY[0] + BAY[1]) / 2).hw - 0.03;
+    bays.push(keelWall(0.045 * zs));
+    bays.push(box(BAY[1] - BAY[0], 0.01, zOut - 0.045, [X((BAY[0] + BAY[1]) / 2), ROOF, ((zOut + 0.045) / 2) * zs]));
+    bays.push(aftWall(zs));
+  }
+  P('Main gear wells', {
+    system: 'Structure', material: 'Composite well liners on a keel web (est.)', mass: 12, count: 2, explode: [0, -0.3, 0],
+    desc: 'Two boxed wells behind the wing box take the retracted main legs, one each side of a keel web that carries fuselage bending past the cut-outs; the feed line to the collector tank runs along the keel between them (layout estimated). The wells and their frames take the landing loads of the heavy-weight trailing-arm gear.',
+  }, L(merge(bays), m.primer));
 
   // wing carry-through: the two spars continue across the body and take the wing attach fittings
   const carry = [];
@@ -228,7 +261,13 @@ export function buildUAV() {
   const FLAP = [0.78, 4.55], AIL = [4.72, 9.3];
   const TANK = [0.5, 8.4];
   const RIBS = [0.45, 1.1, 1.75, 2.4, 3.05, 3.7, 4.35, 5.0, 5.6, 6.2, 6.8, 7.4, 8.0, 8.6, 9.2, 9.85];
-  const STN = [[2.4, 0.92, 0.24, 'inboard'], [4.0, 0.72, 0.2, 'middle'], [5.6, 0.5, 0.15, 'outboard']];
+  // under-wing stations: [span z, pylon chord, pylon depth, name, mass estimate, description]; ratings
+  // are the public figures (inboard 1,500 lb, middle 600 lb, outboard 200 lb)
+  const STN = [
+    [2.4, 0.92, 0.24, 'Inboard', 24, 'Inboard wing station, rated 1,500 lb (680 kg): the heaviest, because the wing is deepest and stiffest here. It takes a 500 lb-class bomb such as the GBU-12 shown or an external fuel tank; since 2020 it can also carry a pair of Hellfires, for eight missiles in all.'],
+    [4.0, 0.72, 0.2, 'Middle', 17, 'Middle wing station, rated 600 lb (272 kg): sized for a two-rail M299 launcher with two Hellfires, about 135 kg together, as shown. A release unit and four sway braces hold the store against gust and landing loads.'],
+    [5.6, 0.5, 0.15, 'Outboard', 12, 'Outboard wing station, rated 200 lb (91 kg), for light stores and pods (shown empty). Weight this far out bends the wing hardest, which is why the ratings fall toward the tip.'],
+  ];
   const surf = { flap: [], ail: [], rv: [], rud: null };
   const storeParts = { gbu: [], hellfire: [], launcher: [] };
   const twistAt = (z) => WING.twist * zE(z);
@@ -247,9 +286,9 @@ export function buildUAV() {
     }), W_TIP.le[2]);
     const wing = P(`Wing skin (${sn})`, {
       system: 'Skin & fairings', skin: true, material: 'Carbon/epoxy skins, integral leading edge (est.)', mass: 125, explode: [0, 1.5, 1.9 * side],
-      desc: 'A long, straight, high-aspect-ratio wing: 20.1 m span over about 24 m², aspect ratio near 17. Induced drag falls with span squared, which is what buys the 27-hour endurance.',
+      desc: 'A long, straight, high-aspect-ratio wing: 20.1 m span over about 24 m², aspect ratio near 17. Induced drag falls with span squared, which is what buys the 27-hour endurance. The baseline MQ-9A wing has no ice protection; leading-edge de-ice provisions came with the longer wing of later versions.',
     }, [wbox, ...fills, tipCap].map((g) => L(f(g), m.skin)));
-    if (side < 0) wing.userData.part.desc = 'Port wing skin, mirror of the starboard one. The skins are bonded to the spars and ribs and also form the walls of the integral fuel bays (estimate of the internal layout).';
+    if (side < 0) wing.userData.part.desc = 'Port wing skin, mirror of the starboard one. The skins are bonded to the spars and ribs and also form the walls of the integral fuel bays (internal layout estimated). Each wing has three store stations and comes off at the carry-through box for shipping.';
 
     P(`Main spar (${sn})`, {
       system: 'Structure', material: 'Carbon-fibre spar caps on a composite web (est.)', mass: 62, explode: [0, 0.75, 1.9 * side],
@@ -313,19 +352,16 @@ export function buildUAV() {
     }, L(f(pod), m.dark));
 
     // pylons and stores
-    const pyl = [], rack = [];
     const stnInfo = [];
-    for (const [z, chord, h] of STN) {
+    for (const [z, chord, h, label, mass, desc] of STN) {
       const le = wpt(z, 0.04, 0), yTop = wpt(z, 0.32, -1)[1] + 0.03;
       const pg = pylon(chord, h);
-      pyl.push(pg.skin.translate(le[0], yTop, z));
-      rack.push(pg.rack.translate(le[0], yTop, z));
+      P(`${label} pylon (${sn})`, {
+        system: 'Weapons', material: 'Aluminium pylon with bomb rack, release unit and sway braces (mass est.)', mass, explode: [0, -0.75, 1.9 * side],
+        desc,
+      }, [L(f(pg.skin.translate(le[0], yTop, z)), m.skin), L(f(pg.rack.translate(le[0], yTop, z)), m.darkMetal)]);
       stnInfo.push({ x: le[0] - chord * 0.45, yBot: yTop - h - 0.03, z });
     }
-    P(`Pylons (${sn})`, {
-      system: 'Weapons', material: 'Aluminium pylons with release units and sway braces', mass: 53, count: 3, explode: [0, -0.75, 1.9 * side],
-      desc: side > 0 ? 'Three under-wing stations: inboard (rated about 1,500 lb, 680 kg), middle (about 600–750 lb) and outboard (about 150–200 lb); press figures differ. Inboard stations can also take fuel tanks.' : 'Port inboard, middle and outboard pylons. With the centreline station there are seven stations in all, for up to 3,000 lb (1,361 kg) of external stores.',
-    }, [L(f(merge(pyl)), m.skin), L(f(merge(rack)), m.darkMetal)]);
 
     // GBU-12 on the inboard station
     const g = gbu12();
@@ -371,7 +407,7 @@ export function buildUAV() {
   const cl = [lru(0.62, 0.05, 0.13, [X(4.6), 0.995, 0], 0.02), box(0.04, 0.035, 0.03, [X(4.6) + 0.178, 0.96, 0]), box(0.04, 0.035, 0.03, [X(4.6) - 0.178, 0.96, 0])];
   P('Centreline station', {
     system: 'Weapons', material: 'Aluminium hardpoint fairing', mass: 6, explode: [0, -0.7, 0],
-    desc: 'The seventh store station, under the fuselage on the centreline (shown empty). Public sources list it among the seven stations without a published rating.',
+    desc: 'The seventh store station, under the fuselage on the centreline (shown empty; public sources give no rating for it). With the six wing stations the aircraft carries up to 3,000 lb (1,361 kg) of external stores.',
   }, L(merge(cl), m.darkMetal));
 
   // ============================================================== V-tail and ventral fin
@@ -549,9 +585,11 @@ export function buildUAV() {
   }, L(merge(coll), m.alu));
   const lines = [];
   for (const zs of [1, -1]) {
-    lines.push(pipe([wpt(0.62, 0.6, -1, 0.03).map((v, i) => (i === 2 ? v * zs : v)), [X(5.4), 1.5, 0.3 * zs], [X(6.2), 1.42, 0.15 * zs], [X(6.35), 1.38, 0.1 * zs]], 0.013, 6, 24));
+    // wing feeds pass over the main-gear well roofs (y 1.42) to the collector's front face
+    lines.push(pipe([wpt(0.62, 0.6, -1, 0.03).map((v, i) => (i === 2 ? v * zs : v)), [X(5.4), 1.52, 0.3 * zs], [X(6.15), 1.475, 0.15 * zs], [X(6.36), 1.4, 0.1 * zs]], 0.013, 6, 24));
   }
-  lines.push(pipe([[X(4.98), 1.1, 0], [X(5.6), 1.2, -0.05], [X(6.33), 1.3, -0.05]], 0.013, 6, 20));
+  // fuselage tank to collector along the keel, between the two gear wells
+  lines.push(pipe([[X(4.98), 1.09, 0], [X(5.6), 1.15, 0], [X(6.15), 1.22, 0], [X(6.36), 1.3, -0.04]], 0.013, 6, 24));
   lines.push(pipe([[X(6.77), 1.3, 0.05], [X(7.3), 1.42, 0.22], [X(7.9), 1.42, 0.24], [X(8.2), 1.45, 0.24]], 0.012, 6, 24));
   lines.push(box(0.06, 0.05, 0.05, [X(7.1), 1.39, 0.2]), box(0.06, 0.05, 0.05, [X(5.3), 1.18, -0.05]));
   P('Fuel lines & valves', {

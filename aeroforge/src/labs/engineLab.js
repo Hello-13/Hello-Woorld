@@ -70,7 +70,7 @@ export function mountEngineLab(root, ctx) {
   });
 
   root.append(
-    el('p', { class: 'lab-intro', text: `The GE90-115B cycle, solved station by station: fan, 4-stage booster and 9-stage HP compressor, a burner pressure loss, the 2-stage HP turbine driving the compressor and the 6-stage LP turbine driving fan and booster, then two ideally expanded nozzles. The design point is tuned to the certified 513 kN (115,300 lbf) take-off at overall pressure ratio 42 and bypass ratio 7.2; fan, booster and turbine-inlet values are not published and are modelled. Change the design and watch the engine respond.` }),
+    el('p', { class: 'lab-intro', text: `The GE90-115B cycle, solved station by station: fan, 4-stage booster and 9-stage HP compressor, a burner pressure loss, the 2-stage HP turbine driving the compressor and the 6-stage LP turbine driving fan and booster, then two ideally expanded nozzles. The design point is tuned to the certified 514 kN (115,540 lbf, EASA type certificate) take-off at overall pressure ratio 42 and bypass ratio 7.2; fan, booster and turbine-inlet values are not published and are modelled. Change the design and watch the engine respond.` }),
     section('Operating point', preset.el, sAlt.el, sMach.el, sThr.el),
     section('Cycle design', sFpr.el, sLpc.el, sOpr.el, sTit.el, sBpr.el),
     status,

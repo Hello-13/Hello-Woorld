@@ -54,13 +54,13 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   const tb = (y0, y1) => barrel(R, y0, y1, { v0y: span[0], v1y: span[1], rings: 3 });
   const lox = P('Second stage LOX tank', {
     system: 'Fuel', skin: true, material: 'Aluminium-lithium 2195', mass: 1150,
-    desc: 'Upper tank of the second stage, about 78 t of densified LOX; its forward skirt carries the avionics and the fairing.',
+    desc: 'Upper tank of the second stage, about 75 t of densified LOX; its forward skirt carries the avionics and the fairing.',
     explode: [0, 1.0, -4.5],
   }, [mesh(tb(Y.s2CommonDome, Y.s2Top), skin), mesh(merge([53.2, 54.9, Y.s2LoxTop, Y.s2Top - 0.05].map((y) => hoop(R - 0.035, 0.03, y, { seg: 72, tube: 4 }))), FM.aluDark())]);
   lox.userData.part.thermalRole = 'lox';
   const rp = P('Second stage RP-1 tank', {
     system: 'Fuel', skin: true, material: 'Aluminium-lithium 2195', mass: 700,
-    desc: 'Lower tank, about 33 t of RP-1. Second-stage propellant totals ≈ 111 t, burned by one Merlin Vacuum for up to ≈ 6.5 minutes in one or more burns.',
+    desc: 'Lower tank, about 32 t of RP-1. Second-stage propellant totals ≈ 107.5 t (≈ 111.5 t fuelled stage), burned by one Merlin Vacuum for up to ≈ 6.5 minutes in one or more burns.',
     explode: [0, -0.6, -4.5],
   }, [mesh(tb(Y.interTop, Y.s2CommonDome), skin), mesh(merge([Y.interTop + 0.05, Y.s2AftSkirt, 49.8].map((y) => hoop(R - 0.035, 0.03, y, { seg: 72, tube: 4 }))), FM.aluDark())]);
   rp.userData.part.thermalRole = 'rp1';

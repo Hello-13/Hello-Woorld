@@ -69,7 +69,6 @@ export function buildCabin({ A, P, surfPoint, surfNormal }) {
   P('Instrument panel & multifunction displays', {
     system: 'Crew systems', material: 'Four 6 × 8 in active-matrix LCD multifunction displays, standby instrument, glareshield', mass: 55, explode: [1.6, 0.9, 0],
     desc: 'The M model\'s glass cockpit: four multifunction displays show flight, engine, navigation and moving-map pages, replacing dozens of round gauges; one standby instrument backs them up.',
-    callout: true, anchor: [3.66, 1.55, -0.3],
   }, [mesh(merge(panelG), MAT.black()), mesh(merge(bezel), MAT.avionics()), mesh(merge(mfd), MAT.screen(), { cast: false })]);
   const cdu = [new THREE.PlaneGeometry(0.13, 0.1).rotateX(-Math.PI / 2).rotateZ(0.6).translate(3.3, 1.04, 0.0)];
   P('Centre console & flight-management CDUs', {

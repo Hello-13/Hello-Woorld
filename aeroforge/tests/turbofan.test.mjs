@@ -1,9 +1,9 @@
 // Turbofan regression tests: `npm test` (node --test).
-// Reference: GE Aerospace GE90-115B — 115,300 lbf (513 kN) certified take-off thrust, overall
-// pressure ratio 42, bypass ratio 7.2 (Aircraft Commerce), take-off EGT (T49) limit 1,090 °C,
-// 100 % N1 = 2,355 rpm and 100 % N2 = 9,332 rpm (FAA / EASA type-certificate data sheets);
-// fan 3.25 m (128 in) with 22 blades, 1 + 4 + 9 compressor and 2 + 6 turbine stages, length
-// 7.29 m (287 in) (GE Aerospace, TCDS).
+// Reference: GE Aerospace GE90-115B — certified take-off thrust 51,395 daN (115,540 lbf),
+// take-off EGT (T49) limit 1,090 °C, 100 % N1 = 2,355 rpm, 100 % N2 = 9,332 rpm, length 7,281 mm
+// (286.7 in) (EASA TCDS IM.E.002 issue 05); overall pressure ratio 42, fan 3.25 m (128 in) with
+// 22 blades, 1 + 4 + 9 compressor and 2 + 6 turbine stages (GE Aerospace); bypass ratio 7.2
+// (Aircraft Commerce no. 84, 2012).
 //
 // The model's geometry is checked through its three.js-free layout module; the tour is checked
 // against the part names declared in the model source, so a renamed part cannot silently drop
@@ -13,7 +13,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { solveTurbofan, DEFAULT_CYCLE, GE90 } from '../src/physics/turbofan.js';
-import { STAGES, FAN, ROWS, CORE, coreAt, bypassAt, STATIONS, PLUG_TIP, FAN_NOZZLE_Y } from '../src/models/ge90/layout.js';
+import { STAGES, FAN, ROWS, CORE, coreAt, bypassAt, STATIONS, PLUG_TIP, FAN_NOZZLE_Y, NACELLE } from '../src/models/ge90/layout.js';
 import TOUR from '../src/learn/tours/turbofan.js';
 
 const close = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg ?? ''} expected ${b} ± ${tol}, got ${a}`);
@@ -23,8 +23,8 @@ test('GE90-115B design point matches the published rating', () => {
   assert.equal(DEFAULT_CYCLE.bpr, 7.2);
   const to = solveTurbofan({});
   assert.ok(to.valid && !to.fanLimited);
-  close(to.thrust / 1000, 513, 15, 'take-off thrust kN');
-  close(to.thrust / 4.44822, 115300, 3500, 'take-off thrust lbf');
+  close(to.thrust / 1000, GE90.ratedThrust / 1000, 5, 'take-off thrust kN');
+  close(to.thrust / 4.44822, 115540, 1200, 'take-off thrust lbf (TCDS)');
   close(to.opr, 42, 0.01, 'overall pressure ratio at 100 % N1');
   assert.ok(to.tsfc * 1e6 > 8 && to.tsfc * 1e6 < 10.5, `take-off TSFC ${to.tsfc * 1e6} g/(kN·s)`);
   close(to.mCore * (1 + DEFAULT_CYCLE.bpr), to.m0, 1e-6, 'core + bypass = total airflow');
@@ -74,8 +74,9 @@ test('model layout: GE90-115B stage counts and main dimensions', () => {
   assert.equal(ROWS.lptBlades.length, 6);
   assert.equal(FAN.blades, 22);
   close(2 * FAN.tipR, 3.25, 1e-9, 'fan diameter m');
-  close(FAN.spinnerTip - PLUG_TIP, 7.29, 1e-9, 'spinner tip to plug tip m');
+  close(FAN.spinnerTip - PLUG_TIP, 7.281, 1e-9, 'spinner tip to plug tip m (TCDS 7,281 mm)');
   assert.ok(FAN.caseR > FAN.tipR && FAN.caseR - FAN.tipR < 0.015, 'fan tip clearance under 15 mm');
+  close(2 * NACELLE.maxR / 0.0254, 166, 0.5, 'Boeing nacelle maximum diameter in');
 });
 
 test('model layout: blade rows alternate rotor/stator in order down the core', () => {

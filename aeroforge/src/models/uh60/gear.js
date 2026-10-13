@@ -99,7 +99,7 @@ export function buildGear({ A, P }) {
     P(side > 0 ? 'Fuel cell (right)' : 'Fuel cell (left)', {
       system: 'Fuel', material: 'Crash-resistant, self-sealing rubberised-fabric bladder', mass: 40, explode: [-0.3, -1.4, 0.9 * s],
       desc: 'One of two cells holding 360 US gal (1,360 L, ≈1,090 kg of JP-8) between them. Each must survive a 20 m (65 ft) drop test full of water without leaking, and the self-sealing layers close up after small-arms penetration. Mass shown is the empty cell.',
-      callout: side > 0, anchor: [-2.4, 1.25, 0.95],
+      callout: side > 0, anchor: [-2.75, 0.95, 0.75],
     }, [mesh(g, MAT.fuelCell()), mesh(merge(fittings), MAT.casting())]);
   }
   const lines = [];

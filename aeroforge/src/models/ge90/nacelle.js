@@ -14,6 +14,14 @@ const TAU = Math.PI * 2;
 const UP = Math.PI * 1.5;          // phi of the pylon (world up)
 const DOWN = Math.PI / 2;          // phi of the lower bifurcation
 
+// The outer lines below were drawn for a 3.96 m nacelle; the published maximum is 166 in (4.22 m).
+// grow(y) adds the difference over the fan cowl, fading to nothing at the inlet highlight and at
+// the fan-nozzle exit, so the inlet lip, the bypass duct and the nozzle area are unchanged.
+const DR = NACELLE.maxR - 1.98;
+const smooth = (a, b, y) => { const t = Math.min(1, Math.max(0, (y - a) / (b - a))); return t * t * (3 - 2 * t); };
+export const grow = (y) => DR * (y > 0.2 ? 1 - smooth(0.2, 1.8, y) : smooth(FAN_NOZZLE_Y, -1.9, y));
+const outerLine = (line) => line.map(([y, r]) => [y, r + grow(y)]);
+
 export function buildNacelle(ctx) {
   const { P, cut } = ctx;
   const nac = SKIN.nacelle();
@@ -21,10 +29,11 @@ export function buildNacelle(ctx) {
 
   // ------------------------------------------------------------------ inlet
   const lip = [[1.535, 1.56], [1.538, 1.7], [1.556, 1.77], [1.588, 1.803], [1.63, 1.814], [1.672, 1.806], [1.714, 1.784], [1.762, 1.738], [1.802, 1.66], [1.828, 1.58],
-    [1.813, 1.58], [1.788, 1.652], [1.75, 1.718], [1.705, 1.764], [1.646, 1.792], [1.598, 1.782], [1.566, 1.752], [1.552, 1.69], [1.55, 1.56]];
-  const outerSkin = wall([[1.58, 1.825], [1.45, 1.862], [1.25, 1.902], [1.0, 1.936], [0.7, 1.958], [0.3, 1.968]], -0.01);
+    [1.813, 1.58], [1.788, 1.652], [1.75, 1.718], [1.705, 1.764], [1.646, 1.792], [1.598, 1.782], [1.566, 1.752], [1.552, 1.69], [1.55, 1.56]]
+    .map(([r, y], i) => [i >= 5 && i <= 14 ? r + grow(y) : r, y]);
+  const outerSkin = wall(outerLine([[1.58, 1.825], [1.45, 1.862], [1.25, 1.902], [1.0, 1.936], [0.7, 1.958], [0.3, 1.968]]), -0.01);
   const barrel = wall([[1.56, 1.536], [1.3, 1.546], [1.0, 1.57], [0.7, 1.6], [0.45, 1.624], [NACELLE.inletAftY, FAN.caseR]], 0.04);
-  const bulkheads = [[[1.55, 1.565], [1.815, 1.565], [1.815, 1.555], [1.55, 1.555]], [[1.66, 0.33], [1.958, 0.33], [1.958, 0.315], [1.66, 0.315]]];
+  const bulkheads = [[[1.55, 1.565], [1.815, 1.565], [1.815, 1.555], [1.55, 1.555]], [[1.66, 0.33], [1.958 + grow(0.33), 0.33], [1.958 + grow(0.315), 0.315], [1.66, 0.315]]];
   const inletShell = cut(cutLathe([lip, outerSkin, ...bulkheads], nac, N));
   const inletLiner = cut(cutLathe(barrel, SKIN.liner(), N));
   P('Inlet cowl', {
@@ -34,8 +43,8 @@ export function buildNacelle(ctx) {
   }, [inletShell, inletLiner]).userData.part.stationTemp = '2';
 
   // ------------------------------------------------------------------ fan cowl doors
-  const fanCowl = [wall([[0.3, 1.968], [-0.2, 1.978], [-0.8, 1.98], [NACELLE.fanCowlAftY, 1.975]], -0.02)];
-  for (const y of [-0.15, -0.75, -1.3]) fanCowl.push([[1.9, y + 0.01], [1.96, y + 0.01], [1.96, y - 0.01], [1.9, y - 0.01]]);
+  const fanCowl = [wall(outerLine([[0.3, 1.968], [-0.2, 1.978], [-0.8, 1.98], [NACELLE.fanCowlAftY, 1.975]]), -0.02)];
+  for (const y of [-0.15, -0.75, -1.3]) fanCowl.push([[1.9 + DR, y + 0.01], [1.96 + DR, y + 0.01], [1.96 + DR, y - 0.01], [1.9 + DR, y - 0.01]]);
   P('Fan cowl doors', {
     system: 'Skin & fairings', skin: true, material: 'Carbon-fibre composite sandwich', mass: 260, count: 2,
     explode: [-0.9, 0.1, -1.1], temp: 300,
@@ -48,9 +57,9 @@ export function buildNacelle(ctx) {
   for (let y = cavityAft; y >= FAN_NOZZLE_Y - 1e-6; y -= 0.1) duct.push([y, bypassAt(y)[1]]);
   duct.push([FAN_NOZZLE_Y, bypassAt(FAN_NOZZLE_Y)[1]]);
   const sleeve = [
-    wall([[NACELLE.fanCowlAftY - 0.02, 1.974], [-1.9, 1.965], [-2.4, 1.93], [-2.9, 1.86], [-3.35, 1.76], [-3.7, 1.645], [FAN_NOZZLE_Y, 1.55]], -0.012),
+    wall(outerLine([[NACELLE.fanCowlAftY - 0.02, 1.974], [-1.9, 1.965], [-2.4, 1.93], [-2.9, 1.86], [-3.35, 1.76], [-3.7, 1.645], [FAN_NOZZLE_Y, 1.55]]), -0.012),
     wall(duct, 0.035),
-    [[bypassAt(cavityAft)[1] + 0.035, cavityAft], [1.92, cavityAft], [1.92, cavityAft - 0.015], [bypassAt(cavityAft)[1] + 0.035, cavityAft - 0.015]],
+    [[bypassAt(cavityAft)[1] + 0.035, cavityAft], [1.92 + grow(cavityAft), cavityAft], [1.92 + grow(cavityAft), cavityAft - 0.015], [bypassAt(cavityAft)[1] + 0.035, cavityAft - 0.015]],
     [[1.49, FAN_NOZZLE_Y], [1.545, FAN_NOZZLE_Y], [1.55, FAN_NOZZLE_Y + 0.03], [1.5, FAN_NOZZLE_Y + 0.03]],
   ];
   const sleeveGrp = cut(cutLathe(sleeve, nac, N));
@@ -61,7 +70,7 @@ export function buildNacelle(ctx) {
   }, sleeveGrp);
 
   // cascades: rings of forward-turning vanes between axial strongbacks, behind the torque box
-  const torqueBox = [[FAN.caseR + 0.01, NACELLE.fanCowlAftY], [1.95, NACELLE.fanCowlAftY], [1.95, sleeveFwd], [FAN.caseR, sleeveFwd]];
+  const torqueBox = [[FAN.caseR + 0.01, NACELLE.fanCowlAftY], [1.95 + DR, NACELLE.fanCowlAftY], [1.95 + DR, sleeveFwd], [FAN.caseR, sleeveFwd]];
   const slats = [];
   for (let k = 0; k < 9; k++) {
     const y = sleeveFwd - 0.06 - k * 0.075;
@@ -210,7 +219,7 @@ export function buildNacelle(ctx) {
   P('Aft engine mount & thrust links', {
     system: 'Structure', material: 'Forged steel / titanium (arrangement typical of GE wide-body engines)', mass: 120,
     explode: [-0.8, -0.95, 0], temp: 600,
-    desc: 'The aft mount on the turbine rear frame takes vertical, side and roll loads; a pair of thrust links runs forward to the fan hub frame and carries the engine\'s 513 kN of thrust into the strut. GE does not publish GE90 mount drawings, so the layout follows GE\'s patents for this class of engine.',
+    desc: 'The aft mount on the turbine rear frame takes vertical, side and roll loads; a pair of thrust links runs forward to the fan hub frame and carries the engine\'s 514 kN of take-off thrust into the strut. GE does not publish GE90 mount drawings, so the layout follows GE\'s patents for this class of engine.',
   }, mesh0(merge(links), GM.steel()));
 
   void kept; void lathe; void tube; void ctx;

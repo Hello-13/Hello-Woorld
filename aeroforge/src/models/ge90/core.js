@@ -381,7 +381,7 @@ export function buildCore(ctx) {
   P('Centre plug', {
     system: 'Propulsion', material: 'Inconel 625 / titanium cone', mass: 65,
     explode: [0, -2.5, 0],
-    desc: 'The exhaust cone fills the hole left by the turbine hub so the core stream expands smoothly and does not separate. Its tip marks the aft end of the engine: 7.29 m from the spinner tip.',
+    desc: 'The exhaust cone fills the hole left by the turbine hub so the core stream expands smoothly and does not separate. Its tip marks the aft end of the engine: 7.28 m (286.7 in) from the spinner tip, the type-certificate length.',
   }, plug).userData.part.stationTemp = '9';
 
   // ====================================================================== shafts, bearings and sumps

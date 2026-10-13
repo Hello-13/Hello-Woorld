@@ -132,7 +132,8 @@ export function buildTail({ A, P, air, roofY }) {
     for (let k = 0; k <= 6; k++) { const p = a.clone().lerp(b, k / 6); p.z = pylonLean(p.y); pts.push(p); }
     for (let k = 0; k < 6; k++) spar.push(tube(pts[k], pts[k + 1], 0.03, 6));
   }
-  spar.push(cyl(0.035, 0.035, 0.26, [-8.85, 1.82, 0.15], 'y', 12), cyl(0.035, 0.035, 0.22, [-9.3, 1.78, 0.11], 'y', 12));
+  // fold-hinge knuckles on the right side of the pylon, just above its joint with the tail cone
+  for (const y of [1.99, 2.21]) spar.push(cyl(0.028, 0.028, 0.09, [-8.47, y, 0.135], 'y', 12), box(0.1, 0.07, 0.012, [-8.53, y, 0.125]));
   P('Pylon spars & fold hinge', {
     system: 'Structure', material: 'Aluminium spars, steel fold-hinge fittings', mass: 45, explode: [-2.9, 0.2, 0.6],
     desc: 'Two spars carry the tail-rotor thrust and gearbox loads down into the tail cone. A hinge at the joint lets the pylon fold alongside the tail cone so the aircraft fits inside a C-130 or C-17.',

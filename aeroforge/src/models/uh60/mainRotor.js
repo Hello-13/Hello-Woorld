@@ -166,7 +166,7 @@ export function buildMainRotor({ A, parent }) {
   P('Main rotor hub', {
     material: 'One-piece forged titanium hub', mass: 270, explode: [0, UPX + 0.5, 0],
     desc: 'A single titanium forging with four box-section arms. Each arm holds one elastomeric bearing, so the hub has no flapping or lagging hinge pins to lubricate — far fewer parts than a conventional fully articulated head.',
-    callout: true, anchor: [0, 0.35, 0],
+    callout: true, anchor: [0, -0.05, 0],
   }, [mesh(merge(hubParts), MAT.hubTi())]);
 
   const rubber = [], steel = [];
@@ -239,7 +239,7 @@ export function buildMainRotor({ A, parent }) {
   const bifPart = P('Bifilar vibration absorber', {
     material: 'Steel arms and tuned tungsten-alloy masses on bifilar pins', mass: 110, explode: [0, UPX + 1.2, 0],
     desc: 'Four tuned masses hang from the arms on two pins each (hence "bifilar"), free to swing in the plane of the rotor. Tuned to three cycles per revolution in the rotating hub, they cancel the dominant four-per-rev vibration before it reaches the fuselage.',
-    callout: true, anchor: [0, 0.32, 0],
+    callout: true, anchor: [0, 0.46, 0],
   }, []);
   for (const i of blades) {
     const a = (i * Math.PI) / 2 + Math.PI / 4;
@@ -314,7 +314,6 @@ export function buildMainRotor({ A, parent }) {
   const servoPart = A.part('Primary servos', {
     system: 'Flight controls', material: 'Dual-stage hydraulic actuators (No. 1 and No. 2 systems)', mass: 54, count: 3, explode: [0, UPX - 2.2, 0],
     desc: 'Forward, aft and lateral servos, each with two independent stages fed by separate hydraulic systems, so a single failure still leaves full control. Together they push against the whole rotor\'s control loads.',
-    callout: true, anchor: [-0.42, -0.85, 0],
   }, [], head);
   const servos = SERVO_AZ.map((a) => {
     const body = mesh(unitRod(14), MAT.hydraulic());

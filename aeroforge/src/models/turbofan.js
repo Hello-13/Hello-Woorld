@@ -25,7 +25,7 @@ import { buildAccessories } from './ge90/accessories.js';
 const H = 2.6;                         // engine centreline height above the floor, m
 const N1_RPM = 2355, N2_RPM = 9332;    // 100 % speeds (FAA TCDS E00049EN)
 const SHOW = 0.02;                     // spools are shown turning at 1/50 of real speed
-const DRY_MASS = 8283;                 // kg, 18,260 lb (GE / TCDS)
+const DRY_MASS = 8761;                 // kg, 19,316 lb (EASA TCDS IM.E.002: includes starter and mounts)
 // Boeing installation hardware and the display cradle, which the engine's dry mass excludes
 const NOT_ENGINE = new Set(['Inlet cowl', 'Fan cowl doors', 'Thrust reverser translating sleeves', 'Thrust reverser cascades', 'Blocker doors & drag links', 'Thrust reverser actuators', 'Core cowl & bifurcations', 'Pylon (strut) stub', 'Display cradle']);
 
@@ -55,13 +55,14 @@ export function buildTurbofan() {
   const sg = [];
   for (const z of [-1.15, 1.15]) sg.push(beam([F, 1.3, z], [F, -6.0, z], 0.16, 0.16));
   for (const y of [1.1, -0.8, -3.0, -4.55, -5.8]) sg.push(beam([F, y, -1.15], [F, y, 1.15], 0.14, 0.14));
-  // forward saddle under the nacelle, on two posts and a central pedestal
-  for (const z of [-0.98, 0.98]) sg.push(beam([F - 0.05, -0.8, z * 1.17], [1.86, -0.8, z], 0.12, 0.12));
-  sg.push(beam([F - 0.05, -0.8, 0], [2.06, -0.8, 0], 0.18, 0.18));
+  // forward saddle under the nacelle (outer radius NACELLE.maxR), on two posts and a central pedestal
+  const R_SAD = NACELLE.maxR + 0.012;
+  for (const z of [-1, 1]) sg.push(beam([F - 0.05, -0.8, z * 1.15], [(R_SAD + 0.06) * Math.cos(0.42), -0.8, z * (R_SAD + 0.06) * Math.sin(0.42)], 0.12, 0.12));
+  sg.push(beam([F - 0.05, -0.8, 0], [R_SAD + 0.07, -0.8, 0], 0.18, 0.18));
   // aft yoke under the core cowl
   sg.push(beam([F - 0.05, -4.55, 0], [1.06, -4.55, 0], 0.2, 0.2));
   for (const z of [-1.15, 1.15]) sg.push(beam([F - 0.05, -4.55, z], [1.5, -4.55, z * 0.08], 0.1, 0.1));
-  const saddles = [sector(1.99, 2.07, -0.6, -1.0, Math.PI / 2 - 0.5, Math.PI / 2 + 0.5, 16), sector(1.0, 1.06, -4.38, -4.72, Math.PI / 2 - 0.6, Math.PI / 2 + 0.6, 16)];
+  const saddles = [sector(R_SAD, R_SAD + 0.08, -0.6, -1.0, Math.PI / 2 - 0.5, Math.PI / 2 + 0.5, 16), sector(1.0, 1.06, -4.38, -4.72, Math.PI / 2 - 0.6, Math.PI / 2 + 0.6, 16)];
   const frame = mesh(mergeGeometries([...sg, ...saddles].map((g) => (g.index ? g.toNonIndexed() : g))), M.gse());
   const casters = [];
   for (const y of [1.15, -5.85]) for (const z of [-1.15, 1.15]) {
@@ -187,27 +188,31 @@ export function buildTurbofan() {
     designation: 'GE90-115B',
     name: 'GE90',
     role: 'High-bypass turbofan · Boeing 777',
-    tagline: '115,300 lbf · 3.25 m composite fan · overall pressure ratio 42',
+    tagline: '115,540 lbf certified · 3.25 m composite fan · overall pressure ratio 42',
     summary: 'The world\'s most powerful certified jet engine in service, built for the Boeing 777-300ER and 777F. A 3.25 m fan of 22 swept carbon-fibre blades moves about 1.6 tonnes of air a second at take-off; roughly one kilogram in eight passes through the core, where a 4-stage booster and 9-stage HP compressor squeeze it 42-fold, a dual annular combustor heats it, and 2 HP and 6 LP turbine stages expand it to drive everything upstream. The bypass air makes most of the thrust. Shown as a cutaway in its Boeing nacelle.',
     specs: [
       ['Manufacturer', 'GE Aerospace, with Safran, IHI and Avio Aero'],
       ['Aircraft', 'Boeing 777-300ER, 777F, 777-200LR'],
-      ['Certified take-off thrust', '115,300 lbf (513 kN)'],
-      ['Record thrust (2002)', '127,900 lbf (569 kN)'],
+      ['Certified take-off thrust', '115,540 lbf (514 kN), flat-rated to 30 °C'],
+      ['GE quoted thrust', '115,300 lbf'],
+      ['Record thrust (certification test, 2003)', '127,900 lbf (569 kN)'],
       ['Fan', '3.25 m (128 in), 22 swept composite blades'],
-      ['Length', '7.29 m (287 in)'],
-      ['Dry mass', '8,283 kg (18,260 lb)'],
-      ['Bypass ratio', '≈ 7.1–7.2 : 1'],
+      ['Length (spinner to centre body)', '7.28 m (286.7 in)'],
+      ['Engine envelope', '3.77 m wide × 3.93 m high'],
+      ['Nacelle diameter', '4.22 m (166 in), Boeing'],
+      ['Dry mass', '8,761 kg (19,316 lb), with starter and mounts'],
+      ['Bypass ratio', '7.2 : 1 (earlier GE90s 8.7 : 1)'],
       ['Overall pressure ratio', '42 : 1'],
       ['Stages', 'Fan + 4 booster · 9 HPC · 2 HPT · 6 LPT'],
       ['Combustor', 'Dual annular (DAC)'],
       ['100 % N1 / N2', '2,355 / 9,332 rpm'],
-      ['Take-off EGT limit', '1,090 °C'],
+      ['Take-off EGT limit (T49)', '1,090 °C'],
+      ['Max continuous thrust', '110,000 lbf (489 kN)'],
       ['Control', 'Dual-channel FADEC'],
       ['Entry into service', '2004 (777-300ER)'],
     ],
-    heroStats: [['513', 'kN', 'Take-off thrust'], ['3.25', 'm', 'Fan diameter'], ['42', ': 1', 'Pressure ratio']],
-    sources: 'GE Aerospace GE90 product pages and press releases (stage counts, dual annular combustor, fan); FAA type certificate data sheet E00049EN and EASA TCDS IM.E.002 (thrust rating, N1/N2 speeds, EGT limit); Aircraft Commerce GE90 owner\'s and operator\'s guide, issue 84, 2012 (-115B configuration, bypass ratio); Flight International, GE90-115B development (added booster stage, de-staged HPC); Museum of Modern Art collection, GE90-115B fan blade (length, mass, materials); NASA Energy Efficient Engine combustor reports (dual-annular combustor principle); GE mount patents US 5,277,382 and US 5,452,575 (mount and thrust-link arrangement); Mattingly, Elements of Propulsion (cycle method); SAE ARP755 (station numbering).',
+    heroStats: [['514', 'kN', 'Take-off thrust'], ['3.25', 'm', 'Fan diameter'], ['42', ': 1', 'Pressure ratio']],
+    sources: 'EASA type-certificate data sheet IM.E.002, issue 05, 2023 (stage counts, length, envelope, dry weight, take-off and maximum-continuous thrust, N1/N2 speeds, T49 EGT limit, bleed limits, Boeing thrust reverser) and FAA TCDS E00049EN; GE Aerospace GE90 product page (stage counts, 135 in engine diameter, 115,300 lbf, OPR 42, inward-opening variable bleed doors) and press releases (dual annular combustor, swept composite fan); Wikipedia, General Electric GE90 (166 in nacelle diameter, fan-blade length and mass after MoMA); Aircraft Commerce GE90 owner\'s and operator\'s guide, issue 84, 2012 (-115B configuration, bypass ratio); Flight International, GE90-115B development (added booster stage, de-staged HPC); Museum of Modern Art collection, GE90-115B fan blade (length, mass, materials); NASA Energy Efficient Engine combustor reports (dual-annular combustor principle); GE mount patents US 5,277,382 and US 5,452,575 (mount and thrust-link arrangement); Mattingly, Elements of Propulsion (cycle method); SAE ARP755 (station numbering).',
     fleetTag: 'OPR 42',
     root: A.root,
     parts: A.parts,

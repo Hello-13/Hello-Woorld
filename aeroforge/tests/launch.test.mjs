@@ -35,8 +35,10 @@ test('engine model reproduces the published Falcon Heavy thrust figures', () => 
   close(engineThrust(C, P_SL, 0.55).thrust, 0.55 * engineThrust(C, P_SL).thrust, 1e-6);
 });
 
-test('liftoff mass matches SpaceX\'s 1,420,788 kg with a ≈ 37 t payload', () => {
-  close(liftoffMass(FALCON_HEAVY, 37000), 1420788, 1420788 * 0.005, 'liftoff mass kg');
+test('liftoff mass matches SpaceX\'s 1,420,788 kg with a ≈ 41 t payload', () => {
+  // published stage loads: 2 × 395.7 t side boosters + 395.7 t centre core + 107.5 t second stage
+  close(FALCON_HEAVY.booster.prop * 3 + FALCON_HEAVY.upper.prop, 3 * 395700 + 107500, 1, 'propellant kg');
+  close(liftoffMass(FALCON_HEAVY, 41000), 1420788, 1420788 * 0.002, 'liftoff mass kg');
   const tw = (engineThrust(FALCON_HEAVY.booster, P_SL).thrust * 2 + engineThrust(FALCON_HEAVY.core, P_SL).thrust)
     / (liftoffMass(FALCON_HEAVY, 15000) * 9.80665);
   assert.ok(tw > 1.6 && tw < 1.72, `liftoff T/W ${tw}`);
@@ -79,9 +81,12 @@ test('Falcon Heavy reaches a near-circular 200 km LEO with the default mission',
 });
 
 test('payload capability brackets the published 63.8 t to LEO (fully expendable)', () => {
-  assert.ok(simulateAscent({ payload: 60000, kickAngle: 12 }).result.success, '60 t reaches orbit');
-  for (const kick of [10, 12, 14, 16, 18]) {
-    assert.equal(simulateAscent({ payload: 70000, kickAngle: kick }).result.success, false, `70 t, kick ${kick}`);
+  // with a well-chosen pitch-over, 62 t reaches a 200 km orbit with propellant to spare; 66 t
+  // cannot reach orbit with any kick — the model's limit sits within a few per cent of 63.8 t
+  const best = simulateAscent({ payload: 62000, kickAngle: 12 }).result;
+  assert.ok(best.success && best.upperPropRemaining > 500, `62 t reaches orbit (${best.upperPropRemaining} kg left)`);
+  for (const kick of [9, 10, 11, 12, 13, 14, 16, 18]) {
+    assert.equal(simulateAscent({ payload: 66000, kickAngle: kick }).result.success, false, `66 t, kick ${kick}`);
   }
 });
 

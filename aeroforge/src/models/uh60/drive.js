@@ -89,7 +89,7 @@ export function buildDrive({ A, P, roofY }) {
     const eng = P(side > 0 ? 'T700-GE-701D engine (right)' : 'T700-GE-701D engine (left)', {
       system: 'Propulsion', material: 'Steel/titanium cold section, nickel-alloy hot section', mass: 207, massSource: 'GE Aviation T700-701D datasheet (456 lb dry)', explode: [0, 1.1, 1.7 * s],
       desc: 'Front-drive turboshaft: five axial and one centrifugal compressor stages (17 : 1), an annular combustor, a two-stage gas-generator turbine and a two-stage free power turbine whose shaft runs forward through the core. 1,994 shp for 10 minutes, 1,716 shp continuous.',
-      callout: side > 0, anchor: [-1.1, ENG.y + 0.42, z],
+      callout: side > 0, anchor: [-1.65, ENG.y + 0.4, z],
     }, [mesh(merge([core, acc]), MAT.darkMetal()), mesh(merge(lines), MAT.copper())]);
     eng.userData.part.thermalRole = 'engine';
     engines.push(eng);

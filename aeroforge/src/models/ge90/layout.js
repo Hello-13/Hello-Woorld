@@ -6,9 +6,10 @@
 // so phi = 0 faces the viewer (+z), phi = π/2 points down and phi = 3π/2 points up (pylon).
 // y = 0 is the fan-blade leading edge at the hub. All figures are metres.
 //
-// Published (GE Aerospace, FAA TCDS E00049EN, EASA TCDS IM.E.002): fan Ø 3.25 m (128 in),
-// 22 fan blades, 1 fan + 4 booster + 9 HPC stages, 2 HPT + 6 LPT stages, length 7.29 m
-// (287 in), dry mass 8,283 kg (18,260 lb). Flow-path radii, axial stations and blade counts
+// Published (GE Aerospace, EASA TCDS IM.E.002 issue 05): fan Ø 3.25 m (128 in), 22 fan blades,
+// 1 fan + 4 booster + 9 HPC stages, 2 HPT + 6 LPT stages, length spinner to centre body
+// 7,281 mm (286.7 in), dry mass 8,761 kg (19,316 lb), engine maximum diameter 135 in (fan case).
+// Boeing nacelle maximum diameter 166 in (4.22 m). Flow-path radii, axial stations and blade counts
 // below are reconstructions sized from public cutaways and from the cycle (annulus areas
 // that pass the take-off airflow), not GE drawings.
 
@@ -23,8 +24,9 @@ export const FAN = {
   spinnerTip: 0.8,
 };
 
-/** Overall: spinner tip to centre-plug tip is 7.29 m (the published length). */
-export const PLUG_TIP = FAN.spinnerTip - 7.29;
+/** Overall: spinner tip to centre-plug tip is 7.281 m (EASA TCDS: 7,281 mm, 286.7 in). */
+export const LENGTH = 7.281;
+export const PLUG_TIP = FAN.spinnerTip - LENGTH;
 
 // Core flow path: [y, hub r, tip r] from the splitter to the core-nozzle exit.
 export const CORE = [
@@ -108,7 +110,7 @@ export const NACELLE = {
   inletAftY: 0.3,          // inlet A-flange to fan case
   fanCowlAftY: -1.45,
   sleeveFwdY: -1.72,
-  maxR: 1.98,
+  maxR: 2.108,             // 166 in maximum diameter
 };
 
 /** The ARP755 station numbering used by the lab and the station planes. */

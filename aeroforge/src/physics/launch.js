@@ -21,16 +21,18 @@ const MERLIN_VAC = { thrustSL: 0, thrustVac: 981e3, ispSL: 0, ispVac: 348, exitA
 
 /**
  * Falcon Heavy (Block 5) in its fully expendable configuration. Propellant loads follow the
- * Falcon 9 figures in public references; dry masses are estimates (SpaceX does not publish them).
- * With these numbers the liftoff mass without payload is 1,383.7 t; SpaceX's published
- * 1,420,788 kg corresponds to a payload of about 37 t.
+ * Falcon 9 figures in public references (first stage 395.7 t; second stage 107.5 t = 75.2 t LOX +
+ * 32.3 t RP-1, gross 111.5 t); dry masses are estimates (SpaceX does not publish them; the centre
+ * core is taken heavier than a side booster for its thicker walls and separation hardware).
+ * With these numbers the liftoff mass without payload is 1,379.7 t; SpaceX's published
+ * 1,420,788 kg corresponds to a payload of about 41 t.
  */
 export const FALCON_HEAVY = {
   name: 'Falcon Heavy',
   launchLatitude: 28.608,                 // deg, LC-39A
   booster: { count: 2, prop: 395700, dry: 25600, engines: 9, ...MERLIN_1D },
   core: { prop: 395700, dry: 28000, engines: 9, ...MERLIN_1D },
-  upper: { prop: 111500, dry: 4000, engines: 1, ...MERLIN_VAC },
+  upper: { prop: 107500, dry: 4000, engines: 1, ...MERLIN_VAC },
   fairing: 1900,
   coreThrottleDown: 0.55,                 // centre-core throttle setting during the booster phase (estimate)
   coreThrottleTime: 40,                   // s after liftoff (SpaceX: "shortly after liftoff")
