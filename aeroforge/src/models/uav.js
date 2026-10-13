@@ -447,7 +447,7 @@ export function buildUAV() {
   P('Engine air inlet & plenum', {
     system: 'Propulsion', material: 'Composite duct, aluminium plenum (layout approximate)', mass: 7, explode: [0, 1.5, 0],
     desc: 'A dorsal ram-air scoop feeds a duct and an annular plenum around the inlet screen behind the gearbox, where the TPE331 draws its air (scoop position from photographs; duct routing estimated).',
-  }, [L(merge(inlet), m.skin), L(box(0.01, 0.07, 0.22, [X(7.33), 1.87, 0]), m.intake)]);
+  }, [L(merge(inlet), m.skin), L(box(0.004, 0.07, 0.22, [X(7.6) + 0.279, 1.875, 0]), m.intake)]);
   role(P('Exhaust stacks', {
     system: 'Propulsion', material: 'Inconel', mass: 6, count: 2, explode: [0.2, 0.35, 0],
     desc: 'The TPE331’s exhaust leaves the end opposite the gearbox, so in this pusher it exits forward and is turned out through a stack on each side. Little jet thrust is left: the propeller does the work.',
@@ -455,7 +455,7 @@ export function buildUAV() {
   role(P('Oil cooler & scoop', {
     system: 'Propulsion', material: 'Aluminium matrix cooler, composite scoop (position approximate)', mass: 9, explode: [0, -0.7, 0],
     desc: 'Engine and gearbox oil rejects its heat to ram air through a ventral scoop and cooler matrix. At 15 km the air is thin, so the cooler is sized for climbing slowly at high power.',
-  }, [L(merge([lru(0.6, 0.09, 0.22, [X(7.3), 1.165, 0], 0.03), box(0.13, 0.13, 0.22, [X(7.2), 1.27, 0])]), m.skin), L(box(0.01, 0.06, 0.18, [X(7.0), 1.15, 0]), m.intake)]), 'oil');
+  }, [L(merge([lru(0.6, 0.09, 0.22, [X(7.3), 1.165, 0], 0.03), box(0.13, 0.13, 0.22, [X(7.2), 1.27, 0])]), m.skin), L(box(0.004, 0.06, 0.18, [X(7.0) + 0.004, 1.155, 0]), m.intake)]), 'oil');
   role(P('Oil tank', {
     system: 'Propulsion', material: 'Aluminium tank', mass: 5, explode: [0, 0.75, -0.45],
     desc: 'Holds the engine and gearbox lubricating oil (a few litres; estimate). The same oil cools the gearbox bearings and drives the propeller pitch control.',
@@ -527,8 +527,8 @@ export function buildUAV() {
     desc: 'Feed lines from the wing and fuselage tanks to the collector and on to the engine fuel control, with shut-off and crossfeed valves the flight computers use to keep the aircraft balanced.',
   }, L(merge(lines), m.pipe));
   const caps = [];
-  for (const zs of [1, -1]) caps.push(cylX(0, 0.001, 0.045, 0.045, 0, 0, 16).rotateZ(Math.PI / 2).translate(...wpt(3.2, 0.42, 1, -0.003).map((v, i) => (i === 2 ? v * zs : v))));
-  caps.push(cylX(0, 0.001, 0.045, 0.045, 0, 0, 16).rotateZ(Math.PI / 2).translate(X(3.75), prof(3.75).top + 0.002, 0.2));
+  for (const zs of [1, -1]) caps.push(new THREE.CylinderGeometry(0.045, 0.045, 0.006, 16).translate(...wpt(3.2, 0.42, 1, -0.002).map((v, i) => (i === 2 ? v * zs : v))));
+  caps.push(new THREE.CylinderGeometry(0.045, 0.045, 0.006, 16).translate(X(3.75), fusePoint(3.75, Math.PI / 2 - 0.45)[1] + 0.001, fusePoint(3.75, Math.PI / 2 - 0.45)[2]));
   P('Gravity refuel ports', {
     system: 'Fuel', material: 'Flush filler caps', mass: 1.5, count: 3, explode: [0, 1.7, 0],
     desc: 'Flush filler caps on each wing and the fuselage top for gravity refuelling at austere sites (positions estimated).',
@@ -550,6 +550,7 @@ export function buildUAV() {
     desc: 'Redundant computers fly the aircraft: they hold attitude, altitude and speed, mix ruddervator commands and can land automatically. GA-ASI describes the avionics as triple-redundant with a fault-tolerant flight control system.',
     callout: true, anchor: [X(2.175), 1.62, -0.1],
   }, L(merge(fcc), m.lru));
+  A.root.updateMatrixWorld(true);
   const tailServo = [];
   for (const zs of [1, -1]) {
     tailServo.push(lru(0.18, 0.07, 0.09, [X(8.75), 1.76, 0.17 * zs]));
@@ -567,7 +568,7 @@ export function buildUAV() {
   const noseLeg = new THREE.Group();
   noseLeg.position.set(X(1.95), 1.03, 0);
   const ng = [
-    cylX(0, 0.001, 0.07, 0.07, 0, 0, 16).rotateZ(Math.PI / 2).scale(1, 30, 1).translate(0, -0.04, 0),
+    new THREE.CylinderGeometry(0.07, 0.07, 0.03, 16).translate(0, -0.04, 0),
     tubeBetween([0, -0.02, 0], [0.02, -0.44, 0], 0.045, 14), tubeBetween([0.02, -0.44, 0], [0.03, -0.64, 0], 0.032, 12),
     tubeBetween([-0.04, -0.34, 0], [-0.06, -0.46, 0], 0.012, 6), tubeBetween([-0.06, -0.46, 0], [-0.02, -0.58, 0], 0.012, 6),
     box(0.06, 0.05, 0.16, [0.03, -0.66, 0]), box(0.05, 0.2, 0.025, [0.035, -0.76, 0.075]), box(0.05, 0.2, 0.025, [0.035, -0.76, -0.075]),
@@ -590,7 +591,7 @@ export function buildUAV() {
   }, [L(lampG.clone().translate(0, 0, 0), m.darkMetal)], noseLeg);
   const lampLens = L(new THREE.CircleGeometry(0.028, 16).rotateY(Math.PI / 2).translate(0.046, 0, 0), m.lamp, { cast: false });
   lampPart.add(lampLens);
-  lampPart.position.set(0.03, -0.3, 0);
+  lampPart.position.set(0.05, -0.3, 0);
 
   const mainLegs = [];
   for (const side of [1, -1]) {
@@ -641,19 +642,20 @@ export function buildUAV() {
   turret.position.set(X(1.08), 0.995, 0);
   const tAz = new THREE.Group();
   turret.add(tAz);
-  tAz.add(L(merge([cylX(0, 0.001, 0.19, 0.19, 0, 0, 28).rotateZ(Math.PI / 2).scale(1, 60, 1).translate(0, -0.03, 0), new THREE.CylinderGeometry(0.17, 0.19, 0.1, 28).translate(0, -0.1, 0)]), m.turret));
-  tAz.add(L(merge([box(0.14, 0.18, 0.05, [0, -0.22, 0.265]), box(0.14, 0.18, 0.05, [0, -0.22, -0.265])]), m.turret));
+  tAz.add(L(merge([new THREE.CylinderGeometry(0.19, 0.19, 0.06, 28).translate(0, -0.03, 0), new THREE.CylinderGeometry(0.17, 0.19, 0.1, 28).translate(0, -0.1, 0)]), m.turret));
   const tEl = new THREE.Group();
-  tEl.position.y = -0.4;
+  tEl.position.y = -0.36;
   tAz.add(tEl);
   tEl.add(L(new THREE.SphereGeometry(0.27, 40, 28), m.turret));
   const win = [];
-  for (const [y, z, r] of [[0.07, 0.07, 0.085], [-0.06, 0.1, 0.055], [0.08, -0.12, 0.045], [-0.07, -0.06, 0.035], [-0.14, 0.02, 0.025]]) {
-    const xs = Math.sqrt(Math.max(0, 0.27 * 0.27 - y * y - z * z)) + 0.002;
-    win.push(new THREE.CircleGeometry(r, 24).rotateY(Math.PI / 2).translate(xs, y, z));
-  }
+  // apertures on the ball face: IR, daylight TV, spotter, laser designator/rangefinder, illuminator
+  const onBall = (y, z, r, lift = 0.002) => {
+    const n = new THREE.Vector3(Math.sqrt(Math.max(0, 0.27 * 0.27 - y * y - z * z)), y, z).normalize();
+    return new THREE.CircleGeometry(r, 24).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n)).translate(n.x * (0.27 + lift), n.y * (0.27 + lift), n.z * (0.27 + lift));
+  };
+  for (const [y, z, r] of [[0.07, 0.07, 0.085], [-0.06, 0.1, 0.055], [0.08, -0.12, 0.045], [-0.07, -0.06, 0.035], [-0.14, 0.02, 0.025]]) win.push(onBall(y, z, r));
   tEl.add(L(merge(win), m.glass, { cast: false }));
-  const laserDot = L(new THREE.CircleGeometry(0.018, 14).rotateY(Math.PI / 2).translate(Math.sqrt(0.27 * 0.27 - 0.07 * 0.07 - 0.06 * 0.06) + 0.004, -0.07, -0.06), m.laser, { cast: false });
+  const laserDot = L(onBall(-0.07, -0.06, 0.018, 0.004), m.laser, { cast: false });
   tEl.add(laserDot);
   const beamMat = new THREE.MeshBasicMaterial({ color: 0xff2a36, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
   const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.02, 40, 6, 1, true).translate(0, 20, 0).rotateZ(-Math.PI / 2), beamMat);
@@ -760,7 +762,7 @@ export function buildUAV() {
   P('GPS antennas', {
     system: 'Communications', material: 'Patch antennas', mass: 1, count: 2, explode: [0, 1.95, 0],
     desc: 'Top-mounted patch antennas see the sky for the two GPS receivers; anti-jam antennas can replace them (positions estimated).',
-  }, L(merge(gps), m.offWhite ?? m.dish));
+  }, L(merge(gps), M.offWhite()));
   const iff = [bladeAntenna(0.12, 0.14).translate(X(6.6), prof(6.6).top - 0.01, 0), bladeAntenna(0.11, 0.13).rotateX(Math.PI).translate(X(6.9), prof(6.9).bot + 0.01, 0)];
   P('IFF antennas', {
     system: 'Communications', material: 'Small blade antennas', mass: 1, count: 2, explode: [0, 1.0, 0],
@@ -807,8 +809,7 @@ export function buildUAV() {
   }, [beaconTop, lensTop, beaconBot, lensBot]);
 
   // ============================================================== environmental control
-  const naca = merge([box(0.2, 0.004, 0.06, [0, 0, 0])]);
-  const nacaFace = naca.clone().translate(...fusePoint(2.2, Math.PI + 0.55, -0.002)).rotateX(0);
+  const nacaFace = skinPatch(2.1, 2.36, Math.PI + 0.48, Math.PI + 0.62, 0.003, 2, 2);
   P('Avionics cooling system', {
     system: 'Environmental control', material: 'Ram-air inlet, electric fan and ducts (layout approximate)', mass: 9, explode: [0.35, -0.45, -0.75],
     desc: 'Ram air from a flush inlet, boosted by a fan on the ground, is ducted over the avionics racks. At altitude the air is cold but thin, so the fan and ducts are sized for hot days on the ramp.',
@@ -905,7 +906,7 @@ export function buildUAV() {
       noseLeg.rotation.z = -1.62 * g;
       noseLeg.visible = g < 0.985;
       for (const { piv, q } of mainLegs) { piv.quaternion.slerpQuaternions(qI, q, g); piv.visible = g < 0.985; }
-      for (const dr of doors) dr.h.setAngle(-dr.open * (1 - d) * dr.side);
+      for (const dr of doors) dr.h.setAngle(dr.open * (1 - d) * dr.side);
       // propeller: shown at a slow, alias-free rate (the real one turns ≈ 1,600 rpm)
       state.propA += dt * (5 + state.throttle * 22);
       propSpin.rotation.x = state.propA;
