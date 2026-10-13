@@ -128,10 +128,12 @@ export function mountEngineLab(root, ctx) {
       burn.push({ x: S['3'].s + (S['4'].s - S['3'].s) * (Math.log(T / S['3'].T) / Math.log(S['4'].T / S['3'].T)), y: T, name: 'Combustor' });
     }
     ts.setData({
-      core: [pt('0'), pt('2'), pt('13'), pt('3'), ...burn, pt('4'), pt('45'), pt('5'), pt('9')],
+      // the core stream goes through the fan hub and booster (2 → 25), not the fan tip (13)
+      core: [pt('0'), pt('2'), pt('25'), pt('3'), ...burn, pt('4'), pt('45'), pt('5'), pt('9')],
       bypass: ['2', '13', '19'].map(pt),
     }, {
       points: [
+        { ...pt('25'), label: '25', series: 'core', align: 'right' },
         { ...pt('3'), label: '3', series: 'core', align: 'right' },
         { ...pt('4'), label: '4', series: 'core' },
         { ...pt('45'), label: '45', series: 'core' },
