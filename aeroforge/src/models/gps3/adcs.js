@@ -13,7 +13,7 @@ import { HX, HY, HZ, IY, IZ, DECK, AFT, boxG, cylG, merge, unit, connPoint, reg 
 import { DECK_AT, onNPE, onBUS } from './layout.js';
 
 /** Reaction wheel centres (x, z) on the −Y panel: a 2 × 2 cluster at 0.36 m pitch (layout estimate). */
-export const WHEELS = [[0.44, 0.62], [0.8, 0.62], [0.44, 0.98], [0.8, 0.98]];
+export const WHEELS = [[0.44, 0.68], [0.8, 0.68], [0.44, 1.04], [0.8, 1.04]];
 const WHEEL_Y = -0.72;
 
 export function buildADCS(P) {
@@ -22,7 +22,7 @@ export function buildADCS(P) {
   // ------------------------------------------------------------------ reaction wheel assembly (−Y panel), spin axes in a pyramid
   const rotors = [];
   const tilt = THREE.MathUtils.degToRad(30);
-  const cc = [0.62, 0.8];
+  const cc = [0.62, 0.86];
   WHEELS.forEach(([x, z], k) => {
     const out = new THREE.Vector3(Math.sign(x - cc[0]), 0, Math.sign(z - cc[1])).normalize();
     const axis = new THREE.Vector3(0, Math.cos(tilt), 0).addScaledVector(out, Math.sin(tilt));
@@ -52,12 +52,12 @@ export function buildADCS(P) {
   box('Reaction wheel drive electronics', {
     system: 'Attitude control', material: 'Aluminium chassis', mass: 9, temp: 300, explode: [0.15, -1.1, 0],
     desc: 'Power electronics that drive the four wheel motors and report their speeds to the on-board computer, which commands torque many times a second (unit split and position estimated).',
-  }, onBUS([1.08, 0.8], 0.12), [0.18, 0.12, 0.3], G.alodine(), { mount: '-y', conn: '+y', n: 4 }, 'bus', true);
+  }, onBUS([1.08, 0.86], 0.12), [0.18, 0.12, 0.3], G.alodine(), { mount: '-y', conn: '+y', n: 4 }, 'bus', true);
 
   // ------------------------------------------------------------------ Earth sensor assemblies (the white two-aperture unit on the deck)
   const [ex, ey] = DECK_AT.esa;
   const earthSensor = (name, y, desc) => {
-    const body = merge([boxG([ex, y, DECK + 0.1], [0.24, 0.13, 0.2]), boxG([ex, y, DECK + 0.005], [0.27, 0.15, 0.01])]);
+    const body = merge([boxG([ex, y, DECK + 0.1], [0.24, 0.13, 0.2]), boxG([ex, y, DECK + 0.005], [0.27, 0.145, 0.01])]);
     const lens = merge([cylG([ex, y, DECK + 0.204], 0.05, 0.01, 'z', 24)]);
     const hood = merge([cylG([ex, y, DECK + 0.215], 0.058, 0.024, 'z', 24, 0.062, true)]);
     reg([ex, y, IZ - 0.02], 'deck');
@@ -65,8 +65,8 @@ export function buildADCS(P) {
       system: 'Attitude control', material: 'White-painted housing, germanium optics, thermopile detectors', mass: 4, temp: 265, explode: [-0.2, (y - ey) * 2 + 0.15, 2.0], desc,
     }, [mesh(body, G.whitePaint()), mesh(lens, G.lens()), mesh(hood, G.darkMetal())]);
   };
-  earthSensor('Earth sensor (A)', ey - 0.07, 'One of the two Earth sensor assemblies ("ESA (2)" in Lockheed\'s figure), taken here to be the white two-aperture unit in the scale model near the −X/+Y deck corner (identification estimated). An infrared Earth sensor sees the planet\'s 14–16 µm carbon-dioxide glow, which looks the same by day and night, and measures where the 27.8°-wide disc sits in its field to keep the antennas on nadir.');
-  earthSensor('Earth sensor (B)', ey + 0.07, 'The second Earth sensor assembly, a redundant twin of the first. Either one can hold nadir pointing to well within the accuracy the 27.8° Earth-coverage beam needs (sensor type assumed infrared).');
+  earthSensor('Earth sensor (A)', ey - 0.076, 'One of the two Earth sensor assemblies ("ESA (2)" in Lockheed\'s figure), taken here to be the white two-aperture unit in the scale model near the −X/+Y deck corner (identification estimated). An infrared Earth sensor sees the planet\'s 14–16 µm carbon-dioxide glow, which looks the same by day and night, and measures where the 27.8°-wide disc sits in its field to keep the antennas on nadir.');
+  earthSensor('Earth sensor (B)', ey + 0.076, 'The second Earth sensor assembly, a redundant twin of the first. Either one can hold nadir pointing to well within the accuracy the 27.8° Earth-coverage beam needs (sensor type assumed infrared).');
 
   // ------------------------------------------------------------------ coarse sun sensors: four detector heads at the aft corners, two electronics boxes
   const heads = [];

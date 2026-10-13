@@ -7,7 +7,8 @@
 // its +Z at the Earth. For display, `body` is turned so +Z (nadir) points up in the hangar and
 // showroom (as the satellite stands on its launch adapter), and in the 'orbit' look down toward the
 // Earth backdrop, pitched 45° toward the viewer so the antenna face can be seen. Subsystems are
-// built in ./gps3/.
+// built in ./gps3/ (layout.js holds where the deck and panel units sit). Lockheed Martin's own axes
+// are turned 180° about Z from the IGS axes used here, so its "−Y" NPE panel is +Y here.
 
 import * as THREE from 'three';
 import { Assembly } from '../engine/assembly.js';
@@ -17,6 +18,8 @@ import { buildPayload } from './gps3/payload.js';
 import { buildPropulsion } from './gps3/propulsion.js';
 import { buildADCS } from './gps3/adcs.js';
 import { buildPower, ARRAY_SPAN, ARRAY_AREA } from './gps3/power.js';
+import { buildHarness } from './gps3/harness.js';
+import { NET } from './gps3/kit.js';
 import { GPS3 } from './gps3/data.js';
 import { clockRelativity, period, RE } from '../physics/orbital.js';
 import { fmt } from '../ui/dom.js';
@@ -49,12 +52,14 @@ export function buildSatellite({ compact = false } = {}) {
   A.root.add(body);
   const P = (name, info, objs, parent = body) => A.part(name, info, objs, parent);
 
+  NET.nodes.length = 0;                  // harness landing points, collected afresh for every build
   buildStructure(P);
   const antennas = buildAntennas(P);
   buildPayload(P);
   buildPropulsion(P);
   const { rotors } = buildADCS(P);
   const power = buildPower(P, body);
+  buildHarness(P);
   A.finalize();
 
   const state = { deploy: compact ? 0 : 1, deployTarget: compact ? 0 : 1, sunAngle: 0, burn: 0, orbitLook: false };
@@ -78,7 +83,7 @@ export function buildSatellite({ compact = false } = {}) {
     specs: [
       ['Launch mass', `${fmt.n(GPS3.launchMass)} kg (8,115 lb, Space Force fact sheet); Lockheed's 2014 sheet gave 3,880 kg, and up to ≈ 4,400 kg is reported for individual launches`],
       ['On-orbit mass', `${fmt.n(GPS3.dryMass)} kg (4,764 lb, fact sheet), used here as the dry mass; listed parts sum to ≈ ${fmt.n(Math.round(listed / 10) * 10)} kg (brackets, fasteners and small items are not listed)`],
-      ['Size', `${W} × ${D} × ${H} m stowed (97 × 70 × 134 in, fact sheet); the 97-in width is taken along the array axis`],
+      ['Size', `Bus ${W} × ${D} × ${H} m (97 × 70 × 134 in, fact sheet): 2.46 m along the Sun axis, 1.78 m along the array axis, as in the IGS box-wing model; ≈ 4.2 m tall stowed with the launch adapter and antennas`],
       ['Bus', 'Lockheed Martin A2100M'],
       ['Power', `${fmt.n(GPS3.powerEOL)} W at end of life`],
       ['Orbit', `${fmt.n(GPS3.altitude)} km circular, ${GPS3.inclination}° inclination`],
@@ -86,13 +91,14 @@ export function buildSatellite({ compact = false } = {}) {
       ['Signals', 'L1 C/A, L1C, L1/L2 P(Y), L2C, L5, M-code; L3 for detection-system data'],
       ['Clocks', '3 rubidium atomic frequency standards, plus a slot for a fourth'],
       ['Relativity', `+${rel.netUs.toFixed(1)} µs/day, clocks pre-set to 10.22999999543 MHz`],
-      ['Propulsion', `Liquid apogee engine (${GPS3.laeThrust} N class, estimate), ${GPS3.thrusterLarge} N and ${GPS3.thrusterSmall} N hydrazine thrusters`],
-      ['Array', `≈ ${ARRAY_SPAN.toFixed(1)} m span, ${ARRAY_AREA.toFixed(1)} m² modelled (≈ 28.5 m² reported)`],
+      ['Propulsion', `100-lbf apogee engine, LEROS-1c class (${GPS3.laeThrust} N, Isp ${GPS3.laeIsp} s; identity unconfirmed); ${GPS3.thrusterLarge} N and ${GPS3.thrusterSmall} N hydrazine thrusters; one hydrazine and two NTO tanks (A2100 dual mode)`],
+      ['Array', `2 wings × 2 panels, ${ARRAY_AREA.toFixed(1)} m² (IGS box-wing model; ≈ 28.5 m² / 307 ft² reported); ${GPS3.arraySpan} m span published, ≈ ${ARRAY_SPAN.toFixed(1)} m modelled`],
       ['Design life', `${GPS3.designLife} years`],
       ['Satellites', 'SV01–SV10; SV01 launched 23 Dec 2018, SV10 21 Apr 2026'],
+      ['Configuration shown', 'A composite of the series: Global Burst Detector (SV01–SV08), laser retroreflector (SV09, SV10), optical communications terminal and Digital RAFS demonstration (SV10)'],
     ],
     heroStats: [['20,180', 'km', 'Orbit altitude'], [`+${rel.netUs.toFixed(1)}`, 'µs/day', 'Clock relativity'], ['15', 'yr', 'Design life']],
-    sources: 'U.S. Space Force GPS III fact sheet (Space Systems Command, Los Angeles: weights, size, design life); W. Marquis & M. Shaw, "GPS III: Bringing New Capabilities to the Global Community", InsideGNSS, Sep/Oct 2011 (subsystems and units); Lockheed Martin patent US 10,749,252 (2020), Fig. 1 GPS III nadir antenna deck (EC, MEC and UHF crosslink element layout); Lockheed Martin GPS III releases, including the SV01 antenna-assembly delivery (2013); Honeywell GPS III OBC / RWA / IMU critical-design-review release (2010); Northrop Grumman Astro Aerospace JIB antenna releases (2011, 2014); Wikipedia "GPS Block III" (A2100M bus, Orbital ATK composite tanks); IS-GPS-200, IS-GPS-705 and IS-GPS-800 signal specifications; ILRS GPS III mission page and NASA (laser retroreflector arrays on SV09 and SV10); IGS/ESA GPS III radiation-force modelling (Dilssner et al., 2022: box face areas, 2,161 kg); L3Harris navigation-payload releases; Excelitas rubidium clock releases; EaglePicher battery heritage; Spaceflight Now (SV01 launch profile); N. Ashby, "Relativity in the Global Positioning System" (Living Reviews in Relativity, 2003).',
+    sources: 'U.S. Space Force GPS III fact sheet (Space Systems Command, Los Angeles: weights, size, design life); W. Marquis & M. Shaw, "GPS III: Bringing New Capabilities to the Global Community", InsideGNSS, Sep/Oct 2011 (subsystems and units; Fig. 3 block diagram; Fig. 4 expanded view: unit placement on the NPE and Bus/NCE/HPE panels, core structure, tanks, sunshade, masts, access panels); P. Steigenberger, S. Thoelert & O. Montenbruck, "GPS III Vespucci: Results of half a year in orbit", Advances in Space Research, 2020 (manufacturer scale model in IGS axes, box-wing areas, MLI colours, 15 m span, phase-centre offsets); Wikipedia "Lockheed Martin A2100" (tank sizes and maxima) and "LEROS" (apogee engine); airforce-technology.com GPS III project page (four UTJ panels, 100-lb apogee engine, Honeywell and ATK contracts); Sandia National Laboratories news release on the Global Burst Detector (2025); Lockheed Martin SV10 launch release (21 Apr 2026: optical crosslink demonstration, Digital RAFS) and Tesat SCOT80 terminal coverage; Lockheed Martin patent US 10,749,252 (2020), Fig. 1 GPS III nadir antenna deck (EC, MEC and UHF crosslink element layout); Lockheed Martin GPS III releases, including the SV01 antenna-assembly delivery (2013); Honeywell GPS III OBC / RWA / IMU critical-design-review release (2010); Northrop Grumman Astro Aerospace JIB antenna releases (2011, 2014); Wikipedia "GPS Block III" (A2100M bus, Orbital ATK composite tanks); IS-GPS-200, IS-GPS-705 and IS-GPS-800 signal specifications; ILRS GPS III mission page and NASA (laser retroreflector arrays on SV09 and SV10); IGS/ESA GPS III radiation-force modelling (Dilssner et al., 2022: box face areas, 2,161 kg); L3Harris navigation-payload releases; Excelitas rubidium clock releases; EaglePicher battery heritage; Spaceflight Now (SV01 launch profile); N. Ashby, "Relativity in the Global Positioning System" (Living Reviews in Relativity, 2003).',
     fleetTag: 'Δv lab',
     root: A.root,
     body,

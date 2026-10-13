@@ -391,8 +391,8 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   }
 
   // engine-bay equipment: TEA-TEB supply, pneumatic helium bottles, engine controllers
-  const tea = [bottle(...at(1.58, 112.5, 2.7), 0.12, 0.42, 14)];
-  tea.push(pipe([at(1.58, 112.5, 2.92), at(1.2, 100, 2.6), at(0.5, 60, 2.35)], 0.018, { seg: 6, tubular: 14 }));
+  const tea = [bottle(...at(1.58, 112.5, 2.62), 0.12, 0.42, 14)];
+  tea.push(pipe([at(1.58, 112.5, 2.84), at(1.2, 100, 2.6), at(0.5, 60, 2.35)], 0.018, { seg: 6, tubular: 14 }));
   P('TEA-TEB ignition tank', {
     system: 'Propulsion', material: 'Stainless pressure vessel, ignition-fluid lines', mass: 25,
     desc: 'Holds the pyrophoric triethylaluminium-triethylborane that lights the engines: enough for all nine at liftoff and for the three engines that relight during recovery. Its green flash shows in the exhaust at every ignition. Tank count and position estimated.',
@@ -483,7 +483,9 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     desc: 'Each fin rotates on a hydraulic actuator in a housing at its root. Block 5 uses a closed-loop hydraulic system; early Falcon 9 grid fins vented their hydraulic fluid overboard and could run out.',
     explode: [0, 2.7, 0],
   }, mesh(merge(finActs), FM.black()));
-  const hpuAz = 200, hpuY = centre ? 46.2 : 42.35, ringY = finY - 0.35;
+  // the unit sits 20° off the outboard side on a side booster (mirrored between A and B), clear of
+  // the inboard attach fitting, the 90° / 270° thruster pods and the fin roots
+  const hpuAz = !centre && attachSide > 0 ? 340 : 200, hpuY = centre ? 46.2 : 42.35, ringY = finY - 0.35;
   const [hux, huz] = polar(1.42, hpuAz);
   const hpu = [
     post(hux, huz, hpuY - 0.2, hpuY + 0.2, 0.11, 14),                                         // motor-pump
@@ -554,18 +556,20 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   // ------------------------------------------------------------------ avionics, power, wiring, antennas
   const fwdY = Y.s1Top + 0.22;
   const rw = [];
-  const rwA = 120;
-  rw.push(unit(R + 0.07, rwA, (Y.heatShield + 0.4 + Y.s1Top) / 2, 0.26, Y.s1Top - Y.heatShield - 0.4, 0.14));
+  // midway between the 45° and 135° legs (clear of the stowed legs' roots); its foot stops above the
+  // pad hold-down clamps. Azimuth estimated.
+  const rwA = 90, rwBottom = Y.heatShield + 0.95;
+  rw.push(unit(R + 0.07, rwA, (rwBottom + Y.s1Top) / 2, 0.26, Y.s1Top - rwBottom, 0.14));
   for (let y = 2.5; y < Y.s1Top; y += 2.4) rw.push(unit(R + 0.04, rwA, y, 0.36, 0.08, 0.1));
   P('raceway', {
     system: 'Electrical', material: 'Composite cable tray cover', mass: 140,
-    desc: 'External tunnel that carries power, data and flight-safety cables up the outside of the tanks between the engine bay and the forward avionics, so no wiring has to pass through the propellant.',
+    desc: 'External tunnel that carries power, data and flight-safety cables up the outside of the tanks between the engine bay and the forward avionics, so no wiring has to pass through the propellant. Shown midway between two landing legs; its exact azimuth on each core is estimated.',
     callout: !centre && attachSide > 0, anchor: at(R + 0.16, rwA, 30.0), explode: [0, 0, 1.6],
   }, mesh(merge(rw), FM.raceway()));
   const wh = [
     hoop(1.6, 0.025, Y.s1Top + 0.04, { seg: 64, tube: 4 }), hoop(1.66, 0.025, 2.9, { seg: 64, tube: 4 }),
     pipe([at(R + 0.06, rwA, Y.s1Top - 0.25), at(R - 0.05, rwA, Y.s1Top - 0.05), at(1.6, rwA, Y.s1Top + 0.04)], 0.03, { seg: 6, tubular: 8 }),
-    pipe([at(R + 0.06, rwA, Y.heatShield + 0.5), at(R - 0.05, rwA, 2.6), at(1.66, rwA, 2.9)], 0.03, { seg: 6, tubular: 8 }),
+    pipe([at(R + 0.06, rwA, rwBottom + 0.1), at(R - 0.02, rwA, 2.6), at(1.7, rwA + 6, 2.75), at(1.66, rwA + 12, 2.9)], 0.03, { seg: 6, tubular: 10 }),   // past the Octaweb post
   ];
   for (const a of OUTER) wh.push(pipe([at(1.66, a + 8, 2.9), at(1.64, a + 8, 1.9)], 0.015, { seg: 4, tubular: 4 }));
   for (const a of [15, 75, 135, 195, 255, 315]) wh.push(pipe([at(1.6, a, Y.s1Top + 0.04), at(1.52, a, fwdY - 0.1)], 0.015, { seg: 4, tubular: 4 }));

@@ -94,7 +94,7 @@ export function buildTail({ A, P, air, roofY }) {
   }, [mesh(merge([trans, well, wellLip]), paint), mesh(well.clone(), MAT.interior())]);
   // between the nacelles its flanks run into the cowls' inboard sides, closing the deck (no open
   // slot between the engines and the fairing, and the fuel lines pass from one to the other inside)
-  const aftF = fairing([[-3.6, 0.16, roofY(-3.6) + 0.12], [-3.0, 0.28, 2.45], [-2.4, 0.35, 2.6], [-1.9, 0.43, 2.645], [-1.65, 0.47, 2.66], [-1.4, 0.47, 2.665], [-0.9, 0.45, 2.67]], roofY, { nu: 36, nv: 28 });
+  const aftF = fairing([[-3.6, 0.17, roofY(-3.6) + 0.18], [-3.0, 0.28, 2.45], [-2.4, 0.35, 2.6], [-1.9, 0.43, 2.645], [-1.65, 0.47, 2.66], [-1.4, 0.47, 2.665], [-0.9, 0.45, 2.67]], roofY, { nu: 36, nv: 28 });
   const grille = [];
   for (let k = 0; k < 7; k++) grille.push(box(0.025, 0.012, 0.42, [-1.48 + k * 0.05, 2.668, 0]));
   P('Aft deck fairing', {

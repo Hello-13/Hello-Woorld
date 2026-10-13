@@ -56,7 +56,7 @@ const cellTexture = () => decalTexture('gps3.cells', 512, 512, (ctx, w) => {
 export const G = {
   /** Multi-layer insulation with a black carbon-loaded Kapton outer layer. */
   blackMLI: (r = 1.2) => once(`blackMLI${r}`, () => {
-    const s = mliSurface({ seed: 61 });
+    const s = mliSurface();   // the engine's default crinkle (shared with SKIN.mli): one procedural surface for all three blankets
     return new THREE.MeshStandardMaterial({
       color: 0x2a2c31, normalMap: tile(s.normalMap, r), roughnessMap: tile(s.roughnessMap, r),
       normalScale: new THREE.Vector2(0.22, 0.22), roughness: 0.5, metalness: 0.3,
@@ -65,7 +65,7 @@ export const G = {
   /** Silver multi-layer insulation (aluminised outer layer): the Sun-facing +X face and, in a
    *  radio-transparent version, the +Z antenna face. */
   silverMLI: (r = 1.2) => once(`silverMLI${r}`, () => {
-    const s = mliSurface({ seed: 23 });
+    const s = mliSurface();
     return new THREE.MeshStandardMaterial({
       color: 0xc9ced3, normalMap: tile(s.normalMap, r), roughnessMap: tile(s.roughnessMap, r),
       normalScale: new THREE.Vector2(0.3, 0.3), roughness: 0.3, metalness: 0.85,
@@ -103,6 +103,8 @@ export const G = {
   blackBox: () => once('blackBox', () => new THREE.MeshStandardMaterial({ color: 0x1e2024, roughness: 0.5, metalness: 0.35 })),
   connector: () => once('connector', () => new THREE.MeshStandardMaterial({ color: 0x5b5f64, roughness: 0.4, metalness: 0.9 })),
   harness: () => once('harness', () => new THREE.MeshStandardMaterial({ color: 0xd8d2bf, roughness: 0.7, metalness: 0.05 })),
+  /** Power bundles: heavier gauge, in a darker sleeve so they read apart from the data harness. */
+  powerHarness: () => once('powerHarness', () => new THREE.MeshStandardMaterial({ color: 0xa88b5c, roughness: 0.65, metalness: 0.1 })),
   /** Propellant tanks: Orbital ATK composite tanks, titanium liner under a carbon-fibre overwrap
    *  (a satin resin finish rather than a polished metal). */
   tank: () => once('tank', () => {

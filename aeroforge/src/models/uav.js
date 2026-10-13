@@ -406,7 +406,7 @@ export function buildUAV() {
     storeParts.gbu.push(P(`GBU-12 Paveway II (${sn})`, {
       system: 'Weapons', material: 'Mk 82 steel bomb body, laser guidance kit', mass: 230, massSource: 'Published GBU-12 figure (≈ 230 kg)', explode: [0, -1.1, 2.1 * side],
       desc: 'A 500 lb-class Mk 82 bomb with a laser seeker and steering canards on the nose and folding wings at the tail: 3.27 m long, 0.27 m across. It steers toward laser energy reflected from a marked spot.',
-      callout: side > 0, anchor: [gx + 1.3, gy, gb.z * side],   // the seeker end
+      callout: side > 0, anchor: [gx - 1.6, gy + 0.13, gb.z * side],   // at the tail wings
     }, [L(place(g.body), m.olive), L(place(g.guidance), m.seeker), L(place(g.dome), m.glass), L(place(g.band), m.yellow)]));
 
     // two Hellfires on a two-rail launcher, middle station
@@ -521,9 +521,9 @@ export function buildUAV() {
   const XT0 = X(STATIONS.turbine0), XG = X(STATIONS.gear1);
   const cb = combustorGeo();
   role(P('TPE331 turbine case', {
-    system: 'Propulsion', material: 'Steel case, nickel-alloy hot section', mass: 22, explode: [0.55, 1.05, 0],
+    system: 'Propulsion', material: 'Steel case, nickel-alloy hot section', mass: 22, explode: [0.55, 1.25, 0],
     desc: 'The hot section of the Honeywell TPE331-10GD (900 shp). The whole engine, gearbox included, is only 1.09 m long and weighs 175 kg (385 lb) dry, because the reverse-flow combustor folds the gas path back around the turbine (published TPE331-10 figures; installed position estimated).',
-    callout: true, anchor: [X(8.05), ENGINE_Y + 0.189, 0.109],   // on the case, 60° above the side
+    callout: true, anchor: [X(7.97), ENGINE_Y - 0.189, 0.109],   // on the case, 60° below the side
   }, L(cb.casing, m.hot)), 'turbine');
   role(P('Annular combustor liner', {
     system: 'Propulsion', material: 'Nickel-alloy liner with cooling holes', mass: 6, explode: [0.55, 0.55, 0.55],
@@ -648,7 +648,7 @@ export function buildUAV() {
   P('Three-blade propeller', {
     system: 'Propulsion', material: 'Carbon-fibre composite blades (est.)', mass: 24, count: 3, explode: [-2.3, -1.0, 0],
     desc: 'A three-blade, variable-pitch pusher propeller about 2.6 m across (diameter estimated; the extended-range modification adds a fourth blade). Behind the wing and sensors it never blocks the view or disturbs the nose.',
-    callout: true, anchor: [PROP_X + 0.03, SHAFT_Y - 0.38, -0.5],   // mid-blade, lower port quadrant of the disc
+    callout: true, anchor: [PROP_X + 0.03, SHAFT_Y - 0.525, -0.909],   // near the blade tips, lower port quadrant of the disc
   }, propSpin);
   propSpin.add(L(blades, m.blade));
   P('Propeller hub & pitch control', {
@@ -962,7 +962,7 @@ export function buildUAV() {
   P('MTS-B EO/IR turret', {
     system: 'Sensors', material: 'Gyro-stabilised gimbal, germanium and sapphire windows', mass: 105, explode: [0.9, -0.75, 0],
     desc: 'Raytheon’s Multi-Spectral Targeting System B: an infrared camera, a colour/monochrome daylight TV camera, an image-intensified (low-light) TV camera, a laser rangefinder/designator and a laser illuminator in one stabilised ball (USAF fact sheet), about 0.55 m across (size and mass estimated).',
-    callout: true, anchor: [X(1.08) + 0.27, 0.635, 0],   // the front of the ball
+    callout: true, anchor: [X(1.08) + 0.234, 0.5, 0],   // the front of the ball, 30° below its equator
   }, turret);
   P('MTS-B electronics unit', {
     system: 'Sensors', material: 'Electronics unit', mass: 15, explode: [0.55, 0.3, 0.75],
@@ -979,7 +979,7 @@ export function buildUAV() {
   P('AN/APY-8 Lynx SAR antenna', {
     system: 'Sensors', material: 'Gimballed Ku-band antenna', mass: 30, explode: [1.35, 0, 0],
     desc: 'General Atomics’ Lynx synthetic-aperture radar (developed with Sandia National Laboratories) images the ground through cloud, smoke and darkness, down to about 10 cm resolution in spotlight mode, and tracks moving vehicles.',
-    callout: true, anchor: [X(0.48) + 0.03, 1.34, 0.2],
+    callout: true, anchor: [X(0.48) - 0.05, 1.24, 0],   // the gimbal, behind the antenna face
   }, lynx);
   P('Lynx radar electronics', {
     system: 'Sensors', material: 'Radar electronics unit', mass: 22, explode: [0.9, -0.15, 0.6],
@@ -1025,7 +1025,7 @@ export function buildUAV() {
   P('Ku-band SATCOM antenna', {
     system: 'Communications', material: 'Steerable reflector on a two-axis pedestal', mass: 30, explode: [1.45, 2.05, 0],
     desc: 'Tracks a geostationary satellite to carry control and sensor video beyond line of sight. The satellite hops alone add at least half a second of delay (35,786 km up and down, twice); with the ground relays the control loop takes over a second, so crews in the US can fly aircraft overseas, but not land them.',
-    callout: true, anchor: [X(1.15) + 0.35, 1.85, 0.15],
+    callout: true, anchor: [X(0.75), 1.931, 0],   // the radome crown just ahead of the dish
   }, dishG);
   P('Ku-band SATCOM modem', {
     system: 'Communications', material: 'Modem and RF unit', mass: 8, explode: [1.0, 1.0, -0.4],

@@ -169,7 +169,7 @@ export function buildGear({ A, P }) {
   }, [mesh(merge(probes), MAT.steel())]);
   const drains = [];
   for (const s of [1, -1]) {
-    drains.push(cyl(0.025, 0.025, 0.06, [-2.15, 0.52, 0.45 * s], 'y', 10));
+    drains.push(cyl(0.025, 0.025, 0.04, [-2.15, 0.535, 0.45 * s], 'y', 10));   // stands about 2 cm proud of the belly
     drains.push(pipe([[-2.0, 1.52, 0.7 * s], [-1.95, 1.9, 0.8 * s], [-1.92, 2.07, 0.79 * s]], 0.01));
   }
   P('Fuel sump drains & vents', {
