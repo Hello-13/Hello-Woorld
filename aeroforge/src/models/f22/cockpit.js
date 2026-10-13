@@ -101,8 +101,8 @@ export function buildCockpit(ctx) {
     const g = [];
     g.push(box(5.3, -0.06, 0, 3.2, 0.04, 0.9));                                     // floor
     for (const side of [1, -1]) {
-      g.push(box(5.55, 0.15, side * 0.43, 1.9, 0.36, 0.18));                         // side consoles
-      g.push(box(5.35, 0.12, side * 0.5, 2.4, 0.36, 0.03));                          // tub walls (below the sills)
+      g.push(box(5.55, 0.12, side * 0.43, 1.7, 0.34, 0.16));                         // side consoles
+      g.push(box(5.5, 0.1, side * 0.47, 1.8, 0.34, 0.03));                           // tub walls (below the sills)
     }
     // instrument panel (tilted back) and glare shield
     const panel = new THREE.BoxGeometry(0.06, 0.46, 0.62).rotateZ(-0.22).translate(X(4.05), 0.2, 0);
@@ -123,7 +123,7 @@ export function buildCockpit(ctx) {
     const back = new THREE.BoxGeometry(0.12, 0.95, 0.5).rotateZ(0.3).translate(X(6.12), 0.52, 0);
     g.push(back);
     g.push(box(5.88, 0.06, 0, 0.5, 0.16, 0.52));                                    // bucket
-    g.push(new THREE.BoxGeometry(0.2, 0.22, 0.34).rotateZ(0.3).translate(X(6.3), 1.0, 0));   // headrest / parachute
+    g.push(new THREE.BoxGeometry(0.18, 0.2, 0.34).rotateZ(0.3).translate(X(6.22), 0.94, 0));  // headrest / parachute
     for (const side of [1, -1]) g.push(new THREE.BoxGeometry(0.08, 0.9, 0.05).rotateZ(0.3).translate(X(6.2), 0.5, side * 0.27));  // rails
     g.push(FR.cylX(6.32, 0.18, 0, 0.28, 0.05, 0.05, 10));                            // catapult / rocket
     y.push(FR.pipe([[5.62, 0.12, -0.12], [5.56, 0.22, 0], [5.62, 0.12, 0.12]], 0.018, 6, 10));   // ejection handle
@@ -156,15 +156,15 @@ export function buildCockpit(ctx) {
 
   // ------------------------------------------------------------------ HOTAS: side-stick and throttles
   {
-    const g = [new THREE.CylinderGeometry(0.018, 0.022, 0.16, 10).translate(X(5.32), 0.4, 0.4), box(5.32, 0.49, 0.4, 0.06, 0.05, 0.05)];
+    const g = [new THREE.CylinderGeometry(0.018, 0.022, 0.16, 10).translate(X(5.32), 0.37, 0.4), box(5.32, 0.46, 0.4, 0.06, 0.05, 0.05), box(5.32, 0.295, 0.4, 0.1, 0.01, 0.08)];
     P('Side-stick controller', {
       system: 'Crew systems', material: 'Force-sensing grip', mass: 3,
       explode: [0, 1.5, 0.4],
       desc: 'A right-hand side-stick that barely moves: it senses the pilot\'s force and sends commands to the flight-control computers, with buttons for weapons and sensors under the fingers (hands on throttle and stick, HOTAS).',
     }, mesh(merge(g), F.black()));
     const t = [];
-    for (const dz of [-0.035, 0.035]) t.push(new THREE.BoxGeometry(0.06, 0.12, 0.05).rotateZ(-0.3).translate(X(5.45), 0.4, -0.4 + dz));
-    t.push(box(5.45, 0.34, -0.4, 0.3, 0.02, 0.14));
+    for (const dz of [-0.035, 0.035]) t.push(new THREE.BoxGeometry(0.06, 0.12, 0.05).rotateZ(-0.3).translate(X(5.45), 0.36, -0.4 + dz));
+    t.push(box(5.45, 0.3, -0.4, 0.3, 0.02, 0.14));
     P('Throttles', {
       system: 'Crew systems', material: 'Twin throttle grips', mass: 4,
       explode: [0, 1.5, -0.4],

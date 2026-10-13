@@ -423,7 +423,7 @@ export function buildSystems(ctx) {
     const navG = mesh(merge(green), lamp(0x002200, 0x2bff6a, 2.2), { cast: false });
     const navR = mesh(merge(red), lamp(0x220000, 0xff2a1a, 2.2), { cast: false });
     const navW = mesh(merge(white), lamp(0x222222, 0xffffff, 1.6), { cast: false });
-    const strips = mesh(merge(form), lamp(0x0c1a10, 0x7dffa0, 0.8), { cast: false });
+    const strips = mesh(merge(form), lamp(0x0c1a10, 0x7dffa0, 0.3), { cast: false });
     anim.lamps = [navG.material, navR.material, navW.material, strips.material];
     P('Navigation & formation lights', {
       system: 'Electrical', material: 'LED position lights, electroluminescent formation strips', mass: 5,
