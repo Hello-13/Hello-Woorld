@@ -6,6 +6,9 @@ import { G0 } from './atmosphere.js';
 export const MU = 398600.4418;   // km³/s²
 export const RE = 6378.137;      // km, equatorial radius
 export const GEO_ALT = 35786;    // km
+export const C_LIGHT = 299792.458;          // km/s
+export const W0_GEOID = 62636856.0;         // m²/s², gravity + rotation potential on the geoid (IERS 2010)
+export const SIDEREAL_DAY = 86164.0905;     // s
 
 export const circularVelocity = (r) => Math.sqrt(MU / r);
 export const period = (a) => 2 * Math.PI * Math.sqrt((a ** 3) / MU);
@@ -39,6 +42,25 @@ export function hohmann(h1, h2, di = 0) {
 export function propellantFor(dv, m0, isp) {
   return m0 * (1 - Math.exp(-(dv * 1000) / (isp * G0)));
 }
+
+/**
+ * Rate of a clock in a circular orbit at altitude h (km) relative to an identical clock on the
+ * geoid, from the weak-field metric: the gravitational term (W₀ − μ/r)/c² makes the orbiting clock
+ * run fast, the velocity term −v²/2c² (special relativity, v² = μ/r) makes it run slow.
+ * Returns fractional rates and the same in µs per day (positive = the satellite clock gains).
+ */
+export function clockRelativity(h) {
+  const mu = MU * 1e9, c2 = (C_LIGHT * 1e3) ** 2;   // SI
+  const r = (RE + h) * 1e3;
+  const grav = (W0_GEOID - mu / r) / c2;
+  const vel = -mu / (2 * r * c2);
+  const net = grav + vel;
+  const usDay = (x) => x * 86400 * 1e6;
+  return { grav, vel, net, gravUs: usDay(grav), velUs: usDay(vel), netUs: usDay(net) };
+}
+
+/** Altitude (km) at which the two relativistic effects cancel: r = 3μ / 2W₀. */
+export const clockCrossoverAlt = () => (1.5 * MU * 1e9) / W0_GEOID / 1e3 - RE;
 
 /** Solve Kepler's equation M = E − e·sinE for the eccentric anomaly (Newton–Raphson). */
 export function solveKepler(M, e) {
