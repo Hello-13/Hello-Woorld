@@ -305,7 +305,7 @@ export function buildUAV() {
     P(`Pylons (${sn})`, {
       system: 'Weapons', material: 'Aluminium pylons with release units and sway braces', mass: 53, count: 3, explode: [0, -0.75, 1.75 * side],
       desc: side > 0 ? 'Three under-wing stations: inboard (rated about 1,500 lb, 680 kg), middle (about 600–750 lb) and outboard (about 150–200 lb); press figures differ. Inboard stations can also take fuel tanks.' : 'Port inboard, middle and outboard pylons. With the centreline station there are seven stations in all, for up to 3,000 lb (1,361 kg) of external stores.',
-    }, [L(f(merge(pyl)), m.skin), L(f(rack), m.darkMetal)]);
+    }, [L(f(merge(pyl)), m.skin), L(f(merge(rack)), m.darkMetal)]);
 
     // GBU-12 on the inboard station
     const g = gbu12();
