@@ -7,7 +7,7 @@ const TAILROTOR = ['Tail rotor blades', 'Tail rotor hub & crossbeam spars', 'Tai
 export default [
   {
     title: 'A rotor is a spinning wing',
-    body: 'Each of the four blades is a long, thin wing flying in a circle at 258 rpm. Together they act like a disc 16.36 m across that pushes air downward: at maximum weight the disc shoves about 2.9 tonnes of air through itself every second at 14 m/s, and the reaction is the lift. Watch the downwash contract below the disc and spread along the ground.',
+    body: 'Each of the four blades is a long, thin wing flying in a circle at 258 rpm. Together they act like a disc 16.36 m across that pushes air downward: at maximum weight the disc shoves about 3.6 tonnes of air through itself every second at 14 m/s (twice that, 28 m/s, far below it), and the reaction is the lift. Watch the downwash contract below the disc and spread along the ground.',
     key: 'Momentum theory: T = 2ρA·v², so the ideal hover power is T^1.5 / √(2ρA). A big disc (low disc loading) hovers on less power.',
     focus: [...BLADES, 'Main rotor hub'], view: { dir: [1, 0.55, 1.1], fill: 1.0 }, demo: 'flow',
   },
@@ -32,7 +32,7 @@ export default [
   {
     title: 'Torque, and why the tail rotor is canted',
     body: 'Spinning the rotor counter-clockwise (seen from above) twists the fuselage the other way. The tail rotor, 9.93 m behind the shaft, pushes the tail to starboard to cancel it; the pedals change its pitch to turn. Its shaft is canted 20° up, so it also lifts the tail — about 3 % of the weight — which widens the centre-of-gravity range. The bearingless rotor flaps and changes pitch by bending and twisting its two composite crossbeam spars.',
-    key: 'Hover at 9,979 kg: torque Q = P/Ω ≈ 66 kN·m, so the tail rotor needs Q / 9.93 m ≈ 6.7 kN of sideways thrust (≈ 9 % of the power).',
+    key: 'Hover at 9,979 kg: torque Q = P/Ω ≈ 70 kN·m, so the tail rotor needs Q / 9.93 m ≈ 7 kN of sideways thrust (≈ 9 % of the power).',
     focus: [...TAILROTOR, 'Tail pylon', 'Intermediate gearbox (42°)'], view: { dir: [-0.35, 0.3, 1], fill: 1.25 }, demo: 'surfaces',
   },
   {

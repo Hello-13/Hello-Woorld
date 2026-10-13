@@ -175,11 +175,12 @@ export function powerRequired({ mass, pressureAltitude = 0, isaDev = 0, V = 0, V
 /**
  * Engine power available (shp at the transmission input) at an altitude and temperature.
  * rating: 'contingency' | 'max' | 'irp' | 'mcp'. oei: one engine inoperative (the survivor at contingency).
+ * fraction scales each engine's rating before the transmission limit is applied (e.g. 0.95 × IRP).
  */
-export function powerAvailable({ pressureAltitude = 0, isaDev = 0, rating = 'irp', oei = false, r = UH60 } = {}) {
+export function powerAvailable({ pressureAltitude = 0, isaDev = 0, rating = 'irp', oei = false, fraction = 1, r = UH60 } = {}) {
   const air = airData(pressureAltitude, isaDev);
   const lapse = Math.min(r.lapseCap, air.delta * Math.pow(air.theta, -r.lapse));
-  const perEngine = r.ratings[oei ? 'contingency' : rating] * lapse * r.install;
+  const perEngine = r.ratings[oei ? 'contingency' : rating] * lapse * r.install * fraction;
   const engines = oei ? perEngine : r.engines * perEngine;
   const shp = Math.min(engines, r.transLimit);
   return { shp, W: shp * SHP, perEngine, engines, lapse, limit: engines > r.transLimit ? 'transmission' : 'engines' };
@@ -293,7 +294,7 @@ export function rotorEnergy(powerW, { toFraction = 0.8, r = UH60 } = {}) {
  * scales the rating: the US Army quotes vertical climb on 95 % of intermediate rated power.
  */
 export function verticalClimb({ mass, pressureAltitude = 0, isaDev = 0, rating = 'irp', oei = false, powerFraction = 1, r = UH60 } = {}) {
-  const avail = powerAvailable({ pressureAltitude, isaDev, rating, oei, r }).W * powerFraction;
+  const avail = powerAvailable({ pressureAltitude, isaDev, rating, oei, fraction: powerFraction, r }).W;
   const req = (Vc) => powerRequired({ mass, pressureAltitude, isaDev, Vc, r }).total;
   if (req(0) > avail) return 0;
   return bisect((Vc) => avail - req(Vc), 0, 40, 0.01);

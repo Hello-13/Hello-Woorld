@@ -111,8 +111,10 @@ test('vertical climb on 95 % IRP at 4,000 ft / 95 °F matches the Sikorsky UH-60
   // brochure: 1,553 ft/min at 16,800 lb and 941 ft/min at 18,000 lb (95 % intermediate rated power)
   const cond = { pressureAltitude: 1219, isaDev: 35 - (15 - 0.0065 * 1219), powerFraction: 0.95 };
   const lb = 0.45359237;
-  close(verticalClimb({ ...cond, mass: 16800 * lb }) / FPM, 1553, 0.12 * 1553, '16,800 lb');
-  close(verticalClimb({ ...cond, mass: 18000 * lb }) / FPM, 941, 0.18 * 941, '18,000 lb');
+  close(verticalClimb({ ...cond, mass: 16800 * lb }) / FPM, 1553, 0.06 * 1553, '16,800 lb');
+  close(verticalClimb({ ...cond, mass: 18000 * lb }) / FPM, 941, 0.1 * 941, '18,000 lb');
+  // at sea level 95 % of IRP still exceeds the 3,400 shp transmission limit
+  assert.equal(powerAvailable({ rating: 'irp', fraction: 0.95 }).limit, 'transmission');
   // and the climb power obeys momentum theory: P = κT(Vc/2 + √((Vc/2)² + v_h²)) + profile + Vc·T
   const Vc = 5, p = powerRequired({ mass: 7620, Vc });
   const vh = p.mr.vh, vi = -Vc / 2 + Math.sqrt(Vc * Vc / 4 + vh * vh);

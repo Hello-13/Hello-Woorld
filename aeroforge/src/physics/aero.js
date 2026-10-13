@@ -15,6 +15,16 @@ export const FIGHTER = {
   clMax: 1.65,
   alphaStall: 26,           // deg, wing alone; thrust vectoring lets the jet fly far beyond it
   gLimit: 9,                // +9 / −3 g
+  // published figures the lab and tests compare the model against (not used by the equations)
+  massEmpty: 19700,         // kg (43,340 lb)
+  massMaxTakeoff: 38000,    // kg (83,500 lb)
+  fuelInternal: 8200,       // kg (18,000 lb)
+  machMax: 2.25,            // at altitude
+  machSeaLevel: 1.21,       // 800 kt, a structural / dynamic-pressure limit
+  machSupercruise: 1.76,    // at altitude, military power
+  ceiling: 19812,           // m (65,000 ft)
+  gNegLimit: -3,
+  tvcDeg: 20,               // 2-D nozzles vector ±20° in pitch
 };
 
 const AR = (FIGHTER.span ** 2) / FIGHTER.wingArea;
