@@ -201,8 +201,7 @@ export function applyMat(g, m) {
       }
     }
   }
-  g.computeVertexNormals();
-  return g;
+  return g;                            // applyMatrix4 already carried the normals through the matrix
 }
 
 /** Flat plate filling the fuselage section at s (bulkheads, firewall). */

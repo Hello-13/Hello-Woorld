@@ -286,7 +286,7 @@ export function buildUAV() {
       desc: side > 0 ? 'Green position light on the starboard wingtip, red on the port one: other pilots can tell which way the aircraft is heading at night.' : 'Red position light on the port wingtip. The MQ-9 flies in shared airspace, so it carries the same lights as a crewed aircraft.',
     }, L(f(lens), side > 0 ? m.navGreen : m.navRed, { cast: false }));
     const pod = latheX([[0.001, -0.4], [0.02, -0.33], [0.024, -0.1], [0.022, 0.05], [0.001, 0.12]], 12);
-    pod.translate(wpt(10.05, 0.45, 0)[0], wpt(10.05, 0.45, 0)[1], WING.semi + 0.02);
+    pod.translate(wpt(10.05, 0.45, 0)[0], wpt(10.05, 0.45, 0)[1], WING.semi - 0.01);
     P(`Wingtip V/UHF antenna (${sn})`, {
       system: 'Communications', material: 'Dielectric fairing (shape approximate)', mass: 1, explode: [0, 1.05, 2.05 * side],
       desc: 'Block 5 aircraft carry VHF/UHF voice-radio antennas at the wingtips for the two ARC-210 radios, so ground forces and air traffic control can talk to the crew through the aircraft (fairing shape approximate).',
@@ -365,7 +365,7 @@ export function buildUAV() {
     const f = (g) => (side > 0 ? g : mirror(g));
     const sn = SN(side);
     const frame = new THREE.Group();
-    frame.position.set(X(8.45), 1.8, 0.1 * side);
+    frame.position.set(X(8.45), 1.745, 0.1 * side);
     frame.rotation.x = -DIH * side;
     air.add(frame);
     tailFrames.push(frame);
