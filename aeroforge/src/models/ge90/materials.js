@@ -46,4 +46,9 @@ export const GM = {
   red: () => std('red', { color: 0xa3261e, roughness: 0.5, metalness: 0.2 }),
   blue: () => std('blue', { color: 0x2f5f8e, roughness: 0.5, metalness: 0.3 }),
   cascade: () => std('cascade', { color: 0x3b3f44, roughness: 0.5, metalness: 0.4 }),
+  // holes (cooling, dilution and web holes) drawn as dark discs through a wall
+  hole: () => std('hole', { color: 0x16130f, roughness: 0.9, metalness: 0.1 }),
+  gear: () => std('gear', { color: 0xb9b2a4, roughness: 0.26, metalness: 1 }),
+  fairing: () => std('fairing', { color: 0x9a8f80, roughness: 0.5, metalness: 0.85 }),
+  orange: () => std('orange', { color: 0xc8692a, roughness: 0.5, metalness: 0.2 }),
 };

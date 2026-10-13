@@ -92,9 +92,9 @@ export function buildFan(ctx) {
   // machined stiffening ribs round the containment zone
   const ribs = cut(cutLathe([0.12, -0.08, -0.28, -0.48].map((y) => [[1.705, y + 0.012], [1.73, y + 0.012], [1.73, y - 0.012], [1.705, y - 0.012]]), GM.fanCase(), { seg: 96 }));
   P('Fan containment case', {
-    system: 'Structure', material: 'Forged and machined aluminium ring (hardwall containment)', mass: 1150,
+    system: 'Structure', material: 'Forged and machined aluminium ring (hardwall containment), made by Volvo Aero', mass: 650,
     explode: [0, 1.15, 0], temp: 290,
-    desc: 'If a blade ever breaks off at full power, this thick aluminium ring has to stop it; certification requires a deliberate blade-off test at take-off speed. A Kevlar/fibreglass wrap was added only as a temporary fix while the 777-300ER was certified in 2003; the production answer was a thicker aluminium forging. The case also carries the fan cowls, the accessory gearbox, FADEC and oil tank.',
+    desc: 'If a blade ever breaks off at full power, this thick aluminium ring, about 600 kg machined (Volvo Aero), has to stop it; certification requires a deliberate blade-off test at take-off speed. A Kevlar/fibreglass wrap was added only as a temporary fix while the 777-300ER was certified in 2003; the production answer was a thicker aluminium forging. The case also carries the fan cowls, the accessory gearbox, FADEC and oil tank.',
     callout: true, anchor: [0.9, 0.0, 1.5],
   }, [caseGrp, ribs]);
   const rub = cut(cutLathe([[FAN.rubR, 0.12], [FAN.caseR, 0.12], [FAN.caseR, -0.5], [FAN.rubR, -0.5]], GM.rubStrip(), { seg: 96 }));
@@ -184,35 +184,40 @@ export function buildFan(ctx) {
 
   // ------------------------------------------------------------------ fan hub frame
   const fr0 = -1.68, fr1 = -2.0;
-  const frame = [];
   // gooseneck (transition) duct walls between booster exit and HPC inlet
   const gooseOut = [], gooseIn = [];
   for (let y = -1.6; y >= -2.1 - 1e-6; y -= 0.05) { const [h, t] = coreAt(y); gooseOut.push([t, y]); gooseIn.push([h, y]); }
-  frame.push(gooseOut.concat(gooseOut.slice().reverse().map(([r, y]) => [r + 0.025, y])));
-  frame.push(gooseIn.map(([r, y]) => [r - 0.03, y]).concat(gooseIn.slice().reverse()));
-  // hub ring that carries the forward sump, and the outer core-duct ring under the bypass wall
-  frame.push([[0.3, fr0], [0.4, fr0], [0.4, fr1], [0.3, fr1]]);
-  frame.push([[0.76, -1.62], [bypassAt(-1.62)[0], -1.62], [bypassAt(-2.02)[0], -2.02], [0.6, -2.02], [0.6, -1.95], [0.74, -1.9]]);
-  // outer frame ring at the fan case aft flange
-  frame.push([[FAN.caseR, -1.45], [1.72, -1.45], [1.72, -1.95], [1.62, -1.95]]);
-  const frameRings = cut(cutLathe(frame, GM.casingDark(), { seg: 64 }));
-  // struts: 12 through the bypass duct (one carries the radial drive shaft), and 12 in the core duct
-  const strutBy = (keep) => {
-    const [a] = bypassAt(-1.78);
-    const g = bladeGeometry({ rHub: a - 0.02, rTip: 1.64, chord: 0.36, stagger: 0, t: 0.16, camber: 0, y: -1.78, stations: 1, n: 8 });
-    return ring(g, 12, { keep });
-  };
-  const strutCore = (keep) => {
-    const g = bladeGeometry({ rHub: 0.39, rTip: 0.77, chord: 0.24, stagger: 0, t: 0.18, camber: 0, y: -1.83, stations: 2, n: 8, sweep: [0.05, -0.02] });
-    return ring(g, 12, { keep });
-  };
-  const sBy = cut(cutPair(strutBy, GM.casingDark()));
-  const sCore = cut(cutPair(strutCore, GM.casingDark()));
-  P('Fan hub frame', {
-    system: 'Structure', material: 'Cast and fabricated titanium / steel frame', mass: 820,
+  const FRAME = 'Cast and fabricated titanium / steel';
+  P('Fan hub frame hub', {
+    system: 'Structure', material: `${FRAME} hub ring`, mass: 140,
+    explode: [0, 0, 0], temp: 330,
+    desc: 'The inner ring of the engine\'s forward backbone. The cones of the forward sump hang from it, carrying the #1, #2 and #3 bearings, so the fan\'s whole weight and thrust come into the frame here.',
+  }, cut(cutLathe([[0.3, fr0], [0.4, fr0], [0.4, fr1], [0.3, fr1]], GM.casingDark(), { seg: 64 })));
+  P('Gooseneck duct', {
+    system: 'Structure', material: `${FRAME} duct walls`, mass: 90,
+    explode: [0, 0, 0], temp: 360,
+    desc: 'The S-shaped transition that carries the core air down from the booster\'s large radius to the HP compressor\'s small one, through the frame. Its curvature has to be gentle enough that the flow does not separate from the inner wall.',
+  }, cut(cutLathe([gooseOut.concat(gooseOut.slice().reverse().map(([r, y]) => [r + 0.025, y])), gooseIn.map(([r, y]) => [r - 0.03, y]).concat(gooseIn.slice().reverse())], GM.casingDark(), { seg: 64 }))).userData.part.stationTemp = '25';
+  P('Fan hub frame core struts', {
+    system: 'Structure', material: `${FRAME} hollow struts`, mass: 110, count: 12,
+    explode: [0, 0, 0], temp: 360,
+    desc: 'Twelve struts across the core duct between hub and mid ring. They are hollow: the radial drive shaft, the N1 probe, the #1-bearing accelerometer lead and the forward sump\'s oil and vent lines pass through them.',
+  }, cut(cutPair((keep) => ring(bladeGeometry({ rHub: 0.39, rTip: 0.77, chord: 0.24, stagger: 0, t: 0.18, camber: 0, y: -1.83, stations: 2, n: 8, sweep: [0.05, -0.02] }), 12, { keep }), GM.casingDark())));
+  P('Fan hub frame mid ring', {
+    system: 'Structure', material: `${FRAME} ring`, mass: 160,
     explode: [0, 0, 0], temp: 320,
-    desc: 'The engine\'s forward backbone: struts across the core and bypass ducts tie the fan case to the hub that holds the forward bearings, and the forward mount picks up the pylon here. One bypass strut is hollow for the radial drive shaft, another carries the fuel and oil lines.',
-  }, [frameRings, sBy, sCore]);
+    desc: 'The ring between the core and bypass ducts that ties the two sets of struts together, with the variable-bypass-valve chutes through it. The core cowl and the reverser\'s inner wall start from its aft edge.',
+  }, cut(cutLathe([[0.76, -1.62], [bypassAt(-1.62)[0], -1.62], [bypassAt(-2.02)[0], -2.02], [0.6, -2.02], [0.6, -1.95], [0.74, -1.9]], GM.casingDark(), { seg: 64 })));
+  P('Fan hub frame bypass struts', {
+    system: 'Structure', material: `${FRAME} hollow struts`, mass: 210, count: 12,
+    explode: [0, 0, 0], temp: 300,
+    desc: 'Twelve thick struts across the bypass duct to the outer ring. Their hollow insides are the passages between fan case and core: one carries the radial drive shaft, one the fuel, servo-fuel and oil-supply lines (6 o\'clock), one the scavenge line, one the N1 probe, harnesses and sense lines.',
+  }, cut(cutPair((keep) => { const [a] = bypassAt(-1.78); return ring(bladeGeometry({ rHub: a - 0.02, rTip: 1.64, chord: 0.36, stagger: 0, t: 0.16, camber: 0, y: -1.78, stations: 1, n: 8 }), 12, { keep }); }, GM.casingDark())));
+  P('Fan hub frame outer ring', {
+    system: 'Structure', material: `${FRAME} ring`, mass: 110,
+    explode: [0, 0, 0], temp: 300,
+    desc: 'Bolted to the fan case\'s aft flange, it takes the struts\' loads into the case. The forward engine mount picks up the pylon on it at 12 o\'clock, so the frame carries the engine\'s weight.',
+  }, cut(cutLathe([[FAN.caseR, -1.45], [1.72, -1.45], [1.72, -1.95], [1.62, -1.95]], GM.casingDark(), { seg: 64 })));
 
   // ------------------------------------------------------------------ variable bleed valves
   const vbv = (keep) => {
@@ -232,10 +237,10 @@ export function buildFan(ctx) {
     return merge(list);
   };
   const vbvGrp = cut(cutPair(vbv, GM.steel()));
-  P('Variable bleed valves', {
-    system: 'Propulsion', material: 'Steel doors, unison ring and fuel-powered actuators (count estimated)', mass: 70, count: 12,
+  P('Variable bypass valves (VBV)', {
+    system: 'Propulsion', material: 'Steel doors and unison ring (door count estimated)', mass: 70, count: 12,
     explode: [-0.4, 0.25, 0.35], temp: 330,
-    desc: 'Doors in the duct between booster and HP compressor. At low power and during rapid throttle changes the booster pumps more air than the core can swallow; the FADEC opens these doors to dump the excess into the bypass and keep the booster from stalling. The GE90 introduced doors that open inward into the flow, so they also scoop out sand, hail and ice flung to the outer wall — GE calls it a FOD-free core.',
+    desc: 'Doors in the duct between booster and HP compressor, which GE\'s manuals call variable bypass valves. At low power and during rapid throttle changes the booster pumps more air than the core can swallow; the FADEC opens these doors to dump the excess into the bypass and keep the booster from stalling. They open inward into the flow, so they also scoop out sand, hail and ice flung to the outer wall — GE calls it a FOD-free core.',
   }, vbvGrp).userData.part.stationTemp = '25';
 
   // two fuel-powered actuators on the frame that turn the unison ring through bellcranks
@@ -250,9 +255,9 @@ export function buildFan(ctx) {
     return merge(list);
   }, GM.steel());
   P('VBV actuators', {
-    system: 'Propulsion', material: 'Fuel-powered hydraulic actuators with bellcranks (count and position estimated)', mass: 14, count: 2,
+    system: 'Propulsion', material: 'Parker fuel-powered actuators with bellcranks (count and position estimated)', mass: 14, count: 2,
     explode: [-0.4, 0.25, 0.75], temp: 330,
-    desc: 'High-pressure fuel from the HMU, used as hydraulic fluid, drives these two rams; through bellcranks they rotate the unison ring that opens and closes all the bleed doors together. A position sensor in each tells the FADEC where the doors are.',
+    desc: 'High-pressure fuel from the HMU, used as hydraulic fluid and fed through a pair of servo tubes, drives these two Parker rams; through bellcranks they rotate the unison ring that opens and closes all the bypass-valve doors together. A position sensor in each tells the FADEC where the doors are.',
   }, cut(vbvAct));
 
   void SKIN;

@@ -251,6 +251,24 @@ function stringer(x0, x1, a, inset = 0.06, r = 0.022) {
   return pipe(pts, r, 5);
 }
 
+/** Aft cabin bulkhead at x = -1.78: a plate cut to the section 3 cm inside the skin, from the floor
+ *  up to the roof beams (a plain rectangle would push its corners out through the side skin). */
+function aftBulkhead(x = -1.78, inset = 0.03, y0 = 0.585, y1 = 2.135) {
+  const sh = new THREE.Shape();
+  let last = null;
+  for (let k = 0; k < 96; k++) {
+    const p = surfPoint(x, -Math.PI / 2 + (2 * Math.PI * k) / 96, -inset);
+    const u = p.z, v = Math.min(y1, Math.max(y0, p.y));
+    if (last && Math.abs(last[0] - u) < 1e-4 && Math.abs(last[1] - v) < 1e-4) continue;
+    if (!last) sh.moveTo(u, v); else sh.lineTo(u, v);
+    last = [u, v];
+  }
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.03, bevelEnabled: false, curveSegments: 1 });
+  g.rotateY(Math.PI / 2);                    // shape (z, y) → the y-z plane; extrusion along x
+  g.translate(x - 0.015, 0, 0);
+  return g;
+}
+
 export function buildFuselage({ A, P }) {
   const G = buildGrid();
   const paint = MAT.paint();
@@ -373,8 +391,10 @@ export function buildFuselage({ A, P }) {
   }, [mesh(merge(ckFrames), MAT.primer())]);
   // roof beams that carry the main transmission, plus cabin frames
   const roof = [];
-  for (const z of [-0.52, 0.52]) roof.push(bar([-2.6, 2.17, z], [2.6, 2.17, z], 0.1, 0.16));
-  for (const x of [-0.5, 0.5]) roof.push(bar([x, 2.17, -0.62], [x, 2.17, 0.62], 0.1, 0.16));
+  // the roof narrows aft and towards its crown, so the beams sit 3–5 cm inside the roof skin all the
+  // way along (they end at the transition section, where the roof is too narrow for them)
+  for (const z of [-0.5, 0.5]) roof.push(bar([-2.1, 2.12, z], [2.6, 2.12, z], 0.1, 0.14));
+  for (const x of [-0.5, 0.5]) roof.push(bar([x, 2.12, -0.62], [x, 2.12, 0.62], 0.1, 0.1));
   P('Cabin frames & roof beams', {
     system: 'Structure', material: 'Aluminium frames, machined roof beams, titanium transmission fittings', mass: 330, explode: [0, 0.8, 0],
     desc: 'Ring frames around the cabin and two deep longitudinal roof beams that carry the main transmission and engines. They are designed to hold the 1-tonne-plus gearbox and rotor head in place in a hard crash rather than let them collapse into the cabin.',
@@ -383,7 +403,7 @@ export function buildFuselage({ A, P }) {
   P('Transition section frames', {
     system: 'Structure', material: 'Aluminium frames and the aft cabin bulkhead', mass: 90, explode: [-0.9, 0.3, 0],
     desc: 'Carries the aft cabin bulkhead, the fuel-cell bays below and the avionics shelf above, and joins the tail cone to the cabin.',
-  }, [mesh(merge([...trFrames, box(0.03, 1.55, 2.12, [-1.78, 1.36, 0])]), MAT.primer())]);
+  }, [mesh(merge([...trFrames, aftBulkhead()]), MAT.primer())]);
   P('Tail cone frames & longerons', {
     system: 'Structure', material: 'Aluminium frames and extruded longerons', mass: 120, explode: [-2.4, 0.4, 0],
     desc: 'Semi-monocoque tail cone: frames every ~0.7 m tied by longerons. It reacts the tail-rotor thrust as torsion and the tail-wheel loads as bending.',

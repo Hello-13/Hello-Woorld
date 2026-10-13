@@ -1,8 +1,10 @@
-// Accessory drive and engine systems: inlet gearbox, radial drive shaft, transfer gearbox and the
-// fan-case accessory gearbox with its starter, pumps, HMU, generators and alternator; FADEC; the
-// lubrication system (tank, pump, filters, chip detectors, deoiler, sensors, supply and scavenge
-// lines); fuel, bleed, starting and anti-ice plumbing; hydraulic and electrical runs to the strut;
-// drains; fire detection and extinguishing; harnesses; ignition; and the main sensors.
+// Accessory drive and the units on the fan case: inlet gearbox, radial drive shaft, transfer
+// gearbox and the fan-case accessory gearbox (housing and spur-gear train) with its starter,
+// pumps, HMU, lubrication unit, generators and alternator; FADEC with its rating plug and
+// configuration box; oil tank; heat exchangers and coolers; the debris monitoring system; bleed,
+// starting and anti-ice air; hydraulic and generator runs to the strut; drains; fire detection
+// and extinguishing; ignition. The fuel, oil and servo lines, harnesses and sensors that join
+// these units are in plumbing.js.
 //
 // Positions on the fan case are estimated (GE does not publish installation drawings). The gearbox
 // hangs on the fan case on the viewer's side, below the horizontal (phi ≈ 0.42…1.34 rad); lines
@@ -10,10 +12,12 @@
 // Items marked "aircraft (Boeing) equipment" are supplied with the 777 and driven or served by the
 // engine; they are left out of the engine's certified dry weight.
 
+import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { GM } from './materials.js';
-import { coreAt, ROWS } from './layout.js';
-import { cutLathe, cutPair, sector, boxAt, axialCyl, radialCyl, hoop, merge, P3, tube, arc, cutTube, bladeGeometry, atPhi } from './geom.js';
+import { coreAt } from './layout.js';
+import { cutLathe, cutPair, sector, boxAt, axialCyl, radialCyl, tangentCyl, hoop, merge, P3, tube, arc, cutTube, bladeGeometry, atPhi } from './geom.js';
+import { toothedGear, axialGear, agbTrain } from './gears.js';
 
 const TAU = Math.PI * 2;
 const UP = Math.PI * 1.5;
@@ -21,58 +25,138 @@ const BOTTOM = Math.PI / 2;
 export const PHI = { radial: Math.PI / 3, n1: Math.PI / 6, fadec: 0.24, tank: 0.25, agb0: 0.42, agb1: 1.34 };
 
 // accessory gearbox: centre radius, forward and aft face stations
-const R_AGB = 1.845, Y_AGB_F = -0.56, Y_AGB_A = -0.94;
+export const R_AGB = 1.845, Y_AGB_F = -0.56, Y_AGB_A = -0.94;
+/** Attachment points (r, y, phi) on the units, where the lines in plumbing.js join them. */
+export const AT = {
+  pumpBoostOut: [1.845, -0.262, 0.82], pumpInlet: [1.866, -0.44, 0.774],
+  hxFuelIn: [1.84, 0.012, 1.44], hxFuelOut: [1.84, -0.552, 1.44], hxOilIn: [1.84, -0.45, 1.352], hxOilOut: [1.84, -0.1, 1.528],
+  filterIn: [1.99, -0.42, 0.852], hmuMetered: [1.945, -0.5, 1.03],
+  unitSupply: [1.83, -0.52, 1.243], unitScavIn: [1.845, -0.42, 1.245], unitPress: [1.89, -0.42, 1.135], unitScavOut: [1.93, -0.545, 1.185],
+  oilFilterHead: [2.04, -0.45, 1.2], scavFilterIn: [1.965, -0.665, 1.243], dmsOut: [1.97, -0.966, 1.3],
+  tankOut: [1.84, -1.2, 0.435], tankReturn: [1.94, -0.86, 0.25], tankVent: [1.94, -1.0, 0.12], deoilerIn: [1.845, -1.088, 1.3],
+  flowIn: [1.81, -1.065, 1.47], flowOut: [1.81, -1.235, 1.47], fadecA: [1.92, -0.15, 0.19], fadecB: [1.92, -0.51, 0.29],
+};
 
 const m = (g, mat) => mesh(g, mat);
-const strap = (r, y, phi, w = 0.02) => boxAt(r, y, phi, [0.01, w, 0.05]);
 /** A small threaded plug: boss on the surface at r0 and a hex head out to r1. */
 const plug = (r0, r1, y, phi, rad = 0.012) => merge([radialCyl(r0, r1, y, phi, rad, 10), radialCyl(r1, r1 + 0.012, y, phi, rad * 1.5, 6)]);
+
+/** A box at (r, y, phi) of size [radial, axial, tangential] built as five walls and a removable side. */
+function shellBox(r, y, phi, [dr, dy, dt], t = 0.012) {
+  const w = (cx, cy, cz, sx, sy, sz) => atPhi(new THREE.BoxGeometry(sx, sy, sz).translate(r + cx, y + cy, cz), phi);
+  const keep = merge([
+    w(-dr / 2 + t / 2, 0, 0, t, dy, dt), w(dr / 2 - t / 2, 0, 0, t, dy, dt),
+    w(0, dy / 2 - t / 2, 0, dr, t, dt), w(0, -dy / 2 + t / 2, 0, dr, t, dt),
+    w(0, 0, -dt / 2 + t / 2, dr, dy, t),
+  ]);
+  // local +z is the side towards decreasing phi, the side facing the viewer on this half of the engine
+  const rest = w(0, 0, dt / 2 - t / 2, dr, dy, t);
+  return { keep, rest };
+}
+/** A group of a housing and its removable cover: the cutaway takes the cover off. */
+function opened(keepGeo, restGeo, mat, cut) {
+  const g = new THREE.Group();
+  const k = mesh(keepGeo, mat), r = mesh(restGeo, mat);
+  r.visible = false;
+  g.add(k, r);
+  g.userData.cutaway = { rest: r, caps: [] };
+  return cut(g);
+}
 
 export function buildAccessories(ctx) {
   const { P, cut } = ctx;
   const C = (build, mat, which = 'engine') => cut(cutPair(build, mat, which));
 
   // ================================================================== drive train
+  // inlet gearbox: a bevel ring on the front of the HP shaft, meshing with the radial shaft's pinion
   const igbRing = cut(cutLathe([[0.166, -1.905], [0.24, -1.915], [0.24, -1.935], [0.166, -1.945]], GM.bronze(), { seg: 48 }));
-  const igbBox = m(merge([radialCyl(0.24, 0.31, -1.86, PHI.radial, 0.035, 14), boxAt(0.3, -1.88, PHI.radial, [0.1, 0.12, 0.12])]), GM.casingDark());
+  const igbTeeth = C((keep) => {
+    const list = [];
+    for (let i = 0; i < 64; i++) { const phi = (i / 64) * TAU; if (keep(phi)) list.push(boxAt(0.222, -1.908, phi, [0.034, 0.01, 0.0055])); }
+    return merge(list);
+  }, GM.bronze());
+  // pinion at the foot of the radial shaft, riding on the ring's face teeth: a bevel with its axis
+  // radial and a shallow cone whose apex lies on the engine axis
+  const pinion = toothedGear([0.029, 0.025], 0.026, { teeth: 16, depth: 0.005 }).rotateZ(-Math.PI / 2).translate(0.2225, -1.879, 0);
+  const igbHousing = shellBox(0.28, -1.86, PHI.radial, [0.07, 0.1, 0.1], 0.01);
   P('Inlet gearbox', {
-    system: 'Drive system', material: 'Steel bevel gears in a cast housing', mass: 15,
+    system: 'Drive system', material: 'Steel bevel gears in a cast housing (cover cut away)', mass: 15,
     explode: [0.09, -0.15, 0.58], temp: 380,
-    desc: 'A bevel gear on the front of the HP shaft turns the drive through 90° into the radial shaft. Accessories run off the HP spool because it is the one the starter has to turn, and it keeps a steady speed range.',
-  }, [igbRing, igbBox]);
+    desc: 'A bevel ring on the front of the HP shaft turns the drive through 90° into the pinion at the foot of the radial shaft. Its gear turns at N2, 9,332 rpm at 100 %; at start it carries the air turbine starter\'s torque the other way, from the radial shaft into the HP spool.',
+  }, [igbRing, igbTeeth, m(atPhi(pinion, PHI.radial), GM.bronze()), opened(merge([igbHousing.keep, radialCyl(0.315, 0.33, -1.84, PHI.radial, 0.035, 14)]), igbHousing.rest, GM.casingDark(), cut)]);
 
-  const radial = m(merge([radialCyl(0.31, 1.76, -1.84, PHI.radial, 0.026, 12), radialCyl(0.9, 1.0, -1.84, PHI.radial, 0.034, 12)]), GM.shaft());
+  const radial = m(merge([tube([P3(0.236, -1.879, PHI.radial), P3(0.27, -1.87, PHI.radial), P3(0.33, -1.842, PHI.radial)], 0.02, { seg: 8, radial: 10 }), radialCyl(0.33, 1.795, -1.84, PHI.radial, 0.026, 12), radialCyl(0.9, 1.0, -1.84, PHI.radial, 0.034, 12)]), GM.shaft());
   P('Radial drive shaft', {
     system: 'Drive system', material: 'Steel tube with splined ends', mass: 12,
     explode: [0.19, -0.15, 1.01], temp: 330,
     desc: 'Runs out through a fan-frame strut — across both the core duct and the bypass duct — to the transfer gearbox on the fan case. At start it carries the starter\'s torque the other way, inwards, to spin the HP spool.',
   }, radial);
-  const tgb = m(merge([boxAt(1.83, -1.72, PHI.radial, [0.16, 0.26, 0.26]), axialCyl(1.83, -1.55, PHI.radial, 0.05, 0.1, 16), radialCyl(1.72, 1.76, -1.84, PHI.radial, 0.05, 16)]), GM.magnesium());
+
+  // transfer gearbox: a bevel pair turns the drive from the radial shaft into the horizontal shaft.
+  // The apex of the pair sits where the two shaft axes meet, at r = R_AGB, y = −1.84.
+  const TGB = { r: R_AGB, y: -1.745, apexY: -1.84 };
+  const tgbBox = shellBox(TGB.r, TGB.y, PHI.radial, [0.16, 0.31, 0.24]);
   P('Transfer gearbox', {
-    system: 'Drive system', material: 'Cast aluminium housing, bevel gears', mass: 28,
+    system: 'Drive system', material: 'Cast aluminium housing (cover cut away)', mass: 22,
     explode: [0.24, -0.1, 1.23], temp: 340,
-    desc: 'Turns the drive from the radial shaft into a shaft running forward along the fan case to the accessory gearbox.',
-  }, tgb);
+    desc: 'Turns the drive from the radial shaft into the horizontal shaft that runs forward along the fan case to the accessory gearbox. Losing the drive here stops every accessory, the fuel pump included, so the engine shuts down.',
+  }, opened(merge([tgbBox.keep, axialCyl(TGB.r, -1.575, PHI.radial, 0.045, 0.04, 16), radialCyl(1.72, 1.77, -1.84, PHI.radial, 0.05, 16)]), tgbBox.rest, GM.magnesium(), cut));
+  const bevelA = toothedGear([0.03, 0.05], 0.02, { teeth: 22, depth: 0.006 }).rotateZ(-Math.PI / 2).translate(TGB.r - 0.04, TGB.apexY, 0);
+  const bevelB = toothedGear([0.05, 0.03], 0.02, { teeth: 22, depth: 0.006 }).translate(TGB.r, TGB.apexY + 0.04, 0);
+  P('TGB radial gearshaft & bevel gears', {
+    system: 'Drive system', material: 'Carburised steel bevel gearshafts', mass: 6, count: 2,
+    explode: [0.32, -0.25, 1.45], temp: 340,
+    desc: 'The radial gearshaft\'s bevel, about 10 cm across, meshes with the horizontal shaft\'s. Cracking of this radial gearshaft caused in-flight shutdowns of GE90-110B1/-115B engines in 2013, and two more later were traced to burrs from rework of its teeth; inspection and replacement are mandatory (FAA ADs 2013-14-51 and 2021-26-06).',
+  }, m(atPhi(merge([bevelA, bevelB, radialCyl(1.765, 1.8, TGB.apexY, Math.PI / 2, 0.02, 10), axialCyl(TGB.r, -1.7, Math.PI / 2, 0.022, 0.18, 10)]), PHI.radial), GM.gear()));
   P('Horizontal drive shaft', {
     system: 'Drive system', material: 'Steel tube', mass: 9,
     explode: [0.26, 0.05, 1.38], temp: 320,
-    desc: 'Links the transfer gearbox to the accessory gearbox.',
-  }, m(axialCyl(1.83, -1.24, PHI.radial, 0.024, 0.62, 12), GM.shaft()));
+    desc: 'Links the transfer gearbox to the accessory gearbox\'s input gear, turning at a fixed ratio to N2.',
+  }, m(axialCyl(R_AGB, -1.25, PHI.radial, 0.024, 0.64, 12), GM.shaft()));
 
   // ------------------------------------------------------------------ accessory gearbox
-  const agbBody = sector(1.77, 1.92, Y_AGB_F, Y_AGB_A, PHI.agb0, PHI.agb1, 30);
+  const [A0, A1] = [PHI.agb0, PHI.agb1];
+  const RI = 1.77, RO = 1.92, WT = 0.015;
+  const housing = merge([
+    sector(RI, RI + WT, Y_AGB_F, Y_AGB_A, A0, A1, 30),
+    sector(RI, RO, Y_AGB_F, Y_AGB_F - WT, A0, A1, 30), sector(RI, RO, Y_AGB_A + WT, Y_AGB_A, A0, A1, 30),
+    sector(RI, RO, Y_AGB_F, Y_AGB_A, A0, A0 + 0.008, 1), sector(RI, RO, Y_AGB_F, Y_AGB_A, A1 - 0.008, A1, 1),
+  ]);
+  const cover = sector(RO - WT, RO, Y_AGB_F - WT, Y_AGB_A + WT, A0 + 0.008, A1 - 0.008, 30);
   const pads = [];
   // pads: [phi, radius, face (+1 forward, −1 aft)]
   const accs = [[0.62, 0.105, 1], [0.82, 0.085, 1], [1.0, 0.07, 1], [1.2, 0.075, 1], [1.31, 0.035, 1], [0.5, 0.075, -1], [0.7, 0.135, -1], [0.95, 0.085, -1], [1.21, 0.06, -1], [PHI.radial, 0.035, -1], [1.3, 0.05, -1]];
   for (const [phi, rad, face] of accs) pads.push(axialCyl(R_AGB, face > 0 ? Y_AGB_F + 0.02 : Y_AGB_A - 0.02, phi, rad + 0.02, 0.04, 20));
-  // mounting links to the fan case and the gearbox's own sump drain boss
+  // mounting links to the fan case
   for (const phi of [0.5, 0.9, 1.25]) pads.push(radialCyl(1.705, 1.77, -0.75, phi, 0.025, 8), boxAt(1.73, -0.75, phi, [0.03, 0.06, 0.08]));
   P('Accessory gearbox', {
-    system: 'Drive system', material: 'Cast aluminium/magnesium housing, spur gear train', mass: 140,
+    system: 'Drive system', material: 'Cast aluminium/magnesium housing (outer cover cut away)', mass: 110,
     explode: [0.32, 0.1, 1.52], temp: 360,
-    desc: 'A crescent-shaped gearbox hung on the fan case. Its gear train drives every pad at its own fixed ratio to N2: the 777\'s generator pad turns at 0.7947 × N2 (about 7,400 rpm at 100 %), the hydraulic-pump pad at 0.3783 × N2 and the backup-generator pad at 2.4126 × N2 (EASA type certificate).',
+    desc: 'A crescent-shaped gearbox hung on the fan case, with the accessories on its forward and aft faces. With its outer cover off, as here, the spur-gear train inside shows: one gear on each pad shaft, idlers between them.',
     callout: true, anchor: [1.62, -0.75, 1.0],
-  }, m(merge([agbBody, ...pads]), GM.magnesium()));
+  }, opened(merge([housing, ...pads]), cover, GM.magnesium(), cut));
+
+  // gear train: pad gears sized from the published pad ratios where they fit (the hydraulic pump,
+  // slowest at 0.3783 × N2, gets about 2.1 times the generator gear's diameter at 0.7947 × N2)
+  const TRAIN = agbTrain(R_AGB, [
+    { phi: 0.5, r: 0.02, kind: 'pad', name: 'VSCF backup generator' }, { phi: 0.62, r: 0.05, kind: 'pad', name: 'starter' },
+    { phi: 0.7, r: 0.028, kind: 'pad', name: 'IDG' }, { phi: 0.82, r: 0.04, kind: 'pad', name: 'fuel pump' },
+    { phi: 0.95, r: 0.059, kind: 'pad', name: 'hydraulic pump' }, { phi: 1.0, r: null, kind: 'pad', name: 'HMU drive' },
+    { phi: PHI.radial, r: null, kind: 'input', name: 'input' }, { phi: 1.205, r: 0.035, kind: 'pad', name: 'lubrication unit / PMA' },
+    { phi: 1.305, r: 0.03, kind: 'pad', name: 'deoiler / hand crank' },
+  ]);
+  const GY = (Y_AGB_F + Y_AGB_A) / 2;
+  const gears = [], shafts = [];
+  for (const g of TRAIN) {
+    gears.push(axialGear(R_AGB, GY, g.phi, g.r, 0.028));
+    if (g.kind === 'idler') shafts.push(axialCyl(R_AGB, GY, g.phi, 0.011, 0.07, 10));
+    else shafts.push(axialCyl(R_AGB, GY, g.phi, 0.013, Y_AGB_F - Y_AGB_A - 0.03, 10));
+  }
+  P('AGB gear train', {
+    system: 'Drive system', material: 'Carburised steel spur gears on roller-bearing shafts (layout estimated)', mass: 30, count: TRAIN.length,
+    explode: [0.45, 0.1, 1.75], temp: 360,
+    desc: 'Every pad turns at a fixed ratio of N2 set by its gear: the generator at 0.7947 (7,416 rpm at 100 %), the hydraulic pump at 0.3783 (3,530 rpm) and the backup generator at 2.4126 (22,515 rpm) (EASA type certificate). So the slow hydraulic-pump gear is about twice the generator gear\'s diameter; idlers carry the drive between pads. The real gear layout is not published.',
+  }, [m(merge(gears), GM.gear()), m(merge(shafts), GM.steel())]);
   P('AGB hand-cranking pad', {
     system: 'Drive system', material: 'Steel drive socket under a bolted cover', mass: 1,
     explode: [0.37, 0.35, 1.6], temp: 340,
@@ -92,6 +176,11 @@ export function buildAccessories(ctx) {
     explode: [0.35, 0.5, 1.95], temp: 300,
     desc: 'Opens when the pilot selects start, letting duct air into the starter, and closes when the FADEC sees the engine accelerating on its own at about 50 % N2. A square drive lets a mechanic open it by hand if its solenoid fails.',
   }, m(merge([axialCyl(1.99, -0.5, 0.62, 0.05, 0.14, 18), boxAt(2.03, -0.5, 0.66, [0.05, 0.08, 0.06]), radialCyl(1.96, 1.99, -0.45, 0.62, 0.04, 14)]), GM.aluminium()));
+  P('Starter control valve', {
+    system: 'Propulsion', material: 'Solenoid pilot valve (Safran), listed for the -110B1/-113B/-115B', mass: 2,
+    explode: [0.35, 0.6, 2.05], temp: 300,
+    desc: 'A small solenoid valve beside the starter air valve: it ports duct pressure to the big valve\'s actuator, so the starter air valve opens and closes on command. GE lists it separately from the Honeywell starter air valve and the air turbine starter.',
+  }, m(merge([boxAt(2.045, -0.605, 0.6, [0.05, 0.055, 0.05]), radialCyl(2.07, 2.085, -0.605, 0.6, 0.012, 8), tube([P3(2.03, -0.585, 0.615), P3(2.04, -0.55, 0.64)], 0.006, { seg: 6, radial: 5 })]), GM.connector()));
   // starter duct: from the strut down the viewer's side of the fan case to the valve
   const starterPath = [P3(2.0, -0.92, UP - 0.06), P3(1.99, -0.72, UP + 0.08), ...arc(1.99, -0.68, UP + 0.16, TAU + 0.5, 0.1), P3(1.99, -0.6, TAU + 0.6)];
   P('Starter duct', {
@@ -102,23 +191,32 @@ export function buildAccessories(ctx) {
   P('Main fuel pump', {
     system: 'Fuel', material: 'Aluminium housing, centrifugal boost stage and gear stage', mass: 32,
     explode: [0.35, 0.35, 1.89], temp: 300,
-    desc: 'A centrifugal boost stage feeding a high-pressure gear pump, driven by the gearbox. It delivers far more fuel than the engine burns; the hydromechanical unit meters what is needed and returns the rest.',
-  }, m(merge([fwd(0.82, 0.085, 0.24), axialCyl(R_AGB, Y_AGB_F + 0.26, 0.82, 0.05, 0.05, 16)]), GM.aluminium()));
+    desc: 'A centrifugal boost stage (the cap at the front) feeding a high-pressure gear stage, driven by the gearbox. Fuel arrives at 34.5 to 482.6 kPa (EASA type certificate); the boost stage sends it round the heat exchanger and filter, then the gear stage raises it far above combustor pressure for the HMU, which meters what is needed and returns the rest.',
+  }, m(merge([fwd(0.82, 0.085, 0.24), axialCyl(R_AGB, Y_AGB_F + 0.26, 0.82, 0.05, 0.05, 16), tangentCyl(1.866, -0.44, 0.78, 0.018, 0.03, 10), tangentCyl(1.86, -0.33, 0.905, 0.014, 0.16, 10)]), GM.aluminium()));
   P('Fuel filter & bypass indicator', {
     system: 'Fuel', material: 'Disposable filter element in an aluminium bowl, pop-out ΔP indicator', mass: 6,
     explode: [0.37, 0.55, 1.89], temp: 300,
     desc: 'Cleans the fuel between the pump\'s boost and high-pressure stages. When it clogs, a bypass valve keeps fuel flowing and a red button pops out of the bowl, and the crew sees a filter-bypass message, so it gets changed at the next stop.',
-  }, m(merge([radialCyl(1.93, 2.02, -0.42, 0.82, 0.042, 18), radialCyl(2.02, 2.035, -0.42, 0.82, 0.03, 12), radialCyl(1.93, 1.96, -0.36, 0.86, 0.012, 8)]), GM.aluminium()));
+  }, m(merge([radialCyl(1.93, 2.02, -0.42, 0.82, 0.042, 18), radialCyl(2.02, 2.035, -0.42, 0.82, 0.03, 12), radialCyl(1.93, 1.96, -0.36, 0.86, 0.012, 8), tangentCyl(1.99, -0.42, 0.847, 0.016, 0.02, 10)]), GM.aluminium()));
   P('Hydromechanical unit (HMU)', {
     system: 'Fuel', material: 'Aluminium body with torque-motor servo valves', mass: 35,
     explode: [0.37, 0.35, 2.03], temp: 300,
-    desc: 'The FADEC\'s muscles: electrically commanded valves meter fuel to the nozzles, and the same high-pressure fuel acts as hydraulic fluid to move the variable stators, bleed valves and clearance-control valves.',
-  }, m(merge([boxAt(R_AGB + 0.01, Y_AGB_F + 0.15, 1.0, [0.14, 0.3, 0.2]), axialCyl(R_AGB + 0.07, Y_AGB_F + 0.18, 1.0, 0.025, 0.2, 10)]), GM.blue()));
-  P('Lube & scavenge pump', {
-    system: 'Drive system', material: 'Aluminium housing, gerotor elements', mass: 18,
+    desc: 'The FADEC\'s muscles: electrically commanded valves meter fuel to the nozzles (4.59 kg/s at take-off), and the same high-pressure fuel, used as hydraulic fluid, is sent down a pair of servo lines to every variable-geometry actuator and clearance-control valve.',
+  }, m(merge([boxAt(R_AGB + 0.01, Y_AGB_F + 0.15, 1.0, [0.14, 0.3, 0.2]), axialCyl(R_AGB + 0.07, Y_AGB_F + 0.18, 1.0, 0.025, 0.2, 10), radialCyl(1.925, 1.945, -0.5, 1.03, 0.017, 10), boxAt(1.935, -0.31, 1.0, [0.02, 0.06, 0.16])]), GM.blue()));
+
+  // lubrication unit: one pressure element and four scavenge elements stacked on one shaft
+  const LU = [[0.072, -0.56, -0.52], [0.066, -0.515, -0.48], [0.066, -0.475, -0.44], [0.066, -0.435, -0.40], [0.066, -0.395, -0.37], [0.05, -0.37, -0.35]];
+  const lu = LU.flatMap(([rad, y0, y1]) => [axialCyl(R_AGB, (y0 + y1) / 2, 1.2, rad, y1 - y0, 22), axialCyl(R_AGB, y1 + 0.002, 1.2, rad + 0.006, 0.004, 22)]);
+  P('Lubrication unit', {
+    system: 'Drive system', material: 'Techspace Aero unit: aluminium housings, gerotor elements on one shaft', mass: 18,
     explode: [0.37, 0.35, 1.74], temp: 360,
-    desc: 'One pressure element sends oil to the bearings and gears; several scavenge elements suck it back from each sump, through filters and coolers, to the tank. The lubrication system shares the drive system\'s colour here.',
-  }, m(merge([fwd(1.2, 0.075, 0.2), boxAt(R_AGB, Y_AGB_F + 0.2, 1.2, [0.1, 0.06, 0.12])]), GM.oil()));
+    desc: 'On the -115B the oil pumps are one Techspace Aero lubrication unit: a pressure element (nearest the gearbox) that feeds the bearings and gears, and scavenge elements on the same shaft that suck the oil back out of the sumps. The type certificate\'s minimum oil pressure is 69 kPa differential.',
+  }, m(merge([...lu, tangentCyl(1.83, -0.52, 1.24, 0.016, 0.03, 10), tangentCyl(1.845, -0.42, 1.24, 0.018, 0.03, 10), boxAt(1.92, -0.545, 1.185, [0.02, 0.04, 0.04])]), GM.oil()));
+  P('Oil pressurizing valve', {
+    system: 'Drive system', material: 'Spring-loaded poppet valve (Techspace Aero)', mass: 1,
+    explode: [0.37, 0.45, 1.68], temp: 360,
+    desc: 'On the pressure element\'s outlet: it stays shut until the pump has built up pressure, then opens and holds the supply pressure so the jets in every sump get a steady flow.',
+  }, m(merge([axialCyl(1.86, -0.42, 1.135, 0.022, 0.09, 14), tangentCyl(1.86, -0.42, 1.152, 0.012, 0.03, 8), radialCyl(1.882, 1.9, -0.42, 1.135, 0.012, 8), tube([P3(1.9, -0.42, 1.135), P3(1.935, -0.43, 1.16), P3(1.94, -0.45, 1.178)], 0.01, { seg: 8, radial: 6 })]), GM.oil()));
   P('Main oil filter', {
     system: 'Drive system', material: 'Pleated filter element in an aluminium bowl, ΔP switch', mass: 4,
     explode: [0.4, 0.55, 1.74], temp: 370,
@@ -127,19 +225,19 @@ export function buildAccessories(ctx) {
   P('Scavenge oil filter', {
     system: 'Drive system', material: 'Filter element in an aluminium bowl', mass: 4,
     explode: [0.4, 0.3, 1.7], temp: 380,
-    desc: 'Catches debris in the oil returning from the sumps before it goes back to the tank, so wear products from one bearing cannot circulate through the others.',
-  }, m(merge([radialCyl(1.92, 2.01, -0.75, 1.1, 0.038, 18), radialCyl(2.01, 2.025, -0.75, 1.1, 0.026, 12)]), GM.oil()));
+    desc: 'Catches debris in the oil returning from the sumps before it goes on to the debris monitor and the tank, so wear products from one bearing cannot circulate through the others.',
+  }, m(merge([radialCyl(1.92, 2.01, -0.7, 1.26, 0.038, 18), radialCyl(2.01, 2.025, -0.7, 1.26, 0.026, 12)]), GM.oil()));
   P('Magnetic chip detectors', {
-    system: 'Sensors', material: 'Magnetic plugs in self-closing valves (count estimated)', mass: 1, count: 5,
+    system: 'Sensors', material: 'Magnetic plugs in self-closing valves (count and positions estimated)', mass: 1, count: 5,
     explode: [0.42, 0.2, 1.68], temp: 370,
-    desc: 'Magnets in each scavenge line and in the gearbox sump that collect steel flakes. Checked at every inspection: a few fuzzy particles are normal, but chips mean a bearing or gear is starting to fail, often long before it vibrates.',
-  }, m(merge([[-0.62, 1.28], [-0.7, 1.28], [-0.78, 1.28], [-0.86, 1.28], [-0.9, 0.55]].map(([y, phi]) => plug(1.92, 1.945, y, phi, 0.011))), GM.connector()));
+    desc: 'Magnets in each scavenge element\'s inlet and in the gearbox sump that collect steel flakes, checked at every inspection: a few fuzzy particles are normal, but chips mean a bearing or gear is starting to fail. They complement the debris monitor, which counts particles electrically in flight.',
+  }, m(merge([...[-0.383, -0.4575, -0.4975, -0.538].flatMap((y) => [tangentCyl(1.885, y, 1.233, 0.009, 0.02, 10), tangentCyl(1.885, y, 1.2425, 0.013, 0.008, 6)]), plug(1.92, 1.945, -0.64, 1.32, 0.011)]), GM.connector()));
 
   // ------------------------------------------------------------------ accessories on the aft face
   P('Integrated drive generator (IDG)', {
     system: 'Electrical', material: 'Constant-speed drive and 120 kVA generator (aircraft equipment)', mass: 70,
     explode: [0.35, -0.3, 1.81], temp: 330,
-    desc: 'The 777\'s main 115 V, 400 Hz generator for this engine, Boeing equipment driven from an engine pad. Its pad turns at 0.7947 × N2 and is rated 181 kW continuous; a hydraulic constant-speed drive inside holds the generator at a steady speed while the engine\'s speed varies.',
+    desc: 'The 777\'s main 115 V, 400 Hz generator for this engine, Boeing equipment driven from an engine pad. Its pad turns at 0.7947 × N2 and is rated 181.3 kW (EASA type certificate); a hydraulic constant-speed drive inside holds the generator at a steady speed while the engine\'s speed varies.',
   }, m(merge([aft(0.7, 0.135, 0.42), axialCyl(R_AGB, Y_AGB_A - 0.44, 0.7, 0.09, 0.04, 20)]), GM.painted()));
   P('Backup generator (VSCF/PMG)', {
     system: 'Electrical', material: 'Variable-speed generator with integral permanent-magnet generators (aircraft equipment)', mass: 22,
@@ -152,101 +250,102 @@ export function buildAccessories(ctx) {
     desc: 'Pressurises one of the 777\'s hydraulic systems to 3,000 psi (20.7 MPa) for flight controls, gear and brakes. Boeing equipment on an engine pad turning at 0.3783 × N2, rated 63.5 kW.',
   }, m(aft(0.95, 0.085, 0.26), GM.aluminium()));
   P('Permanent-magnet alternator', {
-    system: 'Electrical', material: 'Permanent-magnet generator', mass: 8,
+    system: 'Electrical', material: 'Permanent-magnet generator with separate windings for each FADEC channel', mass: 8,
     explode: [0.37, -0.3, 2.1], temp: 330,
-    desc: 'The FADEC\'s private power supply: once the engine turns fast enough, it powers the control even if the aircraft\'s electrical system fails.',
+    desc: 'The FADEC\'s private power supply: once the engine turns fast enough, its windings power both control channels even if the aircraft\'s electrical system fails.',
   }, m(aft(1.21, 0.06, 0.12), GM.avionics()));
   P('Air/oil separator (deoiler)', {
     system: 'Drive system', material: 'Gear-driven centrifugal separator', mass: 6,
     explode: [0.4, -0.35, 2.2], temp: 360,
-    desc: 'Air leaks into the sumps through their seals and has to be vented. This spinning separator on the gearbox flings the oil mist out of that air and returns it, so very little oil leaves through the vent line.',
-  }, m(merge([aft(1.3, 0.05, 0.14), radialCyl(1.88, 1.98, Y_AGB_A - 0.1, 1.3, 0.018, 10)]), GM.magnesium()));
+    desc: 'Air leaks into the sumps through their seals and has to be vented, together with the oil tank\'s vent. This spinning separator on the gearbox flings the oil mist out of that air and returns it, so very little oil leaves through the vent line.',
+  }, m(merge([aft(1.3, 0.05, 0.14), tangentCyl(1.845, -1.04, 1.33, 0.016, 0.03, 10)]), GM.magnesium()));
   P('Deoiler vent line', {
     system: 'Drive system', material: 'Aluminium tube to an overboard vent', mass: 2,
     explode: [0.42, -0.35, 2.3], temp: 340,
-    desc: 'Carries the cleaned sump vent air from the deoiler to the drain mast at the bottom of the fan cowl. (The bearing sumps also vent aft through the centre vent tube inside the LP shaft.)',
-  }, m(tube([P3(1.98, Y_AGB_A - 0.1, 1.3), P3(2.0, -1.0, 1.4), P3(2.0, -0.85, 1.52), P3(1.99, -0.66, BOTTOM - 0.02)], 0.016, { seg: 24 }), GM.duct()));
+    desc: 'Carries the cleaned sump and tank vent air from the deoiler, round behind the gearbox, to the drain mast at the bottom of the fan cowl. (The bearing sumps also vent aft through the centre vent tube inside the LP shaft.)',
+  }, m(tube([P3(1.845, -1.04, 1.345), P3(1.87, -1.12, 1.355), P3(1.88, -1.44, 1.37), P3(1.89, -1.49, 1.45), P3(1.9, -1.47, 1.54), P3(1.94, -1.2, 1.555), P3(1.97, -0.85, 1.556), P3(1.95, -0.7, BOTTOM - 0.012)], 0.014, { seg: 48, radial: 6 }), GM.duct()));
 
-  // ------------------------------------------------------------------ FADEC, oil tank, coolers on the fan case
-  const fadec = merge([
-    boxAt(1.82, -0.32, PHI.fadec, [0.12, 0.5, 0.38]),
-    ...[0.15, 0.27, 0.39].map((dy) => radialCyl(1.88, 1.92, -0.07 - dy, PHI.fadec + 0.05, 0.022, 12)),
-    ...[-0.12, 0.12].flatMap((dp) => [radialCyl(1.705, 1.76, -0.2, PHI.fadec + dp, 0.018, 8), radialCyl(1.705, 1.76, -0.44, PHI.fadec + dp, 0.018, 8)]),
+  // ------------------------------------------------------------------ FADEC, rating plug and configuration box
+  // two channel halves side by side, each with its own row of harness connectors on the outer face
+  const FP = PHI.fadec;
+  const fadecBox = merge([
+    boxAt(1.82, -0.32, FP - 0.052, [0.12, 0.5, 0.185]), boxAt(1.82, -0.32, FP + 0.052, [0.12, 0.5, 0.185]),
+    ...[-0.12, 0.12].flatMap((dp) => [radialCyl(1.705, 1.76, -0.2, FP + dp, 0.018, 8), radialCyl(1.705, 1.76, -0.44, FP + dp, 0.018, 8)]),
   ]);
+  const connectors = merge([...[-0.15, -0.27, -0.39, -0.51].flatMap((y) => [radialCyl(1.88, 1.915, y, FP - 0.05, 0.021, 12), radialCyl(1.88, 1.915, y, FP + 0.05, 0.021, 12)])]);
   P('FADEC (electronic engine control)', {
-    system: 'Avionics', material: 'Dual-channel computer in a fan-case-mounted, vibration-isolated box', mass: 25,
+    system: 'Avionics', material: 'FADEC International (BAE Systems) dual-channel computer in a vibration-isolated box', mass: 25,
     explode: [0.24, 0.4, 1.89], temp: 300,
-    desc: 'Full Authority Digital Engine Control: two independent channels, either able to run the engine alone, read dozens of sensors and schedule fuel, variable geometry and clearance control. The pilot\'s thrust lever only sends a request; the FADEC decides how to meet it within the engine\'s limits.',
+    desc: 'Full Authority Digital Engine Control: two independent channels (the two halves here, each with its own row of connectors and looms) read dozens of sensors and schedule fuel, variable geometry and clearance control; either can run the engine alone. After a loss of thrust control with uncommanded high thrust, the FAA had its MN4 microprocessor replaced at intervals until a software revision added mitigation (ADs 2021-15-05 and 2025).',
     callout: true, anchor: [0.48, -0.32, 1.77],
-  }, m(fadec, GM.avionics()));
-  const tank = merge([sector(1.75, 1.93, -0.8, -1.36, PHI.tank - 0.16, PHI.tank + 0.16, 10), radialCyl(1.93, 1.97, -0.9, PHI.tank, 0.03, 12), boxAt(1.935, -1.12, PHI.tank + 0.1, [0.01, 0.08, 0.05]),
+  }, [m(fadecBox, GM.avionics()), m(connectors, GM.connector())]);
+  P('FADEC rating (identification) plug', {
+    system: 'Avionics', material: 'Coded plug on a lanyard (Safran)', mass: 0.2,
+    explode: [0.3, 0.55, 2.05], temp: 300,
+    desc: 'Tells the FADEC which thrust rating to run. The -110B1, -113B and -115B are the same hardware: the type certificate says the -115B differs from the -110B1 only in its higher thrust ratings, by a "rating plug change". It stays with the engine when the FADEC is swapped.',
+  }, m(merge([boxAt(1.9, -0.105, FP, [0.03, 0.05, 0.05]), tube([P3(1.9, -0.13, FP + 0.02), P3(1.91, -0.16, FP + 0.03), P3(1.885, -0.19, FP + 0.02)], 0.003, { seg: 8, radial: 4 })]), GM.orange()));
+  P('Configuration type box', {
+    system: 'Avionics', material: 'Coded configuration module (Safran)', mass: 0.4,
+    explode: [0.3, 0.65, 2.0], temp: 300,
+    desc: 'Tells the FADEC which hardware is fitted to this engine (the type certificate links each configuration to its FADEC software and limits). Like the rating plug it belongs to the engine, not the FADEC, so a replacement control learns the engine it is on.',
+  }, m(boxAt(1.9, -0.555, FP, [0.04, 0.06, 0.1]), GM.orange()));
+
+  // ------------------------------------------------------------------ oil tank, coolers
+  const tank = merge([sector(1.75, 1.93, -0.8, -1.36, PHI.tank - 0.16, PHI.tank + 0.16, 10), boxAt(1.935, -1.12, PHI.tank + 0.1, [0.01, 0.08, 0.05]),
+    radialCyl(1.93, 1.945, -0.86, PHI.tank, 0.02, 10), radialCyl(1.93, 1.945, -1.0, 0.12, 0.016, 10), tangentCyl(1.84, -1.2, 0.418, 0.016, 0.02, 10),
     ...[-0.12, 0.12].flatMap((dp) => [radialCyl(1.69, 1.75, -0.9, PHI.tank + dp, 0.018, 8), radialCyl(1.69, 1.75, -1.26, PHI.tank + dp, 0.018, 8)])]);
   P('Oil tank', {
-    system: 'Drive system', material: 'Aluminium tank with sight glass and filler', mass: 25,
+    system: 'Drive system', material: 'Aluminium tank with sight glass', mass: 25,
     explode: [0.21, -0.2, 1.89], temp: 340,
-    desc: 'Holds the engine\'s lubricating oil, which also carries heat away from the bearings and gears; it is checked through a sight glass after each flight. The continuous oil-temperature limit is 132 °C (EASA type certificate). The lubrication system shares the drive system\'s colour here.',
+    desc: 'Holds the engine\'s oil, which also carries heat away from the bearings and gears. Scavenged oil returns at the top and de-aerates; the supply leaves from the low end and the vent from the high end. The -115B\'s oil-temperature limits are 132 °C continuous and 143 °C for 15 minutes (EASA type certificate).',
   }, m(tank, GM.aluminium()));
-  P('Oil quantity transmitter', {
-    system: 'Sensors', material: 'Float-type level sensor', mass: 1,
+  P('Oil tank cap', {
+    system: 'Drive system', material: 'Locking filler cap (Safran), listed for the -110B1/-113B/-115B', mass: 0.3,
+    explode: [0.23, -0.1, 2.0], temp: 340,
+    desc: 'The gravity-filler cap. Oil is added within about half an hour of shutdown, while it is still warm and the level reading is valid; a cap left unlocked can let the tank empty in flight.',
+  }, m(merge([radialCyl(1.93, 1.955, -1.05, 0.33, 0.026, 14), boxAt(1.962, -1.05, 0.33, [0.01, 0.045, 0.012])]), GM.red()));
+  P('Oil level sensor', {
+    system: 'Sensors', material: 'Ametek float-type level transmitter', mass: 1,
     explode: [0.23, -0.2, 2.03], temp: 340,
-    desc: 'Measures the oil level in the tank for the cockpit display, so crews can spot a slow leak or oil consumption trend between flights.',
+    desc: 'Measures the oil level in the tank for the 777\'s EICAS display, so crews and engineers can trend oil consumption and spot a slow leak between flights.',
   }, m(merge([radialCyl(1.93, 1.975, -1.25, PHI.tank - 0.08, 0.02, 10), boxAt(1.985, -1.25, PHI.tank - 0.08, [0.03, 0.05, 0.05])]), GM.connector()));
-  const ohe = merge([boxAt(1.84, -0.27, 1.44, [0.13, 0.38, 0.24]), axialCyl(1.84, -0.04, 1.44, 0.04, 0.08, 12), axialCyl(1.84, -0.5, 1.44, 0.04, 0.08, 12), radialCyl(1.705, 1.775, -0.27, 1.44, 0.02, 8)]);
-  P('Fuel/oil heat exchanger', {
-    system: 'Thermal control', material: 'Aluminium tube-bundle cooler', mass: 35,
+  // main fuel/oil heat exchanger: fuel in and out at the ends, oil in and out at the sides
+  const ohe = merge([boxAt(1.84, -0.27, 1.44, [0.13, 0.38, 0.24]), axialCyl(1.84, -0.04, 1.44, 0.04, 0.08, 12), axialCyl(1.84, -0.5, 1.44, 0.04, 0.08, 12), radialCyl(1.705, 1.775, -0.27, 1.44, 0.02, 8),
+    tangentCyl(1.84, -0.45, 1.364, 0.018, 0.04, 10), tangentCyl(1.84, -0.1, 1.516, 0.018, 0.04, 10)]);
+  P('Main fuel/oil heat exchanger', {
+    system: 'Thermal control', material: 'Triumph Thermal tube-bundle cooler ("lube/servo fuel/oil cooler")', mass: 35,
     explode: [0.39, 0.3, 1.45], temp: 360,
-    desc: 'Hot scavenged oil gives its heat to the cold fuel on its way to the burners — cooling the oil, warming the fuel so ice cannot block its filter, and putting the heat back into the cycle instead of wasting it.',
+    desc: 'Fuel is the engine\'s coolant: hot scavenged oil, entering at one side and leaving at the other, gives its heat to the cold fuel flowing end to end, warming the fuel so ice cannot block its filter and putting the heat back into the cycle. After an engine and airplane fire, the FAA had units P/N 1838M88P11 and -P13 replaced (AD 2017-08-06).',
   }, m(ohe, GM.aluminium()));
-  P('IDG fuel/oil cooler', {
-    system: 'Thermal control', material: 'Aluminium plate-fin cooler (aircraft equipment)', mass: 12,
-    explode: [0.42, 0.3, 1.3], temp: 350,
-    desc: 'The generator\'s own oil is cooled by engine fuel here, in a separate cooler so that IDG oil and engine oil never mix.',
-  }, m(merge([boxAt(1.8, -0.25, 1.62, [0.1, 0.3, 0.18]), radialCyl(1.705, 1.75, -0.25, 1.62, 0.018, 8), tube([P3(1.8, -0.4, 1.6), P3(1.8, -0.7, 1.2), P3(1.8, Y_AGB_A - 0.05, 0.75)], 0.012, { seg: 20 })]), GM.aluminium()));
+  // IDG/VSCF air/oil cooler: fan air in from the fan frame, out through the fan cowl (position and routing estimated)
+  const AOC = 0.062;
+  P('IDG/VSCF air/oil cooler', {
+    system: 'Thermal control', material: 'Triumph Thermal plate-fin air/oil cooler with inlet and exit ducts (aircraft equipment; position estimated)', mass: 14,
+    explode: [0.3, -0.35, 1.95], temp: 330,
+    desc: 'On the -110B1/-113B/-115B the 777\'s generators\' oil is cooled by fan air here (the base GE90s used a fuel-cooled unit instead). The IDG it cools is rated 120 kVA, 181.3 kW at its pad (EASA type certificate). Its position and duct routing are estimated.',
+  }, m(merge([boxAt(1.84, -1.05, AOC, [0.18, 0.3, 0.1]), tube([P3(1.7, -1.48, AOC), P3(1.76, -1.38, AOC), P3(1.8, -1.2, AOC)], 0.045, { seg: 10, radial: 10 }), tube([P3(1.93, -1.0, AOC + 0.013), P3(2.0, -0.98, AOC + 0.013), P3(2.075, -0.94, AOC + 0.013)], 0.035, { seg: 8, radial: 10 })]), GM.aluminium()));
+  P('VSCF/lube oil-oil cooler', {
+    system: 'Thermal control', material: 'Triumph Thermal oil-to-oil cooler', mass: 5,
+    explode: [0.4, -0.35, 1.8], temp: 340,
+    desc: 'Passes the backup generator\'s heat into the engine\'s lube oil, which then dumps it into the fuel in the main heat exchanger. The VSCF pad is the fastest on the gearbox, 2.4126 × N2, about 22,500 rpm at 100 %.',
+  }, m(merge([boxAt(1.965, -1.08, 0.5, [0.07, 0.15, 0.12]), radialCyl(1.92, 1.93, -1.04, 0.5, 0.012, 8), radialCyl(1.92, 1.93, -1.12, 0.5, 0.012, 8)]), GM.aluminium()));
 
-  // ------------------------------------------------------------------ fuel lines
-  const fuelSupply = [];
-  for (let k = 0; k <= 24; k++) { const f = k / 24; fuelSupply.push(P3(1.9, -1.05 + 0.3 * f, UP - (UP - 0.82) * f)); }
-  fuelSupply.push(P3(1.87, -0.55, 0.82));
-  const toManifold = [P3(1.87, -0.25, 1.0), P3(1.88, -0.6, 1.25), P3(1.8, -1.2, 1.48), P3(1.6, -1.74, BOTTOM - 0.012), P3(1.1, -1.76, BOTTOM - 0.012), P3(0.85, -1.85, BOTTOM - 0.012), P3(0.72, -2.4, 1.45), P3(0.7, -2.9, 1.4), P3(0.84, -3.05, 1.38), P3(0.86, -3.25, 1.36)];
-  P('Fuel supply lines', {
-    system: 'Fuel', material: 'Stainless-steel tubing', mass: 25,
-    explode: [0.32, 0.0, 1.52], temp: 300,
-    desc: 'Fuel comes from the wing tanks down the strut, round the fan case to the pump, through the heat exchanger and HMU, then down a fan-frame strut to the combustor manifolds.',
-  }, m(merge([tube(fuelSupply, 0.022, { seg: 96 }), tube(toManifold, 0.016, { seg: 72 })]), GM.steel()));
-  P('Fuel flow meter', {
-    system: 'Fuel', material: 'Turbine-type mass flow transmitter', mass: 4,
-    explode: [0.42, 0.0, 1.62], temp: 300,
-    desc: 'Measures the metered fuel on its way to the nozzles for the cockpit fuel-flow display and fuel-used totals: about 4.6 kg/s (16.5 t an hour) at take-off, as the ICAO emissions databank lists, and about 1.2 kg/s in cruise (modelled).',
-  }, m(merge([axialCyl(1.81, -1.15, 1.47, 0.045, 0.16, 16), boxAt(1.86, -1.15, 1.47, [0.04, 0.06, 0.06])]), GM.blue()));
-
-  // ------------------------------------------------------------------ lubrication lines
-  const oilSupply = [
-    tube([P3(1.86, -1.08, PHI.tank + 0.16), P3(1.88, -0.9, 0.7), P3(1.89, -0.6, 1.1), P3(1.87, -0.56, 1.2)], 0.014, { seg: 40 }),
-    // down a fan-frame strut at 6 o'clock to the forward sump
-    tube([P3(1.8, -0.95, 1.2), P3(1.75, -1.5, 1.45), P3(1.6, -1.8, BOTTOM + 0.012), P3(0.8, -1.82, BOTTOM + 0.012), P3(0.45, -1.8, BOTTOM + 0.012), P3(0.32, -1.7, BOTTOM + 0.012)], 0.012, { seg: 48 }),
-    // and aft along the core, outside the casings and inside the core cowl, in through a turbine-rear-frame strut
-    tube([P3(0.8, -1.82, BOTTOM + 0.012), P3(0.64, -1.98, 1.63), P3(0.68, -2.3, 1.68), P3(0.66, -2.8, 1.68), P3(0.84, -3.12, 1.65), P3(0.95, -3.3, 1.62), P3(0.95, -3.85, 1.6), P3(0.88, -4.25, 1.58), P3(0.87, -4.52, BOTTOM), P3(0.94, -4.85, BOTTOM), P3(0.945, -5.0, BOTTOM), P3(0.93, -5.12, BOTTOM), P3(0.8, -5.24, BOTTOM), P3(0.45, -5.3, BOTTOM)], 0.012, { seg: 110 }),
-  ];
-  P('Oil supply lines', {
-    system: 'Drive system', material: 'Stainless-steel tubing', mass: 16,
-    explode: [0.3, -0.1, 1.67], temp: 380,
-    desc: 'Pressure oil from the pump to the forward sump, down a fan-frame strut, and to the aft sump: that line runs the length of the core under the core cowl and in through a turbine-rear-frame strut.',
-  }, m(merge(oilSupply), GM.oil()));
-  const SCAV = BOTTOM + Math.PI / 6;     // the next fan-frame strut round
-  const oilScav = [
-    tube([P3(0.32, -1.75, SCAV), P3(0.45, -1.82, SCAV), P3(0.8, -1.8, SCAV), P3(1.6, -1.78, SCAV), P3(1.8, -1.5, SCAV - 0.1), ...arc(1.8, -1.32, SCAV - 0.25, 1.4, 0.1), P3(1.8, -0.97, 1.29)], 0.014, { seg: 60 }),
-    tube([P3(0.45, -5.3, 2.02), P3(0.8, -5.24, 2.02), P3(0.93, -5.12, 2.02), P3(0.945, -5.0, 2.02), P3(0.94, -4.85, 2.02), P3(0.87, -4.52, 2.03), P3(0.88, -4.25, 2.04), P3(0.95, -3.85, 2.05), P3(0.95, -3.3, 2.06), P3(0.84, -3.12, 2.07), P3(0.66, -2.8, 2.08), P3(0.68, -2.3, 2.09), P3(0.64, -1.98, SCAV), P3(0.8, -1.8, SCAV)], 0.014, { seg: 110 }),
-  ];
-  P('Oil scavenge lines', {
-    system: 'Drive system', material: 'Stainless-steel tubing', mass: 16,
-    explode: [0.15, -0.1, 1.67], temp: 400,
-    desc: 'Return oil sucked out of the aft and forward sumps by the scavenge pumps, up the next fan-frame strut and back to the pump and its filter. Scavenge lines are larger than supply lines because the returning oil is frothy with sump air.',
-  }, m(merge(oilScav), GM.oil()));
-  P('Oil pressure & temperature sensors', {
-    system: 'Sensors', material: 'Pressure transmitter and resistance-thermometer probe', mass: 1, count: 2,
-    explode: [0.42, 0.35, 1.55], temp: 370,
-    desc: 'Measure the oil leaving the pump for the cockpit gauges and the FADEC: low pressure or high temperature are among the first signs of a lubrication problem.',
-  }, m(merge([boxAt(1.95, -0.62, 1.16, [0.04, 0.05, 0.05]), radialCyl(1.905, 1.93, -0.62, 1.16, 0.012, 8), radialCyl(1.88, 1.96, -0.7, 1.13, 0.008, 8), boxAt(1.97, -0.7, 1.13, [0.03, 0.04, 0.04])]), GM.connector()));
+  // ------------------------------------------------------------------ debris monitoring system (Eaton)
+  P('DMS separator', {
+    system: 'Sensors', material: 'Eaton centrifugal air/oil separator', mass: 1.5,
+    explode: [0.45, 0.2, 1.9], temp: 380,
+    desc: 'The first stage of the debris monitoring system: it spins the air out of the frothy scavenge oil, because bubbles would confuse the sensor that counts metal particles after it.',
+  }, m(merge([radialCyl(1.92, 2.0, -0.805, 1.3, 0.034, 16), radialCyl(2.0, 2.012, -0.805, 1.3, 0.024, 10)]), GM.connector()));
+  P('DMS debris sensor', {
+    system: 'Sensors', material: 'Eaton inductive particle sensor', mass: 1,
+    explode: [0.48, 0.1, 1.95], temp: 380,
+    desc: 'Every metal particle passing through its coils disturbs their field, so it counts ferrous and non-ferrous debris electrically in flight. Rising counts flag bearing or gear wear long before vibration shows it.',
+  }, m(merge([axialCyl(1.97, -0.9, 1.3, 0.025, 0.1, 14), axialCyl(1.97, -0.9, 1.3, 0.03, 0.02, 14), axialCyl(1.97, -0.845, 1.3, 0.012, 0.016, 8), axialCyl(1.97, -0.958, 1.3, 0.012, 0.016, 8)]), GM.connector()));
+  P('DMS signal conditioner', {
+    system: 'Avionics', material: 'Eaton signal-conditioning unit', mass: 1,
+    explode: [0.3, 0.3, 2.1], temp: 300,
+    desc: 'Turns the debris sensor\'s pulses into particle counts by size and passes them to the FADEC and the airline\'s maintenance system, so the oil is watched every flight rather than only when the chip detectors are pulled.',
+  }, m(boxAt(1.8, -0.68, 0.33, [0.05, 0.12, 0.08]), GM.avionics()));
 
   // ------------------------------------------------------------------ bleed air (aircraft pneumatic system, Boeing)
   const BL = UP - 0.25;
@@ -297,7 +396,7 @@ export function buildAccessories(ctx) {
   }, [m(merge([tube(naiDuct, 0.035, { seg: 120, radial: 10 }), axialCyl(1.9, -0.9, UP - 0.12, 0.06, 0.16, 18)]), GM.duct()),
     cut(cutPair((keep) => hoop(1.695, 1.69, 0.014, { start: keep.start, arc: keep.arc, tubular: 80 }), GM.duct(), 'nacelle'))]);
 
-  // ------------------------------------------------------------------ hydraulic and electrical runs to the strut
+  // ------------------------------------------------------------------ hydraulic and generator runs to the strut
   // the pump and generators sit on the gearbox; their lines go aft of it and up the side of the fan case
   const upSide = (r, y, phi0) => [...arc(r, y, phi0, 0.0, 0.1), ...arc(r, y, TAU, UP + 0.12, 0.1), P3(r + 0.03, y - 0.05, UP + 0.05)];
   P('Hydraulic pump lines', {
@@ -305,23 +404,23 @@ export function buildAccessories(ctx) {
     explode: [0.2, -0.45, 1.6], temp: 330,
     desc: 'Three lines join the pump to the airplane: a large suction line from the reservoir, the 3,000 psi pressure line, and a small case-drain line whose flow is filtered and cooled, and watched, because a rising case-drain flow means the pump is wearing.',
   }, C((keep) => merge([
-    cutTube([P3(1.84, Y_AGB_A - 0.27, 0.95), P3(1.84, -1.33, 0.93), ...upSide(1.84, -1.4, 0.9)], 0.016, keep),
-    cutTube([P3(1.88, Y_AGB_A - 0.27, 0.97), P3(1.89, -1.35, 0.95), ...upSide(1.89, -1.42, 0.92)], 0.022, keep),
-    cutTube([P3(1.8, Y_AGB_A - 0.25, 0.93), P3(1.79, -1.32, 0.9), ...upSide(1.79, -1.38, 0.88)], 0.01, keep),
+    cutTube([P3(1.9, Y_AGB_A - 0.2, 0.95), P3(1.95, -1.3, 0.955), P3(1.95, -1.42, 0.94), ...upSide(1.95, -1.46, 0.9)], 0.016, keep),
+    cutTube([P3(1.93, Y_AGB_A - 0.15, 0.97), P3(2.0, -1.28, 0.975), P3(2.0, -1.44, 0.96), ...upSide(2.0, -1.5, 0.92)], 0.022, keep),
+    cutTube([P3(1.88, Y_AGB_A - 0.24, 0.93), P3(1.91, -1.32, 0.93), P3(1.92, -1.48, 0.92), ...upSide(1.915, -1.53, 0.88)], 0.01, keep),
   ]), GM.steel()));
   P('IDG feeder cables', {
     system: 'Electrical', material: 'Three-phase aluminium feeders in fire-resistant sleeves (aircraft equipment)', mass: 18,
     explode: [0.25, -0.4, 1.75], temp: 330,
     desc: 'Carry the generator\'s 115 V, 400 Hz output up into the strut and on to the 777\'s power panels: three thick phase cables and a neutral, sized for the 120 kVA rating.',
-  }, C((keep) => cutTube([P3(1.98, Y_AGB_A - 0.2, 0.6), P3(1.98, -1.25, 0.55), ...upSide(1.98, -1.28, 0.5)], 0.022, keep, { radial: 8 }), GM.harness()));
+  }, C((keep) => cutTube([P3(1.98, Y_AGB_A - 0.2, 0.6), P3(2.02, -1.22, 0.56), P3(2.04, -1.28, 0.5), ...upSide(2.04, -1.3, 0.45)], 0.022, keep, { radial: 8 }), GM.harness()));
 
   // ------------------------------------------------------------------ drains
-  const drainHdr = [P3(1.73, -0.53, 0.6), ...arc(1.73, -0.53, 0.6, 1.36, 0.1), P3(1.8, -0.6, 1.5)];
+  const drainHdr = [P3(1.735, -0.505, 0.6), ...arc(1.735, -0.505, 0.6, 1.36, 0.1), P3(1.8, -0.6, 1.5)];
   P('Drain lines & collector', {
     system: 'Fuel', material: 'Small stainless tubes to a collector tank', mass: 5,
     explode: [0.4, 0.45, 1.45], temp: 300,
     desc: 'Every pad seal and actuator leaks a few drops of fuel, oil or hydraulic fluid by design; these lines collect it from the starter, pumps, HMU and generator pads so it can be measured. More than the maintenance-manual limit from one line points to the seal that needs changing.',
-  }, m(merge([tube(drainHdr, 0.007, { seg: 40, radial: 6 }), ...[0.62, 0.82, 1.0, 1.2].map((phi) => radialCyl(1.73, 1.76, -0.53, phi, 0.006, 6)), boxAt(1.82, -0.6, 1.5, [0.06, 0.1, 0.1]), tube([P3(1.85, -0.6, 1.52), P3(1.92, -0.6, BOTTOM)], 0.01, { seg: 6 })]), GM.steel()));
+  }, m(merge([tube(drainHdr, 0.007, { seg: 40, radial: 6 }), ...[0.62, 0.82, 1.0, 1.2].map((phi) => radialCyl(1.735, 1.765, -0.5, phi, 0.006, 6)), boxAt(1.82, -0.6, 1.5, [0.06, 0.1, 0.1]), tube([P3(1.85, -0.6, 1.52), P3(1.92, -0.6, BOTTOM)], 0.01, { seg: 6 })]), GM.steel()));
   const mast = atPhi(bladeGeometry({ rHub: 1.92, rTip: 2.2, chord: [0.16, 0.1], stagger: 0, t: 0.28, camber: 0, y: -0.6, sweep: [0, -0.06], stations: 1, n: 8 }), BOTTOM);
   P('Drain mast', {
     system: 'Fuel', material: 'Streamlined aluminium mast', mass: 2,
@@ -352,21 +451,6 @@ export function buildAccessories(ctx) {
     desc: 'When the crew pulls the fire handle, Halon from bottles in the airplane floods the fan and core compartments through these lines and nozzles; the handle also shuts the fuel, bleed and hydraulic valves to the engine first.',
   }, m(merge([tube(ext, 0.012, { seg: 40 }), ...[UP - 0.5, UP - 0.9].map((phi) => radialCyl(0.97, 0.99, -2.75, phi, 0.018, 8)), tube([P3(2.05, -1.05, UP - 0.2), P3(1.98, -1.0, UP - 0.3), P3(1.95, -0.9, UP - 0.5)], 0.012, { seg: 12 })]), GM.red()));
 
-  // ------------------------------------------------------------------ harnesses
-  const loom = [];
-  const fa = (r, y, phi) => P3(r, y, phi);
-  loom.push(tube([fa(1.8, -0.56, PHI.fadec), fa(1.79, 0.05, 0.4), fa(1.69, 0.18, 0.4)], 0.016, { seg: 30 }));
-  loom.push(tube([fa(1.8, -0.57, PHI.fadec + 0.1), fa(1.8, -1.0, 0.45), fa(1.82, -1.6, PHI.n1), fa(1.79, -1.7, PHI.n1)], 0.016, { seg: 30 }));
-  loom.push(tube([fa(1.79, -0.6, PHI.fadec + 0.15), fa(1.8, -0.75, 0.48)], 0.014, { seg: 8 }));
-  loom.push(tube([fa(1.8, -0.58, PHI.fadec + 0.05), fa(1.79, -1.3, 0.3), fa(1.75, -1.66, PHI.n1 + 0.014), fa(1.2, -1.66, PHI.n1 + 0.014), fa(0.95, -1.68, PHI.n1 + 0.014), fa(0.68, -2.0, 0.6), fa(0.665, -2.66, 0.62), fa(0.7, -3.0, 0.7), fa(0.8, -3.6, 0.6), fa(0.82, -4.16, 0.5)], 0.018, { seg: 100 }));
-  loom.push(hoop(0.665, -2.66, 0.014, { tubular: 120, arc: Math.PI * 1.5 }));
-  for (let k = 0; k < 12; k++) { const phi = (k / 12) * Math.PI * 1.5; loom.push(strap(0.665, -2.66, phi)); }
-  P('Electrical harnesses', {
-    system: 'Electrical', material: 'Shielded, fire-resistant wiring looms in braided sleeves', mass: 60,
-    explode: [0.21, -0.2, 2.03], temp: 380,
-    desc: 'Twin, separately routed looms connect each FADEC channel to its own set of sensors and actuators, so a single chafed harness cannot take out both.',
-  }, m(merge(loom), GM.harness()));
-
   // ------------------------------------------------------------------ ignition
   P('Ignition exciters', {
     system: 'Electrical', material: 'Capacitor-discharge units', mass: 10, count: 2,
@@ -377,54 +461,5 @@ export function buildAccessories(ctx) {
     system: 'Electrical', material: 'Shielded, air-cooled high-tension leads', mass: 3, count: 2,
     explode: [0.25, -0.8, 1.0], temp: 600,
     desc: 'Carry the exciters\' high-voltage pulses to the two igniter plugs. They are shielded so the spark energy does not interfere with the FADEC\'s sensor wiring.',
-  }, m(merge([0.62, 2.52].map((phi) => tube([P3(0.66, -2.9, phi), P3(0.7, -3.1, phi), P3(0.8, -3.3, phi), P3(0.84, -3.43, phi)], 0.01, { seg: 20 }))), GM.braid()));
-
-  // ------------------------------------------------------------------ sensors
-  P('T12 fan-inlet temperature sensor', {
-    system: 'Sensors', material: 'Resistance-thermometer probe', mass: 1,
-    explode: [0.1, 0.6, 0.87], temp: 288,
-    desc: 'Measures the air temperature entering the fan. The FADEC divides speed by the square root of this temperature to get corrected speed — what a compressor really responds to.',
-  }, m(merge([radialCyl(1.56, 1.67, 0.18, 0.42, 0.01, 8), boxAt(1.7, 0.18, 0.42, [0.06, 0.07, 0.06])]), GM.steel()));
-  P('N1 speed sensor', {
-    system: 'Sensors', material: 'Magnetic pick-up probe', mass: 2,
-    explode: [0.14, 0.0, 1.01], temp: 300,
-    desc: 'A long probe down a fan-frame strut that counts teeth on a wheel on the fan shaft. N1 (fan speed) is the GE90\'s primary thrust-setting parameter: the FADEC sets thrust by holding a target N1.',
-  }, m(merge([radialCyl(0.33, 1.76, -1.7, PHI.n1, 0.011, 8), boxAt(1.78, -1.7, PHI.n1, [0.05, 0.08, 0.08])]), GM.steel()));
-  P('T25 probe', {
-    system: 'Sensors', material: 'Thermocouple / pressure probe', mass: 1,
-    explode: [0.12, -0.5, 0.87], temp: 375,
-    desc: 'Senses temperature (and pressure) at the HP compressor inlet; the FADEC uses it to schedule the variable stator vanes on corrected core speed.',
-  }, m(merge([radialCyl(0.45, 0.64, -2.06, 0.75, 0.009, 8), boxAt(0.65, -2.06, 0.75, [0.04, 0.05, 0.05])]), GM.steel()));
-  P('T3 / PS3 sensors', {
-    system: 'Sensors', material: 'Thermocouple probe and static-pressure tap', mass: 1,
-    explode: [0.12, -1.0, 0.87], temp: 900,
-    desc: 'Compressor discharge temperature and pressure, close to 920 K and 4.2 MPa at take-off (modelled). PS3 is a key FADEC input for fuel scheduling and surge protection.',
-  }, m(merge([radialCyl(0.47, 0.82, -3.2, 0.78, 0.009, 8), boxAt(0.83, -3.2, 0.78, [0.04, 0.05, 0.05]), radialCyl(0.76, 0.84, -3.12, 0.85, 0.008, 8)]), GM.steel()));
-  const egt = cutPair((keep) => {
-    const list = [];
-    for (let i = 0; i < 12; i++) {
-      const phi = ((i + 0.5) / 12) * TAU;
-      if (!keep(phi)) continue;
-      list.push(radialCyl(0.645, 0.81, -4.165, phi, 0.008, 6), boxAt(0.815, -4.165, phi, [0.03, 0.04, 0.04]));
-    }
-    list.push(hoop(0.83, -4.165, 0.01, { tubular: 96, start: keep.start, arc: keep.arc }));
-    return merge(list);
-  }, GM.connector());
-  P('EGT thermocouples (T49)', {
-    system: 'Sensors', material: 'Chromel–alumel thermocouple probes on a harness ring (count estimated)', mass: 4, count: 12,
-    explode: [-0.85, -1.55, 0.51], temp: 1200,
-    desc: 'A ring of probes at the LP turbine inlet, averaged into the exhaust gas temperature shown in the cockpit. EGT margin — how far below the 1,090 °C take-off limit (1,050 °C continuous) an engine runs — shrinks as it wears and is how airlines decide when to overhaul it.',
-  }, cut(egt));
-  P('N2 speed sensor', {
-    system: 'Sensors', material: 'Magnetic pick-up', mass: 1,
-    explode: [0.37, -0.3, 2.17], temp: 330,
-    desc: 'Counts gear teeth in the accessory gearbox, which turns at a fixed ratio to the HP spool.',
-  }, m(axialCyl(R_AGB + 0.03, Y_AGB_A - 0.05, 1.27, 0.02, 0.1, 10), GM.steel()));
-  P('Vibration sensors', {
-    system: 'Sensors', material: 'Piezoelectric accelerometers', mass: 2, count: 2,
-    explode: [0.17, -0.5, 1.3], temp: 400,
-    desc: 'One accelerometer near the #1 bearing on the fan frame and one on the turbine rear frame. They track once-per-revolution vibration of each spool: fan imbalance from ice or a damaged blade shows up here first.',
-  }, m(merge([boxAt(1.74, -1.65, 0.12, [0.05, 0.05, 0.05]), boxAt(0.995, -5.25, 0.6, [0.05, 0.05, 0.05])]), GM.connector()));
-
-  void ROWS;
+  }, m(merge([0.62, 2.52].map((phi) => tube([P3(0.68, -2.89, phi), P3(0.78, -3.02, phi), P3(0.88, -3.12, phi), P3(0.925, -3.22, phi), P3(0.92, -3.37, phi), P3(0.865, -3.425, phi)], 0.01, { seg: 24 }))), GM.braid()));
 }

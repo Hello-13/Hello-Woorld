@@ -155,6 +155,14 @@ export const HM = {
   siGrey: () => once('siGrey', () => new THREE.MeshStandardMaterial({ color: 0xa7acb1, roughness: 0.55, metalness: 0.35 })),
   /** Gold Kapton blankets (antenna dishes, some instrument faces). */
   kapton: () => once('kapton', () => new THREE.MeshStandardMaterial({ color: 0xc9953f, roughness: 0.4, metalness: 0.8, side: THREE.DoubleSide })),
+  /** Copper radiator plates and ground-strap braid. */
+  copper: () => once('copper', () => new THREE.MeshStandardMaterial({ color: 0xb87a4b, roughness: 0.4, metalness: 0.9 })),
+  /** Wire harness bundles (Teflon-insulated wire under tape and lacing). */
+  harness: () => once('harness', () => new THREE.MeshStandardMaterial({ color: 0x6a6258, roughness: 0.7, metalness: 0.2 })),
+  /** Heavy power cables. */
+  powerCable: () => once('powerCable', () => new THREE.MeshStandardMaterial({ color: 0x7a4b2c, roughness: 0.6, metalness: 0.35 })),
+  /** White Teflon-insulated data cable. */
+  dataCable: () => once('dataCable', () => new THREE.MeshStandardMaterial({ color: 0xcfcac0, roughness: 0.62, metalness: 0.1 })),
   /** Yellow EVA handrails and foot-restraint sockets. */
   handrail: () => once('handrail', () => new THREE.MeshStandardMaterial({ color: 0xe1b12c, roughness: 0.5, metalness: 0.1 })),
   /** Battery cells: NiH₂ pressure vessels. */

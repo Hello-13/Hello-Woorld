@@ -10,7 +10,7 @@ import { SKIN } from '../../engine/materials.js';
 import { lathe } from '../../engine/geometry.js';
 import { GM } from './materials.js';
 import { NACELLE, FAN, bypassAt, FAN_NOZZLE_Y } from './layout.js';
-import { cutLathe, cutPair, wall, sector, boxAt, axialCyl, radialCyl, merge, P3, kept, tube, arc, cutTube } from './geom.js';
+import { cutLathe, cutPair, wall, sector, boxAt, axialCyl, radialCyl, tangentCyl, merge, P3, kept, tube, arc, cutTube } from './geom.js';
 
 const TAU = Math.PI * 2;
 const UP = Math.PI * 1.5;          // phi of the pylon (world up)
@@ -205,6 +205,30 @@ export function buildNacelle(ctx) {
     explode: [-0.5, -0.55, -1.1], temp: 300,
     desc: 'Flexible shafts gear the three actuators of each half together, so the sleeve cannot skew and jam if one actuator runs ahead of the others. They also drive the position sensors that tell the FADEC where the sleeve is.',
   }, cut(cutPair((keep) => merge([[-0.95, 0], [0, 0.95], [Math.PI - 0.95, Math.PI], [Math.PI, Math.PI + 0.95]].filter(([a, b]) => keep((a + b) / 2)).map(([a, b]) => tube(arc(1.97, -1.76, a, b, 0.06), 0.009, { seg: 24, radial: 6 }))), GM.steel(), 'nacelle')));
+
+  // locks and position sensors: a lock on each half's centre actuator, a lock on each half's
+  // synchronising shaft and a position transducer (LVDT) at each outer end of the shafts
+  P('Thrust reverser locks & position sensors', {
+    system: 'Hydraulics', material: 'Actuator locks, sync-shaft locks and LVDT position transducers (Boeing; arrangement estimated)', mass: 8, count: 8,
+    explode: [-0.62, -0.5, -1.15], temp: 300,
+    desc: 'Three independent locks — on the centre actuators, the synchronising shafts and the aircraft side — and position feedback to the FADEC stand between a single failure and a reverser opening in flight, as happened to Lauda Air flight 004, a 767, in 1991. The FADEC cuts the engine back to idle if a sleeve moves unasked.',
+  }, cut(cutPair((keep) => merge([
+    ...[0, Math.PI].filter((p) => keep(p)).map((phi) => boxAt(1.952, -1.585, phi, [0.04, 0.05, 0.06])),
+    ...[0.5, Math.PI + 0.5].filter((p) => keep(p)).map((phi) => boxAt(1.995, -1.76, phi, [0.04, 0.06, 0.05])),
+    ...[-0.985, 0.985, Math.PI - 0.985, Math.PI + 0.985].filter((p) => keep(p)).map((phi) => tangentCyl(1.97, -1.76, phi, 0.016, 0.07, 10)),
+  ]), GM.connector(), 'nacelle')));
+
+  // fire seals: where the core cowl meets the fan hub frame, along both bifurcations, and along the
+  // fan cowls' hinge line at the strut — they keep the fan and core fire zones apart
+  P('Fire seals', {
+    system: 'Structure', material: 'Fire-resistant silicone and ceramic-fibre seals (Boeing)', mass: 12,
+    explode: [0, -0.3, -1.75], temp: 380,
+    desc: 'The nacelle is split into designated fire zones, the fan compartment and the hotter core compartment, each with its own detector loops and extinguishant (14 CFR 25.1181). These seals close the gaps between them so a fire in one cannot reach the other or the strut.',
+  }, [cut(cutLathe([[0.995, -1.82], [1.012, -1.82], [1.012, -1.86], [0.995, -1.86]], GM.orange(), N)),
+    cut(cutPair((keep) => merge([
+      ...[DOWN - 0.085, DOWN + 0.085, UP - 0.085, UP + 0.085].filter((p) => keep(p)).map((phi) => boxAt(1.07, -2.9, phi, [0.025, 1.8, 0.016])),
+      ...[UP - 0.15, UP + 0.15].filter((p) => keep(p)).map((phi) => boxAt(2.06, -0.575, phi, [0.02, 1.75, 0.02])),
+    ]), GM.orange(), 'nacelle'))]);
 
   // deploy the reverser: 0 stowed … 1 deployed
   ctx.reverser = {

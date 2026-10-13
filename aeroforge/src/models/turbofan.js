@@ -23,6 +23,7 @@ import { buildNacelle } from './ge90/nacelle.js';
 import { buildFan } from './ge90/fan.js';
 import { buildCore } from './ge90/core.js';
 import { buildAccessories } from './ge90/accessories.js';
+import { buildPlumbing } from './ge90/plumbing.js';
 
 const H = 2.6;                         // engine centreline height above the floor, m
 const N1_RPM = 2355, N2_RPM = 9332;    // 100 % speeds (FAA TCDS E00049EN)
@@ -37,9 +38,10 @@ const NOT_ENGINE = new Set([
   'Thrust reverser translating sleeves', 'Thrust reverser cascades', 'Blocker doors & drag links', 'Thrust reverser actuators',
   'Thrust reverser hinge & latch beams', 'Thrust reverser control valve module', 'Thrust reverser hydraulic lines', 'Thrust reverser synchronising shafts',
   'Core cowl & bifurcations', 'Core cowl pressure-relief door', 'Pylon (strut) stub', 'Display cradle',
-  'Integrated drive generator (IDG)', 'Backup generator (VSCF/PMG)', 'Engine-driven hydraulic pump', 'Hydraulic pump lines', 'IDG feeder cables', 'IDG fuel/oil cooler',
+  'Integrated drive generator (IDG)', 'Backup generator (VSCF/PMG)', 'Engine-driven hydraulic pump', 'Hydraulic pump lines', 'IDG feeder cables', 'IDG/VSCF air/oil cooler', 'VSCF/lube oil-oil cooler',
   'Bleed ducts & manifold', 'IP check valve', 'High-pressure shutoff valve', 'Pressure-regulating shutoff valve (PRSOV)', 'Precooler', 'Fan-air valve & duct',
   'Nacelle anti-ice valve & duct', 'Starter air valve', 'Starter duct', 'Fire-extinguisher discharge lines',
+  'Thrust reverser locks & position sensors', 'Fire seals', 'Aircraft fuel supply line',
 ]);
 
 export function buildTurbofan() {
@@ -62,6 +64,7 @@ export function buildTurbofan() {
   buildFan(ctx);
   buildCore(ctx);
   buildAccessories(ctx);
+  buildPlumbing(ctx);
 
   // ------------------------------------------------------------------ display cradle (lathe frame: x down, floor at x = H)
   const F = H - 0.1;
@@ -191,6 +194,11 @@ export function buildTurbofan() {
     return { id, mat, edgeMat: edge.material, tEl, pEl, label };
   });
   eng.add(stationGroup);
+
+  // Dense rows of airfoils (38 to 156 per row) are drawn additively in X-ray and would bury the
+  // shafts, bearings and sumps behind them: dim them
+  const DENSE = /^(Fan blades|Fan outlet guide vanes|Booster (rotor|stator|inlet guide|outlet guide)|HPC (rotor|stator|variable|outlet)|HPT stage \d (nozzle|blades)|LPT stage \d (nozzle|blades)|Combustor domes|Fuel nozzles)/;
+  for (const p of A.parts) { const i = p.userData.part; if (DENSE.test(i.name)) i.xrayWeight = i.name === 'Fan blades' ? 0.4 : 0.32; }
 
   // Part masses are estimates from size and material; scale the engine's so they add up to the
   // published dry mass (massSource stays unset, so the UI still marks each one as an estimate)

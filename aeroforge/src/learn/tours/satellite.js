@@ -62,7 +62,7 @@ export default [
     title: 'Relativity: +38.6 µs a day',
     body: 'Up here, gravity is weaker, so by general relativity the clocks run faster than clocks on the ground by about 45.8 µs a day. The satellite\'s 3.87 km/s orbital speed slows them by about 7.2 µs a day (special relativity). The net gain is about 38.6 µs a day, which would add roughly 11.6 km of range error every day. So the clocks are set before launch to tick slightly slow: 10.22999999543 MHz instead of 10.23 MHz. The orbital-transfer lab computes this for any altitude.',
     key: 'Δf/f ≈ −4.46 × 10⁻¹⁰ (IS-GPS-200 gives −4.4647 × 10⁻¹⁰ for the nominal 26,560 km orbit radius).',
-    focus: [...CLOCKS, 'Clock baseplate'], mode: 'systems', explode: 0.55, view: view([0.75, 0.75, 0.4], { fill: 3.0 }),
+    focus: [...CLOCKS, 'Clock baseplate'], mode: 'systems', explode: 0.55, view: view([0.75, 0.75, 0.4], { fill: 5.0 }),   // the clocks alone are a small group: frame them with the lower bus, as in step 4
   },
   {
     title: 'Crosslinks and talking to the ground',
