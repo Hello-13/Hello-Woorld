@@ -390,6 +390,7 @@ export class Stage {
 
   stepViewShift(dt) {
     const t = this._shiftTarget;
+    this.shifting = false;
     if (!t) return;
     const k = 1 - Math.exp(-dt * 7);
     const dx = t[0] - (this._shift || 0), dy = t[1] - (this._shiftY || 0);
@@ -397,6 +398,7 @@ export class Stage {
       if (dx || dy) { this._shift = t[0]; this._shiftY = t[1]; this.applyViewShift(); }
       return;
     }
+    this.shifting = true;                  // the view is still easing (callouts re-lay out every frame)
     this._shift = (this._shift || 0) + dx * k;
     this._shiftY = (this._shiftY || 0) + dy * k;
     this.applyViewShift();
