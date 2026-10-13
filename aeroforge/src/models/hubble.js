@@ -1,7 +1,8 @@
 // NASA/ESA HUBBLE SPACE TELESCOPE — post-Servicing-Mission-4 configuration (May 2009).
 //
-// Axes: optical axis along +x with the aperture door forward; y up (= +V3, the Sun side, where
-// the door hinges); z right (= +V2, the solar-array axis). Metres, x = 0 at the aft bulkhead.
+// Axes: optical axis along +x (= +V1) with the aperture door forward; y up (= +V3, the Sun side,
+// where the door hinges); z right as seen looking forward (= −V2: the V frame is right-handed, and
+// V2 is the solar-array axis). Metres, x = 0 at the aft bulkhead.
 //
 // Built from four modules in ./hst/: the Optical Telescope Assembly (mirrors from the
 // Ritchey–Chrétien design solved in physics/optics.js), the Support Systems Module (shells,

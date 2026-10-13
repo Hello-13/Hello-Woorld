@@ -79,7 +79,7 @@ export function buildSSM(P) {
   const lsLiner = mesh(tube(RAD.inner, ST.fwdShell, ST.front - 0.02, { seg: 96 }), HM.black());
   const lsRings = mesh(merge([flange(RAD.inner, RAD.shell + 0.04, ST.front - 0.1, ST.front), flange(RAD.shell - 0.02, RAD.shell + 0.025, ST.fwdShell - 0.04, ST.fwdShell + 0.04)]), HM.al());
   out.lightShield = P('Light shield', {
-    system: 'Skin & fairings', skin: true, material: 'Machined magnesium monocoque, stiffened corrugated barrel, under MLI (15 layers aluminised Kapton, aluminised-Teflon outer layer); flat-black interior', mass: 420, temp: 245, explode: [2.6, 2.4, 0],
+    system: 'Skin & fairings', skin: true, material: 'Machined magnesium monocoque, stiffened corrugated barrel, under MLI (15 layers aluminised Kapton, aluminised-Teflon outer layer); flat-black interior', mass: 380, temp: 245, explode: [2.6, 2.4, 0],
     desc: '4 m long with a 3 m bore, it shades the optics from sunlight, moonlight and earthshine. Its magnesium skin carries the aperture door, the forward low-gain antenna, two magnetometers, two coarse sun sensors and the latches that held the arrays and antennas folded for launch.',
   }, [...ls, lsLiner, lsRings]);
   out.lightShield.userData.part.thermalRole = 'blanket';
@@ -123,7 +123,7 @@ export function buildSSM(P) {
   const fsLiner = mesh(tube(RAD.inner, ST.equip, ST.fwdShell, { seg: 96 }), HM.black());
   const fsRings = mesh(merge([flange(RAD.shell - 0.02, RAD.shell + 0.03, ST.equip, ST.equip + 0.1), flange(RAD.shell - 0.02, RAD.shell + 0.025, 7.05, 7.12)]), HM.al());
   out.fwdShell = P('Forward shell', {
-    system: 'Skin & fairings', skin: true, material: 'Machined aluminium plate, external reinforcing rings, internal stiffened panels; MLI outside', mass: 650, temp: 262, explode: [0, 3.9, 0],
+    system: 'Skin & fairings', skin: true, material: 'Machined aluminium plate, external reinforcing rings, internal stiffened panels; MLI outside', mass: 600, temp: 262, explode: [0, 3.9, 0],
     desc: 'The 4 m central barrel, 3 m across, around the main baffle and secondary mirror. Its reinforcing rings are on the outside so the telescope inside has clearance. The solar-array drives, antenna masts, magnetic torquers, grapple fixtures and the OTA equipment bays bolt to it.',
   }, [...fs, fsLiner, fsRings]);
   out.fwdShell.userData.part.thermalRole = 'blanket';
@@ -168,7 +168,7 @@ export function buildSSM(P) {
   for (const p of TRUNNION_PHI) eq.push(atPhi(p, new THREE.BoxGeometry(X_EQ1 - X_EQ0 - 0.07, 0.03, BAY_EDGE - 0.05).translate(X_EQM, FACE + 0.015, 0)));   // trunnion-bay close-outs
   const eqMat = new THREE.MeshStandardMaterial({ color: 0x9aa1a8, roughness: 0.5, metalness: 0.7, side: THREE.DoubleSide });
   out.equip = P('Equipment section', {
-    system: 'Structure', material: 'Machined, stiffened aluminium frame panels on an inner aluminium barrel', mass: 1100, temp: 278, explode: [0, 0, 0],
+    system: 'Structure', material: 'Machined, stiffened aluminium frame panels on an inner aluminium barrel', mass: 950, temp: 278, explode: [0, 0, 0],
     desc: 'A doughnut-shaped ring of twelve trapezoidal bays, 4.2 m across, holding about 90 % of the spacecraft electronics: ten equipment bays behind hinged doors, so spacewalkers can swap boxes as orbital replacement units, and two that carry the aft trunnion pins.',
   }, mesh(merge(eq), eqMat));
 
@@ -346,7 +346,7 @@ export function buildSSM(P) {
   const shroud = sunShadowShell(RAD.big, ST.bulkhead, ST.aftShroud, HM.mli(), 300, 215, { seg: 64, hs: 3 });
   const shroudRings = mesh(merge([flange(RAD.big - 0.02, RAD.big + 0.035, ST.bulkhead, ST.bulkhead + 0.09, 128), flange(RAD.big - 0.02, RAD.big + 0.035, ST.aftShroud - 0.09, ST.aftShroud, 128)]), HM.al());
   out.aftShroud = P('Aft shroud', {
-    system: 'Skin & fairings', skin: true, material: 'Stiffened aluminium skin, internal panels and rings, 16 longeron bars; silvered FOSR tape outside', mass: 1050, temp: 270, explode: [-1.6, -4.0, 0],
+    system: 'Skin & fairings', skin: true, material: 'Stiffened aluminium skin, internal panels and rings, 16 longeron bars; silvered FOSR tape outside', mass: 900, temp: 270, explode: [-1.6, -4.0, 0],
     desc: 'The 3.5 m housing, 4.3 m across, around the focal plane: four axial instruments, the radial camera, three Fine Guidance Sensors, the gyros and the star trackers. Lights inside illuminate the bays for spacewalkers, and every vent is light-tight.',
   }, [...shroud, shroudRings]);
   out.aftShroud.userData.part.thermalRole = 'blanket';

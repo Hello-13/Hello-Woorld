@@ -3,8 +3,10 @@
 // magnetometers and coarse sun sensors.
 //
 // SA3 wings (2002): 7.1 × 2.6 m each (NASA), gallium-arsenide cells, about 5 kW together.
-// The arrays sit on the ±V2 (±z) sides of the forward shell; the high-gain antenna masts on the
-// ±V3 (±y) sides. Mast lengths and dish size are estimates from photographs.
+// The arrays sit on the ±V2 sides of the forward shell (−V2 = +z), the high-gain antenna masts on
+// the ±V3 (±y) sides; the four torquer bars ride on the forward shell at 90° intervals and the
+// magnetometers and two of the five coarse sun sensors on the light shield (SM3A Media Guide §5.1).
+// Mast lengths and dish size are estimates from photographs.
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
@@ -22,7 +24,7 @@ export function buildAppendages(P) {
 
   // ------------------------------------------------------------------ solar arrays (±z)
   for (const s of [1, -1]) {
-    const side = s > 0 ? '+V2' : '−V2';
+    const side = s > 0 ? '−V2' : '+V2';
     // drive housing fixed to the forward shell
     const drive = [new THREE.CylinderGeometry(0.2, 0.24, 0.22, 24).rotateX(Math.PI / 2).translate(SA.x, 0, s * (SA.rDrive + 0.1))];
     drive.push(new THREE.BoxGeometry(0.62, 0.38, 0.1).translate(SA.x, 0, s * (SA.rDrive + 0.03)));
@@ -86,7 +88,7 @@ export function buildAppendages(P) {
     pivot.add(mesh(merge([rod([0, 0, 0], [0, s * HGA.mast, 0], 0.065, 16), new THREE.CylinderGeometry(0.11, 0.11, 0.2, 16).rotateX(Math.PI / 2)]), HM.al()));
     const mp = P(`High-gain antenna mast (${side})`, {
       system: 'Communications', material: 'Aluminium/graphite boom with root deployment hinge, waveguide and cabling', mass: 30, temp: 255, explode: [0, s * 4.4, 0],
-      desc: 'Holds its antenna clear of the telescope so the dish can see a TDRS relay over most of the sky. Folded flat along the forward shell for launch, it swung out 90° after release in 1990. Length estimated.',
+      desc: 'Holds its antenna clear of the telescope so the dish can see a TDRS relay over most of the sky. Latched flat along the forward shell and light shield for launch, it was swung out 90° by its hinge drive after release in 1990. Length estimated.',
     }, [mesh(merge(base), HM.al()), pivot]);
     const tip = new THREE.Group();
     tip.position.set(0, s * HGA.mast, 0);
@@ -113,14 +115,14 @@ export function buildAppendages(P) {
     // waveguide and cable run along the mast
     pivot.add(mesh(merge([rod([0.09, s * 0.15, 0.05], [0.09, s * (HGA.mast - 0.1), 0.05], 0.018, 6), rod([-0.08, s * 0.15, -0.05], [-0.08, s * (HGA.mast - 0.1), -0.05], 0.012, 6)]), HM.kapton()));
     const hp = P(`High-gain antenna (${side})`, {
-      system: 'Communications', material: 'Parabolic graphite-epoxy reflector with S-band feed', mass: 28, temp: 250,
+      system: 'Communications', material: 'Parabolic reflector of aluminium honeycomb with graphite-epoxy facesheets (General Electric), S-band feed', mass: 28, temp: 250,
       explode: [0, s * 0.8, 0],
-      desc: 'Steerable dish (≈1.3 m, estimated) that sends science data to NASA\'s Tracking and Data Relay Satellites 36,000 km up, which relay it to White Sands. The two-axis gimbal tracks the relay satellite as Hubble circles the Earth.',
+      desc: 'Steerable dish (≈1.3 m, estimated) that sends science data at 2255.5 or 2287.5 MHz to NASA\'s Tracking and Data Relay Satellites 36,000 km up, which relay it to White Sands. Its beam is about 4° wide, so the gimbal aims it to within 1° as Hubble circles the Earth.',
       callout: s > 0, anchor: [0.4, s * 0.5, 0.4],
     }, gimbal, tip);
     P(`HGA gimbal (${side})`, {
       system: 'Communications', material: 'Two-axis stepper-motor gimbal with rotary joints for the RF path', mass: 14, temp: 255, explode: [0, s * 0.35, 0],
-      desc: 'Points the dish through about ±90° on two axes so it can follow a TDRS satellite across the sky while Hubble holds its target. Rotary joints carry the S-band signal across both axes.',
+      desc: 'Turns the dish up to 100° either way on two axes so it can follow a TDRS satellite across the sky while Hubble holds its target. Rotary joints carry the S-band signal across both axes.',
     }, mesh(merge(gim), HM.box()), gimbal);
     out.hgas.push({ s, pivot, gimbal, g2, mastPart: mp, dishPart: hp });
   }
@@ -135,23 +137,24 @@ export function buildAppendages(P) {
   const fwd = lga(1).translate(ST.front - 0.12, ...az(deg(200), RAD.shell + 0.2).slice(1));
   P('Low-gain antenna (forward)', {
     system: 'Communications', material: 'Conical spiral antenna on a bracket', mass: 4, temp: 245, explode: [1.6, -0.6, 0],
-    desc: 'One of two near-omnidirectional antennas, this one looking forward along the optical axis. They receive every command sent to Hubble and keep a link alive if the telescope loses attitude.',
+    desc: 'One of two spiral-cone antennas (2.1–2.3 GHz), this one on the light shield looking forward. Between them they see almost the whole sky: every command sent to Hubble arrives through them, and they keep a link alive if the telescope loses attitude.',
   }, [mesh(fwd, HM.dish()), mesh(new THREE.BoxGeometry(0.4, 0.06, 0.12).translate(ST.front - 0.25, ...az(deg(200), RAD.shell + 0.1).slice(1)).rotateX(0), HM.al())]);
   const aft = lga(-1).translate(-0.02, ...az(deg(270), 1.75).slice(1));
   P('Low-gain antenna (aft)', {
     system: 'Communications', material: 'Conical spiral antenna', mass: 4, temp: 255, explode: [-3.8, 0, -0.6],
-    desc: 'The aft-looking twin on the aft bulkhead; between them the two cover nearly the whole sky at low data rates through the multiple-access transponders.',
+    desc: 'The aft-looking twin on the aft bulkhead, set 180° from the forward antenna; between them the two cover nearly the whole sky at low data rates through the multiple-access transponders.',
   }, mesh(aft, HM.dish()));
 
-  // ------------------------------------------------------------------ magnetic torquer bars (light shield)
+  // ------------------------------------------------------------------ magnetic torquer bars (forward shell, 90° apart)
+  const MT0 = 6.3, MT1 = MT0 + 2.5;
   for (const [n, c] of [[1, 45], [2, 135], [3, 225], [4, 315]]) {
     const p = deg(c);
-    const bar = [rod(az(p, RAD.shell + 0.16, 9.65), az(p, RAD.shell + 0.16, 12.15), 0.06, 16)];
-    for (const x of [9.75, 12.05]) bar.push(new THREE.BoxGeometry(0.14, 0.18, 0.18).translate(0, RAD.shell + 0.1, 0).rotateX(p).translate(x, 0, 0));
-    for (const x of [9.65, 12.15]) bar.push(new THREE.CylinderGeometry(0.075, 0.075, 0.06, 16).rotateZ(Math.PI / 2).translate(x, 0, 0).translate(0, ...az(p, RAD.shell + 0.16).slice(1)));
+    const bar = [rod(az(p, RAD.shell + 0.15, MT0), az(p, RAD.shell + 0.15, MT1), 0.045, 16)];
+    for (const x of [MT0 + 0.1, MT1 - 0.1]) bar.push(new THREE.BoxGeometry(0.14, 0.16, 0.16).translate(0, RAD.shell + 0.08, 0).rotateX(p).translate(x, 0, 0));
+    for (const x of [MT0, MT1]) bar.push(new THREE.CylinderGeometry(0.06, 0.06, 0.05, 16).rotateZ(Math.PI / 2).translate(x, 0, 0).translate(0, ...az(p, RAD.shell + 0.15).slice(1)));
     P(`Magnetic torquer bar ${n}`, {
-      system: 'Attitude control', material: 'Ferromagnetic-core electromagnet with redundant windings, about 2.5 m long', mass: 25, temp: 250,
-      explode: az(p, 0.9, 0.6), desc: 'Pushes against the Earth\'s magnetic field to bleed off the momentum the reaction wheels build up from gravity-gradient and aerodynamic torques. Hubble carries no thrusters at all: wheels and torquers do every bit of attitude work.',
+      system: 'Attitude control', material: 'Ferromagnetic-core electromagnet with redundant windings, 2.5 m long', mass: 45, massSource: 'NASA SM3A Media Guide (100 lb)', temp: 255,
+      explode: az(p, 0.9, 0.3), desc: 'One of four bars on the forward shell. Driven against the Earth\'s magnetic field, it bleeds off the momentum the reaction wheels build up from gravity-gradient and aerodynamic torques, and can hold attitude in a contingency. Hubble carries no thrusters at all.',
     }, mesh(merge(bar), HM.mtb()));
   }
 
@@ -177,12 +180,12 @@ export function buildAppendages(P) {
   };
   P('Coarse sun sensors (forward)', {
     system: 'Attitude control', material: 'Silicon photodiode sensors', mass: 2, count: 2, temp: 250, explode: [0.8, 0, 0],
-    desc: 'Two of Hubble\'s four coarse sun sensors, near the aperture. They always know roughly where the Sun is, and if it creeps toward the opening they trigger the aperture door to close.',
+    desc: 'Two of Hubble\'s five coarse sun sensors, near the aperture. They always know roughly where the Sun is, and if it comes within 35° of the optical axis they start the aperture door closing.',
   }, mesh(cssGeo([[ST.front - 0.2, RAD.shell, 110], [ST.front - 0.2, RAD.shell, 250]]), HM.box()));
   P('Coarse sun sensors (aft)', {
-    system: 'Attitude control', material: 'Silicon photodiode sensors', mass: 2, count: 2, temp: 262, explode: [-1.6, -4.0, 0],
-    desc: 'The other two sun sensors, on the aft shroud. Together the four guide the safe mode that turns the solar arrays toward the Sun when something goes wrong.',
-  }, mesh(cssGeo([[0.6, RAD.big, 75], [0.6, RAD.big, 285]]), HM.box()));
+    system: 'Attitude control', material: 'Silicon photodiode sensors', mass: 3, count: 3, temp: 262, explode: [-1.6, -4.0, 0],
+    desc: 'The other three sun sensors, on the aft shroud. Together the five fix the initial attitude after deployment and guide the safe mode that turns the solar arrays toward the Sun when something goes wrong. Positions approximate.',
+  }, mesh(cssGeo([[0.6, RAD.big, 75], [0.6, RAD.big, 180], [0.6, RAD.big, 285]]), HM.box()));
 
   // electrical harness: bundles from the equipment section forward to the light-shield hardware and aft to the instruments
   const hz = [];
@@ -195,7 +198,7 @@ export function buildAppendages(P) {
   }
   for (const s of [1, -1]) hz.push(rod([5.2, 0, s * 1.47], [SA.x, 0, s * 1.5], 0.02, 6), rod([5.2, s * 1.47, 0.1], [HGA.x, s * 1.5, 0.1], 0.02, 6));
   P('Electrical harness', {
-    system: 'Electrical', material: 'Shielded copper wiring bundles, connectors and waveguide', mass: 300, temp: 285, explode: [0, 0, 0],
+    system: 'Electrical', material: 'Shielded copper wiring bundles, connectors and waveguide', mass: 250, temp: 285, explode: [0, 0, 0],
     desc: 'Many kilometres of wire tie the equipment bays to the instruments, sensors, drives and antennas through hundreds of connectors — the reason servicing tools were designed to be worked in pressure gloves. Routing simplified.',
   }, mesh(merge(hz), new THREE.MeshStandardMaterial({ color: 0x5a5148, roughness: 0.7, metalness: 0.2 })));
 

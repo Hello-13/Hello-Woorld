@@ -24,9 +24,9 @@ export default [
   },
   {
     title: 'Two hyperbolic mirrors',
-    body: 'Hubble is a Ritchey–Chrétien telescope: both mirrors are hyperboloids, chosen so that spherical aberration and coma cancel across a wide field. The primary is Corning ULE glass, a front and rear faceplate fused to an egg-crate core so it weighs 828 kg instead of about 3.6 t. Heaters hold it near 21 °C, and 24 actuators on its back can nudge the surface. The metering truss is graphite-epoxy, which barely changes length with temperature.',
+    body: 'Hubble is a Ritchey–Chrétien telescope: both mirrors are hyperboloids, chosen so that spherical aberration and coma cancel across a wide field. The primary is Corning ULE glass, a front and rear faceplate fused to an egg-crate core so it weighs 828 kg instead of about 3.6 t. It hangs inside a titanium main ring; behind it a beryllium reaction plate carries the heaters that hold it near 21 °C and 24 actuators that can nudge its surface. The 48-strut graphite-epoxy metering truss holds the secondary 4.906 m away to within 2.5 µm.',
     key: 'Design conics: K₁ = −1.0023 (primary), K₂ = −1.497 (secondary).',
-    focus: ['Primary mirror', 'Primary mirror egg-crate core', 'Primary mirror rear faceplate', 'Primary mirror mounts & actuators', 'Primary mirror heaters', 'Secondary mirror', 'Main ring', 'Metering truss'],
+    focus: ['Primary mirror', 'Primary mirror egg-crate core', 'Primary mirror rear faceplate', 'Primary mirror mounts & actuators', 'Primary mirror heaters', 'Reaction plate', 'Secondary mirror', 'Secondary mirror assembly', 'Main ring', 'Metering truss'],
     mode: 'systems', explode: 0.55, view: { dir: [-0.55, 0.4, 1], fill: 1.0 },
   },
   {
@@ -44,9 +44,9 @@ export default [
   },
   {
     title: 'Pointing to 0.007″',
-    body: 'Hubble has no thrusters. Four reaction wheels turn it — spin a wheel one way and the telescope turns the other — slewing about 90° in 15 minutes. Six gyroscopes in three rate sensor units sense the motion, three fixed-head star trackers find the field, and two Fine Guidance Sensors lock on guide stars 40 times a second. Four magnetic torquer bars push against the Earth\'s field to unload the wheels.',
+    body: 'Hubble has no thrusters. Four reaction wheels in bays 6 and 9 turn it — spin a wheel one way and the telescope turns the other — slewing about 90° in 15 minutes. Six gyroscopes in three rate sensor units sense the motion, three fixed-head star trackers bring the error below a minute of arc, and then two Fine Guidance Sensors lock on guide stars 40 times a second. Four magnetic torquer bars on the forward shell push against the Earth\'s field to unload the wheels.',
     key: 'Held to 0.007″ for 24 hours: about the width of a human hair seen from 1.6 km.',
-    focus: ['Reaction wheel assembly 1', 'Reaction wheel assembly 2', 'Reaction wheel assembly 3', 'Reaction wheel assembly 4', 'Rate sensor unit 1', 'Rate sensor unit 2', 'Rate sensor unit 3', 'Fine Guidance Sensor 1', 'Fine Guidance Sensor 2', 'Fine Guidance Sensor 3', 'Fixed-head star trackers', 'Magnetic torquer bar 1', 'Magnetic torquer bar 2', 'Magnetic torquer bar 3', 'Magnetic torquer bar 4', 'Magnetometers', 'Coarse sun sensors (forward)', 'Coarse sun sensors (aft)', 'Pointing control electronics'],
+    focus: ['Reaction wheel assembly 1', 'Reaction wheel assembly 2', 'Reaction wheel assembly 3', 'Reaction wheel assembly 4', 'Rate sensor unit 1', 'Rate sensor unit 2', 'Rate sensor unit 3', 'Gyro electronics control units', 'Fine Guidance Sensor 1', 'Fine Guidance Sensor 2', 'Fine Guidance Sensor 3', 'Fine guidance electronics', 'Fixed-head star trackers', 'Magnetic torquer bar 1', 'Magnetic torquer bar 2', 'Magnetic torquer bar 3', 'Magnetic torquer bar 4', 'Magnetometers', 'Coarse sun sensors (forward)', 'Coarse sun sensors (aft)', 'Pointing control electronics', 'Flight computer (80486)'],
     mode: 'systems', explode: 0.45, view: { dir: [0.35, 0.6, 1], fill: 1.0 },
   },
   {
@@ -60,8 +60,15 @@ export default [
     title: 'Talking through a relay',
     body: 'Hubble never talks straight to the ground. Its two steerable high-gain antennas aim at NASA\'s Tracking and Data Relay Satellites in geostationary orbit, which pass the data to White Sands, New Mexico, and on to the Space Telescope Operations Control Center at Goddard. Two low-gain antennas, one at each end, receive commands from almost any attitude. Solid-state recorders hold the data between contacts.',
     key: 'The relay is 36,000 km away even though Hubble is only about 500 km up.',
-    focus: ['High-gain antenna (+V3)', 'High-gain antenna (−V3)', 'High-gain antenna mast (+V3)', 'High-gain antenna mast (−V3)', 'Low-gain antenna (forward)', 'Low-gain antenna (aft)', 'S-band transmitters & transponders', 'Solid-state recorder (bay 5)', 'Solid-state recorder (bay 8)', 'Science instrument command & data handling unit', 'Data management unit', 'Flight computer (80486)'],
+    focus: ['High-gain antenna (+V3)', 'High-gain antenna (−V3)', 'High-gain antenna mast (+V3)', 'High-gain antenna mast (−V3)', 'HGA gimbal (+V3)', 'HGA gimbal (−V3)', 'Low-gain antenna (forward)', 'Low-gain antenna (aft)', 'S-band transmitters & transponders', 'Solid-state recorder (bay 5)', 'Solid-state recorder (bay 8)', 'Science instrument command & data handling unit', 'Data management unit', 'Data interface units', 'Flight computer (80486)'],
     mode: 'systems', view: { dir: [0.75, 0.25, 1], fill: 1.0 },
+  },
+  {
+    title: 'The equipment ring',
+    body: 'Behind the forward shell the spacecraft widens to 4.2 m: a ring of twelve trapezoidal slots holding about 90 % of the electronics. Ten are equipment bays, each behind a hinged door that doubles as a radiator; two carry the launch trunnions. Every box is an orbital replacement unit with handles and connectors on its open face. The layout follows the heat: the batteries sit in bays 2 and 3, on the side that faces away from the Sun.',
+    key: 'Clockwise from +V3, looking forward: bays 8, 9, 10, trunnion, 1, 2, 3, 4, trunnion, 5, 6, 7.',
+    focus: ['Equipment section', 'Data management unit', 'Flight computer (80486)', 'Battery module 1 (bay 2)', 'Battery module 2 (bay 3)', 'Oscillators (bay 2)', 'Power control unit', 'Power distribution units', 'S-band transmitters & transponders', 'Solid-state recorder (bay 5)', 'Reaction wheel assembly 1', 'Reaction wheel assembly 2', 'Mechanism control unit', 'Solar array drive electronics', 'Pointing control electronics', 'Solid-state recorder (bay 8)', 'Reaction wheel assembly 3', 'Reaction wheel assembly 4', 'Science instrument command & data handling unit', 'Gyro electronics control units', 'Data interface units', 'Aft trunnion pins'],
+    mode: 'systems', explode: 0.5, view: { dir: [-1, 0.32, 0.18], fill: 0.9 },
   },
   {
     title: 'Keeping the optics stable',
@@ -71,9 +78,9 @@ export default [
   },
   {
     title: 'Built to be serviced',
-    body: 'Hubble is the only telescope designed to be repaired by astronauts. Shuttle crews visited five times, from 1993 to 2009, grappling it with the robot arm, standing it on berthing pins in the payload bay and working along 69 m of handrails. The last crew left a soft-capture ring on the aft bulkhead so a future spacecraft can dock — to boost it, or to guide it safely into the ocean.',
-    key: '225 ft of handrails, 31 foot-restraint sockets and ten hinged equipment-bay doors.',
-    focus: ['EVA handrails', 'Foot-restraint sockets', 'Grapple fixtures', 'Soft capture mechanism', 'Relative-navigation targets', 'Berthing pins', 'Aft shroud access doors', 'Radial bay doors (FGS)', ...BAY_DOORS],
+    body: 'Hubble is the only telescope designed to be repaired by astronauts. Shuttle crews visited five times, from 1993 to 2009, grappling it with the robot arm, standing it on berthing pins in the payload bay and working along 69 m of handrails. Doors open with J-hooks and every latch and hinge has a hex fitting for a power tool. The last crew left a soft-capture ring on the aft bulkhead so a future spacecraft can dock — to boost it, or to guide it safely into the ocean.',
+    key: '225 ft of handrails, 31 foot-restraint sockets, ten equipment-bay doors and ten more on the OTA equipment section.',
+    focus: ['EVA handrails', 'Foot-restraint sockets', 'Grapple fixtures', 'Soft capture mechanism', 'Relative-navigation targets', 'Berthing pins', 'Aft shroud access doors', 'Radial bay doors (FGS)', 'OTA equipment section', ...BAY_DOORS],
     view: { dir: [-0.9, 0.45, 0.75], fill: 1.0 },
   },
 ];

@@ -1,9 +1,10 @@
 // Focal-plane instruments (post-SM4, 2009) and the sensors that share the aft shroud.
 //
-// Axial bays (behind the primary, parallel to the optical axis): position 1 STIS, 2 NICMOS,
-// 3 ACS, 4 COS (in the bay COSTAR vacated in 2009, which had held the High Speed Photometer).
-// Radial bays (around the focal plane, perpendicular to the axis): WFC3 and the three Fine
-// Guidance Sensors. The quadrant each bay occupies around the axis is schematic.
+// Quadrants from the SM3A Media Reference Guide's field-of-view map (Fig. 5-18, looking forward):
+// axial bays behind the primary — STIS at +V3/+V2 (the former GHRS bay), COS at +V3/−V2 (where
+// COSTAR, and before it the High Speed Photometer, sat), ACS at −V3/−V2 (former FOC bay) and
+// NICMOS at −V3/+V2 (former FOS bay). Radial bays at the focal plane: WFC3 on the −V3 side,
+// FGS 2 at +V3, FGS 1 at −V2 and FGS 3 at +V2. Model azimuth: +y = +V3, +z = −V2.
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
@@ -37,9 +38,9 @@ export function buildInstruments(P, root) {
   // ------------------------------------------------------------------ axial instruments
   const AXIAL = [
     {
-      name: 'Space Telescope Imaging Spectrograph', short: 'STIS', q: [1, 1], mass: 374, temp: 293,
-      material: 'Aluminium optical bench; one CCD and two MAMA photon-counting detectors',
-      desc: 'Axial bay 1 (since 1997, replacing GHRS). Spreads light from 115 nm to 1 µm into spectra, including long slits across galaxies and planets. Its power supply failed in 2004 and was repaired in orbit in 2009 — an instrument never designed to be opened.',
+      name: 'Space Telescope Imaging Spectrograph', short: 'STIS', q: [1, -1], mass: 374, massSource: 'NASA SM3A Media Guide (825 lb)', temp: 293,
+      material: 'Carbon-fibre optical bench, 2.2 × 0.98 × 0.98 m; one CCD and two MAMA photon-counting detectors',
+      desc: 'Axial bay at +V3/+V2 (since 1997, replacing GHRS). Spreads light from 115 nm to 1 µm into spectra, including long slits across galaxies and planets. Its power supply failed in 2004 and was repaired in orbit in 2009 — an instrument never designed to be opened.',
       subs: [
         { name: 'STIS detectors', material: 'CCD (visible) and two Multi-Anode Microchannel Arrays (ultraviolet)', temp: 190,
           desc: 'A 1024 × 1024 CCD for 200 nm–1 µm and two MAMA photon counters for the far and near ultraviolet. The MAMAs are so sensitive that a too-bright target can damage them, so every STIS target is screened first.',
@@ -50,9 +51,9 @@ export function buildInstruments(P, root) {
       ],
     },
     {
-      name: 'Near Infrared Camera and Multi-Object Spectrometer', short: 'NICMOS', q: [1, -1], mass: 391, temp: 290,
+      name: 'Near Infrared Camera and Multi-Object Spectrometer', short: 'NICMOS', q: [-1, -1], mass: 391, temp: 290,
       material: 'Three cameras with 256 × 256 HgCdTe arrays in a dewar',
-      desc: 'Axial bay 2 (since 1997, replacing FOS). Infrared cameras covering 0.8–2.5 µm. Its solid-nitrogen coolant ran out in 1999; a cryocooler revived it in 2002. Dormant since 2008, its infrared work is now done by WFC3.',
+      desc: 'Axial bay at −V3/+V2 (since 1997, replacing FOS). Infrared cameras covering 0.8–2.5 µm. Its solid-nitrogen coolant ran out in 1999; a cryocooler revived it in 2002. Dormant since 2008, its infrared work is now done by WFC3.',
       subs: [
         { name: 'NICMOS dewar', material: 'Aluminium cryostat, now cooled by the external cryocooler', temp: 77,
           desc: 'Built to hold a block of solid nitrogen around the detectors for 4.5 years; a thermal short made it run out after less than two. From 2002 the NICMOS Cooling System pumped cold neon through it instead, holding the arrays near 77 K.',
@@ -60,9 +61,9 @@ export function buildInstruments(P, root) {
       ],
     },
     {
-      name: 'Advanced Camera for Surveys', short: 'ACS', q: [-1, -1], mass: 398, temp: 292,
+      name: 'Advanced Camera for Surveys', short: 'ACS', q: [-1, 1], mass: 398, temp: 292,
       material: 'Wide Field Channel and Solar Blind Channel; High Resolution Channel inoperative',
-      desc: 'Axial bay 3 (since 2002, replacing FOC). Hubble\'s survey camera, behind the Ultra Deep Field and many of its best-known pictures. Its CCD electronics failed in 2007 and were rebuilt by spacewalkers in 2009.',
+      desc: 'Axial bay at −V3/−V2 (since 2002, replacing FOC). Hubble\'s survey camera, behind the Ultra Deep Field and many of its best-known pictures. Its CCD electronics failed in 2007 and were rebuilt by spacewalkers in 2009.',
       subs: [
         { name: 'ACS Wide Field Channel', material: 'Two 2048 × 4096 CCDs, 0.05″ pixels', temp: 192,
           desc: 'The workhorse: a 202″ × 202″ field from 350 nm to 1.1 µm. Its CCDs run at −81 °C. Rebuilt electronics installed in 2009 restored it after the 2007 failure.',
@@ -73,9 +74,9 @@ export function buildInstruments(P, root) {
       ],
     },
     {
-      name: 'Cosmic Origins Spectrograph', short: 'COS', q: [-1, 1], mass: 386, temp: 292,
+      name: 'Cosmic Origins Spectrograph', short: 'COS', q: [1, 1], mass: 386, temp: 292,
       material: 'Single-reflection grating design; far-UV and near-UV channels',
-      desc: 'Axial bay 4, installed in 2009 in the bay COSTAR vacated (it had held the High Speed Photometer until 1993). The most sensitive ultraviolet spectrograph Hubble has carried (115–320 nm), built to read the faint absorption of the gas between galaxies.',
+      desc: 'Axial bay at +V3/−V2, installed in 2009 in the bay COSTAR vacated (it had held the High Speed Photometer until 1993). The most sensitive ultraviolet spectrograph Hubble has carried (115–320 nm), built to read the faint absorption of the gas between galaxies.',
       subs: [
         { name: 'COS optics select mechanism', material: 'Rotating mount of gratings', temp: 292,
           desc: 'Turns to put one of COS\'s gratings in the beam. Each grating both disperses and refocuses the light, because every extra reflection would throw away a large share of the far ultraviolet.',
@@ -106,7 +107,7 @@ export function buildInstruments(P, root) {
       handles.push(rod(a, b, 0.016, 6), rod(b, c2, 0.016, 6), rod(c2, d, 0.016, 6));
     }
     const p = P(si.name, {
-      system: 'Payload', material: si.material, mass: si.mass, temp: si.temp, explode: [-3.4, qy * 0.25, qz * 0.25],
+      system: 'Payload', material: si.material, mass: si.mass, massSource: si.massSource, temp: si.temp, explode: [-3.4, qy * 0.25, qz * 0.25],
       desc: si.desc, callout: si.short === 'COS', anchor: [X_SI0 + 0.3, cy + qy * 0.48, cz + qz * 0.48],
     }, [shellMesh, mesh(merge(det), HM.box()), mesh(ap, HM.black()), mesh(merge(handles), HM.handrail())]);
     p.userData.part.short = si.short;
@@ -150,11 +151,11 @@ export function buildInstruments(P, root) {
   }, [mesh(radPanel, HM.radiator()), mesh(merge(radFins), HM.al())]);
   rad.userData.part.thermalRole = 'radiator';
 
-  // three Fine Guidance Sensors (positions after SM4: FGS-1R, FGS-2R2, FGS-3)
+  // three Fine Guidance Sensors at 90° intervals (units after SM4: FGS-1R, FGS-2R2, FGS-3)
   const FGS = [
-    { n: 1, phi: 90, note: 'FGS-1R (1997) is the most stable and serves as Hubble\'s astrometer, measuring star positions to about a milliarcsecond.' },
-    { n: 2, phi: 0, note: 'The 2009 unit is a refurbished sensor returned from an earlier mission.' },
-    { n: 3, phi: 270, note: 'Two of the three guiders lock on stars for every observation; the third can do science.' },
+    { n: 1, phi: 90, side: '−V2', note: 'FGS-1R (1997) is the most stable and serves as Hubble\'s astrometer, measuring star positions to about a milliarcsecond.' },
+    { n: 2, phi: 0, side: '+V3', note: 'The unit installed in 2009 is a refurbished sensor returned from an earlier mission.' },
+    { n: 3, phi: 270, side: '+V2', note: 'Two of the three guiders lock on stars for every observation; the third can do science.' },
   ];
   out.fgs = [];
   for (const f of FGS) {
@@ -162,8 +163,8 @@ export function buildInstruments(P, root) {
     const body = mesh(wedge(phi, 1.0, 2.04, 0.62, 1.12, 1.82, 3.4), new THREE.MeshStandardMaterial({ color: 0xb4b9be, roughness: 0.5, metalness: 0.45 }));
     const det = [...neck(phi, 0.26), rbox(phi, 0.5, 0.25, 0.4, 2.3, 1.5), rbox(phi, 0.06, 0.4, 0.5, 3.0, 1.6)];
     const p = P(`Fine Guidance Sensor ${f.n}`, {
-      system: 'Attitude control', material: 'White-light shearing interferometers (Koesters prisms), photomultipliers, star selectors', mass: 220, temp: 292,
-      explode: az(phi, 1.8), desc: `Radial bay. Locks on a guide star at the edge of the field and senses its position to a few milliarcseconds, 40 times a second. ${f.note}`,
+      system: 'Attitude control', material: 'Two Koesters-prism interferometers, four photomultipliers, two star-selector servos; 1.5 × 1 m', mass: 220, massSource: 'NASA SM3A Media Guide (485 lb)', temp: 292,
+      explode: az(phi, 1.8), desc: `Radial bay on the ${f.side} side. Its pick-off mirror takes a 90° arc at the edge of the field; it finds a guide star there and holds it to a few milliarcseconds, 40 times a second. It also houses one of the optical control (wavefront) sensors. ${f.note}`,
       callout: f.n === 1, anchor: az(phi, 2.2, 2.6),
     }, [body, mesh(merge(det), HM.box())]);
     out.fgs.push(p);
