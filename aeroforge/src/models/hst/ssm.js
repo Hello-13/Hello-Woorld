@@ -144,7 +144,6 @@ export function buildSSM(P) {
   B(1, 'Flight computer (80486)', {
     system: 'Avionics', material: 'Radiation-hardened Intel 80486 processor boards', mass: 32, temp: 297,
     desc: 'Installed in December 1999, replacing the 1980s DF-224 and its co-processor: an Intel 80486 running at 25 MHz, about 20 times faster with six times the memory. It runs pointing, safing and housekeeping.',
-    callout: true, anchor: az(BAY_PHI[0], 2.1, X_EQM),
   }, mesh(bayBox(1, 0.6, 0.3, 0.4, X_EQM, 1.76, 0.3), HM.box()));
   // bays 2–3: batteries
   for (const [k, n] of [[2, 1], [3, 2]]) {
@@ -230,7 +229,6 @@ export function buildSSM(P) {
   B(10, 'Science instrument command & data handling unit', {
     system: 'Avionics', material: 'Redundant computer, control-unit/science-data-formatter and power modules on a tray', mass: 107, temp: 298,
     desc: 'Bay 10. Commands the instruments and formats their data. Its side A failed in September 2008, delaying the last servicing mission; astronauts installed the spare in May 2009.',
-    callout: true, anchor: az(BAY_PHI[9], 2.15, X_EQM),
   }, mesh(merge(sic), HM.iridite()));
 
   // ------------------------------------------------------------------ aft shroud

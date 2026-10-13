@@ -147,7 +147,6 @@ export function buildAppendages(P) {
     P(`Magnetic torquer bar ${n}`, {
       system: 'Attitude control', material: 'Ferromagnetic-core electromagnet with redundant windings, about 2.5 m long', mass: 25, temp: 250,
       explode: az(p, 0.9, 0.6), desc: 'Pushes against the Earth\'s magnetic field to bleed off the momentum the reaction wheels build up from gravity-gradient and aerodynamic torques. Hubble carries no thrusters at all: wheels and torquers do every bit of attitude work.',
-      callout: n === 1, anchor: az(p, RAD.shell + 0.3, 10.9),
     }, mesh(merge(bar), HM.mtb()));
   }
 

@@ -145,7 +145,6 @@ export function buildInstruments(P, root) {
     return P(`Rate sensor unit ${n}`, {
       system: 'Attitude control', material: 'Two gas-bearing rate-integrating gyroscopes in an enclosure', mass: 24, count: 2, temp: 296,
       explode: az(phi, 1.2, -0.6), desc: `Each unit carries two gyros, six in all. The gyros' flex leads corroded over time; all six were replaced in 2009. Since 2024 Hubble points with a single gyro to conserve the rest. Location in the aft shroud approximate.`,
-      callout: n === 2, anchor: az(phi, 2.0, 2.62),
     }, [mesh(box, HM.iridite()), mesh(merge(gyros), HM.box())]);
   };
   rsu(1, -0.36); rsu(2, 0); rsu(3, 0.36);
