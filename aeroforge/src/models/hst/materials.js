@@ -112,7 +112,7 @@ export const HM = {
   /** Aluminium + MgF₂ mirror coating (a real mirror, so it may be glossy). */
   mirror: () => once('mirror', () => new THREE.MeshStandardMaterial({ color: 0xe8edf2, roughness: 0.08, metalness: 1.0, side: THREE.DoubleSide })),
   /** Corning ULE glass seen at the cut edges and the egg-crate core. */
-  ule: () => once('ule', () => new THREE.MeshStandardMaterial({ color: 0xb9c7cf, roughness: 0.34, metalness: 0.05 })),
+  ule: () => once('ule', () => new THREE.MeshStandardMaterial({ color: 0xb9c7cf, roughness: 0.34, metalness: 0.05, side: THREE.DoubleSide })),
   /** Graphite-epoxy tubes and frames. */
   grEp: () => once('grEp', () => new THREE.MeshStandardMaterial({ color: 0x24272b, roughness: 0.46, metalness: 0.35 })),
   /** Titanium fittings and the main ring. */

@@ -161,16 +161,38 @@ export function buildAppendages(P) {
     system: 'Attitude control', material: 'Two three-axis fluxgate magnetic sensing systems', mass: 6, count: 2, temp: 245, explode: [1.4, 0.3, 0],
     desc: 'Measure the strength and direction of the Earth\'s field so the torquer bars can be driven in the right direction. Mounted near the front of the light shield, away from the electronics.',
   }, mesh(merge(mss), HM.iridite()));
-  const css = [];
-  for (const [x, r, c] of [[ST.front - 0.2, RAD.shell, 110], [ST.front - 0.2, RAD.shell, 250], [0.6, RAD.big, 75], [0.6, RAD.big, 285]]) {
-    const p = deg(c);
-    css.push(new THREE.CylinderGeometry(0.07, 0.08, 0.06, 16).translate(0, r + 0.03, 0).rotateX(p).translate(x, 0, 0));
-    css.push(new THREE.SphereGeometry(0.05, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, r + 0.06, 0).rotateX(p).translate(x, 0, 0));
+  const cssGeo = (list) => {
+    const g = [];
+    for (const [x, r, c] of list) {
+      const p = deg(c);
+      g.push(new THREE.CylinderGeometry(0.07, 0.08, 0.06, 16).translate(0, r + 0.03, 0).rotateX(p).translate(x, 0, 0));
+      g.push(new THREE.SphereGeometry(0.05, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, r + 0.06, 0).rotateX(p).translate(x, 0, 0));
+    }
+    return merge(g);
+  };
+  P('Coarse sun sensors (forward)', {
+    system: 'Attitude control', material: 'Silicon photodiode sensors', mass: 2, count: 2, temp: 250, explode: [0.8, 0, 0],
+    desc: 'Two of Hubble\'s four coarse sun sensors, near the aperture. They always know roughly where the Sun is, and if it creeps toward the opening they trigger the aperture door to close.',
+  }, mesh(cssGeo([[ST.front - 0.2, RAD.shell, 110], [ST.front - 0.2, RAD.shell, 250]]), HM.box()));
+  P('Coarse sun sensors (aft)', {
+    system: 'Attitude control', material: 'Silicon photodiode sensors', mass: 2, count: 2, temp: 262, explode: [-1.6, -4.0, 0],
+    desc: 'The other two sun sensors, on the aft shroud. Together the four guide the safe mode that turns the solar arrays toward the Sun when something goes wrong.',
+  }, mesh(cssGeo([[0.6, RAD.big, 75], [0.6, RAD.big, 285]]), HM.box()));
+
+  // electrical harness: bundles from the equipment section forward to the light-shield hardware and aft to the instruments
+  const hz = [];
+  for (const c of [62, 118, 242, 298]) {
+    hz.push(rod(az(deg(c), 1.485, ST.equip), az(deg(c), 1.485, ST.fwdShell), 0.016, 6), rod(az(deg(c), 1.485, ST.fwdShell), az(deg(c), 1.485, 12.6), 0.012, 6));
   }
-  P('Coarse sun sensors', {
-    system: 'Attitude control', material: 'Silicon photodiode sensors', mass: 4, count: 4, temp: 260, explode: [0, 0, 0],
-    desc: 'Four simple sensors that always know roughly where the Sun is: they guide the safe mode that turns the arrays to the Sun, and they trigger the aperture door to close if sunlight threatens the optics.',
-  }, mesh(merge(css), HM.box()));
+  for (const c of [20, 160, 200, 340]) {
+    hz.push(rod(az(deg(c), 1.96, 3.5), az(deg(c), 1.96, 0.45), 0.022, 6));
+    hz.push(rod(az(deg(c), 1.96, 0.45), az(deg(c), 1.15, 0.28), 0.018, 6));
+  }
+  for (const s of [1, -1]) hz.push(rod([5.2, 0, s * 1.47], [SA.x, 0, s * 1.5], 0.02, 6), rod([5.2, s * 1.47, 0.1], [HGA.x, s * 1.5, 0.1], 0.02, 6));
+  P('Electrical harness', {
+    system: 'Electrical', material: 'Shielded copper wiring bundles, connectors and waveguide', mass: 260, temp: 285, explode: [0, 0, 0],
+    desc: 'Many kilometres of wire tie the equipment bays to the instruments, sensors, drives and antennas through hundreds of connectors — the reason servicing tools were designed to be worked in pressure gloves. Routing simplified.',
+  }, mesh(merge(hz), new THREE.MeshStandardMaterial({ color: 0x5a5148, roughness: 0.7, metalness: 0.2 })));
 
   return out;
 }

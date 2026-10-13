@@ -38,28 +38,52 @@ export function buildInstruments(P, root) {
   const AXIAL = [
     {
       name: 'Space Telescope Imaging Spectrograph', short: 'STIS', q: [1, 1], mass: 374, temp: 293,
-      material: 'Aluminium optical bench; CCD and two MAMA photon-counting detectors',
+      material: 'Aluminium optical bench; one CCD and two MAMA photon-counting detectors',
       desc: 'Axial bay 1 (since 1997, replacing GHRS). Spreads light from 115 nm to 1 µm into spectra, including long slits across galaxies and planets. Its power supply failed in 2004 and was repaired in orbit in 2009 — an instrument never designed to be opened.',
-      inner: (c) => [new THREE.BoxGeometry(0.5, 0.3, 0.3).translate(1.9, c[0] * 0.55, c[1] * 0.45), new THREE.CylinderGeometry(0.12, 0.12, 0.25, 20).rotateZ(Math.PI / 2).translate(1.1, c[0] * 0.45, c[1] * 0.6)],
+      subs: [
+        { name: 'STIS detectors', material: 'CCD (visible) and two Multi-Anode Microchannel Arrays (ultraviolet)', temp: 190,
+          desc: 'A 1024 × 1024 CCD for 200 nm–1 µm and two MAMA photon counters for the far and near ultraviolet. The MAMAs are so sensitive that a too-bright target can damage them, so every STIS target is screened first.',
+          geo: (c) => [new THREE.BoxGeometry(0.42, 0.26, 0.26).translate(2.0, c[0] * 0.58, c[1] * 0.36), new THREE.BoxGeometry(0.3, 0.2, 0.2).translate(1.45, c[0] * 0.3, c[1] * 0.66)] },
+        { name: 'STIS mode select mechanism', material: 'Rotating grating carousel', temp: 293,
+          desc: 'A motor-driven wheel of gratings and mirrors that chooses the spectral mode: low or high resolution, first-order or echelle, ultraviolet or visible.',
+          geo: (c) => [new THREE.CylinderGeometry(0.16, 0.16, 0.08, 28).rotateX(Math.PI / 2).translate(1.0, c[0] * 0.5, c[1] * 0.5)] },
+      ],
     },
     {
       name: 'Near Infrared Camera and Multi-Object Spectrometer', short: 'NICMOS', q: [1, -1], mass: 391, temp: 290,
-      material: 'Three HgCdTe 256 × 256 cameras in a dewar, cooled by the NICMOS Cooling System',
+      material: 'Three cameras with 256 × 256 HgCdTe arrays in a dewar',
       desc: 'Axial bay 2 (since 1997, replacing FOS). Infrared cameras covering 0.8–2.5 µm. Its solid-nitrogen coolant ran out in 1999; a cryocooler revived it in 2002. Dormant since 2008, its infrared work is now done by WFC3.',
-      inner: (c) => [new THREE.CylinderGeometry(0.28, 0.28, 0.9, 32).rotateZ(Math.PI / 2).translate(1.55, c[0] * 0.5, c[1] * 0.5)],
-      cold: true,
+      subs: [
+        { name: 'NICMOS dewar', material: 'Aluminium cryostat, now cooled by the external cryocooler', temp: 77,
+          desc: 'Built to hold a block of solid nitrogen around the detectors for 4.5 years; a thermal short made it run out after less than two. From 2002 the NICMOS Cooling System pumped cold neon through it instead, holding the arrays near 77 K.',
+          geo: (c) => [new THREE.CylinderGeometry(0.29, 0.29, 0.9, 32).rotateZ(Math.PI / 2).translate(1.55, c[0] * 0.5, c[1] * 0.5)] },
+      ],
     },
     {
       name: 'Advanced Camera for Surveys', short: 'ACS', q: [-1, -1], mass: 398, temp: 292,
-      material: 'Wide Field Channel (two 2048 × 4096 CCDs) and Solar Blind Channel',
+      material: 'Wide Field Channel and Solar Blind Channel; High Resolution Channel inoperative',
       desc: 'Axial bay 3 (since 2002, replacing FOC). Hubble\'s survey camera, behind the Ultra Deep Field and many of its best-known pictures. Its CCD electronics failed in 2007 and were rebuilt by spacewalkers in 2009.',
-      inner: (c) => [new THREE.BoxGeometry(0.7, 0.32, 0.32).translate(1.7, c[0] * 0.5, c[1] * 0.42), new THREE.BoxGeometry(0.4, 0.22, 0.22).translate(0.85, c[0] * 0.38, c[1] * 0.66)],
+      subs: [
+        { name: 'ACS Wide Field Channel', material: 'Two 2048 × 4096 CCDs, 0.05″ pixels', temp: 192,
+          desc: 'The workhorse: a 202″ × 202″ field from 350 nm to 1.1 µm. Its CCDs run at −81 °C. Rebuilt electronics installed in 2009 restored it after the 2007 failure.',
+          geo: (c) => [new THREE.BoxGeometry(0.7, 0.3, 0.32).translate(1.75, c[0] * 0.5, c[1] * 0.42)] },
+        { name: 'ACS Solar Blind Channel', material: 'MAMA detector, 115–170 nm', temp: 290,
+          desc: 'A far-ultraviolet camera blind to visible light, so faint ultraviolet sources are not swamped. The third channel, the High Resolution Channel, failed in 2007 and was not repaired.',
+          geo: (c) => [new THREE.BoxGeometry(0.4, 0.22, 0.22).translate(0.85, c[0] * 0.38, c[1] * 0.64)] },
+      ],
     },
     {
       name: 'Cosmic Origins Spectrograph', short: 'COS', q: [-1, 1], mass: 386, temp: 292,
-      material: 'Gratings on a rotating mount; far-UV cross-delay-line and near-UV MAMA detectors',
-      desc: 'Axial bay 4, installed in 2009 in the bay COSTAR vacated. The most sensitive ultraviolet spectrograph Hubble has carried (115–320 nm), built to read the faint absorption of the gas between galaxies.',
-      inner: (c) => [new THREE.CylinderGeometry(0.2, 0.2, 0.08, 28).rotateX(Math.PI / 2).translate(2.0, c[0] * 0.5, c[1] * 0.5), new THREE.BoxGeometry(0.45, 0.28, 0.3).translate(0.9, c[0] * 0.5, c[1] * 0.5)],
+      material: 'Single-reflection grating design; far-UV and near-UV channels',
+      desc: 'Axial bay 4, installed in 2009 in the bay COSTAR vacated (it had held the High Speed Photometer until 1993). The most sensitive ultraviolet spectrograph Hubble has carried (115–320 nm), built to read the faint absorption of the gas between galaxies.',
+      subs: [
+        { name: 'COS optics select mechanism', material: 'Rotating mount of gratings', temp: 292,
+          desc: 'Turns to put one of COS\'s gratings in the beam. Each grating both disperses and refocuses the light, because every extra reflection would throw away a large share of the far ultraviolet.',
+          geo: (c) => [new THREE.CylinderGeometry(0.2, 0.2, 0.08, 28).rotateX(Math.PI / 2).translate(2.0, c[0] * 0.5, c[1] * 0.5)] },
+        { name: 'COS far-UV detector', material: 'Cross-delay-line microchannel-plate detector', temp: 292,
+          desc: 'Counts individual ultraviolet photons from 115 to 205 nm and times each one. A separate MAMA covers the near ultraviolet.',
+          geo: (c) => [new THREE.BoxGeometry(0.45, 0.28, 0.3).translate(0.9, c[0] * 0.5, c[1] * 0.5)] },
+      ],
     },
   ];
   out.axial = [];
@@ -73,9 +97,8 @@ export function buildInstruments(P, root) {
     // guide rails along the two outer faces, entrance aperture near the axis, connector panel and handholds aft
     det.push(new THREE.BoxGeometry(L - 0.1, 0.04, 0.06).translate(xm, cy + qy * 0.47, cz), new THREE.BoxGeometry(L - 0.1, 0.06, 0.04).translate(xm, cy, cz + qz * 0.47));
     det.push(new THREE.BoxGeometry(0.03, 0.18, 0.4).translate(X_SI0 - 0.015, cy + qy * 0.15, cz - qz * 0.12));
+    for (const x of [0.75, 1.45, 2.15]) det.push(new THREE.BoxGeometry(0.05, 0.92, 0.92).translate(x, cy, cz));     // stiffening frames
     const ap = new THREE.BoxGeometry(0.03, 0.09, 0.09).translate(X_SI1 + 0.015, qy * 0.12, qz * 0.12);
-    const inner = mesh(merge(si.inner([qy, qz])), HM.box());
-    if (si.cold) inner.userData.temp = 77;
     const handles = [];
     for (const s of [-1, 1]) {
       const a = [X_SI0 - 0.01, cy + s * 0.25, cz + qz * 0.22], b = [X_SI0 - 0.16, cy + s * 0.25, cz + qz * 0.22];
@@ -83,10 +106,14 @@ export function buildInstruments(P, root) {
       handles.push(rod(a, b, 0.016, 6), rod(b, c2, 0.016, 6), rod(c2, d, 0.016, 6));
     }
     const p = P(si.name, {
-      system: 'Payload', material: si.material, mass: si.mass, temp: si.temp, explode: [-2.4, qy * 0.25, qz * 0.25],
+      system: 'Payload', material: si.material, mass: si.mass, temp: si.temp, explode: [-3.4, qy * 0.25, qz * 0.25],
       desc: si.desc, callout: si.short === 'COS', anchor: [X_SI0 + 0.3, cy + qy * 0.48, cz + qz * 0.48],
-    }, [shellMesh, mesh(merge(det), HM.box()), mesh(ap, HM.black()), inner, mesh(merge(handles), HM.handrail())]);
+    }, [shellMesh, mesh(merge(det), HM.box()), mesh(ap, HM.black()), mesh(merge(handles), HM.handrail())]);
     p.userData.part.short = si.short;
+    for (const sub of si.subs) {
+      const m = mesh(merge(sub.geo([qy, qz])), sub.temp < 150 ? HM.kapton() : HM.iridite());
+      P(sub.name, { system: 'Payload', material: sub.material, temp: sub.temp, explode: [0, qy * 0.9, qz * 0.9], desc: `${sub.desc} Part of ${si.short}; mass included in the instrument.` }, m, p);
+    }
     out.labels.push({ part: p, target: shellMesh, text: si.short, at: [X_SI0 - 0.002, cy - qy * 0.12, cz + qz * 0.18] });
     out.axial.push(p);
   }
@@ -100,14 +127,20 @@ export function buildInstruments(P, root) {
   const wfc3Body = mesh(wedge(wPhi, 1.0, 2.04, 0.75, 1.35, 1.82, 3.4), HM.siGrey());
   const wfc3Det = [];
   wfc3Det.push(...neck(wPhi, 0.08));
-  const wDet = mesh(merge([rbox(wPhi, 0.3, 0.18, 0.22, 2.4, 1.45, -0.25), rbox(wPhi, 0.3, 0.18, 0.22, 2.4, 1.45, 0.25)]), HM.box());
-  wDet.userData.temp = 160;             // UVIS CCDs ≈ −83 °C, IR array ≈ −128 °C
   const wfc3 = P('Wide Field Camera 3', {
     system: 'Payload', material: 'UVIS channel (two 2k × 4k CCDs) and IR channel (1k × 1k HgCdTe), thermoelectrically cooled', mass: 408, temp: 292,
     explode: [0, -1.9, 0],
-    desc: 'The radial-bay camera since 2009, replacing WFPC2. One instrument spans 200 nm to 1.7 µm through two channels; its pick-off mirror takes the centre of Hubble\'s field. It made the 2014 Ultraviolet Deep Field and the infrared Pillars of Creation.',
+    desc: 'The radial-bay camera since 2009, replacing WFPC2 (whose corrective optics had fixed Hubble\'s vision in 1993). One instrument spans 200 nm to 1.7 µm through two channels; its pick-off mirror takes the centre of Hubble\'s field.',
     callout: true, anchor: [2.6, -2.15, 0.4],
-  }, [wfc3Body, mesh(merge(wfc3Det), HM.box()), wDet]);
+  }, [wfc3Body, mesh(merge(wfc3Det), HM.box())]);
+  P('WFC3 UVIS channel', {
+    system: 'Payload', material: 'Two 2051 × 4096 CCDs, 0.04″ pixels, thermoelectrically cooled to −83 °C', temp: 190, explode: [0, -0.9, -0.6],
+    desc: 'Ultraviolet-to-visible camera, 200–1000 nm, over a 162″ field. It made the 2014 Ultraviolet Deep Field. Part of WFC3; mass included in the instrument.',
+  }, mesh(rbox(wPhi, 0.34, 0.2, 0.3, 2.45, 1.45, -0.27), HM.iridite()), wfc3);
+  P('WFC3 IR channel', {
+    system: 'Payload', material: '1024 × 1024 HgCdTe array, 0.13″ pixels, six-stage thermoelectric cooler to 145 K', temp: 145, explode: [0, -0.9, 0.6],
+    desc: 'Near-infrared camera, 800–1700 nm, over a 136″ × 123″ field — the channel that took over from NICMOS and re-imaged the Pillars of Creation in infrared. Part of WFC3; mass included in the instrument.',
+  }, mesh(rbox(wPhi, 0.34, 0.2, 0.3, 2.45, 1.45, 0.27), HM.kapton()), wfc3);
   const radPanel = shellPatch(RAD.big + 0.02, 1.84, 3.38, deg(161), deg(199), { nphi: 12 });
   const radFins = [];
   for (let k = 0; k < 7; k++) radFins.push(rod(az(deg(164 + k * 5.3), RAD.big + 0.03, 1.9), az(deg(164 + k * 5.3), RAD.big + 0.03, 3.32), 0.012, 6));
@@ -116,7 +149,6 @@ export function buildInstruments(P, root) {
     desc: 'The camera\'s outer face is a curved radiator that forms part of the aft shroud skin. It carries away the heat pumped out by the detectors\' thermoelectric coolers.',
   }, [mesh(radPanel, HM.radiator()), mesh(merge(radFins), HM.al())]);
   rad.userData.part.thermalRole = 'radiator';
-  void wfc3;
 
   // three Fine Guidance Sensors (positions after SM4: FGS-1R, FGS-2R2, FGS-3)
   const FGS = [
