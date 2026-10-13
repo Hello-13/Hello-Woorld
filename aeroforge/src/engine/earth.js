@@ -5,16 +5,19 @@
 import * as THREE from 'three';
 
 const loader = new THREE.TextureLoader();
+const load = (file, srgb, onLoad) => {
+  const t = loader.load(`assets/earth/${file}`, onLoad);
+  t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  t.anisotropy = 16;
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+};
+// NASA Blue Marble NG (July 2004, with relief), Black Marble 2016 night lights and the Blue Marble
+// cloud composite; terrain relief and the ocean mask come from GEBCO 2008 elevation. Day, night
+// and clouds come in 4K and 8K; the 8K set loads for the 4K / Ultra presets (see setEarthDetail).
 let maps = null;
 function earthMaps() {
   if (maps) return maps;
-  const load = (file, srgb) => {
-    const t = loader.load(`assets/earth/${file}`);
-    t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
-    t.anisotropy = 8;
-    t.wrapS = THREE.RepeatWrapping;
-    return t;
-  };
   maps = {
     day: load('day.jpg', true),
     night: load('night.jpg', true),
@@ -23,6 +26,37 @@ function earthMaps() {
     clouds: load('clouds.jpg', false),
   };
   return maps;
+}
+
+const earths = new Set();
+const HIRES = { day: ['dayMap', true], night: ['nightMap', true], clouds: ['cloudMap', false] };
+let hires = null;   // { day, night, clouds } once the 8K set has loaded
+let wantHires = false;
+
+function applyMaps(e) {
+  const m = wantHires && hires ? hires : earthMaps();
+  e.surface.material.uniforms.dayMap.value = m.day;
+  e.surface.material.uniforms.nightMap.value = m.night;
+  e.surface.material.uniforms.cloudMap.value = m.clouds;
+  e.clouds.material.uniforms.cloudMap.value = m.clouds;
+}
+
+/** 8K day, night and cloud maps (about 15 MB to download, 0.5 GB of GPU memory) or the 4K set. */
+export function setEarthDetail(on) {
+  wantHires = on;
+  if (on && !hires) {
+    const set = {};
+    let left = 3;
+    for (const [k, [, srgb]] of Object.entries(HIRES)) {
+      set[k] = load(`${k}-8k.jpg`, srgb, () => {
+        if (--left) return;
+        hires = set;
+        for (const e of earths) applyMaps(e);   // swap only when all three are ready
+      });
+    }
+    return;
+  }
+  for (const e of earths) applyMaps(e);
 }
 
 const surfaceVert = /* glsl */`
@@ -147,10 +181,13 @@ export function createEarth(radius = 2, { segments = 128, atmosphere = 1 } = {})
   for (const o of [surface, clouds, atmo]) { o.userData.fx = true; o.userData.noAO = true; }
   clouds.renderOrder = 1; atmo.renderOrder = 2;
   group.add(surface, clouds, atmo);
-  return {
+  const earth = {
     group, surface, clouds, atmosphere: atmo,
     setSun(dir) { sunDir.value.copy(dir).normalize(); },
     setFade(a) { fade.value = a; },
     update(dt) { cloudShift.value = (cloudShift.value + dt * 0.0012) % 1; },
   };
+  earths.add(earth);
+  applyMaps(earth);
+  return earth;
 }

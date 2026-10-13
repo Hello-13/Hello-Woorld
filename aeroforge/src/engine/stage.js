@@ -271,6 +271,7 @@ export class Stage {
     }
     if (this.composer) { for (const p of this.composer.passes) p.dispose?.(); this.composer.dispose(); }
     this.env.showroom.setQuality(q.showroom);
+    this.env.setDetail(this.quality === '4k' || this.quality === 'ultra');
     this._grace = (this.time || 0) + 4;     // shader compiles after a rebuild are not a slow frame rate
     const rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType });
     const composer = new EffectComposer(this.renderer, rt);

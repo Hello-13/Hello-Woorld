@@ -8,7 +8,7 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { skyDome, gridFloor } from './effects.js';
 import { concrete, floorMarkings, fbm } from './surface.js';
 import { rng } from './materials.js';
-import { createEarth } from './earth.js';
+import { createEarth, setEarthDetail } from './earth.js';
 import { Showroom, showroomEnvironment } from './showroom.js';
 
 const R_EARTH_KM = 6371;
@@ -21,7 +21,7 @@ export const LOOKS = {
     key: { color: 0xfff8f0, intensity: 2.1 }, hemi: [0x9fb4cc, 0x0c0e11, 0.16], rim: 1.7, rim2: 0.9,
   },
   hangar: {
-    label: 'Hangar', hdri: 'warehouse', hdriSun: [0.57, 51], background: 'hdri', blur: 0.05, bgIntensity: 0.34, envIntensity: 0.95,
+    label: 'Hangar', hdri: 'warehouse', hdriSun: [0.57, 51], background: 'hdri', plate: 'warehouse', plateGain: 0.79, bgIntensity: 0.34, envIntensity: 0.95,
     exposure: 1.12, bgRotation: 0.2, floor: 'hangar', turntable: true,
     key: { color: 0xfff2df, intensity: 2.4 }, hemi: [0xbfd2ff, 0x3a3630, 0.25], rim: 0.6,
   },
@@ -37,7 +37,7 @@ export const LOOKS = {
     key: { color: 0xfff6e8, intensity: 3.4 }, hemi: [0xa8c8ff, 0x8a8f96, 0.45], rim: 0.0,
   },
   pad: {
-    label: 'Launch pad', hdri: 'dawn', hdriSun: [0.79, 3.9], background: 'hdri', blur: 0.0, bgIntensity: 0.85, bgRotation: 1.12, envIntensity: 0.8,
+    label: 'Launch pad', hdri: 'dawn', hdriSun: [0.79, 3.9], background: 'hdri', plate: 'dawn', plateGain: 1.9, bgIntensity: 0.85, bgRotation: 1.12, envIntensity: 0.8,
     exposure: 1.0, floor: 'pad', turntable: false, fog: [0x8a7f8c, 0.0011],
     sky: { turbidity: 3.2, rayleigh: 3.0, mie: 0.006, g: 0.88 },
     key: { color: 0xffb27a, intensity: 2.0 }, hemi: [0x8a9ac8, 0x3a3228, 0.35], rim: 0.0, floods: true,
@@ -269,6 +269,8 @@ export class Environment {
     this.pmrem = new THREE.PMREMGenerator(renderer);
     this.exr = new EXRLoader();
     this.hdr = new Map();
+    this.plates = new Map();
+    this.platesHires = false;
     this.look = null;
     this.overlay = null;
     this.space = false;
@@ -352,6 +354,45 @@ export class Environment {
     }).catch((e) => { console.warn('HDRI failed', name, e); return null; });
     this.hdr.set(name, p);
     return p;
+  }
+
+  /** The backdrop photograph for an HDRI look: Poly Haven's 8K (or 4K) tonemapped render of the same
+   *  panorama, far sharper than the 2K HDR that lights the scene. plateGain matches its median
+   *  brightness to the HDR's, so bgIntensity means the same thing for both. */
+  loadPlate(name) {
+    const url = `assets/hdri/${name}-${this.platesHires ? '8k' : '4k'}.jpg`;
+    if (!this.plates.has(url)) {
+      this.plates.set(url, new THREE.TextureLoader().loadAsync(url).then((t) => {
+        t.mapping = THREE.EquirectangularReflectionMapping;
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+        return t;
+      }).catch((e) => { console.warn('Backdrop failed', url, e); return null; }));
+    }
+    return this.plates.get(url);
+  }
+
+  /** 8K backdrops and Earth maps for the 4K / Ultra presets, when the GPU takes 8K textures. */
+  setDetail(hires) {
+    hires = hires && this.renderer.capabilities.maxTextureSize >= 8192;
+    setEarthDetail(hires);
+    if (hires === this.platesHires) return;
+    this.platesHires = hires;
+    const L = LOOKS[this.look];
+    if (L?.plate) this.showBackdrop(this.look);
+  }
+
+  /** Put an HDRI look's backdrop behind the scene (plate when it has one, else the HDR itself). */
+  async showBackdrop(name) {
+    const L = LOOKS[name];
+    const h = await this.loadHDRI(L.hdri);
+    const plate = L.plate ? await this.loadPlate(L.plate) : null;
+    if (this.look !== name || this.overlay || this.space || L.background !== 'hdri') return;
+    this.scene.background = plate || h?.equirect || null;
+    this.scene.backgroundBlurriness = 0;
+    this.bgGain = plate ? L.plateGain : 1;
+    this.scene.backgroundIntensity = L.bgIntensity * this.bgGain;
+    this.scene.backgroundRotation.set(0, L.bgRotation || 0, 0);
   }
 
   spaceEnv() {
@@ -473,17 +514,12 @@ export class Environment {
 
     // image-based lighting
     this.scene.environmentIntensity = L.envIntensity;
+    if (L.background === 'hdri') this.showBackdrop(name);
     if (L.hdri) {
       const req = name;
       this.loadHDRI(L.hdri).then((h) => {
         if (!h || this.look !== req) return;
         this.scene.environment = h.env;
-        if (L.background === 'hdri' && !this.overlay && !this.space) {
-          this.scene.background = h.equirect;
-          this.scene.backgroundBlurriness = L.blur;
-          this.scene.backgroundIntensity = L.bgIntensity;
-          this.scene.backgroundRotation.set(0, L.bgRotation || 0, 0);
-        }
         this.scene.environmentRotation.set(0, L.bgRotation || 0, 0);
       });
     } else if (L.env === 'showroom') {
@@ -557,7 +593,7 @@ export class Environment {
   setAscent(h, downrangeAngle) {
     const k = THREE.MathUtils.smoothstep(h, 4000, 70000);
     // the dawn sky thins out: fade the photographic backdrop to black as the air runs out
-    this.scene.backgroundIntensity = LOOKS.pad.bgIntensity * (1 - THREE.MathUtils.smoothstep(h, 6000, 55000));
+    this.scene.backgroundIntensity = LOOKS.pad.bgIntensity * (this.bgGain || 1) * (1 - THREE.MathUtils.smoothstep(h, 6000, 55000));
     this.stars.material.uniforms.opacity.value = THREE.MathUtils.smoothstep(h, 25000, 80000);
     this.scene.fog = h < 3000 ? this.scene.fog || new THREE.FogExp2(LOOKS.pad.fog[0], LOOKS.pad.fog[1]) : null;
     if (this.scene.fog) this.scene.fog.density = LOOKS.pad.fog[1] * (1 - h / 3000);
