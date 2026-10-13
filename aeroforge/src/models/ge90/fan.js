@@ -94,7 +94,7 @@ export function buildFan(ctx) {
     system: 'Structure', material: 'Aluminium case wrapped in Kevlar fabric, abradable rub strip', mass: 1150,
     explode: [0, 1.15, 0], temp: 290,
     desc: 'If a blade ever breaks off at full power, the many layers of Kevlar wound round the case stretch and catch it — certification requires a deliberate blade-off test at take-off speed. The case also carries the fan cowls, the accessory gearbox, FADEC and oil tank.',
-    callout: true, anchor: [-0.6, -0.15, 1.7],
+    callout: true, anchor: [0.05, -0.3, 1.75],
   }, [caseGrp, kevlar, ribs, rub, acoustic]);
 
   // ------------------------------------------------------------------ outlet guide vanes
@@ -118,7 +118,7 @@ export function buildFan(ctx) {
   const splitter = cut(cutLathe(splitterProf, GM.casing(), { seg: 80 }));
   P('Booster casing & splitter', {
     system: 'Structure', material: 'Titanium splitter lip, aluminium casing', mass: 190,
-    explode: [-0.55, 0.85, 0], temp: 300,
+    explode: [-0.55, 0.9, 0], temp: 300,
     desc: 'The sharp splitter lip divides the fan exit flow: about 1 kg of air in 8.2 goes down into the core, the other 7.2 kg into the bypass duct. The casing behind it holds the booster stator vanes.',
   }, splitter).userData.part.stationTemp = '13';
 
@@ -126,7 +126,7 @@ export function buildFan(ctx) {
   const bIGV = cut(cutPair((keep) => coreRow({ ...ROWS.boosterIGV, rotor: false, stagger: [-8, -12], camber: -0.03, t: 0.06 }, keep), GM.titanium()));
   P('Booster inlet guide vanes', {
     system: 'Propulsion', material: 'Titanium (count estimated)', mass: 22, count: ROWS.boosterIGV.count,
-    explode: [-0.55, 1.0, 0], temp: 292,
+    explode: [-0.55, 0.9, 0], temp: 292,
     desc: 'Fixed vanes at the core inlet that set the swirl the first booster rotor wants to see.',
   }, bIGV).userData.part.stationTemp = '13';
 
@@ -140,7 +140,7 @@ export function buildFan(ctx) {
     boosterSpin.push(g);
     P(`Booster rotor ${i + 1}`, {
       system: 'Propulsion', material: 'Titanium blades (count estimated)', mass: 28 - i * 3, count: r.count,
-      explode: [0, 0.95 - i * 0.04, 0],
+      explode: [0, 0.9, 0],
       desc: i === 0
         ? 'First of four booster stages on the fan shaft (the -115B added the fourth stage to supercharge its larger core). Each turns at fan speed, N1, so the blades sit at large radius to get useful blade speed.'
         : i === 3
@@ -152,7 +152,7 @@ export function buildFan(ctx) {
     const s = cut(cutPair((keep) => coreRow({ ...r, rotor: false }, keep), GM.titanium()));
     P(i === 3 ? 'Booster outlet guide vanes' : `Booster stator ${i + 1}`, {
       system: 'Propulsion', material: 'Titanium vanes (count estimated)', mass: 14, count: r.count,
-      explode: [-0.55, 0.92 - i * 0.04, 0],
+      explode: [-0.55, 0.9, 0],
       desc: i === 3
         ? 'Removes the last booster swirl before the air turns down the gooseneck duct towards the HP compressor.'
         : 'Stator vanes slow the air leaving each rotor, turning its velocity into pressure and setting it up for the next rotor.',
@@ -214,7 +214,6 @@ export function buildFan(ctx) {
       if (!keep(phi)) continue;
       // door hinged at its aft edge, cracked open into the duct wall
       const door = sector(0.735, 0.752, -1.64, -1.76, phi - 0.16, phi + 0.16, 6);
-      door.rotateX(0);
       list.push(door);
       // chute through the frame that dumps the bled air into the bypass stream
       list.push(boxAt(0.86, -1.72, phi, [0.2, 0.08, 0.12]));
@@ -229,7 +228,7 @@ export function buildFan(ctx) {
     system: 'Propulsion', material: 'Steel doors, unison ring and fuel-powered actuators (count estimated)', mass: 70, count: 12,
     explode: [-0.4, 0.25, 0.35], temp: 330,
     desc: 'Doors in the duct between booster and HP compressor. At low power and during rapid throttle changes the booster pumps more air than the core can swallow; the FADEC opens these doors to dump the excess into the bypass and keep the booster from stalling.',
-    callout: true, anchor: [0.75, -1.7, 0.2],
+    callout: true, anchor: [0.02, -1.7, 0.77],
   }, vbvGrp).userData.part.stationTemp = '25';
 
   void kept; void SKIN; void wall;

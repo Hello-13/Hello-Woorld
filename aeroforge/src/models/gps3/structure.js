@@ -64,7 +64,8 @@ export function buildStructure(P) {
   // ------------------------------------------------------------------ launch-vehicle adapter ring
   const rI = 0.597;   // 1,194 mm interface (assumed; a standard 47-inch size)
   const prof = [[rI - 0.03, -0.002], [rI + 0.025, -0.002], [rI + 0.025, -0.07], [rI + 0.04, -0.105], [rI + 0.04, -0.14], [rI - 0.012, -0.14], [rI - 0.012, -0.11], [rI - 0.03, -0.09], [rI - 0.03, -0.002]];
-  const ringG = lathe(prof, 96).rotateX(Math.PI / 2).translate(0, 0, -HZ);
+  const ringG = lathe(prof.slice().reverse(), 96)   // reversed so the outer face winds outward
+   .rotateX(Math.PI / 2).translate(0, 0, -HZ);
   P('Launch-vehicle adapter ring', {
     system: 'Separation', material: 'Machined aluminium ring', mass: 24, temp: 240, explode: [0, 0, -1.95],
     desc: 'The satellite\'s half of the separation joint. A clamp band squeezes this ring against the launcher\'s payload adapter and is cut by pyrotechnic bolt cutters at separation. Interface diameter assumed 1,194 mm (a standard size; the GPS III figure is not published).',
