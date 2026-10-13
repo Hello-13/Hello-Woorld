@@ -67,7 +67,8 @@ export function hellfire() {
   return {
     body: merge([body, ...canards, ...wings, ...tails, ...shoe]),
     dome,
-    band: merge([band(0.48, 0.52, R), band(-0.3, -0.26, R)]),   // yellow warhead, brown motor (one paint)
+    band: band(0.48, 0.52, R),          // yellow band: high-explosive warhead
+    motor: band(-0.3, -0.26, R),        // brown band: live rocket motor
     length: L, radius: R,
   };
 }
@@ -76,7 +77,7 @@ export function hellfire() {
 export function launcher() {
   const parts = [
     box(1.55, 0.13, 0.12, [0, 0, 0]),
-    latheX([[0.001, 0.775], [0.05, 0.775], [0.065, 0.82], [0.001, 0.92]], 12).scale(1, 1, 1).translate(0, 0, 0),
+    latheX([[0.065, 0.775], [0.06, 0.82], [0.035, 0.88], [0.001, 0.92]], 12).scale(1, 1, 0.9),
     box(0.42, 0.1, 0.2, [0.45, 0.02, 0]),                  // launcher electronics assembly
   ];
   for (const s of [1, -1]) {
