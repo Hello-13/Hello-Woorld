@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import { Assembly, mesh } from '../engine/assembly.js';
 import { wingPanel, hingedMesh, lathe, loftRings } from '../engine/geometry.js';
 import { M, SKIN } from '../engine/materials.js';
-import { decal, stencilText, danger } from '../engine/decals.js';
+import { decal, danger } from '../engine/decals.js';
 import { decalTexture } from '../engine/surface.js';
 import {
   X, prof, fusePoint, fuselageLoft, stationsWithBreaks, splitTris, merge, box, lru, cylX, tubeBetween, pipe, latheX,
@@ -51,7 +51,7 @@ function materials() {
     olive: M.munition(), seeker: std({ color: 0xc9ccc6, roughness: 0.45, metalness: 0.15 }),
     yellow: std({ color: 0xd8a51f, roughness: 0.5, metalness: 0.1 }), brown: std({ color: 0x6a4527, roughness: 0.6, metalness: 0.1 }),
     navRed: M.navRed(), navGreen: M.navGreen(),
-    beacon: std({ color: 0x300404, emissive: 0xff2a1a, emissiveIntensity: 0.6 }),
+    beacon: std({ color: 0x3a0606, emissive: 0xff2a1a, emissiveIntensity: 0.4, roughness: 0.35 }),
     lamp: std({ color: 0xdedede, emissive: 0xfff3dc, emissiveIntensity: 0.4, roughness: 0.2 }),
     laser: M.laser().clone(),
   };
@@ -72,6 +72,22 @@ const insignia = () => decalTexture('mq9.insignia', 512, 256, (ctx, w, h) => {
   ctx.closePath(); ctx.stroke();
   ctx.strokeRect(cx - R * 2.05, cy - R * 0.3, R * 1.1, R * 0.6);
   ctx.strokeRect(cx + R * 0.95, cy - R * 0.3, R * 1.1, R * 0.6);
+});
+
+/** Wide stencil (the shared stencil canvas is too narrow for "U.S. AIR FORCE"). */
+const wideStencil = (text, ink) => decalTexture(`mq9.st.${text}`, 1024, 128, (ctx, w, h) => {
+  ctx.fillStyle = ink;
+  ctx.font = '700 84px "Barlow Semi Condensed", "Arial Narrow", sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, w / 2, h / 2 + 4, w * 0.94);
+});
+
+/** Exhaust staining: a soft streak that fades aft (u runs forward → aft). */
+const sootStreak = () => decalTexture('mq9.soot', 512, 128, (ctx, w, h) => {
+  const g = ctx.createLinearGradient(0, 0, w, 0);
+  g.addColorStop(0, 'rgba(28,24,22,0.55)'); g.addColorStop(0.35, 'rgba(36,32,30,0.32)'); g.addColorStop(1, 'rgba(40,36,34,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(w * 0.05, h / 2, w * 0.98, h * 0.42, 0, -Math.PI / 2, Math.PI / 2); ctx.fill();
 });
 
 /** Conformal skin patch (doors, access panels) over stations s0..s1 and section angles th0..th1. */
@@ -825,7 +841,8 @@ export function buildUAV() {
   for (const side of [1, -1]) {
     aftSkin.add(decal(aftMesh, danger('DANGER · PROPELLER'), { at: fusePoint(9.2, side > 0 ? 0.05 : Math.PI - 0.05), dir: [0, 0, side], size: [0.75, 0.24, 0.4], roughness: 0.5 }));
     aftSkin.add(decal(aftMesh, insignia(), { at: fusePoint(7.1, side > 0 ? 0.12 : Math.PI - 0.12), dir: [0, 0.1, side], size: [0.95, 0.48, 0.4] }));
-    fwdSkin.add(decal(fwdMesh, stencilText('U.S. AIR FORCE', 'rgba(52,58,64,0.88)'), { at: fusePoint(3.0, side > 0 ? 0.25 : Math.PI - 0.25), dir: [0, 0.25, side], size: [0.9, 0.22, 0.3] }));
+    fwdSkin.add(decal(fwdMesh, wideStencil('U.S. AIR FORCE', 'rgba(52,58,64,0.88)'), { at: fusePoint(3.0, side > 0 ? 0.25 : Math.PI - 0.25), dir: [0, 0.25, side], size: [1.1, 0.14, 0.3] }));
+    aftSkin.add(decal(aftMesh, sootStreak(), { at: fusePoint(8.55, side > 0 ? -0.05 : Math.PI + 0.05), dir: [0, -0.05, side], size: [1.3, 0.3, 0.4], angle: side > 0 ? Math.PI : 0, roughness: 0.8 }));
   }
 
   A.finalize();
@@ -926,9 +943,10 @@ export function buildUAV() {
       for (const { h, side } of surf.rv) h.setAngle((-pitch * 15 * side + yaw * 12) * deg);
       surf.rud.setAngle(yaw * 20 * deg);
       // anti-collision beacons: a soft pulse about once a second, steady when motion is reduced
-      const pulse = reduced ? 0.25 : Math.max(0, Math.cos((t * Math.PI * 2) / 1.3)) ** 4;
-      m.beacon.emissiveIntensity = 0.5 + pulse * 3.5;
-      m.lamp.emissiveIntensity = a > 0.5 ? 0.3 : 1.6;
+      // (a gentle 0.8 Hz swell, never a hard strobe: bright, sharp flashes read as flicker on screen)
+      const pulse = reduced ? 0.3 : (0.5 + 0.5 * Math.cos(t * Math.PI * 1.6)) ** 2;
+      m.beacon.emissiveIntensity = 0.35 + pulse * 1.15;
+      m.lamp.emissiveIntensity = a > 0.5 ? 0.25 : 1.1;
       const lift = smooth(0, 1, a);
       air.position.y = lift * 2.2 + Math.sin(t * 0.7) * 0.05 * lift;
       air.rotation.x = lift * (Math.sin(t * 0.21) * 0.05 + roll * 0.25);
