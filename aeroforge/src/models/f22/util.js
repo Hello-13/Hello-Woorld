@@ -101,7 +101,7 @@ export function platePoly(s, outline, thick = 0.025, inset = 0.012) {
  * Thin slab from a grid of outer-surface points (rows along the panel, columns across), offset by
  * `off(p)` → [dx, dy, dz] toward the inside. Used for doors and access panels.
  */
-export function slab(grid, off) {
+export function slab(grid, off, outward = null) {
   const rows = grid.length, cols = grid[0].length;
   const pos = [], idx = [];
   const outer = [], inner = [];
@@ -128,6 +128,14 @@ export function slab(grid, off) {
   for (let r = 0; r < rows - 1; r++) {
     quad(outer[r][0], outer[r + 1][0], inner[r][0], inner[r + 1][0]);
     quad(inner[r][cols - 1], inner[r + 1][cols - 1], outer[r][cols - 1], outer[r + 1][cols - 1]);
+  }
+  if (outward) {
+    // flip the winding if the first outer face points inward
+    const a = new THREE.Vector3(...pos.slice(idx[0] * 3, idx[0] * 3 + 3));
+    const b = new THREE.Vector3(...pos.slice(idx[1] * 3, idx[1] * 3 + 3));
+    const c = new THREE.Vector3(...pos.slice(idx[2] * 3, idx[2] * 3 + 3));
+    const n = b.sub(a).cross(c.sub(a));
+    if (n.dot(outward) < 0) for (let k = 0; k < idx.length; k += 3) { const t = idx[k + 1]; idx[k + 1] = idx[k + 2]; idx[k + 2] = t; }
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
