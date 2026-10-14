@@ -340,9 +340,9 @@ export function buildSystems(ctx) {
     g.push(FR.pipe([[14.2, -0.42, z * 1.38], [15.5, -0.35, z * 1.4], [16.2, -0.26, z * 1.38]], 0.016, 5));
     g.push(FR.pipe([[14.6, -0.35, z * 1.4], [14.6, 0.15, z * 1.42], [14.9, 0.3, z * 1.42], [15.9, 0.36, z * 1.44]], 0.014, 5));
     // out along the rear spar to the flaperon and aileron actuators (one actuator per surface)
-    const fl = FR.wingSection(FLAP_Z), ai = FR.wingSection(AIL_Z);
-    g.push(FR.pipe([[13.2, -0.55, z * 1.0], [13.45, -0.2, z * 1.55], [13.5, -0.12, z * 1.85], [13.47, FR.wingY(2.4), z * 2.4], [FR.SN - fl.le[0] + 0.79 * fl.chord - 0.02, fl.le[1], z * (FLAP_Z - 0.06)]], 0.014, 5, 24));
-    g.push(FR.pipe([[13.47, FR.wingY(2.4), z * 2.4], [13.45, FR.wingY(3.6), z * 3.6], [FR.SN - ai.le[0] + 0.72 * ai.chord + 0.05, ai.le[1], z * (AIL_Z - 0.05)]], 0.012, 5, 24));
+    const fl = FR.teActuator('flaperon'), ai = FR.teActuator('aileron');
+    g.push(FR.pipe([[13.2, -0.55, z * 1.0], [13.45, -0.2, z * 1.55], [13.5, -0.12, z * 1.85], [13.48, FR.wingY(2.3), z * 2.3], [13.48, fl.y, z * (fl.z - 0.12)], [fl.s1 - 0.12, fl.y, z * (fl.z - 0.035)]], 0.014, 5, 30));
+    g.push(FR.pipe([[13.48, fl.y, z * (fl.z - 0.12)], [13.48, FR.wingY(4.0), z * 4.0], [13.47, FR.wingY(ai.z - 0.25), z * (ai.z - 0.25)], [ai.s1 - 0.03, ai.y, z * (ai.z - 0.03)]], 0.012, 5, 30));
     // forward along the bay sill (y −0.70) to the bay doors and launchers, then round the front of the side bay,
     // under the inlet duct and up outboard of it to the leading-edge-flap power drive unit
     g.push(FR.pipe([[13.2, -0.6, z * 0.6], [12.6, -0.7, z * 0.84], [10.5, -0.7, z * 0.84], [8.7, -0.7, z * 0.84], [8.48, -0.66, z * 0.95], [8.465, -0.6, z * 1.3], [8.465, -0.47, z * 1.62], [8.44, -0.22, z * 1.74], [8.42, -0.06, z * 1.76]], 0.016, 5, 50));

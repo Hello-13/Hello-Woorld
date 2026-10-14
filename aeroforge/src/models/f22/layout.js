@@ -441,6 +441,17 @@ export function wingSection(z) {
   const eta = (z - 1.45) / (WING.semi - 1.45);
   return { le: [X(wingLE(z)), wingY(z), z], chord: wingTE(z) - wingLE(z), t: lerp(0.0592, 0.0429, eta) };
 }
+/**
+ * Trailing-edge actuators, one per surface (Flight International, 1997: "only one actuator on each control
+ * surface"): span fraction eta from the wing root (z 1.45) to the tip, chord fraction c of the rod end, body
+ * length (m). teActuator() gives the rod end (s1), the cylinder head (s0) and the mid-plane y at span z.
+ */
+export const TE_ACT = { flaperon: { eta: 0.27, c: 0.79, len: 0.5 }, aileron: { eta: 0.66, c: 0.72, len: 0.42 } };
+export function teActuator(kind) {
+  const a = TE_ACT[kind], z = 1.45 + a.eta * (WING.semi - 1.45);
+  const s = wingLE(z) + a.c * (wingTE(z) - wingLE(z));
+  return { z, y: wingY(z), s0: s + 0.05 - a.len, s1: s + 0.05, sHinge: s };
+}
 export const STAB = { rootZ: 1.55, tipZ: 4.42, rootLE: 14.97, rootC: 3.95, y: -0.1, pivotS: 16.75, notchZ: 1.95 };
 const stabLEraw = (z) => STAB.rootLE + (z - STAB.rootZ) * tan(42 * DEG);
 /**
