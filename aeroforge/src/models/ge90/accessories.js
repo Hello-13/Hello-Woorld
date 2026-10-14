@@ -157,7 +157,7 @@ export function buildAccessories(ctx) {
   P('AGB gear train', {
     system: 'Drive system', material: 'Carburised steel spur gears on roller-bearing shafts (layout estimated)', mass: 30, count: TRAIN.length + 2,
     explode: [0.45, 0.1, 1.75], temp: 360,
-    desc: 'Every pad turns at a fixed ratio of N2 set by its gears: the generator at 0.7947 (7,416 rpm at 100 %), the hydraulic pump at 0.3783 (3,530 rpm) and the backup generator at 2.4126 (22,515 rpm) (EASA type certificate). So the slow hydraulic-pump gear is about twice the generator gear\'s diameter; idlers carry the drive between pads. The backup generator is too fast for one gear, so its train gear sits on a layshaft whose second, larger gear drives a small pinion on the pad shaft, stepping it up 26 : 12. The real gear layout is not published.',
+    desc: 'Every pad turns at a fixed ratio of N2 set by its gears: the generator at 0.7947 (7,416 rpm at 100 %), the hydraulic pump at 0.3783 (3,530 rpm) and the backup generator at 2.4126 (22,515 rpm) (EASA type certificate). So the slow hydraulic-pump gear is about twice the generator gear\'s diameter; idlers carry the drive between pads. The backup generator is too fast for one gear, so its train gear sits on a layshaft whose second, larger gear drives a small pinion on the pad shaft, stepping it up 26 : 12 (the real gear layout is not published).',
   }, [m(merge(gears), GM.gear()), m(merge(shafts), GM.steel())]);
   P('AGB hand-cranking pad', {
     system: 'Drive system', material: 'Steel drive socket under a bolted cover', mass: 1,

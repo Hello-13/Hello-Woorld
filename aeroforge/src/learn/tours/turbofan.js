@@ -65,7 +65,7 @@ export default [
     title: 'The LP turbine turns the fan',
     body: 'Six LP turbine stages take about 90 MW at take-off (modelled) and send it forward through the LP shaft — three splined pieces, the cone, mid and forward shafts — inside the hollow HP spool to the fan 5 m away. Two spools let each turn at its best speed: the fan at 2,355 rpm, the core four times faster. Between the turbines, the 12-strut turbine center frame carries the HP spool\'s aft bearing.',
     key: 'LP spool work balance, per kg of core air: c_p·[BPR·(T₁₃ − T₂) + (T₂₅ − T₂)] = η_m·(1 + f)·c_p,t·(T₄₅ − T₅).',
-    focus: [...LPT, ...SHAFTS, ...FRAME, 'Fan disk', 'Fan blades', 'Booster spool', ...HPC_ROTOR, ...HPT_ROTOR], mode: 'systems', explode: 0.5, view: { dir: [0.25, 0.45, 1], fill: 0.95 },
+    focus: [...LPT, ...SHAFTS, ...FRAME, 'Fan disk', 'Fan blades', 'Booster spool', ...HPC_ROTOR, ...HPT_ROTOR], explode: 0.5, view: { dir: [0.25, 0.45, 1], fill: 0.95 },
   },
   {
     title: 'The thrust reverser',
@@ -83,7 +83,7 @@ export default [
     title: 'Oil and fuel: one loop cools the other',
     body: 'Trace the lubrication loop: tank, anti-leak valve, the lubrication unit\'s pressure element, filter, then the bearing sumps; scavenge elements suck the oil back through a filter and the debris monitor, which counts metal particles from wearing bearings. The hot oil then gives its heat to the fuel in the main heat exchanger on its way to the pump\'s high-pressure stage, the HMU and the burners — and to the servo lines that move every actuator.',
     key: 'Heat into the fuel: Q = ṁ_fuel·c_p,fuel·ΔT ≈ 4.6 kg/s × 2 kJ/(kg·K) × 15 K ≈ 140 kW at take-off (illustrative).',
-    focus: OIL_FUEL, view: { dir: [0.8, -0.35, 1], fill: 0.72 },
+    focus: OIL_FUEL, view: { dir: [0.75, -0.4, 1], fill: 0.45, lift: -0.1 },
   },
   {
     title: 'Follow the flow',

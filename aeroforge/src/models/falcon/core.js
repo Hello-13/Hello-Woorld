@@ -101,13 +101,17 @@ function engineGeometry() {
   }
   const ec = OUTER.map((a) => unit(1.64, a + 8, 1.8, 0.16, 0.2, 0.12));
   ec.push(unit(0.55, 180, 1.7, 0.16, 0.2, 0.12));
+  // mounts: a standoff from each outer controller to the engine-section wall; the centre engine's
+  // hangs from a strap under the Octaweb's centre hub ring
+  const ecb = OUTER.map((a) => unit(1.755, a + 8, 1.8, 0.1, 0.14, 0.11));
+  ecb.push(block(-0.47, 1.92, 0, 0.06, 0.28, 0.08), block(-0.53, 1.795, 0, 0.1, 0.03, 0.1));
   ENGINE_GEO = {
     bells: merge(ring.bells), pump: merge(ring.pump), gg: merge(ring.gg), duct: merge(ring.duct),
     lines: merge([...ring.line, ...ring.ign]), valves: merge(ring.valve), act: merge(ring.act),
     chamber: merlinChamber(48), inj: merge(pintleInjector()), nozzle: merlinNozzle(56),
     cePump: merge(ce.pump), ceGG: merge(ce.gg), ceDuct: merge(ce.duct), ceLines: merge([...ce.line, ...ce.ign]), ceValves: merge(ce.valve), ceAct: merge(ce.act),
     tvc: merge(tvcLines), bleed: merge(bleeds), tea: merge([bottle(...at(1.58, 112.5, 2.62), 0.12, 0.42, 14)]), relight: merge(relight),
-    pb: merge(pb), legHe: merge(legHe), ec: merge(ec),
+    pb: merge(pb), legHe: merge(legHe), ec: merge(ec), ecb: merge(ecb),
   };
   return ENGINE_GEO;
 }
@@ -137,6 +141,14 @@ function legGeometry(len) {
 
 /** A small box mounted at radius r, azimuth a, height y, facing outward (w tangential, d radial). */
 const unit = (r, a, y, w, h, d) => { const [x, z] = polar(r, a); return block(x, y, z, w, h, d, radialYaw(a)); };
+/**
+ * Standoff bracket for a box built with unit(r, a, y, w, h, d): a web from the box's outer face to a
+ * doubler plate whose outer face sits at radius wall.
+ */
+const wallBracket = (r, a, y, w, h, d, wall) => {
+  const ro = r + d / 2, pw = Math.min(0.3, w * 0.8);
+  return [unit((ro + wall - 0.03) / 2 + 0.005, a, y, Math.min(0.12, w * 0.4), h * 0.55, wall - 0.03 - ro + 0.01), unit(wall - 0.015, a, y, pw, h + 0.06, 0.03)];
+};
 /** A flat panel on the skin at azimuth a with a row of fastener heads round its edge. */
 function accessPanel(a, y, w, h, out) {
   out.panel.push(unit(R + 0.008, a, y, w, h, 0.012));
@@ -350,7 +362,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   // fill, drain and vent valves: ground lines enter at the T-0 plate; the vents sit at the tank tops
   const lfd = P('LOX fill & drain valve', {
     system: 'Fuel', material: 'Stainless valve body and line into the LOX manifold', mass: 22,
-    desc: 'LOX loads from the T-0 plate through this valve into the feed manifold and up the transfer tube, starting about 35 minutes before launch on Falcon 9 and Heavy. Because the densified LOX keeps boiling off, it is topped up until the last minutes. Line routing simplified.',
+    desc: 'LOX loads from the T-0 plate through this valve into the feed manifold and up the transfer tube. On Falcon Heavy first-stage LOX loading starts about 45 minutes before liftoff (NASA's countdown for Psyche, 2023; 35 minutes on Falcon 9). Because the densified LOX keeps boiling off, it is topped up until the last minutes. Line routing simplified.',
     explode: [0, -0.8, 4.8],
   }, mesh(merge([
     pipe([at(R - 0.05, t0Az - 8, T0_Y - 0.05), at(1.45, t0Az - 8, 2.95), at(0.98, t0Az - 4, 2.64)], 0.06, { seg: 8, tubular: 10 }),
@@ -359,7 +371,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   lfd.userData.part.thermalRole = 'lox';
   const rfd = P('RP-1 fill & drain valve', {
     system: 'Fuel', material: 'Stainless valve body and line into the aft dome', mass: 18,
-    desc: 'RP-1 loads through this valve into the bottom of the fuel tank from the T-0 plate, at the same time as the LOX. The same path drains the stage after a scrub.',
+    desc: 'RP-1 loads through this valve into the bottom of the fuel tank from the T-0 plate; on Falcon Heavy first-stage RP-1 loading starts about 50 minutes before liftoff, just ahead of the LOX. The same path drains the stage after a scrub.',
     explode: [0, -0.6, 5.4],
   }, mesh(merge([
     pipe([at(R - 0.05, t0Az + 8, T0_Y + 0.05), at(1.5, t0Az + 8, 3.12), at(1.3, t0Az + 8, aftDomeY(1.3) + 0.04)], 0.05, { seg: 8, tubular: 10 }),
@@ -576,9 +588,9 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   }, mesh(EG.legHe, FM.steelLine()));
   P('engine controllers', {
     system: 'Avionics', count: 9, material: 'Radiation-tolerant engine computers', mass: 9 * 4,
-    desc: 'Each Merlin has its own controller made of three computers that vote, each with two processors checking each other (the flight software is C++ on Linux). It runs start-up, throttle and shutdown sequences and reports health to the flight computers, which can shut an engine down and re-plan around it. Positions estimated.',
+    desc: 'Each Merlin has its own controller made of three computers that vote, each with two processors checking each other (the flight software is C++ on Linux). It runs start-up, throttle and shutdown sequences and reports health to the flight computers, which can shut an engine down and re-plan around it. The eight outer ones stand off the engine-section wall beside their engines; the centre engine\'s hangs under the Octaweb hub. Positions estimated.',
     explode: [0, -1.8, 2.0],
-  }, mesh(EG.ec, FM.avionics()));
+  }, [mesh(EG.ec, FM.avionics()), mesh(EG.ecb, FM.aluDark())]);
 
   // ------------------------------------------------------------------ forward structure
   let finY;
@@ -675,20 +687,28 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   // the unit sits 20° off the outboard side on a side booster (mirrored between A and B), clear of
   // the inboard face, the 90° / 270° thruster pods and the fin roots
   const hpuAz = !centre && attachSide > 0 ? 340 : 200, hpuY = finY - 0.95, ringY = finY - 0.35;
-  const [hux, huz] = polar(1.42, hpuAz);
+  // motor-pump in the middle, reservoir and accumulator either side, each on its own wall bracket
+  const hR = 1.62, rsA = hpuAz + 10, acA = hpuAz - 10, wallIn = R - 0.03;   // inner face of the composite wall
   const hpu = [
-    post(hux, huz, hpuY - 0.2, hpuY + 0.2, 0.11, 14),                                         // motor-pump
-    bottle(...at(1.45, hpuAz + 14, hpuY), 0.1, 0.42, 12),                                      // reservoir
-    new THREE.SphereGeometry(0.11, 14, 10).translate(...at(1.45, hpuAz - 14, hpuY + 0.05)),    // accumulator
-    unit(R - 0.06, hpuAz, hpuY, 0.62, 0.1, 0.04),                                              // mounting plate
+    post(...polar(hR, hpuAz), hpuY - 0.2, hpuY + 0.2, 0.11, 14),                              // motor-pump
+    bottle(...at(hR + 0.01, rsA, hpuY), 0.1, 0.42, 12),                                        // reservoir
+    new THREE.SphereGeometry(0.11, 14, 10).translate(...at(hR, acA, hpuY + 0.05)),             // accumulator
+    ...wallBracket(hR, hpuAz, hpuY, 0.2, 0.36, 0.22, wallIn), ...wallBracket(hR + 0.01, rsA, hpuY, 0.16, 0.3, 0.2, wallIn),
+    ...wallBracket(hR, acA, hpuY + 0.05, 0.16, 0.16, 0.22, wallIn),
     hoop(1.68, 0.02, ringY, { seg: 72, tube: 4 }),                                             // pressure / return lines
-    pipe([[hux, hpuY + 0.2, huz], at(1.62, hpuAz, ringY + 0.1), at(1.68, hpuAz, ringY)], 0.025, { seg: 6, tubular: 8 }),
+    // pressure: pump outlet → (relief valve) → ring; the accumulator tees into it
+    pipe([at(hR, hpuAz, hpuY + 0.19), at(1.64, hpuAz, hpuY + 0.4), at(1.67, hpuAz, ringY - 0.06), at(1.68, hpuAz, ringY)], 0.022, { seg: 6, tubular: 10 }),
+    pipe([at(hR, acA, hpuY + 0.14), at(1.63, acA + 3, hpuY + 0.27), at(1.635, hpuAz - 1, hpuY + 0.31)], 0.018, { seg: 6, tubular: 8 }),
+    // return: ring → reservoir top; suction: reservoir → pump inlet
+    pipe([at(1.68, rsA, ringY), at(1.665, rsA, hpuY + 0.42), at(hR + 0.01, rsA, hpuY + 0.18)], 0.02, { seg: 6, tubular: 8 }),
+    pipe([at(hR + 0.01, rsA, hpuY - 0.12), at(hR + 0.005, hpuAz + 5, hpuY - 0.14), at(hR, hpuAz, hpuY - 0.12)], 0.022, { seg: 6, tubular: 8 }),
   ];
   for (const a of LEGS) hpu.push(pipe([at(1.68, a, ringY), at(1.66, a, finY - 0.05), at(R - 0.25, a, finY + 0.1)], 0.022, { seg: 6, tubular: 8 }));
-  const relief = [post(...polar(1.56, hpuAz + 4), hpuY + 0.3, hpuY + 0.42, 0.03, 8), unit(1.56, hpuAz + 4, hpuY + 0.47, 0.05, 0.06, 0.05)];
+  // the relief valve sits on the pressure line and dumps back into the return line beside it
+  const relief = [unit(1.645, hpuAz, hpuY + 0.42, 0.075, 0.09, 0.075), pipe([at(1.645, hpuAz, hpuY + 0.42), at(1.66, hpuAz + 5, hpuY + 0.44), at(1.665, rsA, hpuY + 0.42)], 0.012, { seg: 4, tubular: 6 })];
   P('grid-fin hydraulic power unit', {
-    system: 'Hydraulics', material: 'Electric motor-pump, reservoir, accumulator, pressure relief valve and lines', mass: 55,
-    desc: 'Block 5\'s closed-loop hydraulics: a motor-driven pump, a reservoir that takes the returned fluid and an accumulator for peak demand, with lines round the inside of the skin to the four fin actuators. After a pump stall cost a landing on CRS-16 (December 2018), a pressure relief valve (gold) was added to the line. Unit layout estimated.',
+    system: 'Hydraulics', material: 'Electric motor-pump, reservoir, accumulator, pressure relief valve and lines on wall brackets', mass: 55,
+    desc: 'Block 5\'s closed-loop hydraulics: a motor-driven pump draws from a reservoir that takes the returned fluid, an accumulator on the pressure line covers peak demand, and lines run round the inside of the skin to the four fin actuators. After a pump stall cost a landing on CRS-16 (December 2018), a pressure relief valve (gold) was added on the pump\'s pressure line, venting back to the return. Unit layout estimated.',
     explode: [0, 2.6, 1.6],
   }, [mesh(merge(hpu), FM.steelLine()), mesh(merge(relief), FM.gold())]);
 
@@ -827,10 +847,15 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     pipe([at(R + 0.06, rwA, rwBottom + 0.1), at(R - 0.02, rwA, 2.6), at(1.7, rwA + 6, 2.75), at(1.66, rwA + 12, 2.9)], 0.03, { seg: 6, tubular: 10 }),   // past the Octaweb post
   ];
   for (const a of OUTER) wh.push(pipe([at(1.66, a + 8, 2.9), at(1.64, a + 8, 1.9)], 0.015, { seg: 4, tubular: 4 }));
+  // the centre engine's controller: in over the LOX manifold beside the TEA-TEB relight line, then
+  // down past the Octaweb hub to the box hanging under it
+  wh.push(pipe([at(1.66, 104, 2.9), at(1.4, 103, 2.72), at(0.95, 108, 2.44), at(0.6, 135, 2.44), at(0.52, 157, 2.32), at(0.55, 170, 2.1), at(0.56, 178, 1.83), at(0.56, 180, 1.79)], 0.015, { seg: 4, tubular: 24 }));
   for (const a of [15, 75, 135, 195, 255, 315]) wh.push(pipe([at(1.6, a, fwdY - 0.22), at(1.52, a, fwdY - 0.12)], 0.015, { seg: 4, tubular: 4 }));
+  for (const a of [45, 225]) wh.push(pipe([at(1.6, a, fwdY - 0.22), at(1.52, a, fwdY - 0.07)], 0.015, { seg: 4, tubular: 4 }));          // S-band transmitters
+  for (const a of [45, 165, 285]) wh.push(pipe([at(1.6, a + 5, fwdY - 0.22), at(1.64, a + 5, fwdY + 0.05), at(1.53, a + 4, fwdY + 0.29)], 0.015, { seg: 4, tubular: 8 }));   // battery packs
   P('wiring harnesses', {
     system: 'Electrical', material: 'Shielded cable bundles', mass: 180,
-    desc: 'Cable bundles leave the raceway through the skin at both ends: a ring in the forward skirt ties the computers, navigation, flight-safety, telemetry and power units together, and a ring in the engine bay drops a harness to each engine controller. Routing simplified.',
+    desc: 'Cable bundles leave the raceway through the skin at both ends: a ring in the forward skirt ties the computers, navigation, flight-safety, S-band transmitters and battery packs together, and a ring in the engine bay drops a harness to each engine controller — the centre engine\'s runs in over the LOX manifold. Routing simplified.',
     explode: [0, 0, 2.0],
   }, mesh(merge(wh), FM.cable()));
   P('flight computers', {
@@ -858,6 +883,16 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     desc: 'Send the stage\'s telemetry and its camera views to the ground — the booster views in every launch webcast — and keep doing so after separation, all the way to landing. Positions estimated.',
     explode: [0, 4.4, 3.0],
   }, mesh(merge([45, 225].map((a) => unit(1.5, a, fwdY, 0.25, 0.15, 0.15))), FM.avionics()));
+  // every forward-skirt box stands off the wall on a bracket: [r, azimuths, y, w, h, d] as built above
+  const avBoxes = [[1.45, [15, 135, 255], fwdY, 0.42, 0.28, 0.32], [1.45, [75], fwdY, 0.34, 0.26, 0.3], [1.45, [195, 315], fwdY, 0.36, 0.26, 0.28],
+    [1.47, [45, 165, 285], fwdY + 0.4, 0.36, 0.24, 0.26], [1.5, [45, 225], fwdY, 0.25, 0.15, 0.15]];
+  const avBr = [];
+  for (const [r, azs, y, w, h, d] of avBoxes) for (const a of azs) avBr.push(...wallBracket(r, a, y, w, h, d, R - 0.015));
+  P('forward-skirt avionics brackets', {
+    system: 'Structure', count: 13, material: 'Machined aluminium brackets and wall doublers', mass: 13 * 1.5,
+    desc: 'Each avionics, power and telemetry box in the forward skirt is bolted to a bracket that stands it off the skirt wall, clear of the forward dome, with the harness ring below. Bracket design not published; layout estimated.',
+    explode: [0, 3.4, 2.4],
+  }, mesh(merge(avBr), FM.aluDark()));
   const antY = centre ? 44.5 : Y.s1Top + 1.2;
   const antAz = centre ? [30, 210] : [73, 253];
   P('S-band telemetry antennas', {
