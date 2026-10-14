@@ -34,6 +34,9 @@ function element(x, y, { h, r, rt = r, turns, quad = false, mat }) {
   return [mesh(metal, G.aluminium()), mesh(radomeG(x, y, r, h, z0 + 0.03, rt), mat), mesh(wire, G.helixWire())];
 }
 
+/** Radius of the beam-forming network's central disc on the Earth deck (the L-band feeds plug into its rim). */
+export const BFN_R = 0.2;
+
 export function buildAntennas(P) {
   const A = DECK_AT;
   // ------------------------------------------------------------------ support frame, panel, feed networks
@@ -52,7 +55,7 @@ export function buildAntennas(P) {
     callout: true, anchor: [1.36, -0.08, PANEL_Z],
   }, mesh(plateG(PANEL_OUTLINE, PANEL_T, PANEL_Z - PANEL_T, holes), G.blackPaint()));
 
-  const bfn = [cylG([ARRAY_C[0], ARRAY_C[1], DECK + 0.03], 0.2, 0.03, 'z', 40)];
+  const bfn = [cylG([ARRAY_C[0], ARRAY_C[1], DECK + 0.03], BFN_R, 0.03, 'z', 40)];
   for (const [x, y] of [...EC_INNER, ...EC_OUTER]) {
     const a = Math.atan2(y - ARRAY_C[1], x - ARRAY_C[0]), r0 = 0.18;
     bfn.push(pipeG([[ARRAY_C[0] + Math.cos(a) * r0, ARRAY_C[1] + Math.sin(a) * r0, DECK + 0.042], [x, y, DECK + 0.042], [x, y, PANEL_Z - PANEL_T]], 0.007));
@@ -150,7 +153,14 @@ export function buildAntennas(P) {
   for (const z of [-0.55, -0.05, 0.45]) sm.push(cylG([sx0, sy0, z], 0.045, 0.12, 'z', 14));
   sm.push(cylG([sx0, sy0, z1 + 0.05], 0.035, 0.1, 'z', 14));
   const brk = [];
-  for (const z of [-0.85, 0.0, 0.8]) brk.push(pipeG([[sx0, sy0, z], [HX + 0.03, 0.5, z], [HX + 0.014, 0.58, z]], 0.012, 8), boxG([HX + 0.017, 0.6, z], [0.01, 0.07, 0.07]));
+  // three launch-lock arms, each from a clamp collar on the mast (the middle one shares the element
+  // fitting) to a foot on the closeout strip
+  for (const z of [-0.85, 0.0, 0.8]) {
+    const rc = z === 0.0 ? 0.045 : 0.032, a = [HX + 0.03, 0.5], d = Math.hypot(a[0] - sx0, a[1] - sy0);
+    const p0 = [sx0 + ((a[0] - sx0) / d) * (rc - 0.002), sy0 + ((a[1] - sy0) / d) * (rc - 0.002), z];
+    brk.push(pipeG([p0, [a[0], a[1], z], [HX + 0.014, 0.58, z]], 0.012, 8), boxG([HX + 0.017, 0.6, z], [0.01, 0.07, 0.07]));
+    if (z !== 0.0) brk.push(cylG([sx0, sy0, z], rc, 0.04, 'z', 14));
+  }
   brk.push(boxG([sx0, sy0, z0 - 0.04], [0.07, 0.07, 0.08]), cylG([sx0, sy0 + 0.05, z0 - 0.04], 0.018, 0.04, 'y', 10));
   P('Stowed antenna (+X)', {
     system: 'Communications', material: 'Composite mast with element fittings; titanium launch-lock brackets', mass: 6, temp: 380, explode: [1.0, 0.1, 0],
@@ -177,7 +187,7 @@ export function buildAntennas(P) {
     const s = THREE.MathUtils.smoothstep(d, 0.55, 0.95);
     for (const r of rods) { r.scale.set(1, 1, Math.max(0.02, s)); r.visible = s > 0.03; }
   };
-  reg([hx, hy, IZ - 0.02], 'deck');
+  reg([hx, hy, DECK + 0.002], 'deck', false, [[hx, hy, IZ - 0.02]]);   // up through the deck into the antenna's base
   reg(rxIn, 'deck');
   return { setJIB };
 }

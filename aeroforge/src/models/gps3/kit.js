@@ -185,12 +185,38 @@ export function connPoint(c, s, conn, off = 0.03) {
   return p;
 }
 
+/** Connector k of a unit() box, laid out exactly as unit() draws it: its tip (where a cable plugs in)
+ *  and the point `off` metres proud of the box face in front of it (where the cable turns away). */
+export function connLead(c, s, { mount = '+y', conn = '-z', n = 4 } = {}, k = Math.floor((n - 1) / 2), off = 0.04) {
+  const ca = AX[conn[1]], cs = conn[0] === '+' ? 1 : -1, ma = AX[mount[1]];
+  const other = [0, 1, 2].filter((i) => i !== ca), along = other.find((i) => i !== ma) ?? other[0];
+  const tip = c.slice();
+  tip[ca] = c[ca] + cs * (s[ca] / 2 + 0.024);
+  tip[along] = c[along] - s[along] / 2 + ((k + 0.5) / n) * s[along];
+  const out = tip.slice();
+  out[ca] = c[ca] + cs * (s[ca] / 2 + off);
+  return [tip, out];
+}
+
 /**
  * Harness landing points, collected from every module and drawn last (harness.js).
  * side: 'npe' (+Y panel), 'bus' (−Y panel), 'deck' (Earth deck units), 'aft' (aft-end units);
  * power: true when the unit also gets a drop from the power harness (the larger loads);
  * lead: points the data cable follows from the unit before the side's usual routing takes over
- * (along an outrigger, or up through the aft deck from a unit mounted outside it).
+ * (out from its connector, along an outrigger, or through a deck from a unit mounted outside it);
+ * extra: { pp, plead, px } for the power drop: its own start (a connector tip) and lead, and the x at
+ * which it runs to the power bus (defaults: the data start and lead, 3 cm beside the data drop).
  */
 export const NET = { nodes: [] };
-export const reg = (p, side, power = false, lead = []) => { NET.nodes.push({ p, side, power, lead }); return p; };
+export const reg = (p, side, power = false, lead = [], extra = {}) => { NET.nodes.push({ p, side, power, lead, ...extra }); return p; };
+
+/** Registers a unit() box's harness landings: the data cable plugs into its middle connector, the power
+ *  cable (if any) into the next one. Each leaves straight out from its connector, then the data cable
+ *  steps along the face to the face centre and the power cable runs 3 cm beside it, as before. */
+export function regUnit(c, s, opts, side, power = false) {
+  const n = opts.n ?? 4, kd = Math.floor((n - 1) / 2);
+  const [tip, out] = connLead(c, s, opts, kd), mid = connPoint(c, s, opts.conn ?? '-z', 0.04);
+  const extra = {};
+  if (power) { const [pt, po] = connLead(c, s, opts, Math.min(n - 1, kd + 1)); Object.assign(extra, { pp: pt, plead: [po], px: mid[0] + 0.03 }); }
+  return reg(tip, side, power, [out, mid], extra);
+}

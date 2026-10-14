@@ -77,5 +77,6 @@ export const battConn = (x) => {
 // from both wings comes up a riser between the batteries and enters at a connector on its underside
 // (−Z face); SPRU_IN is that connector's lower face, where the riser ends (connector position estimated).
 export const SPRU = { c: [-0.1, 0.85], s: [0.44, 0.22, 0.32] };
+export const SPRU_OPTS = { mount: '-y', conn: '+z', n: 5, fins: 7 };   // five top connectors: telemetry on the middle one, the main power bus on the fourth
 export const SPRU_IN = [0.05, -0.7, SPRU.c[1] - SPRU.s[2] / 2 - 0.024];
 export { HX };

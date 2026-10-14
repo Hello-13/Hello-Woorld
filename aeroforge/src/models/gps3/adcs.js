@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { G } from './materials.js';
-import { HX, HY, HZ, T, CORE, BAY, IY, IZ, DECK, AFT, boxG, cylG, merge, unit, connPoint, reg } from './kit.js';
+import { HX, HY, HZ, T, CORE, BAY, IY, IZ, DECK, AFT, boxG, cylG, rodG, merge, unit, reg, regUnit } from './kit.js';
 import { DECK_AT, onNPE, onBUS } from './layout.js';
 
 /** Reaction wheel centres (x, z) on the −Y panel: a 2 × 2 cluster at 0.36 m pitch (layout estimate). */
@@ -17,7 +17,7 @@ export const WHEELS = [[0.44, 0.68], [0.8, 0.68], [0.44, 1.04], [0.8, 1.04]];
 const WHEEL_Y = -0.72;
 
 export function buildADCS(P) {
-  const box = (name, info, c, s, mat, opts, side, power = false) => { reg(connPoint(c, s, opts.conn, 0.04), side, power); return P(name, info, unit(c, s, mat, opts)); };
+  const box = (name, info, c, s, mat, opts, side, power = false) => { regUnit(c, s, opts, side, power); return P(name, info, unit(c, s, mat, opts)); };
 
   // ------------------------------------------------------------------ reaction wheel assembly (−Y panel), spin axes in a pyramid
   const rotors = [];
@@ -40,14 +40,19 @@ export function buildADCS(P) {
     g.add(housing, rotor);
     rotors.push(rotor);
     const ped = mesh(merge([cylG([x, (-IY + WHEEL_Y) / 2 - 0.02, z], 0.07, Math.abs(-IY - WHEEL_Y) - 0.04, 'y', 18), cylG([x, -IY + 0.006, z], 0.11, 0.012, 'y', 22)]), G.aluminium());
-    reg([x + 0.17, -0.7, z], 'bus', true);
+    // motor power and tachometer connector on the housing's side, on the +X side of the tilted wheel
+    const u = new THREE.Vector3(1, 0, 0).addScaledVector(axis, -axis.x).normalize();
+    const at = (r) => [x + u.x * r, WHEEL_Y + u.y * r, z + u.z * r];
+    const plug = mesh(rodG(at(0.146), at(0.174), 0.016, 10), G.connector());
+    const tip = at(0.174), lead = at(0.182);
+    reg(tip, 'bus', true, [lead], { pp: tip, plead: [lead], px: x + 0.2 });
     P(`Reaction wheel ${k + 1}`, {
       system: 'Attitude control', material: 'Steel flywheel on ball bearings, sealed housing (Honeywell)', mass: 13, temp: 295,
       explode: [Math.sign(x - cc[0]) * 0.2, -1.05, Math.sign(z - cc[1]) * 0.2],
       desc: k === 0
         ? 'Part of Honeywell\'s reaction wheel assembly ("RWA (4)" in Lockheed\'s figure), grouped with the computer and the IMU on the bus panel. The four spin axes are tilted 30° from the panel normal in a pyramid (geometry estimated), so any three give full three-axis control. Speeding a wheel up turns the spacecraft the other way, because angular momentum is conserved, so pointing costs electricity, not propellant.'
         : 'One of the four reaction wheels, about 0.30 m across. Steady torques, mostly from sunlight pressure, slowly spin the wheels up; the thrusters or the torque rods periodically dump that stored momentum.',
-    }, [g, ped]);
+    }, [g, ped, plug]);
   });
   box('Reaction wheel drive electronics', {
     system: 'Attitude control', material: 'Aluminium chassis', mass: 9, temp: 300, explode: [0.15, -1.1, 0],
@@ -60,7 +65,7 @@ export function buildADCS(P) {
     const body = merge([boxG([ex, y, DECK + 0.1], [0.24, 0.13, 0.2]), boxG([ex, y, DECK + 0.005], [0.27, 0.145, 0.01])]);
     const lens = merge([cylG([ex, y, DECK + 0.204], 0.05, 0.01, 'z', 24)]);
     const hood = merge([cylG([ex, y, DECK + 0.215], 0.058, 0.024, 'z', 24, 0.062, true)]);
-    reg([ex, y, IZ - 0.02], 'deck');
+    reg([ex, y, DECK + 0.002], 'deck', false, [[ex, y, IZ - 0.02]]);   // up through the deck into the sensor's base
     return P(name, {
       system: 'Attitude control', material: 'White-painted housing, germanium optics, thermopile detectors', mass: 4, temp: 265, explode: [-0.2, (y - ey) * 2 + 0.15, 2.0], desc,
     }, [mesh(body, G.whitePaint()), mesh(lens, G.lens()), mesh(hood, G.darkMetal())]);

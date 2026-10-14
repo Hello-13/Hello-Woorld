@@ -179,7 +179,7 @@ export function buildPropulsion(P) {
   }, mesh(merge([cylG([0.1, 0.15, -1.22], 0.025, 0.08, 'z', 14), cylG([0.1, 0.15, -1.45], 0.022, 0.05, 'z', 12), cylG([0.3, 0.15, -1.45], 0.022, 0.05, 'z', 12), cylG([-0.085, -0.15, -1.638], 0.022, 0.04, 'z', 12),
     boxG([0.1, 0.15, -1.45], [0.03, 0.06, 0.03]), boxG([0.3, 0.15, -1.45], [0.03, 0.06, 0.03])]), G.silverBox()));
   // valve-position telemetry from each latch valve body
-  reg([0.1, 0.19, -1.45], 'core'); reg([0.3, 0.19, -1.45], 'core'); reg([-0.085, -0.175, -1.638], 'core');
+  reg([0.1, 0.184, -1.45], 'core'); reg([0.3, 0.184, -1.45], 'core'); reg([-0.085, -0.175, -1.638], 'core');
   const FV = -1.02;
   const fdv = (name, y, desc) => P(name, {
     system: 'Fuel', material: 'Stainless-steel service valve with cap', mass: 0.6, temp: 240, explode: [-0.3, 0, -1.9], desc,

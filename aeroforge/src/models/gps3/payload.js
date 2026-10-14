@@ -14,16 +14,16 @@ import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { lathe } from '../../engine/geometry.js';
 import { G } from './materials.js';
-import { IY, IZ, HZ, DECK, AFT, boxG, cylG, merge, unit, pipeG, plateG, octagon, connPoint, reg } from './kit.js';
+import { IY, IZ, HZ, DECK, AFT, boxG, cylG, merge, unit, pipeG, plateG, octagon, connLead, reg, regUnit } from './kit.js';
 import { ARRAY_C, DECK_AT, BUS, onNPE, onBUS, AFT_ANT } from './layout.js';
-import { PANEL_Z } from './antennas.js';
+import { PANEL_Z, BFN_R } from './antennas.js';
 
 const COMPOSITE = 'The model shows a composite of the series: the burst detector flew on SV01–SV08 (Sandia\'s block of eight ended with SV08 on 30 May 2025), the laser retroreflector on SV09 and SV10.';
 
 export function buildPayload(P) {
-  /** A box on a panel; registers its harness landing on the payload or bus data bus. */
+  /** A box on a panel; registers its harness landings (its connectors) on the payload or bus data bus. */
   const box = (name, info, c, s, mat, opts, side, power = false) => {
-    reg(connPoint(c, s, opts.conn, 0.04), side, power);
+    regUnit(c, s, opts, side, power);
     return P(name, info, unit(c, s, mat, opts));
   };
   const npe = (xz, s) => onNPE(xz, s[1]);
@@ -39,7 +39,7 @@ export function buildPayload(P) {
   const muxC = npe(MUX.c, MUX.s);
   const cav = [];
   for (let i = 0; i < 6; i++) cav.push(cylG([muxC[0] - 0.14 + (i % 3) * 0.14, muxC[1] - 0.11 - 0.035, muxC[2] - 0.06 + Math.floor(i / 3) * 0.12], 0.034, 0.07, 'y', 16));
-  reg(connPoint(muxC, MUX.s, '+z', 0.04), 'npe');
+  regUnit(muxC, MUX.s, { mount: '+y', conn: '+z', n: 3 }, 'npe');   // telemetry on the middle top connector
   P('L1/L2/L5 multiplexer', {
     system: 'Payload', material: 'Silver-plated invar filter cavities', mass: 18, temp: 300, explode: [0, 1.2, 0.15],
     desc: 'Combines the L1, L2 and L5 transmitter outputs onto the single feed of the L-band antenna (the block diagram\'s "L1, L2, L5 Multiplexer"); L3 has its own filter. Each channel is a chain of tuned cavities, so one antenna can radiate three carriers more than 100 MHz apart without the transmitters loading each other.',
@@ -78,11 +78,13 @@ export function buildPayload(P) {
   const clockAt = (x) => [x, IY - 0.02 - 0.075, CB.z];
   /** Face of one of a clock package's two connectors (k 0: reference output, 1: power and telemetry), plus off. */
   const clkConn = (x, k, off = 0) => [x + (k ? 1 : -1) * CS[0] / 4, IY - 0.02 - 0.075, CB.z - CS[2] / 2 - 0.024 - off];
+  /** Telemetry and power both plug into the second connector, leave it downward and split 2.8 cm below. */
+  const regClock = (x) => { const t = clkConn(x, 1), o = clkConn(x, 1, 0.028); reg(t, 'npe', true, [o], { pp: t, plead: [o], px: o[0] + 0.03 }); };
   CLK_X.forEach((x, k) => {
     const c = clockAt(x);
     const pkg = unit(c, CS, G.silverBox(), { mount: '+y', conn: '-z', n: 2 });
     pkg.push(mesh(cylG([x, c[1] - 0.075 - 0.03, CB.z + 0.06], 0.045, 0.06, 'y', 20), G.alodine()));
-    reg(clkConn(x, 1, 0.028), 'npe', true);   // power and telemetry on the second connector
+    regClock(x);   // power and telemetry on the second connector
     P(`Rubidium atomic clock ${k + 1}`, {
       system: 'Payload', material: 'Rubidium lamp, absorption cell and quartz oscillator (Excelitas RAFS)', mass: 8, temp: 293, explode: [0, 1.1, 0],
       desc: k === 0
@@ -93,7 +95,7 @@ export function buildPayload(P) {
   const dx = 0.42, dc = clockAt(dx);
   const drafs = unit(dc, CS, G.alodine(), { mount: '+y', conn: '-z', n: 2 });
   drafs.push(mesh(merge([boxG([dx, dc[1] - 0.085, CB.z + 0.07], [0.1, 0.02, 0.08])]), G.blackBox()));
-  reg(clkConn(dx, 1, 0.028), 'npe', true);
+  regClock(dx);
   P('Digital rubidium clock (SV10)', {
     system: 'Payload', material: 'Rubidium physics package with digital control electronics', mass: 8, temp: 293, explode: [0, 1.1, 0],
     desc: 'GPS III was designed with a fourth clock position for new or experimental frequency standards, such as a hydrogen maser. Lockheed says SV10, launched on 21 April 2026, carries a demonstration Digital Rubidium Atomic Frequency Standard; that it sits in this fourth slot is an inference, and on SV01–SV09 the slot is empty.',
@@ -115,7 +117,7 @@ export function buildPayload(P) {
     system: 'Payload', material: 'Aluminium chassis', mass: 4, temp: 298, explode: [0, 1.15, 0],
     desc: 'A unit Lockheed\'s figure labels "TFU", low on the NPE panel beside the interface unit; a second TFU sits on the bus panel. The source does not expand the acronym or say what it does (size estimated).',
   }, unit(npe([0.86, -0.62], [0.2, 0.12, 0.15]), [0.2, 0.12, 0.15], G.alodine(), { mount: '+y', conn: '-y', n: 2 }));
-  reg(connPoint(npe([0.86, -0.62], [0.2, 0.12, 0.15]), [0.2, 0.12, 0.15], '-y', 0.04), 'npe');
+  regUnit(npe([0.86, -0.62], [0.2, 0.12, 0.15]), [0.2, 0.12, 0.15], { mount: '+y', conn: '-y', n: 2 }, 'npe');
 
   // ---- L-band RF cables: transmitters → multiplexer / L3 filter → through the Earth deck → beam-forming network
   const rf = [], yr = IY - 0.235;
@@ -140,9 +142,12 @@ export function buildPayload(P) {
   }
   const zA = DECK + 0.035;
   // the multiplexer's output leaves its −X top connector (the middle one carries telemetry), clear of the UHF element above
-  const mo = [muxC[0] - MUX.s[0] / 3, muxC[1], muxC[2] + MUX.s[2] / 2], fo = connPoint(npe(L3F.c, L3F.s), L3F.s, '+z', 0.0);
-  rf.push(pipeG([mo, [mo[0], mo[1], HZ - 0.01], [mo[0], mo[1], zA], [ARRAY_C[0] - 0.12, 0.3, zA], [ARRAY_C[0] - 0.05, 0.12, zA], [ARRAY_C[0], 0.05, DECK + 0.03]], 0.011));
-  rf.push(pipeG([fo, [fo[0], fo[1], HZ - 0.01], [fo[0], fo[1], zA], [ARRAY_C[0] + 0.05, 0.3, zA], [ARRAY_C[0] + 0.05, 0.12, zA], [ARRAY_C[0] + 0.03, 0.05, DECK + 0.03]], 0.009));
+  const mo = [muxC[0] - MUX.s[0] / 3, muxC[1], muxC[2] + MUX.s[2] / 2], fo = connLead(npe(L3F.c, L3F.s), L3F.s, { mount: '+y', conn: '+z', n: 2 }, 1)[0];   // the L3 filter's output: its second top connector (telemetry is on the first)
+  // each line runs in toward the beam-forming network's centre and plugs into the rim of its disc
+  const rim = (a) => { const dx = a[0] - ARRAY_C[0], dy = a[1] - ARRAY_C[1], k = (BFN_R - 0.002) / Math.hypot(dx, dy); return [ARRAY_C[0] + dx * k, ARRAY_C[1] + dy * k, zA]; };
+  const ma = [ARRAY_C[0] - 0.12, 0.3, zA], fa1 = [ARRAY_C[0] + 0.05, 0.3, zA];
+  rf.push(pipeG([mo, [mo[0], mo[1], HZ - 0.01], [mo[0], mo[1], zA], ma, rim(ma)], 0.011));
+  rf.push(pipeG([fo, [fo[0], fo[1], HZ - 0.01], [fo[0], fo[1], zA], fa1, rim(fa1)], 0.009));
   P('L-band RF cables', {
     system: 'Payload', material: 'Low-loss semi-rigid coaxial cable', mass: 5, temp: 295, explode: [0, 0.95, 0.4],
     desc: 'Coaxial lines from the L1, L2 and L5 transmitters to the multiplexer and from the L3 transmitter to its filter, then up through the Earth deck to the beam-forming network under the antenna panel. Every tenth of a decibel lost here is transmitter power wasted as heat (routing estimated).',
@@ -179,7 +184,7 @@ export function buildPayload(P) {
     desc: 'Coaxial lines from the two uplink/downlink units to the forward TT&C mast on the Earth deck and to the aft antenna at the far end, cross-strapped so either radio can reach the ground whichever way the satellite points (routing estimated).',
   }, mesh(merge([
     pipeG([fa, [fa[0], -0.64, fa[2]], [fa[0], 0.6, fa[2]], [fa[0], 0.6, ZFS], [fx, 0.6, ZFS], [fx, fy, ZFS], [fx, fy, DECK + 0.02]], 0.007),
-    pipeG([fb, [fb[0], -0.672, fb[2]], [1.19, -0.672, fb[2]], [1.19, -0.672, ZBS], [1.14, -0.672, ZBS], [1.14, ay, ZBS], [ax, ay, ZBS], [ax, ay, AFT - 0.01]], 0.007),
+    pipeG([fb, [fb[0], -0.672, fb[2]], [1.19, -0.672, fb[2]], [1.19, -0.672, ZBS], [1.14, -0.672, ZBS], [1.14, ay, ZBS], [ax, ay, ZBS], [ax, ay, AFT - 0.002]], 0.007),
   ]), G.tubing()));
 
   // ================================================================== HOSTED PAYLOAD: Global Burst Detector (NDS)
@@ -196,20 +201,20 @@ export function buildPayload(P) {
   const shade = lathe(shadeProf, 40).rotateX(Math.PI / 2).translate(sx, sy, DECK + 0.1);
   const sens = merge([boxG([sx, sy, DECK + 0.05], [0.26, 0.26, 0.1]), boxG([sx, sy, DECK + 0.004], [0.3, 0.3, 0.008])]);
   const optL = merge([cylG([sx, sy - 0.055, DECK + 0.106], 0.045, 0.012, 'z', 22), cylG([sx, sy + 0.055, DECK + 0.106], 0.045, 0.012, 'z', 22)]);
-  reg([sx, sy, IZ - 0.02], 'deck');
+  reg([sx, sy, DECK + 0.002], 'deck', false, [[sx, sy, IZ - 0.02]]);   // up through the deck into the sensor's base
   P('NDS optical sensor & sunshade', {
     system: 'Payload', material: 'Optical radiometers behind filters under a white-painted sunshade', mass: 14, temp: 260, explode: [-0.2, -0.3, 2.1],
     desc: `The burst detector's optical sensor, with "a prominent sunshade" (white, about 0.45 m tall and as wide) in this corner of the Earth deck: the feature IGS analysts used to fix GPS III's body axes. Two apertures look out through the cone for the double flash of a nuclear explosion; GPS satellites have carried such sensors since 1980, supporting test-ban monitoring. ${COMPOSITE}`,
     callout: true, anchor: [sx - 0.05, sy - 0.2, DECK + 0.46],
   }, [mesh(sens, G.alodine()), mesh(shade, G.whitePaint()), mesh(optL, G.lens())]);
   const [xx, xy] = DECK_AT.xray;
-  reg([xx, xy, IZ - 0.02], 'deck');
+  reg([xx, xy, DECK + 0.002], 'deck', false, [[xx, xy, IZ - 0.02]]);
   P('NDS X-ray & dosimeter sensor', {
     system: 'Payload', material: 'Detector head with beryllium window (generic)', mass: 7, temp: 255, explode: [-0.3, -0.2, 1.95],
     desc: 'X-ray and charged-particle sensors of the burst detector. On earlier GPS blocks a combined X-ray and dosimeter instrument also mapped the radiation belts; Los Alamos released 16 years of its particle data in 2017 (generic stand-in, position estimated).',
   }, [mesh(merge([boxG([xx, xy, DECK + 0.08], [0.12, 0.12, 0.16]), boxG([xx, xy, DECK + 0.004], [0.16, 0.16, 0.008])]), G.alodine()), mesh(cylG([xx, xy, DECK + 0.164], 0.035, 0.008, 'z', 16), G.prism())]);
   const [hx, hy] = DECK_AT.hpeSensor;
-  reg([hx, hy, IZ - 0.02], 'deck');
+  reg([hx, hy, DECK + 0.002], 'deck', false, [[hx, hy, IZ - 0.02]]);
   P('HPE sensor', {
     system: 'Payload', material: 'Sensor head (government-furnished, generic)', mass: 6, temp: 255, explode: [0.3, 0.25, 2.0],
     desc: 'A second hosted-payload sensor, drawn in Lockheed\'s figure as a green box labelled simply "Sensor" at the opposite end of the Earth deck from the sunshade. Which of the burst detector\'s sensors it is, is not public (generic box, size estimated).',
@@ -235,7 +240,7 @@ export function buildPayload(P) {
   const head = merge([boxG([ox, oy, DECK + 0.1], [0.26, 0.19, 0.12]), cylG([ox, oy, DECK + 0.185], 0.075, 0.05, 'z', 24), new THREE.SphereGeometry(0.075, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2).translate(ox, oy, DECK + 0.21)]);
   const ped = merge([boxG([ox, oy, DECK + 0.02], [0.22, 0.16, 0.04])]);
   const ap = cylG([ox + 0.05, oy, DECK + 0.255], 0.042, 0.03, 'x', 20).rotateY(0);
-  reg([ox, oy, IZ - 0.02], 'deck', true);
+  reg([ox, oy, DECK + 0.002], 'deck', true, [[ox, oy, IZ - 0.02]], { pp: [ox, oy + 0.03, DECK + 0.002], plead: [[ox, oy + 0.03, IZ - 0.03]] });   // data and power up into the pedestal
   P('Optical communications terminal (SV10)', {
     system: 'Communications', material: 'Tesat SCOT80 terminal: 80 mm telescope on a coarse pointing head', mass: 12, temp: 270, explode: [0.45, 0, 2.05],
     desc: 'SV10 carries an optical-crosslink demonstration: a Tesat SCOT80 laser terminal with an 80 mm aperture, about 12 kg and 60–80 W, to prove laser links at GPS altitude ahead of GPS IIIF. Its position on the satellite is not public; it is placed here at the +X end of the Earth deck (estimate), and SV01–SV09 do not carry it.',

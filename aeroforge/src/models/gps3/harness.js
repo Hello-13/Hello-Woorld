@@ -8,8 +8,8 @@
 
 import { mesh } from '../../engine/assembly.js';
 import { G } from './materials.js';
-import { IY, HZ, SADA_C, NET, merge, pipeG } from './kit.js';
-import { BATT, battConn, SPRU_IN } from './layout.js';
+import { HY, HZ, SADA_C, NET, merge, pipeG, connLead } from './kit.js';
+import { BATT, battConn, SPRU, SPRU_IN, SPRU_OPTS, onBUS } from './layout.js';
 
 const YD = 0.585, YP = 0.64;           // data and power trunk offsets from the core axis on each panel
 const ZT = 1.595, ZB = -1.6, XR = 1.08; // top and bottom data trunks, risers at x = ±XR
@@ -29,29 +29,37 @@ export function buildHarness(P) {
   for (const x of [-1.0, 1.0]) data.push(pipeG([[x, -YD, ZT], [x, YD, ZT]], 0.01, 8));
   for (const x of [-XR, XR]) data.push(pipeG([[x, -YD, ZB], [x, YD, ZB]], 0.01, 8));
   const clampX = (x) => Math.max(-XR, Math.min(XR, x));
-  for (const { p, side, power: pw, lead = [] } of NET.nodes) {
+  /** A node's power drop: its start (a connector tip), its lead out from the connector, the lead's last
+   *  point r and the x at which it runs to the bus (default 3 cm beside the data drop). */
+  const pwr = (n) => {
+    const pp = n.pp ?? n.p, pl = n.plead ?? n.lead ?? [], r = pl.length ? pl[pl.length - 1] : pp;
+    return { pp, pl, r, xp: n.px ?? r[0] + 0.03 };
+  };
+  for (const node of NET.nodes) {
+    // every cable starts on its unit (a connector tip, or inside a deck unit's base) and follows the
+    // unit's lead before the side's usual routing takes over from the lead's last point q
+    const { p, side, power: pw, lead = [] } = node, q = lead.length ? lead[lead.length - 1] : p;
     const s = side === 'npe' ? 1 : side === 'bus' ? -1 : (p[1] >= 0 ? 1 : -1);
     if (side === 'npe' || side === 'bus') {
-      const zt = p[2] > 0 ? ZT : ZB;
-      data.push(pipeG([p, [p[0], s * YD, p[2]], [p[0], s * YD, zt]], 0.0055, 6));
-      if (pw) power.push(pipeG([p, [p[0] + 0.03, s * YP, p[2]], [p[0] + 0.03, s * YP, p[2] > -0.6 ? ZPT : ZPB]], 0.008, 6));
+      const zt = q[2] > 0 ? ZT : ZB;
+      data.push(pipeG([p, ...lead, [q[0], s * YD, q[2]], [q[0], s * YD, zt]], 0.0055, 6));
+      if (pw) { const { pp, pl, r, xp } = pwr(node); power.push(pipeG([pp, ...pl, [xp, r[1], r[2]], [xp, s * YP, r[2]], [xp, s * YP, r[2] > -0.6 ? ZPT : ZPB]], 0.008, 6)); }
     } else if (side === 'deck') {
-      const x = clampX(p[0]);
-      data.push(pipeG([p, [x, p[1], p[2]], [x, s * YD, p[2]], [x, s * YD, ZT]], 0.0055, 6));
+      // up through the Earth deck from the unit's base (its lead), then under the deck to the nearer trunk
+      const x = clampX(q[0]);
+      data.push(pipeG([p, ...lead, [x, q[1], q[2]], [x, s * YD, q[2]], [x, s * YD, ZT]], 0.0055, 6));
       // deck loads beyond the +X end of the bus panels land on the main bus where it crosses the +X bay
-      if (pw) power.push(pipeG(p[0] > XC ? [[p[0], p[1] + 0.03, p[2] - 0.01], [XC, p[1] + 0.03, ZPT]] : [[p[0], p[1] + 0.03, p[2] - 0.01], [x, p[1] + 0.03, ZPT], [x, s * YP, ZPT]], 0.008, 6));
+      if (pw) { const { pp, pl, r } = pwr(node); power.push(pipeG(r[0] > XC ? [pp, ...pl, [XC, r[1], ZPT]] : [pp, ...pl, [clampX(r[0]), r[1], ZPT], [clampX(r[0]), s * YP, ZPT]], 0.008, 6)); }
     } else if (side === 'aft') {
       // aft-end units follow their own lead first (a thruster pod's cable runs back along its outrigger,
       // 5 cm inboard of the feed line; a sun sensor's goes straight up through the deck), then run
       // inside the aft deck to the corner riser
-      const pts = [p, ...lead];
-      const last = pts[pts.length - 1];
-      pts.push([clampX(last[0]), last[1], -HZ + 0.06], [clampX(last[0]), s * YD, -HZ + 0.06], [clampX(last[0]), s * YD, ZB]);
-      data.push(pipeG(pts, 0.0055, 6));
+      const x = clampX(q[0]);
+      data.push(pipeG([p, ...lead, [x, q[1], -HZ + 0.06], [x, s * YD, -HZ + 0.06], [x, s * YD, ZB]], 0.0055, 6));
     } else {
       // core and bay units: out to the nearer panel's trunk; a unit beyond the risers meets the riser instead
-      const zt = p[2] > 0 ? ZT : ZB, x = clampX(p[0]);
-      data.push(pipeG(x === p[0] ? [p, [p[0], s * YD, p[2]], [p[0], s * YD, zt]] : [p, [p[0], s * YD, p[2]], [x, s * YD, p[2]]], 0.0055, 6));
+      const zt = q[2] > 0 ? ZT : ZB, x = clampX(q[0]);
+      data.push(pipeG(x === q[0] ? [p, ...lead, [q[0], s * YD, q[2]], [q[0], s * YD, zt]] : [p, ...lead, [q[0], s * YD, q[2]], [x, s * YD, q[2]]], 0.0055, 6));
     }
   }
   P('Data harness (1553B)', {
@@ -60,7 +68,7 @@ export function buildHarness(P) {
   }, mesh(merge(data), G.harness()));
 
   // ---- power: drives → SPRU, batteries, main bus
-  const yIn = IY - 0.105;   // inner end of each drive housing
+  const yIn = HY - 0.133;   // 2 mm into the inner end face of each drive housing (the slip-ring output)
   const [dx, dz] = SADA_C;
   const xr = 0.13, yb = -0.7;            // the SPRU's riser on the bus panel, between the two batteries
   // +Y wing: across the NPE panel at drive height to its +X edge, down it, and across the bottom of the +X bay
@@ -70,14 +78,18 @@ export function buildHarness(P) {
   power.push(pipeG([[dx, -yIn, dz], [dx, yb, dz], [xr, yb, dz]], 0.016, 8));
   // battery feeders: from the riser over the packs to each pack's power connector
   for (const bx of BATT.xs) { const c = battConn(bx).power; power.push(pipeG([[xr, yb, -0.8], [c[0], yb, -0.8], [c[0], c[1], c[2]]], 0.013, 8)); }
-  power.push(pipeG([[-0.1, -0.7, 1.05], [-0.1, -YP, ZPT], [XC, -YP, ZPT], [XC, YP, ZPT], [-1.0, YP, ZPT]], 0.016, 8));
-  // the −Y main bus runs from the last drop at its −X end to the last at its +X end (the wheels, the
-  // IMU and the wheel drive electronics stand beyond the +X bay crossing), so every drop lands on it
-  const busX = NET.nodes.filter((n) => n.power && n.side === 'bus' && n.p[2] > -0.6).map((n) => n.p[0] + 0.03);
-  power.push(pipeG([[-0.1, -YP, ZPT], [Math.min(-0.1, ...busX) - 0.01, -YP, ZPT]], 0.014, 8));
-  if (Math.max(...busX) > XC) power.push(pipeG([[XC, -YP, ZPT], [Math.max(...busX) + 0.01, -YP, ZPT]], 0.014, 8));
-  // the +Y main bus turns down the −X edge of the NPE panel into the lower branch, to just past the last clock drop
-  const xEnd = Math.max(-1.0, ...NET.nodes.filter((n) => n.power && n.side === 'npe' && n.p[2] <= -0.6).map((n) => n.p[0] + 0.03)) + 0.01;
+  // the main power bus leaves the SPRU's fourth top connector, climbs the −Y panel to the Earth deck,
+  // crosses the +X bay and runs along the +Y panel
+  const [mb] = connLead(onBUS(SPRU.c, SPRU.s[1]), SPRU.s, SPRU_OPTS, 3), mz = mb[2] + 0.046;
+  power.push(pipeG([mb, [mb[0], mb[1], mz], [mb[0], -YP, mz], [mb[0], -YP, ZPT], [XC, -YP, ZPT], [XC, YP, ZPT], [-1.0, YP, ZPT]], 0.014, 8));   // 14 mm, inside the connector's 16 mm shell
+  // the −Y main bus runs on to the last drop at each end (the wheels, the IMU and the wheel drive
+  // electronics stand beyond the +X bay crossing) and stops flush with it, so every drop lands on it
+  const drops = (sd, hi) => NET.nodes.filter((n) => n.power && n.side === sd && (pwr(n).r[2] > -0.6) === hi).map((n) => pwr(n).xp);
+  const busX = drops('bus', true), DR = 0.008;
+  power.push(pipeG([[mb[0], -YP, ZPT], [Math.min(mb[0], ...busX) - DR, -YP, ZPT]], 0.014, 8));
+  if (Math.max(...busX) > XC) power.push(pipeG([[XC, -YP, ZPT], [Math.max(...busX) + DR, -YP, ZPT]], 0.014, 8));
+  // the +Y main bus turns down the −X edge of the NPE panel into the lower branch, to the last clock drop
+  const xEnd = Math.max(-1.0, ...drops('npe', false)) + DR;
   power.push(pipeG([[-1.0, YP, ZPT], [-1.0, YP, ZPB], [xEnd, YP, ZPB]], 0.014, 8));
   P('Power harness', {
     system: 'Electrical', material: 'Copper power cables, beta-cloth wrap', mass: 55, temp: 295, explode: [0, 0, 0.2],
