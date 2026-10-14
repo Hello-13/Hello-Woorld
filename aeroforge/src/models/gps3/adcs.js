@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { G } from './materials.js';
-import { HX, HY, HZ, IY, IZ, DECK, AFT, boxG, cylG, merge, unit, connPoint, reg } from './kit.js';
+import { HX, HY, HZ, T, CORE, BAY, IY, IZ, DECK, AFT, boxG, cylG, merge, unit, connPoint, reg } from './kit.js';
 import { DECK_AT, onNPE, onBUS } from './layout.js';
 
 /** Reaction wheel centres (x, z) on the −Y panel: a 2 × 2 cluster at 0.36 m pitch (layout estimate). */
@@ -75,7 +75,10 @@ export function buildADCS(P) {
     const d = new THREE.Vector3(sx, sy * 0.7, -0.8).normalize();
     const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), d);
     heads.push(new THREE.BoxGeometry(0.06, 0.06, 0.03).applyQuaternion(q).translate(...p), boxG([p[0] - sx * 0.02, p[1] - sy * 0.02, AFT - 0.01], [0.07, 0.07, 0.02]));
-    reg([p[0] - sx * 0.08, p[1] - sy * 0.08, -HZ + 0.06], 'aft');
+    // the head's cable leaves the inboard corner of its bracket and runs straight up through the
+    // blanket and the aft deck into the box
+    const cx = [p[0] - sx * 0.05, p[1] - sy * 0.05];
+    reg([...cx, AFT - 0.01], 'aft', false, [[...cx, -HZ + 0.06]]);
   }
   P('Sun sensor detectors', {
     system: 'Attitude control', material: 'Silicon photocells behind cover glass on angled brackets', mass: 1.2, count: 4, temp: 260, explode: [0, 0, -1.7],
@@ -91,24 +94,37 @@ export function buildADCS(P) {
   // ------------------------------------------------------------------ IMU, torque rods
   box('Inertial measurement unit', {
     system: 'Attitude control', material: 'Fibre-optic gyroscopes in an aluminium housing (Honeywell)', mass: 9, temp: 295, explode: [0.1, -1.1, 0.05],
-    desc: 'Honeywell\'s IMU, on the bus panel between the computer and the wheels as Lockheed\'s figure shows. Fibre-optic gyros measure rotation by the Sagnac effect, light sent both ways round a coil returning slightly out of step when it turns. It carries attitude through apogee burns and eclipses, and the 12-year mean mission duration depends on gyros like these lasting.',
-  }, onBUS([1.0, 1.44], 0.16), [0.16, 0.16, 0.14], G.blackBox(), { mount: '-y', conn: '+y', n: 2 }, 'bus', true);
-  const rodMesh = (a, b) => {
-    const ax = ['x', 'y', 'z'][[0, 1, 2].find((i) => Math.abs(a[i] - b[i]) > 1e-6)];
-    const c = a.map((v, i) => (v + b[i]) / 2), L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
-    const g = [cylG(c, 0.018, L, ax, 12)];
-    for (const e of [a, b]) g.push(cylG(e, 0.026, 0.04, ax, 12));
-    for (const t of [0.25, 0.75]) g.push(boxG(a.map((v, i) => v + (b[i] - v) * t), ax === 'z' ? [0.03, 0.05, 0.03] : ax === 'x' ? [0.03, 0.03, 0.05] : [0.05, 0.03, 0.03]));
-    return mesh(merge(g), G.darkMetal());
+    desc: 'Honeywell\'s IMU, on the bus panel beside the computer and above the wheel cluster, grouped with them as Lockheed\'s figure shows. Fibre-optic gyros measure rotation by the Sagnac effect, light sent both ways round a coil returning slightly out of step when it turns. It carries attitude through apogee burns and eclipses, and the 12-year mean mission duration depends on gyros like these lasting.',
+  }, onBUS([1.0, 1.44], 0.16), [0.16, 0.16, 0.14], G.blackBox(), { mount: '-y', conn: '+y', n: 2 }, 'bus', true);   // outboard of the OBC, above the wheels
+  /** A torque rod from a to b (along one body axis) on two saddle brackets that stand off a mounting
+   *  face: `mount` is the axis normal to that face and `face` its coordinate on that axis. */
+  const rodMesh = (a, b, mount, face) => {
+    const ai = [0, 1, 2].find((i) => Math.abs(a[i] - b[i]) > 1e-6), ax = 'xyz'[ai], mi = 'xyz'.indexOf(mount);
+    const c = a.map((v, i) => (v + b[i]) / 2), L = Math.abs(b[ai] - a[ai]);
+    const rod = [cylG(c, 0.018, L, ax, 12)];
+    for (const e of [a, b]) rod.push(cylG(e, 0.026, 0.04, ax, 12));
+    const brk = [];
+    for (const t of [0.2, 0.8]) {
+      const p = a.map((v, i) => v + (b[i] - v) * t), d = face - p[mi];
+      const saddle = [0.05, 0.05, 0.05]; saddle[ai] = 0.03;
+      const so = p.slice(), ss = [0.035, 0.035, 0.035]; so[mi] = p[mi] + d / 2; ss[mi] = Math.abs(d); ss[ai] = 0.03;
+      const fp = p.slice(), fs = [0.07, 0.07, 0.07]; fp[mi] = face - Math.sign(d) * 0.003; fs[mi] = 0.006; fs[ai] = 0.05;
+      brk.push(boxG(p, saddle), boxG(so, ss), boxG(fp, fs));   // saddle clamp, stand-off, foot bolted to the face
+    }
+    return [mesh(merge(rod), G.darkMetal()), mesh(merge(brk), G.aluminium())];
   };
-  const torque = (name, a, b, ex, where) => { reg(b, 'core'); return P(name, {
-    system: 'Attitude control', material: 'Copper winding on a permalloy core', mass: 2.5, temp: 293, explode: ex,
+  const torque = (name, a, b, ex, where, mount, face) => P(name, {
+    system: 'Attitude control', material: 'Copper winding on a permalloy core, aluminium saddle brackets', mass: 2.5, temp: 293, explode: ex,
     desc: `An electromagnet that pushes against the Earth's magnetic field for fine momentum control, ${where}. At 20,180 km the field is about 70 times weaker than at the surface (it falls as 1/r³), so the torques are tiny (one rod per axis; count, size and position estimated).`,
-  }, rodMesh(a, b)); };
-  torque('Magnetic torque rod (X)', [0.56, 0.3, 1.4], [1.12, 0.3, 1.4], [0.75, 0, 0.3], 'high in the +X bay');
-  torque('Magnetic torque rod (Y)', [1.03, -0.3, 1.53], [1.03, 0.3, 1.53], [0.85, 0, 0.35], 'under the Earth deck in the +X bay');
-  // on the +X bay face of the +X/+Y shear web (web face at y = 0.475; end caps r 0.026 seat against it), inboard of the tank struts
-  torque('Magnetic torque rod (Z)', [0.64, 0.449, -1.1], [0.64, 0.449, -0.5], [0.8, 0.1, 0], 'on the +X/+Y shear web');
+  }, rodMesh(a, b, mount, face));
+  // two rods on the +X bay face of the +X/+Y shear web, one on the +X core wall; each stands 3 cm off its face on two brackets
+  const WEB = BAY - 0.9 * T, yW = WEB - 0.03;   // web face toward the bay (web 0.8 T thick, centred at BAY − T/2)
+  torque('Magnetic torque rod (X)', [0.56, yW, 1.4], [1.1, yW, 1.4], [0.75, 0, 0.3], 'on the +X/+Y shear web, high in the +X bay', 'y', WEB);
+  reg([0.56, yW, 1.4], 'core');
+  torque('Magnetic torque rod (Y)', [CORE + 0.03, -0.3, 1.6], [CORE + 0.03, 0.3, 1.6], [0.85, 0, 0.35], 'high on the +X core wall, just under the Earth deck', 'x', CORE);
+  reg([CORE + 0.03, 0.3, 1.6], 'core');
+  torque('Magnetic torque rod (Z)', [0.64, yW, -1.1], [0.64, yW, -0.5], [0.8, 0.1, 0], 'on the +X/+Y shear web', 'y', WEB);
+  reg([0.64, yW, -0.5], 'core');
 
   // ------------------------------------------------------------------ bus avionics (TT&C subsystem)
   box('On-board computer', {

@@ -12,7 +12,7 @@ import { mesh } from '../../engine/assembly.js';
 import { lathe } from '../../engine/geometry.js';
 import { G } from './materials.js';
 import { GPS3 } from './data.js';
-import { HX, HZ, IZ, CORE, AFT, ADAPTER, boxG, cylG, capsuleG, merge, pipeG, rodG, plateG, reg } from './kit.js';
+import { HX, HZ, IZ, CORE, AFT, ADAPTER, boxG, cylG, capsuleG, merge, pipeG, rodG, plateG, reg, latheLoopG } from './kit.js';
 
 import { FUEL, OX, HE } from './dims.js';
 
@@ -57,11 +57,18 @@ export function buildPropulsion(P) {
     system: 'Propulsion', material: 'Torque-motor valves on the injector head', mass: 1.2, temp: 280, explode: [0, 0, -2.1],
     desc: 'Twin valves that open fuel and oxidiser to the injector together, so the hypergolic propellants meet only in the chamber. Each apogee burn lasts many minutes; the valves open and close for every one (form estimated).',
   }, mesh(merge([boxG([0.085, 0, LAE_TOP - 0.03], [0.06, 0.05, 0.05]), boxG([-0.085, 0, LAE_TOP - 0.03], [0.06, 0.05, 0.05]), boxG([0, 0.075, LAE_TOP - 0.02], [0.05, 0.03, 0.04])]), G.gunmetal()));
-  const shield = merge([new THREE.RingGeometry(0.1, 0.36, 48).translate(0, 0, LAE_TOP - 0.1), cylG([0, 0, LAE_TOP - 0.16], 0.1, 0.12, 'z', 32, 0.16, true)]);
+  // a thin polished ring with a skirt round the chamber (4 mm sheet), hung from the engine mount ring
+  // on four struts that continue the mount's own strut lines down and out
+  const SH = LAE_TOP - 0.1, st = 0.004;
+  const shield = [latheLoopG([[0.1, SH - 0.12], [0.1 + st, SH - 0.12], [0.16 + st, SH - st], [0.36, SH - st], [0.36, SH], [0.1, SH], [0.1, SH - st], [0.16, SH - st]], 48)];
+  for (let k = 0; k < 4; k++) {
+    const a = Math.PI / 4 + (k * Math.PI) / 2, c = Math.cos(a), sn = Math.sin(a);
+    shield.push(rodG([c * 0.3, sn * 0.3, SH - st / 2], [c * 0.1, sn * 0.1, LAE_TOP + 0.005], 0.006, 8), boxG([c * 0.3, sn * 0.3, SH + 0.004], [0.03, 0.03, 0.008]));
+  }
   P('Engine heat shield', {
-    system: 'Thermal control', material: 'Polished molybdenum / titanium radiation shield', mass: 3, temp: 320, explode: [0, 0, -2.05],
-    desc: 'The nozzle glows above 1,000 °C during a burn and is cooled only by radiating. This shield reflects that heat away from the core foot, the adapter and the propellant lines.',
-  }, mesh(shield, G.silverBox()));
+    system: 'Thermal control', material: 'Polished molybdenum / titanium radiation shield on titanium struts', mass: 3, temp: 320, explode: [0, 0, -2.05],
+    desc: 'The nozzle glows above 1,000 °C during a burn and is cooled only by radiating. This shield, hung from the engine mount ring on four thin struts, reflects that heat away from the core foot, the adapter and the propellant lines (form estimated).',
+  }, mesh(merge(shield), G.silverBox()));
 
   // ------------------------------------------------------------------ tanks
   const fuelMounts = [cylG(FUEL.c, FUEL.r + 0.012, 0.05, 'z', 56), cylG([0, 0, fuelTop + 0.01], 0.06, 0.04, 'z', 16), cylG([0, 0, fuelBot - 0.01], 0.06, 0.04, 'z', 16)];
@@ -116,7 +123,7 @@ export function buildPropulsion(P) {
     system: 'Fuel', material: 'Strain-gauge transducers', mass: 0.5, count: 3, temp: 290, explode: [-0.78, 0, 0.15],
     desc: 'Read the helium pressure before and after the regulator; tank pressures and temperatures are how the ground estimates the propellant left in orbit (count and position estimated).',
   }, mesh(merge([[-0.19, PZ + 0.06], [0.19, PZ + 0.06], [0.07, PZ - 0.06]].map(([y, z]) => cylG([cx + 0.01, y, z], 0.012, 0.05, 'x', 10))), G.blackBox()));
-  reg([cx, 0.2, PZ + 0.2], 'core');
+  reg([px - 0.004, 0.2, PZ + 0.2], 'core');   // telemetry from the plate's transducer connector
 
   // ------------------------------------------------------------------ helium lines: both tanks → panel → the tops of all three propellant tanks
   const r = 0.005;
@@ -171,7 +178,8 @@ export function buildPropulsion(P) {
     desc: 'A filter catches particles before they reach a valve seat; latching valves, which hold open or closed with no power, let the ground isolate the engine fuel branch, the thruster branch or the oxidiser line (count estimated).',
   }, mesh(merge([cylG([0.1, 0.15, -1.22], 0.025, 0.08, 'z', 14), cylG([0.1, 0.15, -1.45], 0.022, 0.05, 'z', 12), cylG([0.3, 0.15, -1.45], 0.022, 0.05, 'z', 12), cylG([-0.085, -0.15, -1.638], 0.022, 0.04, 'z', 12),
     boxG([0.1, 0.15, -1.45], [0.03, 0.06, 0.03]), boxG([0.3, 0.15, -1.45], [0.03, 0.06, 0.03])]), G.silverBox()));
-  reg([0.2, 0.15, -1.45], 'core');
+  // valve-position telemetry from each latch valve body
+  reg([0.1, 0.19, -1.45], 'core'); reg([0.3, 0.19, -1.45], 'core'); reg([-0.085, -0.175, -1.638], 'core');
   const FV = -1.02;
   const fdv = (name, y, desc) => P(name, {
     system: 'Fuel', material: 'Stainless-steel service valve with cap', mass: 0.6, temp: 240, explode: [-0.3, 0, -1.9], desc,
@@ -194,18 +202,24 @@ export function buildPropulsion(P) {
     const c = CLUSTER(sx, sy);
     // two perforated side plates (x–z plane) joined by a top plate, an end plate and a root fitting
     const side = [];
-    const holes = [[1.31, -1.77], [1.41, -1.79], [1.5, -1.81], [1.36, -1.86], [1.46, -1.88]].map(([u, v]) => { const h = new THREE.Path(); h.absarc(sx * u, v, 0.022, 0, Math.PI * 2, true); return h; });
+    // lightening holes, all inside the plate; the one at (1.5, −1.844) passes the side-pointing thruster
+    const holes = [[1.31, -1.77], [1.41, -1.79], [1.55, -1.765], [1.36, -1.835], [1.5, -1.844]].map(([u, v]) => { const h = new THREE.Path(); h.absarc(sx * u, v, 0.022, 0, Math.PI * 2, true); return h; });
     const outline = [[1.2, -1.69], [1.6, -1.73], [1.6, -1.93], [1.24, -1.84]].map(([u, v]) => [sx * u, v]);
     const toXZ = new THREE.Matrix4().makeBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, -1, 0));
     for (const dy of [-0.1, 0.1]) side.push(plateG(outline, 0.012, -0.006, holes, 7).applyMatrix4(toXZ).translate(0, c[1] + dy, 0));
-    side.push(boxG([sx * 1.4, c[1], -1.715], [0.4, 0.22, 0.012]), boxG([sx * 1.6, c[1], -1.83], [0.012, 0.22, 0.2]), boxG([sx * 1.215, c[1], -1.76], [0.03, 0.22, 0.12]));
+    // end plate (y–z plane) with a port for the outward-pointing thruster
+    const port = new THREE.Path(); port.absarc(c[1] + sy * 0.04, -1.851, 0.018, 0, Math.PI * 2, true);
+    const toYZ = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0));
+    const endPlate = plateG([[c[1] - 0.11, -1.93], [c[1] + 0.11, -1.93], [c[1] + 0.11, -1.73], [c[1] - 0.11, -1.73]], 0.012, sx * 1.6 - 0.006, [port], 12).applyMatrix4(toYZ);
+    side.push(boxG([sx * 1.4, c[1], -1.715], [0.4, 0.22, 0.012]), endPlate, boxG([sx * 1.215, c[1], -1.76], [0.03, 0.22, 0.12]));
     P(`Thruster outrigger (${tag})`, {
       system: 'Propulsion', material: 'White-painted perforated aluminium truss bracket', mass: 2.5, temp: 260, explode: [sx * 0.5, sy * 0.25, -1.6],
       desc: 'One of four white lattice brackets at the aft corners that stand the thruster pod about 0.35 m outboard of the ±X faces (scale model), keeping the 0.9 N and 22 N plumes clear of the radiators, the stowed arrays and the blankets (size estimated).',
     }, mesh(merge(side), G.whitePaint()));
-    const pod = [boxG([c[0], c[1], c[2] + 0.04], [0.1, 0.14, 0.05])];
+    // the valve block spans the outrigger and is bolted between its two side plates
+    const pod = [boxG([c[0], c[1], c[2] + 0.04], [0.12, 0.19, 0.05])];
     const small = [
-      ...thrusterG([c[0] + sx * 0.04, c[1] + 0.04, c[2] + 0.03], [sx, 0, -0.35]),
+      ...thrusterG([c[0] + sx * 0.04, c[1] + sy * 0.04, c[2] + 0.03], [sx, 0, -0.35]),
       ...thrusterG([c[0], c[1] + sy * 0.06, c[2] + 0.03], [0, sy, -0.35]),
       ...thrusterG([c[0] - sx * 0.02, c[1] - sy * 0.04, c[2] + 0.015], [0.2 * sx, 0.2 * sy, -1]),
     ];
@@ -219,9 +233,12 @@ export function buildPropulsion(P) {
     const big = P(`22 N thruster (${tag})`, {
       system: 'Propulsion', material: 'Catalytic hydrazine thruster', mass: 0.7, temp: 270, explode: [sx * 0.75, sy * 0.35, -2.0],
       desc: 'One of the "5-lbf" (22 N) hydrazine thrusters for the larger on-orbit manoeuvres, such as moving the satellite to a new slot in its plane or the final move to a disposal orbit above the constellation (count and position estimated).',
-    }, mesh(merge(thrusterG([c[0] + sx * 0.03, c[1] - sy * 0.02, c[2] - 0.0], [0, 0, -1], 1.6)), G.nozzle()));
+    }, mesh(merge(thrusterG([c[0] + sx * 0.03, c[1] - sy * 0.05, c[2] + 0.015], [0, 0, -1], 1.6)), G.nozzle()));   // valve on the block's underside
     big.userData.part.thermalRole = 'thruster';
-    reg([c[0] - sx * 0.1, c[1], c[2] + 0.1], 'aft');
+    // valve-driver and thermistor cable: from the block's inboard face, 5 cm inboard of the feed line,
+    // back along the outrigger and up through the aft deck
+    const yc = c[1] - sy * 0.05;
+    reg([c[0] - sx * 0.06, yc, c[2] + 0.04], 'aft', false, [[sx * 1.3, yc, -1.78], [sx * 1.15, yc, AFT - 0.02], [sx * 1.15, yc, -HZ + 0.06]]);
   }
 
   // ------------------------------------------------------------------ heaters

@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { lathe } from '../../engine/geometry.js';
 import { G } from './materials.js';
-import { HX, HY, HZ, T, CORE, BAY, IX, IY, IZ, ADAPTER, SEP_Z, boxG, cylG, merge, plateG, rectHole, boltsG } from './kit.js';
+import { HX, HY, HZ, T, CORE, BAY, IX, IY, IZ, ADAPTER, SEP_Z, boxG, cylG, merge, plateG, rectHole, boltsG, latheLoopG } from './kit.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 /** Plate drawn in a (u, v) plane and extruded along w, then mapped to the body axes given. */
@@ -113,16 +113,21 @@ export function buildStructure(P) {
 
   // ------------------------------------------------------------------ launch adapter section and separation hardware
   const { r: rA, z0: za0, z1: za1 } = ADAPTER, ha = za0 - za1;
-  const adapt = [cylG([0, 0, (za0 + za1) / 2], rA, ha, 'z', 72, rA, true), cylG([0, 0, za0 - 0.025], rA + 0.012, 0.05, 'z', 72), cylG([0, 0, za1 + 0.025], rA + 0.012, 0.05, 'z', 72)];
+  // an open cylindrical section: the wall, and an 8 cm-deep ring frame (not a closed disc) at each end,
+  // so the apogee engine, its mount and its valves stand in the open and the nozzle fires straight
+  // down through it. The top frame bolts under the aft deck; the bottom frame sits on the separation ring.
+  const FR = { ro: rA + 0.012, ri: rA + 0.012 - 0.082, h: 0.05 };
+  const frame = (zb, zt) => latheLoopG([[FR.ri, zb], [FR.ro, zb], [FR.ro, zt], [FR.ri, zt]], 72);
+  const adapt = [cylG([0, 0, (za0 + za1) / 2], rA, ha, 'z', 72, rA, true), frame(za0 - FR.h, za0), frame(SEP_Z - 0.002, za1 + FR.h)];
   for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2 + Math.PI / 8; adapt.push(boxG([Math.cos(a) * (rA - 0.02), Math.sin(a) * (rA - 0.02), (za0 + za1) / 2], [0.04, 0.04, ha])); }
   // eight radial gussets under the core foot that spread its load into the adapter's top frame
   for (let k = 0; k < 8; k++) {
     const a = (k / 8) * Math.PI * 2;
-    adapt.push(new THREE.BoxGeometry(0.29, 0.04, 0.05).translate(0.695, 0, 0).rotateZ(a).translate(0, 0, za0 - 0.03));
+    adapt.push(new THREE.BoxGeometry(0.29, 0.04, 0.05).translate(0.695, 0, 0).rotateZ(a).translate(0, 0, za0 - 0.025));
   }
   P('Launch adapter section', {
     system: 'Separation', material: 'Composite cylinder with aluminium end frames and longerons', mass: 38, skin: true, temp: 235, explode: [0, 0, -1.95],
-    desc: 'A short cylinder about 1.7 m across and 0.4 m tall under the aft deck that carries the satellite\'s weight from the core to the separation ring; the apogee engine fires down through it. The manufacturer\'s scale model shows it under black MLI, and the IGS box-wing envelope (4.2 m tall) includes it (size from the scale model, estimated).',
+    desc: 'A short, open cylinder about 1.7 m across and 0.4 m tall under the aft deck that carries the satellite\'s weight from the core to the separation ring. Its end frames are rings, not closed plates, so the apogee engine stands inside it in the open and fires straight down through it. The manufacturer\'s scale model shows it under black MLI, and the IGS box-wing envelope (4.2 m tall) includes it (size from the scale model, estimated).',
   }, mesh(merge(adapt), G.cfrp(5)));
   const rI = 0.833;   // 1,666 mm interface (assumption: the adapter's width suggests this class rather than 1,194 mm; not published)
   const prof = [[rI - 0.03, -0.002], [rI + 0.025, -0.002], [rI + 0.025, -0.05], [rI + 0.04, -0.075], [rI + 0.04, -0.1], [rI - 0.012, -0.1], [rI - 0.012, -0.08], [rI - 0.03, -0.065], [rI - 0.03, -0.002]];
@@ -131,33 +136,39 @@ export function buildStructure(P) {
     system: 'Separation', material: 'Machined aluminium ring', mass: 32, temp: 240, explode: [0, 0, -2.25],
     desc: 'The satellite\'s half of the separation joint. A clamp band squeezes this ring against the launcher\'s payload adapter and is released by pyrotechnic bolt cutters at separation. Shown at the 1,666 mm (66 in) interface size that the adapter\'s 1.7 m width suggests; the GPS III figure is not published (assumption).',
   }, mesh(ringG, G.aluminium()));
-  const springs = [], zs = SEP_Z - 0.06;
+  // the separation hardware stands against the ring's inner face (r 0.803) and up under the adapter's
+  // bottom frame, each item 2 mm into both so it reads as bolted to them
+  const rIn = rI - 0.03 + 0.002, zTop = za1 + 0.002;
+  /** Centre of an item whose outer face (half-depth d) is on the ring's inner face, at angle a. */
+  const onRing = (a, d, z) => [Math.cos(a) * (rIn - d), Math.sin(a) * (rIn - d), z];
+  const springs = [];
   for (let k = 0; k < 4; k++) {
-    const a = Math.PI / 4 + (k * Math.PI) / 2, r = rI - 0.07;
-    springs.push(cylG([Math.cos(a) * r, Math.sin(a) * r, zs], 0.028, 0.09, 'z', 14));
-    springs.push(cylG([Math.cos(a) * r, Math.sin(a) * r, zs - 0.06], 0.012, 0.03, 'z', 10));
+    const a = Math.PI / 4 + (k * Math.PI) / 2, c = onRing(a, 0.028, zTop - 0.045);
+    springs.push(cylG(c, 0.028, 0.09, 'z', 14), cylG([c[0], c[1], c[2] - 0.06], 0.012, 0.03, 'z', 10));
+    // clamp bracket from the cartridge to the ring face
+    springs.push(new THREE.BoxGeometry(0.024, 0.07, 0.04).translate(rIn - 0.01, 0, zTop - 0.035).rotateZ(a));
   }
   P('Separation springs', {
-    system: 'Separation', material: 'Steel spring cartridges with push rods', mass: 4, count: 4, temp: 240, explode: [0, 0, -2.35],
-    desc: 'Four spring cartridges (count estimated) push the satellite off the adapter at a fraction of a metre per second once the clamp band releases, so it drifts cleanly away from the launcher\'s upper stage.',
+    system: 'Separation', material: 'Steel spring cartridges with push rods, aluminium clamp brackets', mass: 4, count: 4, temp: 240, explode: [0, 0, -2.35],
+    desc: 'Four spring cartridges (count estimated), clamped to the ring\'s inner face under the adapter frame, push the satellite off the adapter at a fraction of a metre per second once the clamp band releases, so it drifts cleanly away from the launcher\'s upper stage.',
   }, mesh(merge(springs), G.gunmetal()));
   const umb = [];
   for (const s of [1, -1]) {
-    umb.push(boxG([0, s * (rI - 0.08), zs + 0.01], [0.07, 0.09, 0.07]));
-    umb.push(cylG([0, s * (rI - 0.08), zs - 0.04], 0.03, 0.03, 'z', 16));
+    const c = onRing(s * Math.PI / 2, 0.045, zTop - 0.035);
+    umb.push(boxG(c, [0.07, 0.09, 0.07]), cylG([c[0], c[1], c[2] - 0.05], 0.03, 0.03, 'z', 16));
   }
   P('Separation connectors', {
     system: 'Separation', material: 'Pull-apart umbilical connectors', mass: 3, count: 2, temp: 240, explode: [0, 0, -2.4],
-    desc: 'Two umbilical connectors carry ground power, battery charging and telemetry through the launch-vehicle adapter until the satellite moves away and they pull apart.',
+    desc: 'Two umbilical connectors, bracketed to the ring under the adapter frame with their faces at the separation plane, carry ground power, battery charging and telemetry through the launch-vehicle adapter until the satellite moves away and they pull apart.',
   }, mesh(merge(umb), G.blackBox()));
   const sw = [];
   for (const a of [0, Math.PI]) {
-    const c = [Math.cos(a) * (rI - 0.08), Math.sin(a) * (rI - 0.08), zs + 0.02];
+    const c = onRing(a, 0.025, zTop - 0.025);
     sw.push(boxG(c, [0.05, 0.04, 0.05]), cylG([c[0], c[1], c[2] - 0.04], 0.008, 0.03, 'z', 8));
   }
   P('Separation switches', {
     system: 'Separation', material: 'Plunger switches', mass: 0.6, count: 2, temp: 240, explode: [0, 0, -2.38],
-    desc: 'Plunger switches held closed by the adapter: the "event detectors" of the TT&C subsystem. When they open at separation they start the on-board computer\'s timed sequence: wake the attitude control, null the tip-off rates, point the satellite. Lockheed\'s figure also labels two "GED" units near the base of the core (acronym not expanded; count and form estimated).',
+    desc: 'Plunger switches on the ring\'s inner face, held closed by the adapter: the "event detectors" of the TT&C subsystem. When they open at separation they start the on-board computer\'s timed sequence: wake the attitude control, null the tip-off rates, point the satellite. Lockheed\'s figure also labels two "GED" units near the base of the core (acronym not expanded; count and form estimated).',
   }, mesh(merge(sw), G.silverBox()));
 
   // ------------------------------------------------------------------ the two big equipment panels (±Y), OSR outer faces

@@ -3,7 +3,7 @@
 // re-exported here for the building modules.
 
 import * as THREE from 'three';
-import { mergeGeometries } from '../../engine/geometry.js';
+import { mergeGeometries, lathe } from '../../engine/geometry.js';
 import { mesh } from '../../engine/assembly.js';
 import { G } from './materials.js';
 
@@ -41,6 +41,19 @@ export function rodG(a, b, r, seg = 10) {
   g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), B.clone().sub(A).normalize()));
   const m = A.add(B).multiplyScalar(0.5);
   return g.translate(m.x, m.y, m.z);
+}
+
+/** Solid of revolution about the z axis from a closed (r, z) outline listed counter-clockwise (r out,
+ *  z up). Each edge is turned on its own, so corners stay sharp and every face points outward: open
+ *  ring frames, flanges and thin shields that read correctly from inside and below. */
+export function latheLoopG(loop, seg = 48) {
+  const out = [];
+  for (let i = 0; i < loop.length; i++) {
+    const g = lathe([loop[i], loop[(i + 1) % loop.length]], seg).rotateX(Math.PI / 2);
+    g.normalizeNormals();
+    out.push(g);
+  }
+  return merge(out);
 }
 
 /** Polyline tube with gently rounded corners (plumbing / harness runs). */
@@ -175,7 +188,9 @@ export function connPoint(c, s, conn, off = 0.03) {
 /**
  * Harness landing points, collected from every module and drawn last (harness.js).
  * side: 'npe' (+Y panel), 'bus' (−Y panel), 'deck' (Earth deck units), 'aft' (aft-end units);
- * power: true when the unit also gets a drop from the power harness (the larger loads).
+ * power: true when the unit also gets a drop from the power harness (the larger loads);
+ * lead: points the data cable follows from the unit before the side's usual routing takes over
+ * (along an outrigger, or up through the aft deck from a unit mounted outside it).
  */
 export const NET = { nodes: [] };
-export const reg = (p, side, power = false) => { NET.nodes.push({ p, side, power }); return p; };
+export const reg = (p, side, power = false, lead = []) => { NET.nodes.push({ p, side, power, lead }); return p; };

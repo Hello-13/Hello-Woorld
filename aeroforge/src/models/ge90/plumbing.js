@@ -37,7 +37,7 @@ export function buildPlumbing(ctx) {
     system: 'Fuel', material: 'Stainless-steel tube with a shrouded flexible section (Boeing interface at the strut)', mass: 8,
     explode: [0.25, 0.1, 1.45], temp: 290,
     desc: 'Fuel from the 777\'s wing tanks comes down the strut and round the fan case to the inlet of the main fuel pump\'s boost stage. The type certificate allows 34.5 to 482.6 kPa at the pump inlet (cut away with the case here).',
-  }, C((keep) => cutTube([P3(2.02, -0.95, UP + 0.02), P3(2.0, -0.6, UP + 0.12), ...arc(2.0, -0.32, UP + 0.2, TAU + 0.7, 0.1), P3(1.96, -0.36, 0.735), P3(1.9, -0.43, 0.757), at(AT.pumpInlet)], 0.022, keep, { radial: 10 }), GM.steel()));
+  }, C((keep) => cutTube([P3(2.03, -0.62, UP), P3(2.005, -0.5, UP + 0.1), ...arc(2.0, -0.32, UP + 0.2, TAU + 0.7, 0.1), P3(1.96, -0.36, 0.735), P3(1.9, -0.43, 0.757), at(AT.pumpInlet)], 0.022, keep, { radial: 10 }), GM.steel()));
   P('Low-pressure fuel loop', {
     system: 'Fuel', material: 'Stainless-steel tubes', mass: 6,
     explode: [0.32, 0.25, 1.62], temp: 300,
@@ -155,7 +155,7 @@ export function buildPlumbing(ctx) {
   }, m(merge([radialCyl(0.33, 1.76, -1.7, PHI.n1, 0.011, 8), boxAt(1.78, -1.7, PHI.n1, [0.05, 0.08, 0.08])]), GM.steel()));
   // T25/PT25: a probe across the HPC inlet with a wedge ice shield on its upstream face
   const shield = new THREE.CylinderGeometry(0.022, 0.022, 0.08, 3).rotateZ(-Math.PI / 2).rotateX(-Math.PI / 2).translate(0.49, -2.06 + 0.012, 0);
-  const coreA = [[1.6, -1.66, 0.538], [1.2, -1.66, 0.538], [0.95, -1.68, 0.538], [0.82, -1.98, 0.58], [0.72, -2.1, 0.62], [0.69, -2.4, 0.65], [0.7, -2.6, 0.64], [0.725, -2.8, 0.66], [0.735, -3.0, 0.72], [0.8, -3.3, 0.7], [0.82, -3.6, 0.62], [0.83, -3.95, 0.52], [0.85, -4.02, 0.5]];
+  const coreA = [[1.6, -1.66, 0.538], [1.2, -1.66, 0.538], [0.95, -1.68, 0.538], [0.82, -1.98, 0.58], [0.72, -2.1, 0.62], [0.69, -2.4, 0.65], [0.7, -2.6, 0.64], [0.725, -2.8, 0.66], [0.78, -2.98, 0.7], [0.825, -3.08, 0.72], [0.825, -3.4, 0.72], [0.825, -3.6, 0.665], [0.83, -3.74, 0.6], [0.83, -3.95, 0.52], [0.85, -4.02, 0.5]];
   // channel B's route from the FADEC over the oil tank, ending aft of the gearbox (and of the IDG)
   const fanAft = (dPhi, dy) => [[1.915, -0.51, 0.29 + dPhi], [1.95, -0.6, 0.3 + dPhi], [1.965, -0.85, 0.31 + dPhi], [1.965, -1.36 + dy, 0.3 + dPhi], [1.965, -1.4 + dy, 0.38]];
   P('T25/PT25 sensor', {
@@ -163,7 +163,7 @@ export function buildPlumbing(ctx) {
     explode: [0.12, -0.5, 0.87], temp: 375,
     desc: 'Measures temperature and pressure at the HP-compressor inlet; the FADEC schedules the variable stators from it, and its pressure is piped to the control through the small tube along the core harness. The type certificate requires some configurations to carry the "PT25 extended wedge ice shield" (Service Bulletin 77-008) together with a FADEC software update.',
   }, m(merge([radialCyl(0.45, 0.64, -2.06, 0.75, 0.009, 8), boxAt(0.65, -2.06, 0.75, [0.04, 0.05, 0.05]), atPhi(shield, 0.75),
-    line([[0.67, -2.06, 0.75], [0.72, -2.08, 0.66], ...coreA.slice(0, 5).reverse().map(([r, y, p]) => [r, y - 0.012, p + 0.008]), [1.7, -1.652, 0.545], [1.76, -1.6, 0.52], [1.86, -1.51, 0.505], [1.955, -1.42, 0.39], ...fanAft(0.02, -0.012).reverse().slice(1, -1), [1.88, -0.4, 0.31], [1.9, -0.34, 0.3]], 0.004, 5)]), GM.steel()));
+    line([[0.67, -2.06, 0.75], [0.72, -2.08, 0.66], ...coreA.slice(0, 5).reverse().map(([r, y, p]) => [r, y - 0.026, p + 0.008]), [1.7, -1.666, 0.545], [1.76, -1.614, 0.52], [1.86, -1.518, 0.505], [1.96, -1.42, 0.39], ...fanAft(0.02, -0.03).reverse().slice(1, -1), [1.895, -0.4, 0.31], [1.883, -0.34, 0.3]], 0.004, 5)]), GM.steel()));
   P('T3 / PS3 sensors', {
     system: 'Sensors', material: 'Thermocouple probe and static-pressure tap', mass: 1,
     explode: [0.12, -1.0, 0.87], temp: 900,
@@ -174,7 +174,7 @@ export function buildPlumbing(ctx) {
     explode: [0.2, -0.6, 1.3], temp: 500,
     desc: 'A thin tube carries compressor-discharge static pressure, about 4.2 MPa at take-off (modelled), from its tap on the combustion case along the core harness, up a fan-frame strut and over the oil tank to separate Kulite transducers near the FADEC, which turn it into the electrical signal the control uses for fuel scheduling and surge detection.',
   }, m(merge([
-    line([[0.84, -3.12, 0.85], [0.8, -3.0, 0.76], [0.73, -2.66, 0.66], [0.7, -2.4, 0.66], [0.73, -2.1, 0.63], [0.84, -1.96, 0.58], [0.96, -1.82, 0.528], [1.2, -1.82, 0.528], [1.6, -1.82, 0.528], [1.72, -1.72, 0.488], [1.86, -1.52, 0.46], [1.955, -1.38, 0.36], [1.955, -0.85, 0.36], [1.9, -0.72, 0.25], [1.81, -0.7, 0.215]], 0.005, 5),
+    line([[0.84, -3.12, 0.85], [0.8, -3.0, 0.76], [0.745, -2.66, 0.68], [0.715, -2.4, 0.675], [0.765, -2.1, 0.585], [0.875, -1.95, 0.545], [0.96, -1.82, 0.528], [1.2, -1.82, 0.528], [1.6, -1.82, 0.528], [1.72, -1.72, 0.488], [1.86, -1.52, 0.46], [1.955, -1.38, 0.36], [1.955, -0.85, 0.36], [1.9, -0.72, 0.25], [1.81, -0.7, 0.215]], 0.005, 5),
     ...[0.17, 0.2, 0.23].map((p) => axialCyl(1.79, -0.68, p, 0.013, 0.05, 10)),
   ]), GM.steel()));
   const egtProbes = cutPair((keep) => {
@@ -207,8 +207,8 @@ export function buildPlumbing(ctx) {
     explode: [0.2, 0.3, 0.9], temp: 360,
     desc: 'One of the -115B\'s two vibration sensors, mounted right on the #1 bearing\'s support inside the forward sump, so fan imbalance from ice or a damaged blade is measured at its source. Its lead runs back along the sump cone and out through a fan-frame strut to a junction on the fan case.',
   }, m(merge([boxAt(0.205, -0.625, 0.5, [0.04, 0.04, 0.04]),
-    line([[0.205, -0.648, 0.5], [0.18, -0.8, 0.5], [0.18, -0.92, 0.5], [0.245, -1.3, 0.5], [0.315, -1.68, 0.51], [0.4, -1.86, PHI.n1], [0.77, -1.88, PHI.n1], [1.0, -1.88, PHI.n1], [1.62, -1.88, PHI.n1], [1.7, -1.8, 0.476], [1.745, -1.68, 0.474], [1.768, -1.625, 0.49]], 0.005, 5),
-    boxAt(1.78, -1.6, 0.5, [0.035, 0.05, 0.05])]), GM.connector()));
+    line([[0.205, -0.648, 0.5], [0.18, -0.8, 0.5], [0.18, -0.92, 0.5], [0.245, -1.3, 0.5], [0.315, -1.68, 0.51], [0.4, -1.86, PHI.n1], [0.77, -1.88, PHI.n1], [1.0, -1.88, PHI.n1], [1.62, -1.88, PHI.n1], [1.7, -1.82, 0.56], [1.75, -1.7, 0.575], [1.772, -1.625, 0.575]], 0.005, 5),
+    boxAt(1.78, -1.6, 0.575, [0.035, 0.05, 0.05])]), GM.connector()));
 
   // ================================================================== harnesses
   // each FADEC channel has its own looms: channel A forward along the fan case, channel B aft over
@@ -228,7 +228,7 @@ export function buildPlumbing(ctx) {
     line([[1.8, -0.62, 0.33], [1.85, -0.6, 0.3], [1.915, -0.52, 0.295]], 0.008),                                                            // DMS conditioner
     line([[1.79, -0.655, 0.2], [1.85, -0.6, 0.21], [1.915, -0.53, 0.19]], 0.007),                                                           // PS3 transducers
     // channel B aft: over the tank to the oil level sensor, N1 sensor and #1 bearing accelerometer junction
-    line([...fanAft(0, 0), [1.9, -1.43, 0.45], [1.82, -1.5, 0.5], [1.79, -1.56, 0.5]], 0.016), line([[1.965, -1.33, 0.3], [1.99, -1.33, 0.2], [1.99, -1.33, 0.17]], 0.006),
+    line([...fanAft(0, 0), [1.9, -1.43, 0.45], [1.86, -1.47, 0.52], [1.83, -1.52, 0.56], [1.8, -1.565, 0.575]], 0.016), line([[1.965, -1.33, 0.3], [1.99, -1.33, 0.2], [1.99, -1.33, 0.17]], 0.006),
     line([[1.9, -1.43, 0.46], [1.82, -1.5, 0.53], [1.8, -1.62, 0.526], [1.805, -1.68, PHI.n1]], 0.008),
   ];
   P('Fan harnesses (W701–W719)', {
@@ -236,14 +236,14 @@ export function buildPlumbing(ctx) {
     explode: [0.21, -0.2, 2.03], temp: 320,
     desc: 'The fan-case looms join the FADEC to the sensors and units round it: T12, the N1 and N2 sensors, the PMA, HMU, oil and fuel sensors, the debris monitor and the PS3 transducers. Each FADEC channel has its own looms on separate routes, so one chafed harness cannot blind both.',
   }, m(merge(fan), GM.harness()));
-  const coreB = [[1.6, -1.76, 0.508], [1.2, -1.76, 0.512], [0.95, -1.78, 0.512], [0.82, -2.02, 0.48], [0.74, -2.15, 0.44], [0.72, -2.4, 0.43], [0.74, -3.0, 0.46], [0.8, -3.6, 0.42], [0.84, -3.9, 0.36], [0.97, -3.92, 0.32]];
+  const coreB = [[1.6, -1.76, 0.508], [1.2, -1.76, 0.512], [0.95, -1.78, 0.512], [0.82, -2.02, 0.48], [0.74, -2.15, 0.44], [0.72, -2.4, 0.43], [0.74, -2.8, 0.47], [0.79, -2.98, 0.52], [0.825, -3.08, 0.535], [0.825, -3.6, 0.535], [0.83, -3.74, 0.48], [0.84, -3.9, 0.36], [0.97, -3.92, 0.32]];
   const core = [
     line([[1.965, -1.395, 0.39], [1.9, -1.44, 0.47], [1.84, -1.5, 0.51], [1.77, -1.58, 0.534], [1.7, -1.64, 0.537], ...coreA], 0.014),
-    line([[1.965, -1.405, 0.37], [1.88, -1.43, 0.44], [1.8, -1.48, 0.5], [1.76, -1.62, 0.503], [1.7, -1.74, 0.503], ...coreB], 0.014),
+    line([[1.965, -1.405, 0.37], [1.88, -1.43, 0.44], [1.8, -1.48, 0.5], [1.765, -1.6, 0.497], [1.69, -1.72, 0.5], ...coreB], 0.014),
     line([[0.72, -2.1, 0.62], [0.72, -2.07, 0.7], [0.68, -2.06, 0.75]], 0.007),                                       // T25
-    line([[0.75, -3.1, 0.715], [0.84, -3.17, 0.76], [0.85, -3.2, 0.78]], 0.007),                                      // T3
+    line([[0.825, -3.12, 0.72], [0.845, -3.17, 0.75], [0.85, -3.2, 0.775]], 0.007),                                      // T3
     line([[0.7, -2.6, 0.64], [0.69, -2.645, 0.632], [0.668, -2.66, 0.63]], 0.009),                                   // to the distributor ring
-    line([[0.8, -3.3, 0.7], [0.88, -3.36, 0.76], ...arc(0.96, -3.36, 0.82, 1.3, 0.08), [0.962, -3.31, 1.34], [0.958, -3.27, 1.358], [0.952, -3.262, 1.36]], 0.007), // fuel manifold pressure
+    line([[0.825, -3.36, 0.72], [0.88, -3.37, 0.77], ...arc(0.96, -3.37, 0.82, 1.3, 0.08), [0.962, -3.32, 1.34], [0.958, -3.28, 1.355], [0.952, -3.262, 1.36]], 0.007), // fuel manifold pressure
     line([[0.83, -3.95, 0.52], [0.8, -4.05, 0.6], [0.783, -4.1, 0.64]], 0.007),                                       // TCF accelerometer
     line([[1.0, -1.7, 0.512], [0.92, -1.6, 0.6], [0.9, -1.5, 0.72], [0.888, -1.45, 0.75]], 0.007),                     // VBV actuator position
     line([[0.74, -2.15, 0.44], [0.705, -2.3, 0.38], [0.693, -2.32, 0.36]], 0.007),                                    // VSV actuator position
@@ -252,7 +252,7 @@ export function buildPlumbing(ctx) {
     hoop(0.665, -2.66, 0.012, { tubular: 100, arc: 4.3 }),
     ...Array.from({ length: 11 }, (_, k) => boxAt(0.665, -2.66, (k / 10) * 4.3, [0.01, 0.02, 0.05])),
     line([[0.665, -2.66, 3.49], [0.7, -2.6, 3.505], [0.715, -2.5, 3.51], [0.708, -2.36, 3.503], [0.697, -2.33, 3.5]], 0.007),
-    line([[0.665, -2.66, 3.89], [0.72, -2.3, 3.9], [0.75, -2.05, 3.9], [0.86, -1.75, 3.88], [0.888, -1.5, 3.89]], 0.007),
+    line([[0.665, -2.66, 3.89], [0.72, -2.3, 3.9], [0.75, -2.05, 3.88], [0.83, -1.82, 3.84], [0.88, -1.68, 3.84], [0.89, -1.56, 3.875], [0.888, -1.5, 3.89]], 0.007),
   ];
   P('Core harnesses (W721–W739)', {
     system: 'Electrical', material: 'High-temperature looms in braided sleeves (GE W721–W724, W727–W729, W731, W732, W737–W739)', mass: 24,
@@ -271,7 +271,7 @@ export function buildPlumbing(ctx) {
     explode: [-0.3, -0.5, 1.0], temp: 450,
     desc: 'Listed only for the -110B1/-113B/-115B: opened by servo fuel from the HMU, it lets warm compressor air forward through the fan hub frame to keep ice off the booster inlet. GE does not publish its routing; the duct here is drawn through the frame to the splitter.',
   }, m(merge([axialCyl(0.66, -2.15, 1.25, 0.028, 0.07, 14), boxAt(0.695, -2.15, 1.25, [0.03, 0.05, 0.04]), radialCyl(0.56, 0.635, -2.17, 1.25, 0.018, 10),
-    line([[0.66, -2.118, 1.25], [0.665, -2.0, 1.27], [0.78, -1.84, 1.3], [0.84, -1.66, 1.318], [0.845, -1.55, 1.325], [0.87, -1.2, 1.33], [0.875, -0.82, 1.33]], 0.018, 8)]), GM.duct()));
+    line([[0.66, -2.118, 1.25], [0.665, -2.0, 1.3], [0.78, -1.84, 1.42], [0.84, -1.66, 1.46], [0.845, -1.55, 1.46], [0.87, -1.2, 1.46], [0.875, -0.82, 1.46]], 0.018, 8)]), GM.duct()));
   P('Core compartment cooling valve', {
     system: 'Thermal control', material: 'Parker FADEC-commanded butterfly valve and duct (location estimated)', mass: 3,
     explode: [0.4, -0.55, 0.9], temp: 400,

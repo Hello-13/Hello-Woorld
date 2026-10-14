@@ -36,7 +36,7 @@ export const LOADOUTS = {
   clean: { label: 'Clean', detail: 'sensors only', mass: 0, dragArea: 0 },
   hellfire: { label: '4 × Hellfire', detail: '4 × AGM-114 on two M310 launchers', mass: 4 * 49 + 2 * 43, dragArea: 2 * 0.035 },
   strike: { label: '+ 2 × GBU-12', detail: '2 × GBU-12 + 4 × AGM-114', mass: 2 * 230 + 4 * 49 + 2 * 43, dragArea: 2 * 0.026 + 2 * 0.035 },
-  er: { label: 'ER fuel pods', detail: '2 × ER fuel pods (1,202 kg of extra fuel)', mass: 2 * 45, fuel: 1202, dragArea: 2 * 0.045 },
+  er: { label: 'ER pods', detail: '2 × ER fuel pods (1,202 kg of extra fuel)', mass: 2 * 45, fuel: 1202, dragArea: 2 * 0.045 },
 };
 
 const AR = (MQ9.span ** 2) / MQ9.wingArea;

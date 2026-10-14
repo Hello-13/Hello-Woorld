@@ -1099,7 +1099,7 @@ export function buildUAV() {
     parts: A.parts,
     // a raised front quarter: the planform reads, and the nose sensors' and the tail's labels stack
     // without covering one another's dots (anchors and this view were laid out together)
-    view: { dir: [1.19, 1.05, 1], fill: 0.85 },
+    view: { dir: [1.19, 1.05, 1], fill: 0.75 },
     displaySize: 11.5,
     thermalRange: [230, 560],
     state,

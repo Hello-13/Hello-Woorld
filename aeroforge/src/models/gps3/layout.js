@@ -73,4 +73,9 @@ export const battConn = (x) => {
   const z = BATT.z + BATT.s[2] / 2 + 0.05;   // connector faces, 5 cm proud of the pack's +Z side
   return { power: [x - 0.05, -IY + 0.165, z], data: [x + 0.05, -IY + 0.075, z] };
 };
+// The power regulation unit ("SPRU") on the −Y panel: centre (x, z) and size [x, depth y, z]. Array power
+// from both wings comes up a riser between the batteries and enters at a connector on its underside
+// (−Z face); SPRU_IN is that connector's lower face, where the riser ends (connector position estimated).
+export const SPRU = { c: [-0.1, 0.85], s: [0.44, 0.22, 0.32] };
+export const SPRU_IN = [0.05, -0.7, SPRU.c[1] - SPRU.s[2] / 2 - 0.024];
 export { HX };

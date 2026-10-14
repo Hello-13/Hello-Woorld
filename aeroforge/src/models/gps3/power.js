@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { G } from './materials.js';
 import { HX, HY, HZ, IY, SADA_C, boxG, cylG, merge, unit, pipeG, connPoint, reg } from './kit.js';
-import { onBUS, BATT, battConn } from './layout.js';
+import { onBUS, BATT, battConn, SPRU, SPRU_IN } from './layout.js';
 
 import { SADA_L, YOKE_L, PANEL_L, PANEL_W, PANEL_T, GAP, ARRAY_SPAN, ARRAY_AREA } from './dims.js';
 
@@ -140,10 +140,10 @@ export function buildPower(P, body) {
   };
 
   // ------------------------------------------------------------------ batteries and regulation (on the −Y bus panel, inner face y = −IY)
-  const box = (name, info, xz, sz, mat, opts, power = true) => {
+  const box = (name, info, xz, sz, mat, opts, power = true, extra = []) => {
     const c = onBUS(xz, sz[1]);
     reg(connPoint(c, sz, opts.conn, 0.04), 'bus', power);
-    return P(name, info, unit(c, sz, mat, opts));
+    return P(name, info, [...unit(c, sz, mat, opts), ...extra]);
   };
   const BAT = BATT;
   const battery = (name, x, desc) => {
@@ -169,8 +169,9 @@ export function buildPower(P, body) {
   battery('Battery 2', 0.66, 'The second NiH₂ battery. Cells are kept cool, about 0–10 °C, on the radiator panel, because battery life falls quickly when they run warm (cell count estimated).');
   box('Power regulation unit (SPRU)', {
     system: 'Power', material: 'Aluminium chassis, shunt regulators and battery charge electronics', mass: 44, temp: 305, explode: [0, -1.15, 0.05],
-    desc: 'Lockheed\'s figure labels this unit "SPRU" (acronym not expanded in the source); the design paper names the subsystem\'s power regulation unit. It holds the main bus voltage steady, shunts surplus array current in sunlight, charges the batteries and switches to battery power at each eclipse entry without a glitch to the clocks or transmitters.',
-  }, [-0.1, 0.85], [0.44, 0.22, 0.32], G.alodine(), { mount: '-y', conn: '+z', n: 5, fins: 7 });
+    desc: 'Lockheed\'s figure labels this unit "SPRU" (acronym not expanded in the source); the design paper names the subsystem\'s power regulation unit. It holds the main bus voltage steady, shunts surplus array current in sunlight, charges the batteries and switches to battery power at each eclipse entry without a glitch to the clocks or transmitters. Array power from both wings comes up the riser to the connector on its underside, and the main power bus leaves from its top.',
+  }, SPRU.c, SPRU.s, G.alodine(), { mount: '-y', conn: '+z', n: 5, fins: 7 }, true,
+  [mesh(cylG([SPRU_IN[0], SPRU_IN[1], SPRU_IN[2] + 0.012], 0.022, 0.024, 'z', 12), G.connector())]);
   box('FBA unit', {
     system: 'Power', material: 'Aluminium chassis', mass: 5, temp: 300, explode: [0.1, -1.15, 0],
     desc: 'A box Lockheed\'s figure labels "FBA", next to the solar-array drive on the bus panel. The source does not expand the acronym or describe it, so its function is left unstated here (size estimated).',

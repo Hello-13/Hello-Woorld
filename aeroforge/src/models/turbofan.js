@@ -38,7 +38,7 @@ const NOT_ENGINE = new Set([
   'Thrust reverser translating sleeves', 'Thrust reverser cascades', 'Blocker doors & drag links', 'Thrust reverser actuators',
   'Thrust reverser hinge & latch beams', 'Thrust reverser control valve module', 'Thrust reverser hydraulic lines', 'Thrust reverser synchronising shafts',
   'Core cowl & bifurcations', 'Core cowl pressure-relief door', 'Pylon (strut) stub', 'Display cradle',
-  'Integrated drive generator (IDG)', 'Backup generator (VSCF/PMG)', 'Engine-driven hydraulic pump', 'Hydraulic pump lines', 'IDG feeder cables', 'IDG/VSCF air/oil cooler', 'VSCF/lube oil-oil cooler',
+  'Integrated drive generator (IDG)', 'Backup generator (VSCF/PMG)', 'Engine-driven hydraulic pump', 'Hydraulic pump lines', 'IDG feeder cables', 'IDG/VSCF air/oil cooler', 'VSCF/lube oil-oil cooler', 'IDG & VSCF cooler oil lines',
   'Bleed ducts & manifold', 'IP check valve', 'High-pressure shutoff valve', 'Pressure-regulating shutoff valve (PRSOV)', 'Precooler', 'Fan-air valve & duct',
   'Nacelle anti-ice valve & duct', 'Starter air valve', 'Starter duct', 'Fire-extinguisher discharge lines',
   'Thrust reverser locks & position sensors', 'Fire seals', 'Aircraft fuel supply line',

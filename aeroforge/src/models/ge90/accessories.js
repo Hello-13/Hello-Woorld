@@ -312,7 +312,7 @@ export function buildAccessories(ctx) {
     system: 'Drive system', material: 'Locking filler cap (Safran), listed for the -110B1/-113B/-115B', mass: 0.3,
     explode: [0.23, -0.1, 2.0], temp: 340,
     desc: 'The gravity-filler cap. Oil is added within about half an hour of shutdown, while it is still warm and the level reading is valid; a cap left unlocked can let the tank empty in flight.',
-  }, m(merge([radialCyl(1.93, 1.955, -1.05, 0.33, 0.026, 14), boxAt(1.962, -1.05, 0.33, [0.01, 0.045, 0.012])]), GM.red()));
+  }, m(merge([radialCyl(1.93, 1.955, -1.12, 0.2, 0.026, 14), boxAt(1.962, -1.12, 0.2, [0.01, 0.045, 0.012])]), GM.red()));
   P('Oil level sensor', {
     system: 'Sensors', material: 'Ametek float-type level transmitter', mass: 1,
     explode: [0.23, -0.2, 2.03], temp: 340,
@@ -480,7 +480,7 @@ export function buildAccessories(ctx) {
     system: 'Electrical', material: 'Capacitor-discharge units', mass: 10, count: 2,
     explode: [0.19, -0.7, 1.09], temp: 420,
     desc: 'Each exciter stores energy in a capacitor and dumps it into its igniter as a spark of several joules, a few times a second. Two independent systems give redundancy.',
-  }, m(merge([0.62, 2.52].map((phi) => boxAt(0.66, -2.78, phi, [0.08, 0.22, 0.12]))), GM.painted()));
+  }, m(merge([0.62, 2.52].map((phi) => boxAt(0.66, -2.79, phi, [0.08, 0.2, 0.12]))), GM.painted()));
   P('Igniter leads', {
     system: 'Electrical', material: 'Shielded, air-cooled high-tension leads', mass: 3, count: 2,
     explode: [0.25, -0.8, 1.0], temp: 600,
