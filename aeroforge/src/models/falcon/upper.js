@@ -13,11 +13,13 @@ import { mesh } from '../../engine/assembly.js';
 import { lathe, rod, beam, ogiveProfile } from '../../engine/geometry.js';
 import { SKIN, M } from '../../engine/materials.js';
 import { R, Y, polar } from './dims.js';
-import { merge, barrel, dome, domeY, pipe, hoop, post, block, bottle, radialYaw } from './util.js';
-import { MVAC, mvacChamber, mvacRegen, mvacExtension, mvacKit, placeAll, thrustCone } from './merlin.js';
+import { merge, barrel, dome, domeY, pipe, hoop, post, block, bottle, radialYaw, revolve } from './util.js';
+import { MVAC, mvacChamber, mvacRegen, mvacExtension, mvacKit, placeAll } from './merlin.js';
 import { FM, stagePaint, tankMaterial } from './materials.js';
 
 const D = Y.s2DomeDepth;
+// helium pass-throughs in the thrust cone: radius and azimuths (cell centres of its 96-segment grid)
+const HE_PASS = { r: 1.62, az: [331.875, 28.125] };
 const at = (r, a, y) => { const [x, z] = polar(r, a); return [x, y, z]; };
 const unit = (r, a, y, w, h, d) => { const [x, z] = polar(r, a); return block(x, y, z, w, h, d, radialYaw(a)); };
 /** Capsule bottle lying tangentially at radius r, azimuth a, height y. */
@@ -180,12 +182,32 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
 
   // ------------------------------------------------------------------ thrust structure and Merlin Vacuum
   const gimbalY = ex + MVAC.gimbalTop;
-  const ts = [thrustCone(R - 0.06, Y.s2AftSkirt - 0.32, 0.62, gimbalY + 0.1, 48), hoop(R - 0.08, 0.05, Y.s2AftSkirt - 0.32, { seg: 64, tube: 6 }), hoop(0.62, 0.05, gimbalY + 0.1, { seg: 32, tube: 6 })];
+  // the cone runs from the skirt wall to the gimbal ring, so the helium lines from the tanks to the
+  // engine's heat exchanger come down through it: each passes a window (one cell of the cone's
+  // 96-segment grid, so the bands meet without seams) lined with a grommet
+  const coneR0 = R - 0.06, coneY0 = Y.s2AftSkirt - 0.32, coneR1 = 0.62, coneY1 = gimbalY + 0.1;
+  const coneY = (r) => coneY1 + ((r - coneR1) / (coneR0 - coneR1)) * (coneY0 - coneY1);
+  const coneSeg = 96, cell = (2 * Math.PI) / coneSeg;
+  const passR = HE_PASS.r, rA = passR + 0.036, rB = passR - 0.036;
+  const band = (ra, rb, k0 = 0, n = coneSeg) => revolve([[ra, coneY(ra)], [rb, coneY(rb)]], n, k0 * cell, n * cell);
+  const winK = HE_PASS.az.map((a) => Math.round((((90 - a) % 360 + 360) % 360) / 3.75 - 0.5)).sort((a, b) => a - b);
+  const cone = [band(coneR0, rA), band(rB, coneR1)];
+  for (let i = 0; i < winK.length; i++) {
+    const k0 = winK[i] + 1, k1 = i + 1 < winK.length ? winK[i + 1] : winK[0] + coneSeg;
+    cone.push(band(rA, rB, k0, k1 - k0));
+  }
+  const slope = Math.atan2(coneY0 - coneY1, coneR0 - coneR1);
+  const grommet = HE_PASS.az.map((a) => {
+    const g = new THREE.TorusGeometry(0.05, 0.012, 6, 20);
+    g.rotateX(Math.PI / 2); g.rotateZ(slope); g.rotateY((-a * Math.PI) / 180);
+    return g.translate(...at(passR, a, coneY(passR)));
+  });
+  const ts = [merge(cone), hoop(R - 0.08, 0.05, Y.s2AftSkirt - 0.32, { seg: 64, tube: 6 }), hoop(0.62, 0.05, gimbalY + 0.1, { seg: 32, tube: 6 }), ...grommet];
   for (let i = 0; i < 8; i++) ts.push(beam(at(R - 0.1, i * 45 + 22.5, Y.interTop + 0.06), at(0.62, i * 45 + 22.5, gimbalY + 0.08), 0.07, 0.07));
   for (const a of [45, 135, 225, 315]) ts.push(beam(at(0.62, a, gimbalY + 0.1), at(0.12, a, gimbalY - 0.02), 0.08, 0.1));
   P('Second stage thrust structure', {
     system: 'Structure', xrayWeight: 0.5, material: 'Aluminium thrust cone, struts and gimbal ring', mass: 260,
-    desc: 'Carries the Merlin Vacuum\'s ≈ 981 kN from the gimbal into the aft skirt. The cone sits under the aft dome; the powerhead pokes up through its central ring.',
+    desc: 'Carries the Merlin Vacuum\'s ≈ 981 kN from the gimbal into the aft skirt. The cone sits under the aft dome; the powerhead pokes up through its central ring, and two grommeted pass-throughs let the helium pressurisation lines down to the engine (positions estimated).',
     explode: [0, -0.4, 0],
   }, [mesh(ts[0], FM.aluDark()), mesh(merge(ts.slice(1)), FM.aluDark())]);
 
@@ -263,24 +285,37 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
 
   // helium: bottles in the LOX → down the wall → heat exchanger on the engine → back to both ullages
   const hxAt = at(0.75, 180, gimbalY - 0.05);
+  // a straight vertical run through the aft dome and the cone's pass-through at azimuth a (top → bottom)
+  const heDrop = (a) => [48.4, 48.25, 47.8, 47.72].map((y) => at(HE_PASS.r, a, y));
   const he = [
     block(hxAt[0], hxAt[1], hxAt[2], 0.2, 0.14, 0.3),
-    pipe([at(1.0, 330, 53.55), at(1.72, 332, 53.0), at(1.72, 334, Y.s2CommonDome), at(1.72, 336, 48.3), at(1.6, 340, 47.68), at(0.95, 200, 47.42), [hxAt[0] - 0.08, hxAt[1], hxAt[2] + 0.12]], 0.028, { seg: 6, tubular: 70 }),
-    pipe([[hxAt[0] + 0.08, hxAt[1], hxAt[2] - 0.12], at(0.95, 160, 47.42), at(1.6, 20, 47.68), at(1.72, 22, 48.3), at(1.72, 24, Y.s2CommonDome - 0.3), at(1.72, 26, Y.s2LoxTop - 0.1), at(1.3, 26, Y.s2LoxTop + 0.4)], 0.025, { seg: 6, tubular: 70 }),
+    // from the COPVs down the tank wall, out through the aft dome and the thrust cone's pass-through,
+    // then under the cone round the −z side of the powerhead (over the struts) to the exchanger
+    pipe([at(1.0, 330, 53.55), at(1.72, 332, 53.0), at(1.72, 334, Y.s2CommonDome), at(1.72, 333, 48.9), ...heDrop(HE_PASS.az[0]),
+      at(1.4, 327, 47.62), ...[315, 300, 285, 270, 255, 240, 225].map((a) => at(1.2, a, 47.575)), at(1.18, 211, 47.575), at(1.15, 203, 47.565), at(1.08, 196, 47.5),
+      at(1.0, 192, 47.42), [-0.8, 47.24, -0.3], [hxAt[0], hxAt[1], hxAt[2] - 0.24], [hxAt[0], hxAt[1], hxAt[2] - 0.13]], 0.028, { seg: 6, tubular: 150 }),
+    // warmed helium back: round the +z side under the struts (and under the engine controller),
+    // up through the other pass-through and the aft dome to both ullages
+    pipe([[hxAt[0], hxAt[1], hxAt[2] + 0.13], [hxAt[0], hxAt[1], hxAt[2] + 0.25], at(0.85, 152, 47.15), at(0.86, 120, 47.13), at(0.86, 80, 47.12), at(0.88, 55, 47.15),
+      at(1.0, 42, 47.3), at(1.25, 34, 47.55), at(1.45, 30, 47.66), ...heDrop(HE_PASS.az[1]).reverse(), at(1.72, 23, 48.9), at(1.72, 22, 50.0), at(1.72, 24, Y.s2CommonDome - 0.3),
+      at(1.72, 26, Y.s2LoxTop - 0.1), at(1.3, 26, Y.s2LoxTop + 0.4)], 0.025, { seg: 6, tubular: 140 }),
     pipe([at(1.72, 22, 50.0), at(1.5, 22, Y.s2CommonDome - 0.55)], 0.02, { seg: 6, tubular: 6 }),
     post(...polar(1.5, 22), Y.s2CommonDome - 0.68, Y.s2CommonDome - 0.48, 0.045, 10),       // RP-1 ullage diffuser
     post(...polar(1.3, 26), Y.s2LoxTop + 0.3, Y.s2LoxTop + 0.5, 0.05, 10),                 // LOX ullage diffuser
   ];
   P('Second stage helium heat exchanger & pressurisation lines', {
     system: 'Fuel', material: 'Heat exchanger on the engine, stainless helium lines', mass: 40,
-    desc: 'The second stage is pressurised with heated helium too: gas from the COPVs is warmed in a heat exchanger on the Merlin Vacuum and fed to the tops of both tanks. Routing simplified.',
+    desc: 'The second stage is pressurised with heated helium too: gas from the COPVs is warmed in a heat exchanger on the Merlin Vacuum and fed to the tops of both tanks. The lines leave the tanks through the aft dome and pass the thrust cone through grommeted pass-throughs. Routing estimated.',
     explode: [0, 0.4, 3.4],
   }, mesh(merge(he), FM.steelLine()));
 
   // ------------------------------------------------------------------ mission-extension kit hardware
-  const mekC = [sideBottle(1.6, 5, 47.78, 0.13, 0.6), sideBottle(1.6, 100, 47.78, 0.13, 0.6)];
-  const mekL = [pipe([at(1.6, 354.6, 47.78), at(1.61, 348, 47.72), at(1.6, 341, 47.685)], 0.012, { seg: 4, tubular: 6 }),
-    pipe([at(1.6, 89, 47.78), at(1.45, 92, 47.6), at(1.0, 150, 47.45), [hxAt[0] + 0.02, hxAt[1] + 0.08, hxAt[2] + 0.1]], 0.012, { seg: 4, tubular: 14 })];
+  // the bottles sit between the thrust cone and the separation plane; one tees into the supply line below its pass-through,
+  // the other runs over the cone's struts to the top of the heat exchanger
+  const mekC = [sideBottle(1.6, 5, 47.75, 0.13, 0.6), sideBottle(1.6, 100, 47.75, 0.13, 0.6)];
+  const mekL = [pipe([at(1.6, 354.6, 47.75), at(1.61, 346, 47.73), at(1.62, 337, 47.74), at(1.62, HE_PASS.az[0] + 0.8, 47.76)], 0.012, { seg: 4, tubular: 10 }),
+    pipe([at(1.6, 89.4, 47.75), at(1.42, 96, 47.64), at(1.3, 112.5, 47.64), at(1.15, 135, 47.56), at(1.08, 158, 47.53), at(0.9, 168, 47.36), at(0.78, 172, 47.27),
+      [hxAt[0] + 0.02, hxAt[1] + 0.065, hxAt[2] + 0.1]], 0.012, { seg: 4, tubular: 28 })];
   P('Second stage mission-extension kit COPVs', {
     system: 'Fuel', count: 2, material: 'Composite-overwrapped helium bottles and lines', mass: 2 * 30,
     desc: 'The mission-extension kit adds helium bottles for pressurisation control through coasts of hours (first flown on Falcon 9 for CRS-18, 2019), plumbed into the stage\'s pressurisation system. Their real count and placement are not published; two are shown in the aft skirt.',

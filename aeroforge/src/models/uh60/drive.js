@@ -170,7 +170,7 @@ export function buildDrive({ A, P, roofY }) {
   }, [mesh(merge(chips), MAT.yellow())]);
   P('Transmission oil pressure & temperature switches', {
     system: 'Drive system', material: 'Pressure switch, temperature switch', mass: 0.5, count: 2, explode: [0.4, 0.9, -0.8],
-    desc: 'The oil-pressure switch sits on the left accessory module because it is the farthest point from the pumps: if pressure there falls to 1,462 psi the MAIN XMSN OIL PRESS caution comes on. The temperature switch at the oil-cooler inlet, near the tail take-off flange, lights MAIN XMSN OIL TEMP at 120 °C.',
+    desc: 'The oil-pressure switch sits on the left accessory module because it is the farthest point from the pumps: if pressure there drops to 14 ± 2 psi the MAIN XMSN OIL PRESS caution comes on (normal continuous pressure is 30–65 psi). The temperature sensor at the oil-cooler inlet to the main module, near the tail take-off flange, lights MAIN XMSN OIL TEMP at 120 °C.',
   }, [mesh(merge([cyl(0.02, 0.02, 0.07, [0.5, 2.66, -0.5], 'y', 10), cyl(0.018, 0.018, 0.06, [cx - 0.56, 2.36, 0.14], 'y', 10)]), MAT.yellow())]);
 
   // ------------------------------------------------------------------ input and accessory modules
@@ -188,7 +188,7 @@ export function buildDrive({ A, P, roofY }) {
     }, [mesh(merge(g), MAT.casting())]);
     P(`Input bevel gears ${R}`, {
       system: 'Drive system', material: 'Carburised steel spiral-bevel pinion and gear', mass: 8, explode: [0.35, 1.0, 1.35 * s],
-      desc: `A ${GEARS.inputPinion}-tooth spiral-bevel pinion on the engine shaft (${rpm(SPEEDS.input)} rpm) drives an ${GEARS.inputGear}-tooth gear about 0.25 m across at ${rpm(SPEEDS.inputGear)} rpm. That gear's shaft drives the accessory module forward and the combining pinion inboard.`,
+      desc: `A ${GEARS.inputPinion}-tooth spiral-bevel pinion on the engine shaft (${rpm(SPEEDS.input)} rpm) drives an ${GEARS.inputGear}-tooth gear at ${rpm(SPEEDS.inputGear)} rpm. That gear's shaft drives the accessory module forward and the combining pinion inboard.`,
     }, [mesh(merge([place(new THREE.CylinderGeometry(0.03, 0.045, 0.08, 16), [0.02, 2.52, 0.56 * s], [0, 0, -Math.PI / 2]), cyl(0.02, 0.02, 0.1, [-0.04, 2.52, 0.56 * s], 'x', 10),
       onAxis(gearWheel(0.125, 0.035, 48, [0, 0, 0], 'y', 28), s, 0), onAxis(cyl(0.03, 0.03, 0.17, [0, 0, 0], 'y', 12), s, 0.055)]), MAT.steel())]);   // gear and its output shaft to the combining pinion
     // ramp-roller clutch in the input gear's hub: outer race, inner cam, twelve rollers
@@ -432,7 +432,7 @@ export function buildDrive({ A, P, roofY }) {
     desc: 'Flexible couplings made of packs of thin steel discs join the sections instead of universal joints. The discs flex to take up the angle between sections and the bending of the tail cone in flight, need no lubrication, and turn at a constant speed where a universal joint would not.',
   }, [mesh(merge(cpl), MAT.steel())]);
   const hangers = [];
-  for (const x of [-2.55, -3.75, -5.3, -6.85]) {
+  for (const x of [-2.9, -3.75, -5.3, -6.85]) {          // the first on section 2, aft of the APU
     const k = x > -3.6 ? 1 : x > -5.15 ? 2 : x > -6.7 ? 3 : 4;
     const p = J[k].clone().lerp(J[k + 1], (x - J[k].x) / (J[k + 1].x - J[k].x));
     hangers.push(cyl(0.085, 0.085, 0.07, [p.x, p.y, 0], 'x', 18), box(0.06, 0.1, 0.24, [p.x, p.y - 0.07, 0]), box(0.12, 0.012, 0.3, [p.x, p.y - 0.125, 0]));

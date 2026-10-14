@@ -451,14 +451,18 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   const fd = [], ct = [];
   for (const s of [1, -1]) {
     // from the underside of the generator, down through the roof inboard of the roof beam, under the
-    // frame at x 1.0, to the control unit and the converter
-    fd.push(pipe([[0.7, 2.44, 0.5 * s], [0.71, 2.35, 0.47 * s], [0.76, 2.25, 0.42 * s], [0.88, 2.13, 0.4 * s], [1.0, 2.1, 0.39 * s], [1.4, 2.08, 0.36 * s], [1.62, 2.04, 0.32 * s], [1.85, 1.96, 0.42 * s], [1.98, 1.97, 0.4 * s]], 0.015, 6));
-    fd.push(pipe([[2.0, 1.97, 0.35 * s], [2.0, 2.02, 0.26 * s], [2.0, 2.05, 0.2 * s]], 0.012, 6));
-    ct.push(cyl(0.03, 0.03, 0.03, [0.708, 2.37, 0.478 * s], 'y', 12), box(0.06, 0.04, 0.05, [2.06, 2.0, 0.3 * s]));
+    // frame at x 1.0 and over the top of the GCU to a terminal on the aft face of the distribution
+    // panel (the AC bus); a sense lead from the feeder ends on the GCU's aft face, and the panel feeds
+    // its converter through a lead from its outboard face to a terminal on the converter's top
+    fd.push(pipe([[0.7, 2.44, 0.5 * s], [0.71, 2.35, 0.47 * s], [0.76, 2.25, 0.42 * s], [0.88, 2.13, 0.4 * s], [1.0, 2.1, 0.39 * s], [1.3, 2.1, 0.33 * s], [1.6, 2.1, 0.2 * s], [1.8, 2.095, 0.18 * s], [1.88, 2.08, 0.18 * s]], 0.015, 6));
+    fd.push(pipe([[1.45, 2.1, 0.29 * s], [1.55, 2.07, 0.29 * s], [1.625, 2.03, 0.3 * s]], 0.008, 5));
+    fd.push(pipe([[2.07, 2.04, 0.285 * s], [2.07, 2.0, 0.37 * s], [2.07, 1.975, 0.47 * s]], 0.012, 6));
+    ct.push(cyl(0.03, 0.03, 0.03, [0.708, 2.37, 0.478 * s], 'y', 12), box(0.05, 0.03, 0.05, [2.07, 1.995, 0.4 * s]),
+      cyl(0.022, 0.022, 0.012, [1.869, 2.08, 0.18 * s], 'x', 10), cyl(0.014, 0.014, 0.01, [1.615, 2.03, 0.3 * s], 'x', 8), cyl(0.02, 0.02, 0.01, [2.07, 1.973, 0.47 * s], 'y', 10));   // terminals on the panel, GCU and converter faces
   }
   P('Generator feeders, current transformers & limiters', {
     system: 'Electrical', material: 'Heavy-gauge feeder cables, current transformers, current limiters', mass: 12, count: 2, explode: [1.0, 0.2, 0],
-    desc: 'Each generator\'s feeder runs down through the cabin roof to its control unit, the converters and the distribution panel. A current transformer on the feeder lets the GCU see a fault current, and a current limiter protects the bus; each set is interchangeable side to side.',
+    desc: 'Each generator\'s heavy feeder runs down through the cabin roof, over its generator control unit, to the AC bus in the distribution panel, which in turn feeds that side\'s AC/DC converter. A current transformer on the feeder, wired to the GCU by a sense lead, lets the GCU see a fault current, and a current limiter protects the bus; each set is interchangeable side to side.',
   }, [mesh(merge(fd), MAT.wiring()), mesh(merge(ct), MAT.casting())]);
   P('APU generator', {
     system: 'Electrical', material: '115 V AC generator on the APU gearbox', mass: 14, explode: [-1.2, 1.5, -1.0],
@@ -472,7 +476,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   P('AC/DC converters', {
     system: 'Electrical', material: 'Two 200 A transformer-rectifier units', mass: 16, count: 2, explode: [0.8, 0.8, 0],
     desc: 'Turn 115 V AC into 28 V DC for most of the aircraft\'s equipment; two 200 A units, so one can fail without losing the DC buses. There is no external DC connector — all DC comes from these and the battery.',
-  }, [mesh(merge([box(0.3, 0.18, 0.4, [2.0, 1.88, 0.55]), box(0.3, 0.18, 0.4, [2.0, 1.88, -0.55])]), MAT.avionics())]);
+  }, [mesh(merge([box(0.3, 0.18, 0.32, [2.0, 1.88, 0.58]), box(0.3, 0.18, 0.32, [2.0, 1.88, -0.58])]), MAT.avionics())]);   // outboard of the crew-chief seats' ceiling hangers
   P('Power distribution panels', {
     system: 'Electrical', material: 'AC and DC bus panels, relays and circuit protection', mass: 12, count: 2, explode: [0.9, 0.9, 0],
     desc: 'AC and DC buses are split into primary and essential groups, so losing one generator or converter sheds only the non-essential loads; an electric priority feature lets a main generator supersede the APU generator, which supersedes external power. (Location approximate.)',
@@ -692,13 +696,21 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
     system: 'Environmental control', material: 'Electric centrifugal blower', mass: 7, explode: [0.6, 1.4, 0.6],
     desc: 'With VENT BLOWER on, it forces outside air into the cabin ducts; switched off, the heater gives its maximum output. Ram-air vents beside the consoles cool the cockpit.',
   }, [mesh(merge([cyl(0.1, 0.1, 0.16, [1.82, 2.4, 0.28], 'x', 18), box(0.12, 0.12, 0.16, [1.68, 2.38, 0.28])]), MAT.casting())]);
-  const ecs = [];
-  for (const s of [1, -1]) ecs.push(pipe([[2.2, 1.97, 0.6 * s], [0.5, 1.97, 0.7 * s], [-1.6, 1.97, 0.7 * s]], 0.04, 8));
-  ecs.push(pipe([[1.82, 2.32, 0.3], [2.3, 2.15, 0.4], [2.9, 2.05, 0.45], [3.5, 1.5, 0.75]], 0.035, 8));
-  ecs.push(pipe([[1.75, 2.32, 0.28], [1.7, 2.1, 0.45], [1.8, 1.99, 0.62]], 0.035, 8));
-  ecs.push(pipe([[-1.62, 2.34, 0.18], [-1.62, 2.12, 0.0], [-1.6, 2.0, -0.4], [-1.6, 1.97, -0.68]], 0.035, 8), pipe([[-1.62, 2.12, 0.1], [-1.6, 1.98, 0.5], [-1.6, 1.97, 0.68]], 0.035, 8));
+  // Routed clear of the roof structure and the units on it: the two side ducts run along the
+  // ceiling outboard of the roof beams and the troop-seat hangers, from just aft of the AC/DC
+  // converters back to a cross-duct under the APU accumulator, just forward of the aft cabin
+  // bulkhead and aft of the AVCS force generators. The heater feeds that cross-duct straight down
+  // from the mixing valve, outboard of the tail-rotor cables; the vent blower feeds the right side
+  // duct down past the aft face of the generator control unit and under the right roof beam, and
+  // the cockpit duct forward between the roof frames, inboard of the beam and over the
+  // distribution panel.
+  const ecs = [], SD = 0.76;
+  for (const s of [1, -1]) ecs.push(pipe([[1.72, 1.97, SD * s], [0.5, 1.97, SD * s], [-1.66, 1.97, SD * s]], 0.04, 8));
+  ecs.push(pipe([[1.88, 2.38, 0.3], [1.97, 2.36, 0.31], [2.03, 2.25, 0.33], [2.08, 2.17, 0.34], [2.2, 2.13, 0.345], [2.45, 2.09, 0.36], [2.7, 2.05, 0.4], [2.95, 2.0, 0.5], [3.5, 1.5, 0.75]], 0.035, 8));
+  ecs.push(pipe([[1.66, 2.34, 0.28], [1.585, 2.22, 0.31], [1.56, 2.08, 0.35], [1.56, 2.0, 0.42], [1.59, 1.975, 0.56], [1.64, 1.97, 0.7], [1.66, 1.97, SD]], 0.035, 8));
+  ecs.push(pipe([[-1.66, 1.97, -SD], [-1.66, 1.97, 0], [-1.66, 1.97, SD]], 0.035, 8), pipe([[-1.66, 2.36, 0.27], [-1.66, 2.17, 0.27], [-1.66, 1.98, 0.27]], 0.035, 8));
   const reg = [];
-  for (const s of [1, -1]) for (const x of [1.6, 0.4, -0.8]) reg.push(box(0.12, 0.03, 0.08, [x, 1.93, 0.68 * s]));
+  for (const s of [1, -1]) for (const x of [1.4, 0.4, -0.8]) reg.push(box(0.12, 0.03, 0.08, [x, 1.93, SD * s]));
   P('Heating & ventilation ducts & registers', {
     system: 'Environmental control', material: 'Composite ducts along the cabin ceiling, adjustable registers', mass: 14, explode: [0.0, 1.15, 0], xrayWeight: 0.5,
     desc: 'Ducts carry the mixed or ventilating air along both sides of the cabin ceiling and forward to the cockpit, with adjustable registers over the seats.',

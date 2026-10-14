@@ -131,9 +131,18 @@ export function buildUAV() {
   const L = (geo, material, o) => mesh(geo, material, o);
 
   // ============================================================== fuselage skins
-  const fl = fuselageLoft(stationsWithBreaks([0.95, 2.05, 4.0, 6.3, FIREWALL_S], 0.2), 48);
-  const panels = splitTris(fl, (cx, cy) => {
+  // the skin is cut away under the gear doors (main wells s 4.9–6.5 from the keel strip up the lower side; nose well s 1.92–3.08);
+  // the doors, 4 mm proud of the skin, overlap the cut-outs' edges
+  const opening = (s, y, z) => {
+    const { top, bot, hw, yc } = prof(s);
+    const u = Math.abs(z) / hw, v = (y - yc) / ((top - bot) / 2);
+    const th = Math.atan2(Math.sign(v) * Math.abs(v) ** 1.2, u ** 1.2) + Math.PI / 2;     // section angle from the keel
+    return (s > 4.9 && s < 6.5 && th > 0.1 && th < 1.45) || (s > 1.92 && s < 3.08 && th > 0.1 && th < 0.41);
+  };
+  const fl = fuselageLoft(stationsWithBreaks([0.95, 1.92, 2.05, 3.08, 4.0, 4.9, 6.3, 6.5, FIREWALL_S], 0.2), 48);
+  const panels = splitTris(fl, (cx, cy, cz) => {
     const s = 5.5 - cx;
+    if (opening(s, cy, cz)) return null;
     if (s < 2.05 && cy > prof(Math.max(0, s)).yc - 0.02) return 'radome';
     if (s < 0.95) return 'lynx';
     if (s < 4.0) return 'fwd';
@@ -185,22 +194,26 @@ export function buildUAV() {
   // the frame under the aft cell has a keel cut-out for the feed line and the IFF cable; the one at the oil cooler opens round its scoop
   const keelCut = (a) => ({ from: -PI / 2 + a, to: PI * 1.5 - a, n: 34 });
   const aftOpen = { 6.95: keelCut(0.16), 7.75: keelCut(0.34) };
-  const aftFrames = [4.25, 5.25, 6.3, 6.95, 7.75, 10.3].map((s) => hoop(s, { h: s > 9 ? 0.035 : 0.045, ...(inWell(s) ? openArc : s > 9 ? { from: -0.35, to: PI + 0.35, n: 30 } : aftOpen[s] ?? {}) }));
+  // the frames over the main wells are cut away up to just above the doors' upper edges, where the lower longerons run
+  const mainWellArc = { from: 0.12, to: PI - 0.12, n: 24 };
+  const aftFrames = [4.25, 5.25, 6.3, 6.95, 7.75, 10.3].map((s) => hoop(s, { h: s > 9 ? 0.035 : 0.045, ...(inWell(s) ? mainWellArc : s > 9 ? { from: -0.35, to: PI + 0.35, n: 30 } : aftOpen[s] ?? {}) }));
   aftFrames.push(...arcs(8.78, [[-PI / 2, PI / 2 - DUCT], [PI / 2 + DUCT, PI * 1.5]], 0.045));
   aftFrames.push(...arcs(9.31, [[-0.35, 0.66], [1.08, PI / 2 - 0.38], [PI / 2 + 0.38, PI - 1.08], [PI - 0.66, PI + 0.35]], 0.04));   // the duct is wider here, where it rises over the engine
   P('Centre & aft fuselage frames', {
     system: 'Structure', material: 'Composite and aluminium ring frames (est.)', mass: 44, count: 8, xrayWeight: 0.4, explode: [-0.3, 0.45, 0],
-    desc: 'Frames at the wing spars, main-gear wells, accessory bay, V-tail spars and engine mounts. The frames at the front and rear spar positions take the wing’s lift into the body; the two V-tail spar frames carry the tail’s root fittings and are cut where the inlet duct and exhaust pipes pass; those over the wells and the engine bay are open below, and the two under the aft cell and at the oil cooler have keel cut-outs for the feed line, the cables and the cooler scoop (spacing estimated).',
+    desc: 'Frames at the wing spars, main-gear wells, accessory bay, V-tail spars and engine mounts. The frames at the front and rear spar positions take the wing’s lift into the body; the two V-tail spar frames carry the tail’s root fittings and are cut where the inlet duct and exhaust pipes pass; the two over the main-gear wells are open from the keel up to the longerons above the doors, the engine-bay ones are open below, and the two under the aft cell and at the oil cooler have keel cut-outs for the feed line, the cables and the cooler scoop (spacing estimated).',
   }, L(merge(aftFrames), m.frame));
   const longerons = [0.9, Math.PI - 0.9, -0.5, -Math.PI + 0.5].map((th) => {
     const pts = [];
-    // the upper pair ends at the firewall, where the inlet duct, the exhaust pipes and the V-tail roots fill the top
-    for (let s = 0.95; s <= (th > 0 ? FIREWALL_S : 10.3) + 1e-6; s += 0.25) pts.push(fusePoint(s, th, 0.04));
-    return pipe(pts, 0.012, 6, 80);
+    // the upper pair ends at the firewall, where the inlet duct, the exhaust pipes and the V-tail roots fill the top;
+    // the lower pair steps up over the main-gear wells to run above the doors' upper edges
+    const lift = (s) => (th < 0 ? smooth(4.5, 4.8, s) * (1 - smooth(6.52, 6.82, s)) * 0.62 : 0);
+    for (let s = 0.95; s <= (th > 0 ? FIREWALL_S : 10.3) + 1e-6; s += 0.125) pts.push(fusePoint(s, th > -1 ? th + lift(s) : th - lift(s), 0.04));
+    return pipe(pts, 0.012, 6, 160);
   });
   P('Fuselage longerons', {
     system: 'Structure', material: 'Carbon-fibre composite (est.)', mass: 30, count: 4, xrayWeight: 0.4, explode: [0, 0.6, 0],
-    desc: 'Four longitudinal members tie the frames together and carry fuselage bending from the heavy nose sensors and the engine at the tail. The lower pair runs along the outer edges of the gear wells, above the door hinges (positions estimated).',
+    desc: 'Four longitudinal members tie the frames together and carry fuselage bending from the heavy nose sensors and the engine at the tail. The lower pair runs along the lower sides and steps up over the main-gear wells to pass above the doors, so the cut-outs do not sever them (positions estimated).',
   }, L(merge(longerons), m.composite));
   P('Avionics floor', {
     system: 'Structure', material: 'Aluminium honeycomb panel (est.)', mass: 10, explode: [0.6, 0.35, 0],
@@ -219,7 +232,7 @@ export function buildUAV() {
       new THREE.Vector2(X(MW[0]), yb(MW[0])), new THREE.Vector2(X(MW[1]), yb(MW[1])),
       new THREE.Vector2(X(MW[1]), MROOF[1]), new THREE.Vector2(X(MSTEP), MROOF[1]), new THREE.Vector2(X(MSTEP), MROOF[0]), new THREE.Vector2(X(MW[0]), MROOF[0]),
     ].reverse());
-    return new THREE.ExtrudeGeometry(sh, { depth: 0.01, bevelEnabled: false }).translate(0, 0, zc - 0.005);
+    return new THREE.ExtrudeGeometry(sh, { depth: 0.008, bevelEnabled: false }).translate(0, 0, zc - 0.004);
   };
   // a cross wall at station s between the keel wall and the skin, below height roof (shape in z–y, extruded along x)
   const crossWall = (s, roof, zs) => {
@@ -241,7 +254,7 @@ export function buildUAV() {
   };
   const bays = [];
   for (const zs of [1, -1]) {
-    bays.push(keelWall(0.045 * zs));
+    bays.push(keelWall(0.044 * zs));
     bays.push(roofPlate(MW[0], MSTEP, MROOF[0], zs), roofPlate(MSTEP, MW[1], MROOF[1], zs));
     bays.push(crossWall(MW[0], MROOF[0], zs), crossWall(MW[1], MROOF[1], zs));
     bays.push(box(0.01, MROOF[1] - MROOF[0], 0.27, [X(MSTEP), (MROOF[0] + MROOF[1]) / 2, 0.18 * zs]));
@@ -681,24 +694,29 @@ export function buildUAV() {
     pipe([[0.03, -0.04, -0.095], [-0.03, -0.055, -0.085], [-0.075, -0.065, -0.04], [-0.07, -0.073, 0.02]], 0.005, 5, 14),
   ]), m.harness), noseLeg);
 
-  // ---- main gear: trailing-arm legs, retracting aft into the wells
-  // offsets from the trunnion with the leg down (x forward, starboard side; mirrored for port)
-  const MG = { pivot: [4.97, 1.22, 0.17], knee: [0, -0.8, 0.6], axle: [-0.25, -0.94, 0.71], stow: [6.15, 1.41, 0.105] };
-  const mainLegs = [];
+  // ---- main gear: trailing-arm legs on trunnions at the lower corners of the body, retracting aft into the wells
+  // Offsets from the trunnion with the leg down (x forward, starboard side; mirrored for port). Photographs show long, splayed
+  // legs (about 40° from vertical, a track of about 2.4 m) and small wheels, about 0.38 m across; the legs fold aft into slots
+  // along the lower corners, the wheels into pockets at the aft end. The leg turns as one rigid unit (strut, trailing arm,
+  // shock absorber, brake and wheel) about a single fixed hinge axis, `hinge`, by `stow` radians; axis and angle were
+  // chosen so the folded leg clears the well walls, the keel web and the frames (kinematics estimated).
+  const MG = { pivot: [4.95, 1.2, 0.31], knee: [0, -0.87, 0.74], axle: [-0.22, -1.01, 0.84], wheelOff: 0.06, hinge: [0.5871, -0.1049, -0.8027], stow: 1.9574 };
+  const mainLegs = [], uplockAt = [];
   for (const side of [1, -1]) {
     const sd = SN(side);
     const V = (a) => new THREE.Vector3(a[0], a[1], a[2] * side);
     const piv = new THREE.Group();
     piv.position.set(X(MG.pivot[0]), MG.pivot[1], MG.pivot[2] * side);
     const K = V(MG.knee), Ax = V(MG.axle);
-    const stowDir = new THREE.Vector3(X(MG.stow[0]) - piv.position.x, MG.stow[1] - piv.position.y, (MG.stow[2] - MG.pivot[2]) * side).normalize();
-    const q = new THREE.Quaternion().setFromUnitVectors(Ax.clone().normalize(), stowDir);
-    const hingeAxis = new THREE.Vector3(q.x, q.y, q.z).normalize();
-    const pin = new THREE.CylinderGeometry(0.04, 0.04, 0.2, 14).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(Yup, hingeAxis));
+    // mirroring a rotation through the x–y plane flips the axis' z and the sense of rotation
+    const hingeAxis = V(MG.hinge).normalize();
+    const q = new THREE.Quaternion().setFromAxisAngle(hingeAxis, MG.stow * side);
+    // trunnion pin along the hinge axis, offset inboard so its outer end stays inside the skin
+    const pin = tubeBetween([0, 0, 0], hingeAxis.clone().multiplyScalar(0.1).toArray(), 0.04, 14);
     const at = (t) => K.clone().multiplyScalar(t);
     P(`Main gear strut (${sd})`, {
       system: 'Landing gear', material: 'Titanium strut (PCC Structurals) and trunnion', mass: 18, explode: [0, -0.95, 0.75 * side],
-      desc: 'The titanium main leg of GA-ASI’s heavy-weight trailing-arm gear (announced January 2012, fitted to Block 5): it pivots on a trunnion in the well and carries the trailing arm at its foot. GA-ASI gives 30 %+ more landing weight at a 10 ft/s sink rate and rejected-take-off braking at 11,700 lb (retraction path estimated).',
+      desc: 'The titanium main leg of GA-ASI’s heavy-weight trailing-arm gear (announced January 2012, fitted to Block 5): it pivots on a trunnion at the lower corner of the body, splays about 40° outward for a track near 2.4 m, and carries the trailing arm at its foot. GA-ASI gives 30 %+ more landing weight at a 10 ft/s sink rate and rejected-take-off braking at 11,700 lb (leg geometry from photographs; retraction path estimated).',
     }, piv);
     piv.add(L(merge([tubeBetween([0, 0, 0], K.toArray(), 0.05, 14), pin, box(0.05, 0.06, 0.05, at(0.32).toArray()), box(0.05, 0.06, 0.05, at(0.5).add(new THREE.Vector3(-0.07, 0, 0)).toArray())]), m.alu));
     P(`Main gear trailing arm (${sd})`, {
@@ -710,19 +728,22 @@ export function buildUAV() {
       system: 'Landing gear', material: 'Taylor Devices sealed shock absorber', mass: 5, explode: [-0.35, -0.8, 1.1 * side],
       desc: 'Runs from the strut to the trailing arm and absorbs the landing energy. Made by Taylor Devices and, GA-ASI says, maintenance-free: it needs no nitrogen servicing.',
     }, L(merge([tubeBetween(s0.toArray(), s0.clone().lerp(s1, 0.6).toArray(), 0.034, 12), tubeBetween(s0.clone().lerp(s1, 0.55).toArray(), s1.toArray(), 0.02, 10)]), m.darkMetal), piv);
+    // down the front of the strut, round the inboard side of the trailing arm to the brake servo (its own lead goes on to the brake)
+    const bs = K.clone().lerp(Ax, 0.62).add(new THREE.Vector3(0.0, 0.065, -0.035 * side));
     const brakeLine = [];
     for (let k = 0; k <= 6; k++) brakeLine.push(at(k / 6).add(new THREE.Vector3(0.055, 0.02, 0)).toArray());
-    brakeLine.push(K.clone().lerp(Ax, 0.5).add(new THREE.Vector3(0.0, 0.05, 0)).toArray(), Ax.clone().add(new THREE.Vector3(0.0, 0.07, -0.02 * side)).toArray());
+    brakeLine.push(K.clone().lerp(Ax, 0.25).add(new THREE.Vector3(0.02, 0.01, -0.056 * side)).toArray(), K.clone().lerp(Ax, 0.45).add(new THREE.Vector3(0.0, 0.04, -0.06 * side)).toArray(), [bs.x + 0.06, bs.y, bs.z]);
     P(`Brake line & harness (${sd})`, {
       system: 'Landing gear', material: 'Flexible brake hose and sensor wiring (est.)', mass: 1, explode: [0.25, -0.9, 1.0 * side],
-      desc: 'Runs down the leg to the wheel brake and carries the wheel-speed and weight-on-wheels signals back up; the automatic landing system uses them (routing estimated; brake actuation type not public).',
+      desc: 'Runs down the leg to the brake servo on the trailing arm and carries the wheel-speed and weight-on-wheels signals back up; the automatic landing system uses them (routing estimated; brake actuation type not public).',
     }, L(pipe(brakeLine, 0.007, 5, 40), m.harness), piv);
-    const w = [new THREE.TorusGeometry(0.2, 0.08, 14, 32), merge([new THREE.CylinderGeometry(0.15, 0.15, 0.13, 24).rotateX(Math.PI / 2), new THREE.CylinderGeometry(0.035, 0.035, 0.12, 12).rotateX(Math.PI / 2).translate(0, 0, -0.02 * side)]), new THREE.CylinderGeometry(0.12, 0.12, 0.03, 20).rotateX(Math.PI / 2).translate(0, 0, -0.07 * side)];
+    // wheel, tyre and brake (wheel frame: axle along z, outboard toward +z on the starboard side)
+    const w = [new THREE.TorusGeometry(0.135, 0.055, 14, 32), merge([new THREE.CylinderGeometry(0.1, 0.1, 0.1, 24).rotateX(Math.PI / 2), new THREE.CylinderGeometry(0.03, 0.03, 0.1, 12).rotateX(Math.PI / 2).translate(0, 0, -0.02 * side)]), new THREE.CylinderGeometry(0.085, 0.085, 0.025, 20).rotateX(Math.PI / 2).translate(0, 0, -0.055 * side)];
     const wheel = P(`Main wheel & brake (${sd})`, {
-      system: 'Landing gear', material: 'Parker Hannifin wheel and multi-disc brake, tubeless tyre', mass: 22, explode: [0, -0.15, 0.4 * side],
-      desc: 'Parker Hannifin wheel and brake, about 0.56 m in diameter (size estimated), with provisions for anti-lock braking. The brakes work only with the gear down and are commanded from the ground station or the automatic landing system; reverse propeller pitch does most of the stopping (GA-ASI; USAF).',
+      system: 'Landing gear', material: 'Parker Hannifin wheel and multi-disc brake, tubeless tyre', mass: 16, explode: [0, -0.15, 0.4 * side],
+      desc: 'Parker Hannifin wheel and brake, about 0.38 m in diameter (estimated from photographs), with provisions for anti-lock braking. It retracts with its leg and lies tilted in a pocket at the aft end of the well. The brakes work only with the gear down and are commanded from the ground station or the automatic landing system; reverse propeller pitch does most of the stopping (GA-ASI; USAF).',
     }, [L(w[0], m.rubber), L(w[1], m.alu), L(w[2], m.darkMetal)], piv);
-    wheel.position.set(Ax.x, Ax.y, Ax.z + 0.065 * side);
+    wheel.position.set(Ax.x, Ax.y, Ax.z + MG.wheelOff * side);
     // retraction actuator from the well's forward upper corner to a lug on the strut
     const act = makeActuator(0.032, 0.018, 0.3, m.darkMetal);
     const anchor = new THREE.Vector3(X(4.92), 1.45, 0.3 * side), lug = at(0.32);
@@ -731,24 +752,24 @@ export function buildUAV() {
       desc: 'Pulls the strut aft and up into the well, a cycle of about 25 s, and holds it locked down for landing. To lower the gear the pilot moves the handle, waits for “Ready to lower landing gear” and presses the stick trigger; the sensor operator then confirms it with the MTS-B camera. In 2012 the trigger step was missed and an MQ-9 landed gear-up (USAF; geometry estimated).',
     }, act.meshes);
     movers.push(() => act.set(anchor, lug.clone().applyQuaternion(piv.quaternion).add(piv.position)));
-    // uplock on the well roof, where the stowed trailing arm comes to rest
-    const kS = K.clone().applyQuaternion(q).add(piv.position);
-    const roof = 5.5 - kS.x > MSTEP ? MROOF[1] : MROOF[0];
+    // uplock on the keel web, beside the folded leg's knee: its hook closes under the strut just above the trailing-arm pivot
+    const kS = at(0.93).applyQuaternion(q).add(piv.position);
+    const kw = 0.048 * side, hookIn = kS.z - 0.052 * side;
+    uplockAt.push([kS.x, kS.y + 0.055, (kw + hookIn) / 2]);
     P(`Main gear uplock (${sd})`, {
       system: 'Landing gear', material: 'Spring-loaded hook with an electric release (est.)', mass: 1, explode: [0, 0.5, 0.6 * side],
-      desc: 'Hooks the trailing arm when the leg is up so the gear cannot drop in flight; the release opens it for extension (position estimated).',
-    }, L(merge([box(0.06, roof - kS.y - 0.04, 0.04, [kS.x, (roof + kS.y + 0.04) / 2, kS.z]), box(0.07, 0.02, 0.05, [kS.x - 0.02, kS.y + 0.05, kS.z])]), m.darkMetal));
-    const bs = K.clone().lerp(Ax, 0.62).add(new THREE.Vector3(0.0, 0.065, -0.035 * side));
+      desc: 'Bolted to the keel web beside the folded leg, it hooks the strut just above the trailing-arm pivot when the leg is up, so the gear cannot drop in flight; an electric release opens it for extension (position estimated).',
+    }, L(merge([box(0.09, 0.1, 0.008, [kS.x, kS.y + 0.01, kw + 0.004 * side]), box(0.05, 0.03, Math.abs(hookIn - kw), [kS.x, kS.y - 0.035, (kw + hookIn) / 2]), box(0.05, 0.03, 0.02, [kS.x, kS.y + 0.055, (kw + hookIn) / 2])]), m.darkMetal));
     P(`Brake servo (${sd})`, {
       system: 'Landing gear', material: 'Electromechanical brake servo (est.)', mass: 1.2, explode: [0.35, -1.1, 1.2 * side],
-      desc: 'Each main brake has its own servo, so the crew can brake differentially to help steer. After a 2022 hard landing an MQ-9A needed new landing gear, retract drivers and brake servos (USAF investigation; position estimated).',
+      desc: 'Each main brake has its own servo, so the crew can brake differentially to help steer. It rides on the trailing arm beside the wheel and folds with it. After a 2022 hard landing an MQ-9A needed new landing gear, retract drivers and brake servos (USAF investigation; position estimated).',
     }, L(merge([lru(0.12, 0.06, 0.06, bs.toArray(), 0.01), tubeBetween([bs.x - 0.06, bs.y, bs.z], [Ax.x + 0.02, Ax.y + 0.05, Ax.z - 0.02 * side], 0.006, 5)]), m.lruOlive), piv);
     const drv = [X(5.16), MROOF[0] - 0.035, 0.25 * side];
     P(`Main gear retract driver (${sd})`, {
       system: 'Landing gear', material: 'Motor driver electronics on the well roof (est.)', mass: 1.5, explode: [0.1, 0.65, 0.75 * side],
       desc: 'Powers and controls the retraction actuator on command from the ground station: gear and brakes are moved by electric servos and drivers, not hydraulics (USAF investigations; position estimated).',
     }, L(merge([lru(0.2, 0.06, 0.12, drv, 0.012), pipe([[drv[0] + 0.1, drv[1], drv[2]], [X(4.95), 1.44, 0.29 * side], [anchor.x - 0.02, anchor.y - 0.01, anchor.z]], 0.006, 5, 10)]), m.lru));
-    mainLegs.push({ piv, wheel, q, qw: q.clone().invert() });
+    mainLegs.push({ piv, q });
   }
   // gear electrics: a branch from each main power feeder down behind the wing box to its retract driver, on to the trunnion where
   // the brake line starts; and a branch from the avionics bay harness under the floor to the nose retract driver and steering controller
@@ -766,8 +787,8 @@ export function buildUAV() {
 
   // gear doors: conformal skin patches; the nose doors hinge on their outer edges, the main doors on the keel
   const doors = [];
-  const doorPart = (name, s0, s1, th0, th1, hingeOn, info) => {
-    const g = skinPatch(s0, s1, th0, th1);
+  const doorPart = (name, s0, s1, th0, th1, hingeOn, { nt = 6, ...info }) => {
+    const g = skinPatch(s0, s1, th0, th1, 0.004, 6, nt);
     const th = hingeOn === 'outer' ? th1 : th0;
     const p0 = new THREE.Vector3(...fusePoint(s0, th)), p1 = new THREE.Vector3(...fusePoint(s1, th));
     const h = hingedMesh(g, m.skinDouble, p0, p1);
@@ -775,20 +796,22 @@ export function buildUAV() {
     P(name, { system: 'Landing gear', skin: true, material: 'Composite doors (est.)', ...info }, h.pivot);
     return h;
   };
+  const DOOR_ACT = [];                     // the door actuators' fixed ends, for the gear harness
   for (const side of [1, -1]) {
     const sd = SN(side);
-    const mainDoor = doorPart(`Main gear door (${sd})`, 4.9, 6.46, -Math.PI / 2 + 0.035 * side, -Math.PI / 2 + 1.02 * side, 'keel', {
-      mass: 5, explode: [0, -0.6, 0.55 * side],
-      desc: 'A long door hinged along the keel that closes the main-gear well in flight to keep the underside smooth. It opens before the leg moves and closes after it is up (sequencing estimated).',
+    const mainDoor = doorPart(`Main gear door (${sd})`, 4.9, 6.5, -Math.PI / 2 + 0.035 * side, -Math.PI / 2 + 1.45 * side, 'outer', {
+      mass: 6, explode: [0, -0.6, 0.55 * side], nt: 12,
+      desc: 'A long door that closes the main-gear well in flight to keep the underside smooth. It wraps from the keel strip round the lower corner, because the leg folds into a slot there and the wheel into a pocket at the aft end, and it hinges along its upper edge, under the lower longeron, so it swings out clear of the leg. It opens before the leg moves and closes after it is up (shape, hinge line and sequencing estimated).',
     });
-    doors.push({ h: mainDoor, sign: -side, open: 1.5 });
+    doors.push({ h: mainDoor, sign: side, open: 1.6 });
     doors.push({ h: doorPart(`Nose gear door (${sd})`, 1.92, 3.08, -Math.PI / 2 + 0.02 * side, -Math.PI / 2 + 0.42 * side, 'outer', {
       mass: 1.5, explode: [0, -0.55, 0.35 * side], desc: 'One of a pair of nose-gear doors hinged along the outer edge of the well, linked to open with the leg.',
     }), sign: side, open: 1.45 });
-    // door actuator: keel wall to a lug on the door's inner face
-    const act = makeActuator(0.016, 0.009, 0.16, m.darkMetal);
-    const anchor = new THREE.Vector3(X(5.7), 1.36, 0.06 * side);
-    const lugClosed = new THREE.Vector3(...fusePoint(5.7, -Math.PI / 2 + 0.3 * side, 0.012));
+    // door actuator: from a bracket inside the well, below the hinge line, out to a lug on the door's inner face
+    const act = makeActuator(0.016, 0.009, 0.12, m.darkMetal);
+    const anchor = new THREE.Vector3(X(5.7), 1.3, 0.25 * side);
+    const lugClosed = new THREE.Vector3(...fusePoint(5.7, -Math.PI / 2 + 1.25 * side, 0.012));
+    DOOR_ACT.push(anchor);
     const p0 = mainDoor.pivot.position.clone();
     P(`Main gear door actuator (${sd})`, {
       system: 'Landing gear', material: 'Small linear actuator (est.)', mass: 1, explode: [0, -0.2, 0.45 * side],
@@ -1198,7 +1221,8 @@ export function buildUAV() {
       const g = smooth(0.05, 0.62, a);            // gear travel
       const d = smooth(0.62, 0.9, a);             // doors closing behind it
       noseLeg.rotation.z = NG.stow * g;
-      for (const ml of mainLegs) { ml.piv.quaternion.slerpQuaternions(qI, ml.q, g); ml.wheel.quaternion.slerpQuaternions(qI, ml.qw, g); }
+      // each main leg turns as one rigid unit about its fixed hinge axis: slerp from identity keeps that axis
+      for (const ml of mainLegs) ml.piv.quaternion.slerpQuaternions(qI, ml.q, g);
       for (const dr of doors) dr.h.setAngle(dr.open * (1 - d) * dr.sign);
       for (const fn of movers) fn();
       // propeller: shown at a slow, alias-free rate (the real one turns ≈ 1,600 rpm)

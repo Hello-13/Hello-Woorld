@@ -53,7 +53,7 @@ export default [
   },
   {
     title: 'Torque, and why the tail rotor is canted',
-    body: 'Spinning the rotor counter-clockwise (seen from above) twists the fuselage the other way. The tail rotor, 9.93 m behind the shaft, pushes the tail to starboard to cancel it; the pedals change its pitch through cables, a spring-loaded quadrant and a two-stage servo. Its shaft is canted 20° up, so it also lifts the tail — about 3 % of the weight — which widens the centre-of-gravity range. The bearingless rotor flaps and changes pitch by bending and twisting its two composite crossbeam spars. The pylon is ghosted here so the 42° and 90° gearboxes and the servo inside it show.',
+    body: 'Spinning the rotor counter-clockwise (seen from above) twists the fuselage the other way. The tail rotor, 9.93 m behind the shaft, pushes the tail to starboard to cancel it; the pedals change its pitch through cables, a spring-loaded quadrant and a two-stage servo. Its shaft is canted 20° up, so it also lifts the tail — about 2.5 % of the total lift in a hover — which widens the centre-of-gravity range. The bearingless rotor flaps and changes pitch by bending and twisting its two composite crossbeam spars. The pylon is ghosted here so the 42° and 90° gearboxes and the servo inside it show.',
     key: 'Hover at 9,979 kg: torque Q = P/Ω ≈ 70 kN·m, so the tail rotor needs Q / 9.93 m ≈ 7 kN of sideways thrust (≈ 9 % of the power).',
     focus: [...TAILROTOR, 'Intermediate gearbox (42°)', 'Tail drive shaft section 6'], view: { dir: [0.2, 0.55, 1], fill: 1.2 }, demo: 'surfaces',
   },

@@ -131,23 +131,30 @@ export function merlinKit({ detail = false, level = detail ? 'full' : 'mid' } = 
     block(0.24, 1.62, -0.15, 0.1, 0.1, 0.1),                            // main fuel valve
     post(px + 0.06, 0.2, 1.62, 1.7, 0.03, 8),                           // GG valve
     post(0.228, -0.127, 1.47, 1.53, 0.05, full ? 14 : 8),              // mixture-ratio trim butterfly valve
-    block(0.3, 1.5, -0.2, 0.06, 0.08, 0.06),                            // its servo motor
+    block(0.3, 1.5, -0.17, 0.06, 0.08, 0.06),                           // its servo motor (inboard of the Octaweb's lower ring)
     block(-0.3, 2.32, 0.1, 0.08, 0.08, 0.08),                           // TEA-TEB igniter valve
   ];
   const ign = [
-    // TEA-TEB igniter feeds to the injector and the gas generator (dual-redundant)
-    pipe([[-0.3, 2.3, 0.1], [-0.18, 1.95, 0.12], [-0.06, 1.86, 0.06]], 0.012, { seg: lseg, tubular: full ? 12 : 8 }),
-    pipe([[-0.3, 2.3, 0.1], [0.1, 2.1, 0.3], [px, 1.62, 0.22]], 0.012, { seg: lseg, tubular: full ? 14 : 8 }),
+    // TEA-TEB igniter feeds to the injector and the gas generator (dual-redundant); the GG feed
+    // crosses the engine's inboard side above the Octaweb's radial web, then drops to the GG head
+    pipe(IGN_CHAMBER, 0.012, { seg: lseg, tubular: full ? 12 : 8 }),
+    pipe(IGN_GG, 0.012, { seg: lseg, tubular: full ? 18 : 12 }),
   ];
   // TVC hydraulics: high-pressure RP-1 from the fuel-pump discharge to each actuator, and the
   // return to the pump's low-pressure inlet (no separate hydraulic fluid to run out)
   const tvcR = full ? 0.01 : 0.009, tv = { seg: lseg, tubular: full ? 14 : 8 };
   const port = (a, r, y) => [Math.cos((a * Math.PI) / 180) * r, y, Math.sin((a * Math.PI) / 180) * r];
+  // (the inboard return crosses above the Octaweb's radial web; on an outer engine the outboard one
+  // passes under the corner web on the pump side, where that web has risen toward the octagon)
   const tvc = [
     pipe([[px - 0.08, 1.86, -0.12], [0.05, 1.95, -0.3], port(235, 0.45, 2.03)], tvcR, tv),
     pipe([[0.05, 1.95, -0.3], [-0.15, 1.99, -0.33], [-0.34, 2.0, -0.05], [-0.33, 2.01, 0.2], port(125, 0.45, 2.03)], tvcR, tv),
-    pipe([port(125, 0.47, 2.09), [0.0, 2.15, 0.36], [0.35, 2.25, 0.22], [px + 0.24, 2.3, 0.04]], tvcR, tv),
-    pipe([port(235, 0.47, 2.09), [0.0, 2.15, -0.36], [0.35, 2.25, -0.22], [px + 0.24, 2.3, -0.04]], tvcR, tv),
+    pipe([port(125, 0.47, 2.09), [-0.14, 2.22, 0.38], [0.05, 2.25, 0.36], [0.35, 2.28, 0.22], [px + 0.24, 2.32, 0.04]], tvcR, tv),
+    // (the centre and vacuum engines have no corner web there, and their chill-bleed line takes that
+    // space, so they keep the direct run)
+    full
+      ? pipe([port(235, 0.47, 2.09), [0.0, 2.15, -0.36], [0.35, 2.25, -0.22], [px + 0.24, 2.3, -0.04]], tvcR, tv)
+      : pipe([port(235, 0.47, 2.09), [0.0, 2.12, -0.37], [0.25, 2.17, -0.24], [0.47, 2.19, -0.23], [0.58, 2.22, -0.12], [px + 0.24, 2.32, -0.04]], tvcR, { seg: lseg, tubular: 12 }),
   ];
   // engine chill: a bleed valve on the LOX pump inlet dumps LOX through the pump overboard,
   // through the heat shield, until the hardware is cold enough for start
@@ -165,6 +172,11 @@ export function merlinKit({ detail = false, level = detail ? 'full' : 'mid' } = 
   ];
   return { pump, line, gg, duct, act, valve, ign, tvc, bleed };
 }
+
+// TEA-TEB igniter line paths from the igniter valve (engine frame): to the injector, and to the
+// gas-generator head (each leaves the valve body through its lower corner on that side)
+const IGN_CHAMBER = [[-0.285, 2.29, 0.085], [-0.18, 1.95, 0.12], [-0.06, 1.86, 0.06]];
+const IGN_GG = [[-0.285, 2.29, 0.125], [-0.08, 2.27, 0.2], [0.1, 2.22, 0.27], [0.2, 2.02, 0.28], [0.36, 1.62, 0.22]];
 
 /** Place a list of engine-frame geometries at (x, y0, z) turned by yaw (rad). */
 export function placeAll(list, x, y0, z, yaw) {
@@ -214,9 +226,11 @@ export function mvacKit() {
     pipe([[0.26, 2.3 + dy, -0.12], [0.38, 2.15 + dy, -0.28], [0.5, 1.9 + dy, -0.36], [0.62, 1.6 + dy, -0.4]], 0.0125, { seg: 6, tubular: 12 }),
   ];
   // insulation lagging over the igniter lines (added after the first v1.1 relight failure, 2013)
+  // (the lagging stops just short of each line's ends)
+  const lagPath = (pts) => pts.map(([x, y, z], i) => (i === 0 ? [x, y - 0.02, z] : i === pts.length - 1 ? [x + (pts[i - 1][0] - x) * 0.04, y + 0.02, z] : [x, y, z])).map(([x, y, z]) => [x, y + dy, z]);
   out.lag = [
-    pipe([[-0.3, 2.28 + dy, 0.1], [-0.18, 1.95 + dy, 0.12], [-0.07, 1.87 + dy, 0.065]], 0.024, { seg: 8, tubular: 12 }),
-    pipe([[-0.3, 2.28 + dy, 0.1], [0.1, 2.1 + dy, 0.3], [0.35, 1.64 + dy, 0.22]], 0.024, { seg: 8, tubular: 14 }),
+    pipe(lagPath(IGN_CHAMBER), 0.024, { seg: 8, tubular: 12 }),
+    pipe(lagPath(IGN_GG), 0.024, { seg: 8, tubular: 18 }),
   ];
   out.inj = pintleInjector(dy);
   return out;

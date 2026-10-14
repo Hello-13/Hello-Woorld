@@ -156,6 +156,23 @@ function legGeometry(len) {
   return loftRings(rings, { capStart: true, capEnd: true });
 }
 
+/**
+ * Straight bar from p0 to p1 with a level section: w across it in the horizontal plane, h in the
+ * vertical plane through it (engine/geometry's beam() rolls its section with the bar's heading).
+ */
+function bar(p0, p1, w, h) {
+  const a = new THREE.Vector3(...p0), b = new THREE.Vector3(...p1);
+  const along = b.clone().sub(a), len = along.length();
+  along.divideScalar(len);
+  const side = new THREE.Vector3(0, 1, 0).cross(along);
+  if (side.lengthSq() < 1e-8) side.set(1, 0, 0);
+  side.normalize();
+  const up = along.clone().cross(side).normalize();
+  const g = new THREE.BoxGeometry(w, h, len);
+  g.applyMatrix4(new THREE.Matrix4().makeBasis(side, up, along));
+  const m = a.add(b).multiplyScalar(0.5);
+  return g.translate(m.x, m.y, m.z);
+}
 /** A small box mounted at radius r, azimuth a, height y, facing outward (w tangential, d radial). */
 const unit = (r, a, y, w, h, d) => { const [x, z] = polar(r, a); return block(x, y, z, w, h, d, radialYaw(a)); };
 /**
@@ -440,18 +457,19 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   const oct = (r, y) => Array.from({ length: 8 }, (_, i) => { const [x, z] = polar(r, i * 45); return [x, y, z]; });
   for (const [y, h] of [[1.45, 0.2], [3.05, 0.16]]) {
     const v = oct(1.7, y);
-    for (let i = 0; i < 8; i++) ow.push(beam(v[i], v[(i + 1) % 8], 0.12, h));
+    for (let i = 0; i < 8; i++) ow.push(bar(v[i], v[(i + 1) % 8], 0.12, h));
   }
-  for (const [x, , z] of oct(1.7, 0)) ow.push(beam([x, 1.45, z], [x, 3.05, z], 0.14, 0.14), beam([x, 3.05, z], [x * 1.04, 3.24, z * 1.04], 0.1, 0.1));
+  for (const [x, , z] of oct(1.7, 0)) ow.push(beam([x, 1.45, z], [x, 3.05, z], 0.14, 0.14), bar([x, 3.05, z], [x * 1.04, 3.24, z * 1.04], 0.1, 0.1));
   for (const a of OUTER) {
     const [x, z] = polar(ENGINE_RING, a);
     const [ix, iz] = polar(HUB.r, a);
-    ow.push(beam([ix, 2.08, iz], [x, 2.08, z], 0.12, 0.18));                // radial web to the engine mount
+    ow.push(bar([ix, 2.08, iz], at(ENGINE_RING - 0.11, a, 2.08), 0.12, 0.18));   // radial web to the side of the engine mount
     for (const s of [-22.5, 22.5]) {
       const [vx, vz] = polar(1.7, a + s);
-      ow.push(beam([x, 2.08, z], [vx, 2.4, vz], 0.1, 0.12));
+      ow.push(bar([x, 2.15, z], [vx, 2.4, vz], 0.1, 0.12));                // corner webs from the pad's top to the octagon, over the turbopump
     }
-    ow.push(block(x, 2.08, z, 0.3, 0.14, 0.3));                             // gimbal mount pad
+    // gimbal mount pad, square to its engine, on a boss over the gimbal block (as at the centre)
+    ow.push(block(x, 2.09, z, 0.26, 0.12, 0.26, radialYaw(a)), post(x, z, Y.engineTop - 0.005, 2.035, 0.1, 16));
   }
   // attachment ring at the dome-to-barrel junction (the tank's Y-ring)
   ow.push(hoop(R - 0.04, 0.04, 3.3, { seg: 64, tube: 6 }));
