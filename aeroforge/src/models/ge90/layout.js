@@ -65,6 +65,23 @@ export const BYPASS = [
 ];
 export const FAN_NOZZLE_Y = -3.95;
 
+/** Core cowl (Boeing inner fixed structure): its outer line [y, r] from the fan hub frame to its
+ *  aft edge, and its wall thickness; the core compartment is everything inside r − t. */
+export const CORE_COWL = { t: 0.02, line: [[-1.82, 0.99], [-2.6, 1.05], [-3.2, 1.06], [FAN_NOZZLE_Y, 1.04], [-4.5, 1.015], [-5.1, 0.983]] };
+
+/** Outer radius of the core cowl at station y (the lathe joins its profile points with straight lines). */
+export function cowlAt(y) {
+  const L = CORE_COWL.line;
+  if (y >= L[0][0]) return L[0][1];
+  for (let i = 1; i < L.length; i++) {
+    if (y >= L[i][0]) {
+      const [y0, r0] = L[i - 1], [y1, r1] = L[i];
+      return r0 + ((r1 - r0) * (y - y0)) / (y1 - y0);
+    }
+  }
+  return L[L.length - 1][1];
+}
+
 export function bypassAt(y) {
   if (y >= BYPASS[0][0]) return [BYPASS[0][1], BYPASS[0][2]];
   for (let i = 1; i < BYPASS.length; i++) {

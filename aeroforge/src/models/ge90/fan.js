@@ -117,17 +117,26 @@ export function buildFan(ctx) {
   }, ogv).userData.part.stationTemp = '13';
 
   // ------------------------------------------------------------------ booster casing & splitter
-  const casingFwd = -0.72, casingAft = -1.66;
-  const inner = [];
-  for (let y = casingFwd; y >= casingAft - 1e-6; y -= 0.06) inner.push([coreAt(y)[1], y]);
-  const outer = [];
-  for (let y = casingAft; y <= casingFwd + 1e-6; y += 0.06) outer.push([bypassAt(y)[0], y]);
-  const splitterProf = [[0.872, -0.70], ...inner, ...outer.slice(0, -1), [0.885, -0.70]];
+  // One U-shaped section: a solid splitter nose, then two walls with the actuator cavity between
+  // them, open aft onto the fan hub frame. The booster case (2 cm wall on the core flow path) ends
+  // on the gooseneck's lip at y −1.60; the splitter's inner bypass wall (1.5 cm) ends on the frame's
+  // mid ring at y −1.62.
+  const NOSE_AFT = -0.86, CASE_AFT = -1.60, SHELL_AFT = -1.62, CASE_T = 0.02, SHELL_T = 0.015;
+  const stations = (y0, y1) => { const out = []; for (let y = y0; y > y1 + 1e-6; y -= 0.06) out.push(y); out.push(y1); return out; };
+  const tipAt = (y) => coreAt(y)[1], bypIn = (y) => bypassAt(y)[0];
+  const splitterProf = [
+    [0.872, -0.70],
+    ...stations(-0.72, CASE_AFT).map((y) => [tipAt(y), y]),                       // core flow path, front to back
+    ...stations(NOSE_AFT, CASE_AFT).reverse().map((y) => [tipAt(y) + CASE_T, y]),  // outside of the booster case
+    ...stations(NOSE_AFT, SHELL_AFT).map((y) => [bypIn(y) - SHELL_T, y]),          // nose bulkhead, inside of the bypass wall
+    ...stations(-0.72, SHELL_AFT).reverse().map((y) => [bypIn(y), y]),             // bypass flow path, back to front
+    [0.885, -0.70],
+  ];
   const splitter = cut(cutLathe(splitterProf, GM.casing(), { seg: 80 }));
   P('Booster casing & splitter', {
-    system: 'Structure', material: 'Titanium splitter lip, aluminium casing', mass: 190,
+    system: 'Structure', material: 'Titanium splitter lip, aluminium casing and inner bypass wall', mass: 190,
     explode: [-0.55, 0.9, 0], temp: 300,
-    desc: 'The sharp splitter lip divides the fan exit flow: about 1 kg of air in 8.1 goes down into the core, the other 7.1 kg into the bypass duct (take-off bypass ratio 7.1, ICAO databank). The casing behind it holds the booster stator vanes.',
+    desc: 'The sharp splitter lip divides the fan exit flow: about 1 kg of air in 8.1 goes down into the core, the other 7.1 kg into the bypass duct (take-off bypass ratio 7.1, ICAO databank). Behind the lip, the booster case that holds the stator vanes and the splitter\'s inner bypass wall part company; the cavity between them, closed at the back by the fan hub frame, houses the VBV actuators and unison ring, their servo-fuel tubes and harness leads, and the booster anti-ice duct.',
   }, splitter).userData.part.stationTemp = '13';
 
   // ------------------------------------------------------------------ booster (LP compressor) rows
@@ -249,6 +258,8 @@ export function buildFan(ctx) {
     for (const phi of [0.75, 0.75 + Math.PI]) {
       if (!keep(phi)) continue;
       list.push(axialCyl(0.86, -1.43, phi, 0.028, 0.26, 16), axialCyl(0.86, -1.27, phi, 0.018, 0.06, 12));
+      // head-end clevis bracket and a mid-body steady bracket, both bolted to the booster case
+      for (const [y0, y1, top] of [[-1.25, -1.29, 0.852], [-1.43, -1.47, 0.84]]) list.push(slab([[coreAt(y0)[1] + CASE_T + 0.0002, y0], [coreAt(y1)[1] + CASE_T + 0.0002, y1], [top, y1], [top, y0]], phi - 0.018, phi + 0.018, 3));
       list.push(tube([P3(0.86, -1.56, phi), P3(0.84, -1.6, phi + 0.02), P3(0.81, -1.63, phi + 0.04)], 0.009, { seg: 8 }));
       list.push(boxAt(0.81, -1.625, phi + 0.04, [0.05, 0.03, 0.04]));
     }
@@ -257,7 +268,7 @@ export function buildFan(ctx) {
   P('VBV actuators', {
     system: 'Propulsion', material: 'Parker fuel-powered actuators with bellcranks (count and position estimated)', mass: 14, count: 2,
     explode: [-0.4, 0.25, 0.75], temp: 330,
-    desc: 'High-pressure fuel from the HMU, used as hydraulic fluid and fed through a pair of servo tubes, drives these two Parker rams; through bellcranks they rotate the unison ring that opens and closes all the bypass-valve doors together. A position sensor in each tells the FADEC where the doors are.',
+    desc: 'High-pressure fuel from the HMU, used as hydraulic fluid and fed through a pair of servo tubes, drives these two Parker rams, bracketed to the booster case inside the splitter cavity; through bellcranks they rotate the unison ring that opens and closes all the bypass-valve doors together. A position sensor in each tells the FADEC where the doors are.',
   }, cut(vbvAct));
 
   void SKIN;

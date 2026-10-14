@@ -37,7 +37,7 @@ const FUEL = [
   'Forward fuel cell', 'Header fuel cell', 'Aft fuel cell', ...SIDES(['Inboard wing tank', 'Outboard wing tank', 'Wing jet pumps', 'Wing transfer lines', 'Wing motive-fuel line', 'Wing fuel vents', 'ER fuel pod']),
   'Header tank pumps', 'Jet-pump selector valves', 'Jet-pump motive manifold', 'Fuselage jet pumps', 'Fuselage transfer lines', 'Fuselage tank vents',
   'Fuel quantity probes', 'Fuel sump drains', 'Gravity refuel ports', 'Fuel dump valve & outlet', 'Forward electric fuel heater',
-  'Electrical fuel shutoff valve (FSOV)', 'Engine feed line',
+  'Electrical fuel shutoff valve (FSOV)', 'Engine feed line', 'Fuel system harness',
 ];
 const STORES = [
   ...SIDES(['Inboard pylon', 'Middle pylon', 'Outboard pylon', 'Store release hardware', 'GBU-12 Paveway II', 'M310 launcher', 'AGM-114 Hellfire pair']), 'Centreline station',
@@ -48,7 +48,7 @@ const CONTROLS = [
 ];
 const GEAR = [
   'Nose gear oleo strut', 'Nose gear torque links', 'Nose gear steering actuator', 'Nose-wheel steering controller', 'Nose gear retraction actuator', 'Nose gear retract driver',
-  'Nose gear uplock', 'Nose wheel & tyre',
+  'Nose gear uplock', 'Nose wheel & tyre', 'Nose leg harness', 'Landing gear harness',
   ...SIDES(['Main gear strut', 'Main gear trailing arm', 'Main gear shock absorber', 'Main gear retraction actuator', 'Main gear retract driver', 'Main gear uplock', 'Main wheel & brake', 'Brake servo']),
 ];
 

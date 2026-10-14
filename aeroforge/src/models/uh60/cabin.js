@@ -9,7 +9,7 @@
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
-import { MAT, V3, merge, box, cyl, tube, pipe, place, DEICE } from './common.js';
+import { MAT, V3, merge, box, cyl, tube, pipe, place, DEICE, TR_CTL } from './common.js';
 import { aftDeckPoint } from './tail.js';
 
 /** A blade antenna standing on point p with its root along the surface normal n. */
@@ -313,7 +313,10 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   for (const dz of [0.05, 0.1]) {
     const pts = [[1.2, 2.4, dz], [0.95, 2.28, dz + 0.1], [0.75, 2.12, dz + 0.12], [0.5, 2.055, dz + 0.12], [0.0, 2.1, dz + 0.12], [-0.5, 2.055, dz + 0.12], [-1.0, 2.1, dz + 0.12], [-1.6, 2.13, dz + 0.1], [-2.4, 2.15, dz + 0.05], [-3.6, 2.12, dz]];
     for (let x = -4.4; x >= -8.2; x -= 0.95) pts.push([x, 1.98 - (x + 4.4) * -0.015, dz]);
-    pts.push([-8.9, 2.2, -0.02], [-9.2, 2.6, -0.11], [-9.33, 2.86, -0.22]);
+    // under the 42° gearbox, past the right side of the pylon's rear spar and up behind it to the
+    // quadrant's two cable-end fittings
+    const [qx, qy, qz] = TR_CTL.quadrant;
+    pts.push([-8.5, 1.83, dz], [-8.8, 1.98, dz], [-9.05, 2.25, dz * 0.5], [-9.3, 2.6, -0.1], dz === 0.05 ? [qx - 0.02, qy - 0.11, qz] : [qx + 0.09, qy - 0.08, qz]);
     cab.push(pipe(pts, 0.006, 4));
     if (dz === 0.05) cabPts.push(...pts);
   }
@@ -326,7 +329,8 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   const crank = (p, ax = 'z') => [cyl(0.03, 0.03, 0.04, p, ax, 10), box(0.1, 0.02, 0.025, [p[0] + 0.03, p[1] + 0.02, p[2]])];
   for (const p of [[2.62, 0.6, 0.32], [2.62, 0.6, -0.32], [2.4, 0.62, -0.7], [2.35, 0.68, -0.88], [2.3, 2.05, -0.92], [2.2, 2.3, -0.6]]) bc.push(...crank(p));
   bc.push(box(0.04, 0.03, 0.4, [1.0, 2.4, -0.1]), cyl(0.02, 0.02, 0.06, [1.0, 2.38, -0.1], 'y', 8));
-  for (const p of cabPts.slice(cabPts.findIndex((q) => q[0] === -3.6), -2)) bc.push(cyl(0.032, 0.032, 0.025, [p[0], p[1] + 0.01, 0.075], 'z', 12), box(0.05, 0.08, 0.06, [p[0], p[1] + 0.06, 0.075]));
+  // pulleys with short brackets up to the tail-cone top longerons (the drive-shaft hangers sit above the skin)
+  for (const p of cabPts.slice(cabPts.findIndex((q) => q[0] === -3.6), -2)) bc.push(cyl(0.032, 0.032, 0.025, [p[0], p[1] + 0.01, 0.075], 'z', 12), box(0.05, 0.045, 0.06, [p[0], p[1] + 0.045, 0.075]));
   P('Control bellcranks & cable pulleys', {
     system: 'Flight controls', material: 'Aluminium bellcranks and walking beam, phenolic cable pulleys on brackets', mass: 5, count: 15, explode: [0.0, 1.4, -0.9],
     desc: 'Wherever a control run changes direction there is a bellcrank: under the cockpit floor, at the foot and the top of the control closet, and a walking beam on the deck. Along the tail cone the two tail-rotor cables run over pulleys on brackets about every metre.',
@@ -391,8 +395,13 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
     mesh(merge([box(0.012, 0.12, 0.17, [2.172, 1.98, 0.83]), box(0.012, 0.12, 0.17, [2.172, 1.98, -0.83])]), MAT.casting())]);   // mounting flanges on the frame at x 2.2
   // lines, one part per system so each can be traced in the Systems view
   const sv = servoBases.length ? servoBases.map((p) => [p.x - 0.02, p.y + 0.04, p.z]) : [[0.45, 2.33, -0.3], [0.5, 2.33, 0], [0.45, 2.33, 0.3]];
-  const trServo = [-9.38, 2.95, -0.24];
-  const tailRun = (dz) => [[-1.0, 2.3, -0.36 + dz * 0.2], [-2.0, 2.28, -0.2 + dz], [-3.0, 2.12, -0.16 + dz], [-5.0, 1.97, -0.14 + dz], [-7.5, 1.86, -0.1 + dz], [-8.6, 2.08, -0.02 + dz * 0.5], [-9.0, 2.5, -0.08 + dz * 0.3], [-9.3, 2.85, -0.2 + dz * 0.2], trServo];
+  // tail-rotor servo ports: No. 1 (dz 0) at its lower end, backup (dz 0.2) 0.1 m up the body
+  const trPort = (dz) => { const [a, b] = [V3(...TR_CTL.servoLo), V3(...TR_CTL.servoHi)]; return dz ? a.clone().addScaledVector(b.sub(a).normalize(), 0.1) : a; };
+  // along the tail cone, under the 42° gearbox, up the pylon beside the right face of its rear spar,
+  // then aft over the cable quadrant to the servo behind the spar; the pylon drive shaft, which
+  // climbs ahead of the spar, stays clear of them
+  const tailRun = (dz) => [[-1.0, 2.3, -0.36 + dz * 0.2], [-2.0, 2.28, -0.2 + dz], [-3.0, 2.12 - dz * 0.25, -0.16 + dz], [-5.0, 1.97 - dz * 0.25, -0.14 + dz], [-7.5, 1.86 - dz * 0.2, -0.1 + dz], [-8.3, 1.83, -0.08 + dz * 0.8], [-8.62, 1.95, -0.03 + dz * 0.4], [-9.0, 2.5, -0.08 + dz * 0.3],
+    dz ? [-9.25, 2.72, -0.04] : [-9.25, 2.72, -0.08], dz ? [-9.4, 2.97, -0.15] : [-9.44, 2.88, -0.13], trPort(dz)];
   // transfer module → round the outside of the main-module case → over the servo deck brackets to
   // each servo's manifold (sv is ordered left, centre, right)
   const toServos = (s) => {

@@ -7,7 +7,7 @@ import { mesh } from '../../engine/assembly.js';
 import { lathe } from '../../engine/geometry.js';
 import { M } from '../../engine/materials.js';
 import { GM } from './materials.js';
-import { ROWS, coreAt, PLUG_TIP, TCF } from './layout.js';
+import { ROWS, coreAt, PLUG_TIP, TCF, CORE_COWL, cowlAt } from './layout.js';
 import { cutLathe, cutPair, bladeGeometry, ring, boxAt, radialCyl, axialCyl, hoop, kept, merge, P3, tube, cutTube, rotorRow } from './geom.js';
 import { coreRow, coreRotor, coreBlade } from './fan.js';
 
@@ -523,29 +523,48 @@ export function buildCore(ctx) {
     explode: [-0.6, -1.55, 0], temp: 750,
     desc: 'The flared case that holds the six LPT nozzle rows. Its cone angle shows how much the gas expands: the annulus area grows about 2.5-fold from LPT inlet to exit.',
   }, lptC).userData.part.stationTemp = '5';
+  // LPT ACC, all inside the core compartment: each stage has a spray hoop over its blade row, kept
+  // at least 12 mm inside the core cowl (the cowl closes in over the last stages); two half-manifolds
+  // are fed at 0.3 and 2.4 rad, leaving room at the bottom for the oil lines. Each feed header leaves
+  // its valve aft, crosses the EGT plane outboard of the thermocouple harness ring, and runs aft along
+  // the hoops; the last hoop, where the cowl is closest, is fed by a smaller jumper tube.
+  const ACC_PHI = [0.3, 2.4], ACC_VALVE = { r: 0.965, y: -3.92, rad: 0.05, len: 0.1 }, HDR = 0.022;
+  const cowlIn = (y) => cowlAt(y) - CORE_COWL.t;
+  const hoopR = (y) => Math.min(coreAt(y)[1] + 0.075, cowlIn(y) - 0.024);
+  const hdrR = (y) => Math.min(coreAt(y)[1] + 0.105, cowlIn(y) - HDR - 0.008);
+  const LPT_ROW_Y = ROWS.lptBlades.map((r) => r.y);
+  const hdrY = [...LPT_ROW_Y.slice(0, 4), -4.85, LPT_ROW_Y[4]];          // -4.85: over the case flange
   const lptAcc = cut(cutPair((keep) => {
-        // two half-manifolds per stage, fed at 0.3 and 2.4 rad, leaving room at the bottom for the oil lines
-        const GAP0 = 1.35, GAP1 = 2.2;
-        const list = [];
-        for (const r of ROWS.lptBlades) {
-          const rr = coreAt(r.y)[1] + 0.075;
-          const a0 = Math.max(keep.start, GAP1), a1 = keep.start + keep.arc;
-          if (keep.start < GAP0) list.push(hoop(rr, r.y, 0.012, { start: keep.start, arc: Math.min(GAP0, a1) - keep.start, tubular: 24, radial: 5 }));
-          if (a1 > a0) list.push(hoop(rr, r.y, 0.012, { start: a0, arc: a1 - a0, tubular: 40, radial: 5 }));
-        }
-    for (const phi of [0.3, 2.4]) {
+    const GAP0 = 1.35, GAP1 = 2.2;
+    const list = [];
+    for (const y of LPT_ROW_Y) {
+      const rr = hoopR(y);
+      const a0 = Math.max(keep.start, GAP1), a1 = keep.start + keep.arc;
+      if (keep.start < GAP0) list.push(hoop(rr, y, 0.012, { start: keep.start, arc: Math.min(GAP0, a1) - keep.start, tubular: 24, radial: 5 }));
+      if (a1 > a0) list.push(hoop(rr, y, 0.012, { start: a0, arc: a1 - a0, tubular: 40, radial: 5 }));
+    }
+    for (const phi of ACC_PHI) {
       if (!keep(phi)) continue;
-      const pts = ROWS.lptBlades.map((r) => P3(coreAt(r.y)[1] + 0.105, r.y, phi));
-      list.push(tube([P3(1.03, -3.95, phi), P3(0.86, -4.12, phi), ...pts], 0.026, { seg: 32, radial: 8 }));
-      list.push(axialCyl(1.03, -3.92, phi, 0.05, 0.1, 16));
+      const V = ACC_VALVE;
+      list.push(axialCyl(V.r, V.y, phi, V.rad, V.len, 16));
+      // inlet neck from the top of the valve to the cowl's inner wall, under the scoop
+      list.push(radialCyl(V.r + V.rad - 0.01, cowlIn(-3.922) - 0.0008, -3.9, phi, 0.022, 12));
+      list.push(tube([P3(V.r, V.y - 0.035, phi), P3(0.915, -4.08, phi), P3(0.88, -4.165, phi), ...hdrY.map((y) => P3(hdrR(y), y, phi))], HDR, { seg: 40, radial: 8 }));
+      const y5 = LPT_ROW_Y[4], y6 = LPT_ROW_Y[5];
+      list.push(tube([P3(hdrR(y5), y5, phi), P3((hdrR(y5) + hoopR(y6)) / 2, (y5 + y6) / 2, phi), P3(hoopR(y6), y6, phi)], 0.012, { seg: 10, radial: 6 }));
     }
     return merge(list);
   }, GM.duct()));
+  // fan-air scoops on the core cowl's outer face, over the valve necks; cut with the cowl
+  // (seated on the cowl at its forward end; the cowl falls away by 2 mm towards its aft end)
+  const SCOOP_Y = -3.89, SCOOP_L = 0.09, SCOOP_R = 0.025, scoopR = cowlAt(SCOOP_Y + SCOOP_L / 2) + SCOOP_R * Math.cos(Math.PI / 14) + 0.0003;
+  const scoops = cut(cutPair((keep) => merge(ACC_PHI.filter((p) => keep(p)).map((phi) => axialCyl(scoopR, SCOOP_Y, phi, SCOOP_R, SCOOP_L, 14))), GM.duct(), 'nacelle'));
+  const mouths = cut(cutPair((keep) => merge(ACC_PHI.filter((p) => keep(p)).map((phi) => axialCyl(scoopR, SCOOP_Y + SCOOP_L / 2 + 0.0008, phi, 0.019, 0.002, 14))), GM.hole(), 'nacelle'));
   P('LPT active clearance control', {
-    system: 'Thermal control', material: 'Aluminium / stainless spray tubes, fan-air valve', mass: 30,
+    system: 'Thermal control', material: 'Aluminium / stainless spray tubes, fan-air valves and cowl scoops', mass: 30,
     explode: [-0.95, -1.55, 0.3], temp: 360,
-    desc: 'Fan air ducted from the bypass stream through a FADEC-controlled valve and sprayed on the LPT case through perforated rings, shrinking it onto the blade tips in cruise.',
-  }, lptAcc);
+    desc: 'Fan air taken from the bypass stream through a scoop in the core cowl, metered by a FADEC-controlled valve and sprayed on the LPT case through a perforated ring over each of the six stages, shrinking the case onto the blade tips in cruise. Two valves and feed headers serve the two halves of the rings (scoop and valve positions estimated).',
+  }, [lptAcc, scoops, mouths]);
 
   // ====================================================================== turbine rear frame
   const trf = cut(cutLathe([rect(0.905, 0.935, -5.13, -5.4), rect(0.935, 0.98, -5.13, -5.15), rect(0.5, 0.56, -5.14, -5.4), rect(0.935, 1.02, -5.22, -5.32)], GM.casing(), { seg: 72 }));
@@ -597,10 +616,10 @@ export function buildCore(ctx) {
   const hpShaft = cut(cutLathe([rect(0.15, 0.166, -1.93, -2.12), [[0.166, -2.08], [0.178, -2.08], [0.24, -2.16], [0.226, -2.16]],
     rect(0.385, 0.4, -3.04, -3.6),
     rect(0.125, 0.14, -4.06, -4.18), [[0.14, -4.06], [0.18, -4.02], [0.18, -4.04], [0.14, -4.08]]], GM.shaft(), { seg: 48 }));
-  P('HP shaft & CDP seal drum', {
+  P('HP shaft & compressor-to-turbine drum', {
     system: 'Drive system', material: 'Nickel-alloy drum, steel stub shafts', mass: 120,
     explode: [0.9, -0.7, 0.4], temp: 650,
-    desc: 'The HP spool\'s backbone: a forward stub shaft into the #3 thrust bearing, the drum under the combustor that links compressor to turbine, and an aft stub shaft into the #4 bearing in the turbine center frame. It is hollow, so the LP shaft passes straight through.',
+    desc: 'The HP spool\'s backbone: a forward stub shaft into the #3 thrust bearing, the drum under the combustor that carries the turbine\'s torque forward to the compressor (the rotating CDP seal, a separate part, is bolted between its aft end and the HP turbine), and an aft stub shaft into the #4 bearing in the turbine center frame. It is hollow, so the LP shaft passes straight through.',
   }, hpShaft).userData.part.stationTemp = '3';
   const cdp = [rect(0.385, 0.4, -3.6, -3.775)];
   for (let k = 0; k < 4; k++) { const y = -3.615 - k * 0.025; cdp.push([[0.4, y + 0.004], [0.4033, y + 0.0008], [0.4033, y - 0.0008], [0.4, y - 0.004]]); }
@@ -682,7 +701,7 @@ export function buildCore(ctx) {
     system: 'Structure', material: 'Threaded high-temperature plugs (count estimated)', mass: 2, count: 6,
     explode: [-0.75, -1.55, 0.2], temp: 750,
     desc: 'One per LP-turbine stage, between the rows of nozzle vanes.',
-  }, ports(ROWS.lptNozzles.map((r) => [coreAt(r.y)[1] + 0.026, PORT_PHI, r.y])));
+  }, ports(ROWS.lptNozzles.map((r) => [coreAt(r.y)[1] + 0.026, PORT_PHI + 0.1, r.y])));          // clear of the LPT ACC feed header at 0.3 rad
 
   // centre vent tube: the bearing sumps vent their seal air aft through the LP shaft and out of the plug
   const vent = cut(cutLathe([rect(0.035, 0.045, -0.5, -6.43)], GM.duct(), { seg: 24 }));

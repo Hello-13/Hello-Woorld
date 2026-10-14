@@ -181,6 +181,8 @@ test('guided tour: real part names, every demo, cards that fit', () => {
     if (step.mode) assert.ok(modes.has(step.mode), `step ${i + 1}: mode ${step.mode}`);
     if (step.demo) assert.ok(demos.has(step.demo), `step ${i + 1}: demo ${step.demo}`);
     assert.ok(words(step.body) <= 46 && words(step.key) <= 26 && step.title.length <= 26, `step ${i + 1} text fits the card (${words(step.body)} + ${words(step.key)} words)`);
+    // measured at 1280 × 800: bodies of 255+ characters, or body + key over 355, pushed the key idea under the card's nav
+    assert.ok(step.body.length <= 250 && step.body.length + step.key.length <= 355, `step ${i + 1} text fits the card (${step.body.length} + ${step.key.length} characters)`);
     for (const name of step.focus || []) assert.ok(literals.has(name) || templates.some((re) => re.test(name)), `step ${i + 1}: no part named "${name}"`);
   }
   for (const d of ['tvc', 'surfaces', 'bay', 'mach2']) assert.ok(TOUR.some((s) => s.demo === d), `the tour runs the ${d} demo`);

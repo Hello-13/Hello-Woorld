@@ -21,11 +21,13 @@ export function buildThermal(ctx) {
 
   // ------------------------------------------------------------------ vapour-cycle pack
   {
-    const g = [box(6.78, -0.2, 0.42, 0.34, 0.17, 0.26)];
-    g.push(FR.cylX(6.7, -0.08, 0.36, 0.16, 0.05, 0.05, 14));                                 // refrigerant compressor
-    g.push(box(6.86, -0.08, 0.5, 0.14, 0.07, 0.1));                                          // expansion valve block
-    const l = [FR.pipe([[6.62, -0.25, 0.42], [6.55, -0.36, 0.42], [6.5, -0.44, 0.42]], 0.016, 6, 6),            // evaporator ↔ PAO loop 1
-      FR.pipe([[6.95, -0.22, 0.48], [7.05, -0.4, 0.46], [7.18, -0.55, 0.44]], 0.016, 6, 8)];                      // condenser ↔ fuel
+    // under the cockpit floor (y ≈ −0.07): pack, compressor and valve block all stay below y −0.09
+    const g = [box(6.78, -0.26, 0.42, 0.34, 0.17, 0.26)];
+    g.push(FR.cylX(6.7, -0.14, 0.39, 0.16, 0.05, 0.05, 14));                                 // refrigerant compressor
+    g.push(box(6.86, -0.14, 0.5, 0.14, 0.07, 0.1));                                          // expansion valve block
+    const l = [FR.pipe([[6.62, -0.31, 0.42], [6.55, -0.41, 0.41], [6.5, -0.51, 0.37]], 0.016, 6, 6),            // evaporator ↔ PAO loop 1
+      // condenser ↔ fuel: outboard of the main harness and the bleed duct, under the front of F-1
+      FR.pipe([[6.94, -0.29, 0.52], [7.0, -0.33, 0.6], [7.04, -0.46, 0.63], [7.1, -0.53, 0.65]], 0.016, 6, 8)];
     P('Vapour-cycle refrigeration pack', {
       system: 'Environmental control', material: 'Electric compressor, refrigerant evaporator and fuel-cooled condenser', mass: 28,
       explode: [0.3, -0.75, 0.95],
@@ -110,7 +112,7 @@ export function buildThermal(ctx) {
       g.push(FR.pipe([[7.3, -0.55, z * 0.85], [7.4, -0.3, z * 0.8]], 0.016, 6, 4));
     }
     // condenser line from the vapour-cycle pack joins the right-hand return
-    g.push(FR.pipe([[7.18, -0.55, 0.44], [7.25, -0.58, 0.6], [7.3, -0.55, 0.82]], 0.014, 6, 6));
+    g.push(FR.pipe([[7.1, -0.53, 0.65], [7.2, -0.56, 0.73], [7.3, -0.55, 0.83]], 0.014, 6, 6));
     P('Fuel thermal-management lines', {
       system: 'Fuel', material: 'Aluminium / titanium fuel lines, temperature-controlled recirculation valves', mass: 14, xrayWeight: 0.7,
       explode: [0.3, 0.6, 0],

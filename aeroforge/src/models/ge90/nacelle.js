@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { SKIN } from '../../engine/materials.js';
 import { lathe } from '../../engine/geometry.js';
 import { GM } from './materials.js';
-import { NACELLE, FAN, bypassAt, FAN_NOZZLE_Y } from './layout.js';
+import { NACELLE, FAN, bypassAt, FAN_NOZZLE_Y, CORE_COWL } from './layout.js';
 import { cutLathe, cutPair, wall, sector, boxAt, axialCyl, radialCyl, tangentCyl, merge, P3, kept, tube, arc, cutTube } from './geom.js';
 
 const TAU = Math.PI * 2;
@@ -248,7 +248,7 @@ export function buildNacelle(ctx) {
   };
 
   // ------------------------------------------------------------------ core cowl and bifurcations
-  const ifs = wall([[-1.82, 0.99], [-2.6, 1.05], [-3.2, 1.06], [FAN_NOZZLE_Y, 1.04], [-4.5, 1.015], [-5.1, 0.983]], -0.02);
+  const ifs = wall(CORE_COWL.line, -CORE_COWL.t);
   const bif = cut(cutPair((keep) => {
     const list = [];
     for (const phi of [UP, DOWN]) {

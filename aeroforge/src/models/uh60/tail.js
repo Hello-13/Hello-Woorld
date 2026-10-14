@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { wingPanel, mirrorZ, loftRings, orientOutward, airfoilLoop } from '../../engine/geometry.js';
-import { MAT, DEG, V3, merge, box, cyl, tube, pipe, pchip, unitRod, aimRod, TAIL, pylonLean, strobeMat, DEICE } from './common.js';
+import { MAT, DEG, V3, merge, box, cyl, tube, pipe, pchip, unitRod, aimRod, TAIL, pylonLean, strobeMat, DEICE, TR_CTL } from './common.js';
 
 /** Grid surface: fn(u, v) → Vector3 over u, v ∈ [0, 1]; skip(p) drops a quad. Normals computed. */
 function gridSurface(nu, nv, fn, skip = null) {
@@ -211,10 +211,15 @@ export function buildTail({ A, P, air, roofY }) {
     system: 'Drive system', material: 'Magnesium case, bevel gears, pitch-change shaft through the output', mass: 38, explode: [-3.0, 0.9, -0.3],
     desc: 'Turns the drive 90° into the tail-rotor shaft and reduces it to 1,190 rpm — 4.6 times main-rotor speed — with the tail rotor\'s pitch-change shaft passing through its hollow output. Its housing is magnesium; it mounts the tail rotor and the tail-rotor servo, and like the 42° box it can run 30 minutes with no oil.',
   }, [mesh(merge([tube(tgb.clone().addScaledVector(n, -0.08), tgb.clone().addScaledVector(n, 0.2), 0.15, 18), tube(tgb, tgb.clone().addScaledVector(pyDir, -0.24), 0.1, 14)]), MAT.casting())]);
+  // tail-rotor servo aft of the rear spar (the pylon shaft climbs just ahead of the spar): a trunnion
+  // link to the spar at its lower end, and its output rod reaching up to the 90° gearbox from behind
+  const sLo = V3(...TR_CTL.servoLo), sHi = V3(...TR_CTL.servoHi), sRod = V3(-9.98, 3.36, -0.38);
+  const sparAt = (y) => { const f = (y - 1.62) / 2.35; return V3(-8.455 - 1.728 * f, y, pylonLean(y)); };   // rear-spar axis (see the spars above)
   P('Tail rotor servo', {
-    system: 'Flight controls', material: 'Dual-stage hydraulic actuator', mass: 9, explode: [-3.0, 0.4, -0.5],
-    desc: 'Driven by cables from the pedals, it moves the pitch-change shaft through the tail gearbox. Two stages: the first on the No. 1 hydraulic system, the second on the backup pump.',
-  }, [mesh(merge([tube([-9.38, 2.95, pylonLean(2.95)], [-9.55, 3.28, pylonLean(3.28)], 0.04, 12), tube([-9.55, 3.28, pylonLean(3.28)], [-9.85, 3.4, pylonLean(3.4)], 0.012, 8)]), MAT.hydraulic())]);
+    system: 'Flight controls', material: 'Dual-stage hydraulic actuator on a trunnion link to the pylon rear spar', mass: 9, explode: [-3.0, 0.4, -0.5],
+    desc: 'Driven by cables from the pedals through the quadrant below it, it moves the tail rotor\'s pitch-change shaft through the tail gearbox. Two stages: the first on the No. 1 hydraulic system, the second on the backup pump. Shown behind the pylon\'s rear spar, clear of the drive shaft (exact position approximate).',
+  }, [mesh(merge([tube(sLo, sHi, 0.04, 12), tube(sHi, sRod, 0.012, 8), cyl(0.045, 0.045, 0.03, [sHi.x, sHi.y, sHi.z], 'y', 12).translate(0, -0.01, 0),
+    tube(sparAt(sLo.y).add(V3(-0.02, 0, 0.005)), sLo.clone().add(V3(0.02, 0, 0)), 0.014, 8), cyl(0.02, 0.02, 0.07, [sLo.x, sLo.y, sLo.z], 'x', 10)]), MAT.hydraulic())]);
   // gearbox chip/temperature sensors, sight gauges and filler caps
   const tc = tgb.clone().addScaledVector(n, 0.06), dn = V3(0, -Math.cos(TAIL.cant), Math.sin(TAIL.cant));
   P('Tail gearbox chip/temperature sensors & sight gauges', {
@@ -223,13 +228,16 @@ export function buildTail({ A, P, air, roofY }) {
   }, [mesh(merge([cyl(0.022, 0.022, 0.06, [igb.x, igb.y - 0.17, 0], 'y', 10), cyl(0.026, 0.026, 0.02, [igb.x + 0.05, igb.y, 0.155], 'z', 14), cyl(0.03, 0.03, 0.03, [igb.x - 0.02, igb.y + 0.16, 0], 'y', 12),
     tube(tc.clone().addScaledVector(dn, 0.14), tc.clone().addScaledVector(dn, 0.2), 0.022, 10), cyl(0.026, 0.026, 0.02, [tc.x - 0.15, tc.y, tc.z], 'x', 14), tube(tc.clone().addScaledVector(dn, -0.14), tc.clone().addScaledVector(dn, -0.18), 0.03, 12)]), MAT.yellow())]);
   // tail rotor quadrant: where the two control cables meet the tail-rotor servo's input
-  const qd = V3(-9.33, 2.86, pylonLean(2.86));
+  const qd = V3(...TR_CTL.quadrant);
   const sector = new THREE.CylinderGeometry(0.1, 0.1, 0.03, 16, 1, false, -0.6, 1.9).rotateX(Math.PI / 2).translate(qd.x, qd.y, qd.z);
   P('Tail rotor quadrant', {
     system: 'Flight controls', material: 'Aluminium cable quadrant on a pivot, tension spring, microswitches', mass: 2, explode: [-2.4, 0.2, -0.7],
     desc: 'The two tail-rotor cables end on this quadrant, which turns the servo\'s input. Spring tension keeps it working normally if one cable is cut, and microswitches then light TAIL ROTOR QUADRANT; if control is lost altogether, the spring sets the blades to a pitch that roughly balances cruise power. (Location approximate.)',
-  }, [mesh(merge([sector, cyl(0.016, 0.016, 0.07, [qd.x, qd.y, qd.z], 'z', 10), box(0.04, 0.03, 0.03, [qd.x + 0.09, qd.y - 0.08, qd.z]), box(0.04, 0.03, 0.03, [qd.x - 0.02, qd.y - 0.11, qd.z])]), MAT.casting()),
-    mesh(merge([tube([qd.x + 0.06, qd.y + 0.06, qd.z], [qd.x + 0.22, qd.y + 0.12, qd.z], 0.009, 6), tube([qd.x + 0.05, qd.y - 0.02, qd.z + 0.02], [qd.x - 0.06, qd.y + 0.12, qd.z + 0.02], 0.007, 6)]), MAT.steel())]);
+  }, [mesh(merge([sector, cyl(0.016, 0.016, 0.07, [qd.x, qd.y, qd.z], 'z', 10), box(0.04, 0.03, 0.03, [qd.x + 0.09, qd.y - 0.08, qd.z]), box(0.04, 0.03, 0.03, [qd.x - 0.02, qd.y - 0.11, qd.z]),
+      tube(sparAt(qd.y).add(V3(-0.02, 0, -0.005)), V3(qd.x, qd.y, qd.z - 0.042), 0.012, 8), cyl(0.024, 0.024, 0.012, [qd.x, qd.y, qd.z - 0.04], 'z', 10)]), MAT.casting()),   // pivot bracket on the rear spar
+    // output link up to the servo's input lever, and the centring spring to the bracket
+    mesh(merge([tube([qd.x, qd.y + 0.075, qd.z], sLo.clone().addScaledVector(sHi.clone().sub(sLo).normalize(), 0.06).add(V3(0, 0, 0.045)), 0.009, 6),
+      cyl(0.014, 0.014, 0.03, [qd.x, qd.y + 0.075, qd.z], 'z', 8), tube([qd.x + 0.05, qd.y - 0.02, qd.z - 0.02], [qd.x + 0.13, qd.y, qd.z - 0.035], 0.007, 6)]), MAT.steel())]);
 
   // ------------------------------------------------------------------ tail rotor (non-rotating frame, spinning children)
   const trFrame = new THREE.Group();

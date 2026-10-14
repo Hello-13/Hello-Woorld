@@ -1,6 +1,7 @@
 // Guided tour: Lockheed Martin / Boeing F-22A Raptor (13 steps). See ../tours.js for the step format.
 // Every focus name matches a part in src/models/f22/ exactly (tests/fighter.test.mjs checks it).
-// Text is kept short (body ≈ 40 words, key idea ≈ 20) so each card fits without scrolling at 1280 × 800.
+// Text is kept short (body ≈ 40 words / 240 characters, key idea ≈ 20 words) so each card fits without scrolling
+// at 1280 × 800 (re-measured in the page: .tour-card overflow is the 13 px nav baseline or less on every step).
 // Views were solved in the browser at 1280 × 800: no focused part falls under the tour card or the Systems /
 // Thermal legend, and no callout dot lands on another callout's label (steps with right-side callouts look from the right).
 
@@ -28,7 +29,7 @@ export default [
   },
   {
     title: 'Titanium and composites',
-    body: 'About 40 % of the structural weight is titanium and a quarter composite. Titanium bulkheads carry the wing spars around the inlet ducts and the centre-split weapons bay; wing spars are titanium forgings and RTM sine-wave composite; the aft booms are electron-beam welded.',
+    body: 'About 40 % of the structural weight is titanium and a quarter composite. Titanium bulkheads carry the wings around the inlet ducts and weapons bay; wing spars are titanium or RTM sine-wave composite; the aft booms are electron-beam welded.',
     key: 'Ti-6Al-4V is as strong as many steels at 57 % of the density, and stays strong beside hot engines.',
     focus: [
       'Radar bulkhead', 'Forward fuselage frames & bulkheads', 'Mid-fuselage titanium bulkheads', 'Mid-fuselage aluminium frames', 'Main bay centre divider', 'Engine-bay frames',
@@ -55,7 +56,7 @@ export default [
   },
   {
     title: 'Inside the F119',
-    body: 'Each F119-PW-100 is a twin-spool turbofan built for supercruise: variable guide vanes, three fan stages on one LP turbine stage, six compressor stages on one HP stage, spools turning opposite ways. A gearbox and shaft drive the airframe\'s accessory drive.',
+    body: 'Each F119-PW-100 is a twin-spool turbofan built for supercruise: variable guide vanes, three fan stages on one LP turbine stage, six compressor stages on one HP stage, spools turning opposite ways, and a gearbox for accessories.',
     key: 'Thrust ≈ ṁ (V_exit − V_flight): 116 kN dry and 156 kN with afterburner, from a 2,270 kg engine.',
     focus: RIGHT_F119,
     mode: 'xray', explode: 0.8, view: { dir: [0.32, 0.34, 0.88], fill: 1.4 },
@@ -69,7 +70,7 @@ export default [
   },
   {
     title: 'Fly-by-wire controls',
-    body: 'Leading-edge flaps, flaperons, ailerons, all-moving stabilators and rudders move on 4,000 psi hydraulic actuators, commanded over triplex wiring by computers that keep the deliberately unstable airframe in check. There is no airbrake: the surfaces deflect against each other.',
+    body: 'Leading-edge flaps, flaperons, ailerons, stabilators and rudders move on 4,000 psi hydraulic actuators, commanded over triplex wiring by computers that keep the unstable airframe in check. There is no airbrake: surfaces deflect against each other.',
     key: 'At 4,000 psi (27.6 MPa) a 5 cm piston pushes about 54 kN, a third more than at 3,000 psi.',
     focus: [...BOTH('Leading-edge flap'), ...BOTH('Flaperon'), ...BOTH('Aileron'), ...BOTH('Stabilator'), ...BOTH('Rudder'), ...BOTH('Leading-edge flap drive'),
       ...BOTH('Flaperon & aileron actuators'), ...BOTH('Stabilator actuator'), ...BOTH('Rudder actuator'), 'Vehicle management system computers', 'Fly-by-wire harnesses (triplex)',
@@ -113,7 +114,7 @@ export default [
   },
   {
     title: 'Weapons bays and gun',
-    body: 'The main bay, split by a centre web, holds six AIM-120Cs on hydro-pneumatic LAU-142/A ejectors behind bifold doors; each side bay swings an AIM-9X out on a trapeze so its seeker sees first. An M61A2 gun with 480 rounds sits in the right wing root.',
+    body: 'The main bay holds six AIM-120Cs on LAU-142/A ejectors behind bifold doors; each side bay swings an AIM-9X out on a trapeze so its seeker sees first. An M61A2 gun with 480 rounds sits in the right wing root.',
     key: 'The AVEL\'s 9 in stroke at up to 40 g throws a 152 kg missile clear at over 25 ft/s, with no explosive cartridges.',
     focus: ['Main weapons bay', 'Main bay centre divider', ...BOTH('Main bay door'), ...BOTH('Main bay door drive'), 'AIM-120C AMRAAM ×3 (right main bay)', 'AIM-120C AMRAAM ×3 (left main bay)',
       ...BOTH('LAU-142/A AVEL launchers ×3'), 'AIM-9X Sidewinder (right side bay)', 'AIM-9X Sidewinder (left side bay)', ...BOTH('LAU-141/A trapeze launcher'), ...BOTH('LAU-141/A trapeze actuator'),
@@ -123,7 +124,7 @@ export default [
   },
   {
     title: 'One pilot, fused sensors',
-    body: 'One pilot sits on an ACES II zero-zero seat — catapult, rocket, headbox chutes and a digital sequencer — under a frameless one-piece canopy, with the side-stick right and throttles left. OBOGS and a BRAG valve feed oxygen; six colour displays show one fused picture.',
+    body: 'One pilot sits on an ACES II zero-zero seat — catapult, rocket, parachutes and a digital sequencer — under a frameless canopy, side-stick right, throttles left. OBOGS and a BRAG valve feed oxygen; six displays show one fused picture.',
     key: 'The canopy is 140 × 45 × 27 in (3.56 × 1.14 × 0.69 m) and 360 lb; its gold film reflects radar away.',
     focus: ['Canopy', 'Canopy sill frame & seals', 'Canopy actuator & jettison rockets', 'Cockpit tub & floor', 'Right console', 'Left console', 'Instrument panel & glare shield',
       'Rudder pedals', 'ACES II ejection seat', 'Seat guide rails', 'Seat headbox (drogue & main parachute)', 'Seat survival kit', 'Seat catapult & under-seat rocket',

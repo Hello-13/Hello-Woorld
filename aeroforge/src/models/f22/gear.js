@@ -236,7 +236,7 @@ export function buildGear(ctx) {
     const axle = V(X(G.axleS), FR.GROUND + Rm, side * G.axleZ);
     const vd = axle.clone().sub(T);
     const L = vd.length();
-    const vs = V(X(12.33) - T.x, -0.59 - T.y, side * 1.25 - T.z).normalize().multiplyScalar(L);   // stowed axle, low enough that the wheel clears the duct floor and the closed door
+    const vs = V(X(12.33) - T.x, -0.585 - T.y, side * 1.225 - T.z).normalize().multiplyScalar(L);   // stowed axle: the wheel clears the closed door and stays inside the trunk side wall
     const q = new THREE.Quaternion().setFromUnitVectors(vd.clone().normalize(), vs.clone().normalize());
     const dir = vd.clone().normalize();
     const at = (k) => dir.clone().multiplyScalar(L * k);

@@ -12,10 +12,14 @@ const HPT_ROTOR = ['Forward HPT rotor seal', 'HPT stage 1 disk', 'Interstage HPT
 const HPT = ['HPT stage 1 nozzle', 'HPT stage 1 blades', 'HPT stage 2 nozzle', 'HPT stage 2 blades', ...HPT_ROTOR, 'HPT casing & shrouds', 'HPT active clearance control', 'Borescope ports (HP turbine)'];
 const LPT = [...range('LPT stage', 6, ' blades'), ...range('LPT stage', 6, ' nozzle'), ...range('LPT stage', 6, ' disk')];
 const FRAME = ['Turbine center frame', 'TCF sump & bearing housing', 'TCF bearing service tubes', 'HP aft roller bearing (#4)', 'EGT thermocouples (T49)'];
-const SHAFTS = ['Fan forward shaft', 'Fan mid shaft', 'LPT cone shaft', 'HP shaft & CDP seal drum', 'Centre vent tube'];
+const SHAFTS = ['Fan forward shaft', 'Fan mid shaft', 'LPT cone shaft', 'HP shaft & compressor-to-turbine drum', 'Centre vent tube'];
 const REVERSER = ['Thrust reverser translating sleeves', 'Thrust reverser cascades', 'Blocker doors & drag links', 'Thrust reverser actuators', 'Thrust reverser hinge & latch beams', 'Thrust reverser hydraulic lines', 'Thrust reverser synchronising shafts', 'Thrust reverser control valve module', 'Thrust reverser locks & position sensors'];
 const ACCESSORIES = ['Accessory gearbox', 'AGB gear train', 'Inlet gearbox', 'Radial drive shaft', 'Transfer gearbox', 'TGB radial gearshaft & bevel gears', 'Horizontal drive shaft', 'Air turbine starter', 'Starter air valve', 'Starter control valve', 'Starter duct', 'Main fuel pump', 'Hydromechanical unit (HMU)', 'Lubrication unit', 'Air/oil separator (deoiler)', 'Integrated drive generator (IDG)', 'Backup generator (VSCF/PMG)', 'Engine-driven hydraulic pump', 'Permanent-magnet alternator', 'AGB hand-cranking pad', 'FADEC (electronic engine control)', 'FADEC rating (identification) plug', 'Configuration type box', 'IDG/VSCF air/oil cooler', 'VSCF/lube oil-oil cooler', 'IDG & VSCF cooler oil lines', 'Hydraulic pump lines', 'IDG feeder cables', 'Fan harnesses (W701–W719)', 'Nacelle harnesses (W717, W718)'];
-const OIL_FUEL = ['Oil tank', 'Oil tank cap', 'Oil level sensor', 'Static anti-leak valve', 'Lubrication unit', 'Oil pressurizing valve', 'Main oil filter', 'Oil supply lines', 'Oil scavenge lines', 'Scavenge oil filter', 'Magnetic chip detectors', 'DMS separator', 'DMS debris sensor', 'DMS signal conditioner', 'Oil return line', 'VSCF/lube oil-oil cooler', 'Oil tank vent line', 'Air/oil separator (deoiler)', 'Main fuel/oil heat exchanger', 'Fuel/oil temperature sensor', 'Aircraft fuel supply line', 'Main fuel pump', 'Low-pressure fuel loop', 'Fuel filter & bypass indicator', 'Hydromechanical unit (HMU)', 'Metered fuel line', 'Fuel flow transmitter', 'Servo fuel lines', 'Oil pressure & temperature sensors'];
+// the oil and fuel units round the gearbox (the engine-length runs have their own step, so the
+// camera frames this cluster rather than the whole engine)
+const OIL_FUEL = ['Oil tank', 'Oil tank cap', 'Oil level sensor', 'Static anti-leak valve', 'Lubrication unit', 'Oil pressurizing valve', 'Main oil filter', 'Scavenge oil filter', 'Magnetic chip detectors', 'DMS separator', 'DMS debris sensor', 'DMS signal conditioner', 'Oil return line', 'VSCF/lube oil-oil cooler', 'Oil tank vent line', 'Air/oil separator (deoiler)', 'Main fuel/oil heat exchanger', 'Fuel/oil temperature sensor', 'Aircraft fuel supply line', 'Main fuel pump', 'Low-pressure fuel loop', 'Fuel filter & bypass indicator', 'Hydromechanical unit (HMU)', 'Fuel flow transmitter', 'Oil pressure & temperature sensors'];
+// the lines from the fan case down to the core, and what they serve there
+const CORE_RUNS = ['Oil supply lines', 'Oil scavenge lines', 'Metered fuel line', 'Servo fuel lines', 'Hydromechanical unit (HMU)', 'Lubrication unit', 'Forward sump & bearing supports', 'TCF sump & bearing housing', 'TCF bearing service tubes', 'Aft sump', 'Fuel manifolds', 'Fuel nozzles', 'VBV actuators', 'VSV actuators & unison rings', 'HPT active clearance control', 'LPT active clearance control', 'Booster anti-ice valve'];
 
 export default [
   {
@@ -84,6 +88,12 @@ export default [
     body: 'Trace the lubrication loop: tank, anti-leak valve, the lubrication unit\'s pressure element, filter, then the bearing sumps; scavenge elements suck the oil back through a filter and the debris monitor, which counts metal particles from wearing bearings. The hot oil then gives its heat to the fuel in the main heat exchanger on its way to the pump\'s high-pressure stage, the HMU and the burners — and to the servo lines that move every actuator.',
     key: 'Heat into the fuel: Q = ṁ_fuel·c_p,fuel·ΔT ≈ 4.6 kg/s × 2 kJ/(kg·K) × 15 K ≈ 140 kW at take-off (illustrative).',
     focus: OIL_FUEL, view: { dir: [0.75, -0.4, 1], fill: 0.45, lift: -0.1 },
+  },
+  {
+    title: 'Down the strut to the core',
+    body: 'The fan-case units reach the core through the hollow 6 o\'clock fan-frame strut. Oil supply lines run on to the forward, turbine-center-frame and aft sumps, and scavenge lines bring the oil back up the next strut. The metered fuel line runs to the tee on the nozzle manifolds. Every fuel-powered actuator gets a pair of servo-fuel tubes, one to each side of its piston: the VBV and VSV actuators, the clearance-control valves and the booster anti-ice valve.',
+    key: 'A servo ram\'s force is F = Δp·A: 7 MPa across a 4 cm bore (12.6 cm²) pushes about 8.8 kN (illustrative figures).',
+    focus: CORE_RUNS, mode: 'systems', view: { dir: [0.35, -0.25, 1] },
   },
   {
     title: 'Follow the flow',

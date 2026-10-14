@@ -28,7 +28,7 @@ export const PHI = { radial: Math.PI / 3, n1: Math.PI / 6, fadec: 0.24, tank: 0.
 export const R_AGB = 1.845, Y_AGB_F = -0.56, Y_AGB_A = -0.94;
 /** Attachment points (r, y, phi) on the units, where the lines in plumbing.js join them. */
 export const AT = {
-  pumpBoostOut: [1.845, -0.262, 0.82], pumpInlet: [1.866, -0.44, 0.774],
+  pumpBoostOut: [1.845, -0.276, 0.82], pumpInlet: [1.866, -0.44, 0.774],
   hxFuelIn: [1.84, 0.012, 1.44], hxFuelOut: [1.84, -0.552, 1.44], hxOilIn: [1.84, -0.45, 1.352], hxOilOut: [1.84, -0.1, 1.528],
   filterIn: [1.99, -0.42, 0.852], hmuMetered: [1.945, -0.5, 1.03],
   unitSupply: [1.83, -0.52, 1.243], unitScavIn: [1.845, -0.42, 1.245], unitPress: [1.89, -0.42, 1.135], unitScavOut: [1.93, -0.545, 1.185],
@@ -367,8 +367,8 @@ export function buildAccessories(ctx) {
   P('DMS signal conditioner', {
     system: 'Avionics', material: 'Eaton signal-conditioning unit', mass: 1,
     explode: [0.3, 0.3, 2.1], temp: 300,
-    desc: 'Turns the debris sensor\'s pulses into particle counts by size and passes them to the FADEC and the airline\'s maintenance system, so the oil is watched every flight rather than only when the chip detectors are pulled.',
-  }, m(boxAt(1.8, -0.68, 0.33, [0.05, 0.12, 0.08]), GM.avionics()));
+    desc: 'Turns the debris sensor\'s pulses into particle counts by size and passes them to the FADEC and the airline\'s maintenance system, so the oil is watched every flight rather than only when the chip detectors are pulled. It is bolted to the fan case\'s mid flange (position estimated).',
+  }, m(boxAt(1.793, -0.68, 0.33, [0.05, 0.12, 0.08]), GM.avionics()));
 
   // ------------------------------------------------------------------ bleed air (aircraft pneumatic system, Boeing)
   const BL = UP - 0.25;
@@ -476,14 +476,17 @@ export function buildAccessories(ctx) {
   }, m(merge([tube(ext, 0.012, { seg: 40 }), ...[UP - 0.5, UP - 0.9].map((phi) => radialCyl(0.97, 0.99, -2.75, phi, 0.018, 8)), tube([P3(2.05, -1.05, UP - 0.2), P3(1.98, -1.0, UP - 0.3), P3(1.95, -0.9, UP - 0.5)], 0.012, { seg: 12 })]), GM.red()));
 
   // ------------------------------------------------------------------ ignition
+  // the far exciter sits at 2.47 rad, just ahead of its igniter's angle, clear of the LPT cooling-air pipe at 2.62
+  const EXCITER_PHI = [0.62, 2.47];
   P('Ignition exciters', {
     system: 'Electrical', material: 'Capacitor-discharge units', mass: 10, count: 2,
     explode: [0.19, -0.7, 1.09], temp: 420,
     desc: 'Each exciter stores energy in a capacitor and dumps it into its igniter as a spark of several joules, a few times a second. Two independent systems give redundancy.',
-  }, m(merge([0.62, 2.52].map((phi) => boxAt(0.66, -2.79, phi, [0.08, 0.2, 0.12]))), GM.painted()));
+  }, m(merge(EXCITER_PHI.map((phi) => boxAt(0.66, -2.79, phi, [0.08, 0.2, 0.12]))), GM.painted()));
+  // each lead runs from its exciter's aft face to its igniter (igniters at 0.62 and 2.52 rad)
   P('Igniter leads', {
     system: 'Electrical', material: 'Shielded, air-cooled high-tension leads', mass: 3, count: 2,
     explode: [0.25, -0.8, 1.0], temp: 600,
     desc: 'Carry the exciters\' high-voltage pulses to the two igniter plugs. They are shielded so the spark energy does not interfere with the FADEC\'s sensor wiring.',
-  }, m(merge([0.62, 2.52].map((phi) => tube([P3(0.68, -2.89, phi), P3(0.78, -3.02, phi), P3(0.88, -3.12, phi), P3(0.925, -3.22, phi), P3(0.92, -3.37, phi), P3(0.865, -3.425, phi)], 0.01, { seg: 24 }))), GM.braid()));
+  }, m(merge([[0.62, 0.62], [EXCITER_PHI[1], 2.52]].map(([p0, p1]) => tube([P3(0.68, -2.89, p0), P3(0.78, -3.02, p0 + (p1 - p0) * 0.4), P3(0.88, -3.12, p0 + (p1 - p0) * 0.8), P3(0.925, -3.22, p1), P3(0.92, -3.37, p1), P3(0.865, -3.425, p1)], 0.01, { seg: 24 }))), GM.braid()));
 }

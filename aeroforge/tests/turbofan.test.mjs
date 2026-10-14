@@ -259,7 +259,8 @@ test('every guided-tour focus names a part declared in the model', () => {
   const esc = (t) => t.replace(/[.*+?^()|[\]\\]/g, '\\$&');
   const templates = args.flatMap((a) => [...a.matchAll(/`([^`$]*)\$\{[^}]+\}([^`$]*)`/g)].map((m) => new RegExp(`^${esc(m[1])}\\d+${esc(m[2])}$`)));
   assert.ok(literals.size + templates.length > 80, `found ${literals.size} literal and ${templates.length} templated part names`);
-  assert.ok(TOUR.length >= 8 && TOUR.length <= 12, `${TOUR.length} tour steps`);
+  // the fleet's tours run 12–15 steps
+  assert.ok(TOUR.length >= 8 && TOUR.length <= 15, `${TOUR.length} tour steps`);
   for (const [i, step] of TOUR.entries()) {
     for (const name of step.focus || []) assert.ok(literals.has(name) || templates.some((re) => re.test(name)), `step ${i + 1}: no part named "${name}"`);
   }

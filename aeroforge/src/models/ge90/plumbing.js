@@ -68,13 +68,14 @@ export function buildPlumbing(ctx) {
   // ------------------------------------------------------------------ servo fuel
   // HMU → fan case → 6 o'clock fan-frame strut → each actuator: [name, head path, rod path]
   const SERVO = [
-    ['VBV actuator', [[0.92, -1.585, 1.5], ...arc(0.88, -1.59, 1.45, 0.82, 0.1), [0.865, -1.578, 0.75]], [[0.92, -1.6, 1.52], ...arc(0.9, -1.6, 1.46, 0.84, 0.1), [0.9, -1.45, 0.8], [0.875, -1.33, 0.784]]],
-    ['VBV actuator', [[0.92, -1.585, 1.64], ...arc(0.88, -1.59, 1.7, 3.84, 0.1), [0.865, -1.578, 3.89]], [[0.92, -1.6, 1.62], ...arc(0.9, -1.6, 1.68, 3.82, 0.1), [0.9, -1.45, 3.86], [0.875, -1.33, 3.858]]],
+    ['VBV actuator', [[0.95, -1.634, 1.53], [0.92, -1.585, 1.5], ...arc(0.88, -1.59, 1.45, 0.82, 0.1), [0.865, -1.578, 0.75]], [[0.95, -1.636, 1.55], [0.92, -1.6, 1.52], ...arc(0.9, -1.6, 1.46, 0.84, 0.1), [0.9, -1.45, 0.8], [0.875, -1.33, 0.784]]],
+    ['VBV actuator', [[0.95, -1.644, 1.61], [0.92, -1.585, 1.64], ...arc(0.88, -1.59, 1.7, 3.84, 0.1), [0.865, -1.578, 3.89]], [[0.95, -1.646, 1.6], [0.92, -1.6, 1.62], ...arc(0.9, -1.6, 1.68, 3.82, 0.1), [0.9, -1.45, 3.86], [0.875, -1.33, 3.858]]],
     ['VSV actuator', [[0.97, -1.86, 1.52], [0.8, -2.05, 1.45], ...arc(0.745, -2.12, 1.4, 0.43, 0.1), [0.71, -2.3, 0.39], [0.69, -2.505, 0.36], [0.665, -2.508, 0.35]], [[0.97, -1.86, 1.53], [0.81, -2.05, 1.46], ...arc(0.76, -2.1, 1.4, 0.44, 0.1), [0.7, -2.16, 0.4], [0.668, -2.17, 0.393]]],
     ['VSV actuator', [[0.97, -1.86, 1.62], [0.8, -2.05, 1.7], ...arc(0.745, -2.12, 1.75, 3.45, 0.1), [0.71, -2.3, 3.47], [0.69, -2.505, 3.48], [0.665, -2.508, 3.49]], [[0.97, -1.86, 1.61], [0.81, -2.05, 1.69], ...arc(0.76, -2.1, 1.74, 3.44, 0.1), [0.7, -2.16, 3.45], [0.668, -2.17, 3.447]]],
     ['HPT ACC valve', [[0.97, -1.86, 1.5], [0.88, -2.2, 1.42], [0.86, -2.7, 1.2], [0.92, -2.97, 1.02], [0.95, -3.02, 0.996]], [[0.97, -1.86, 1.51], [0.89, -2.2, 1.43], [0.87, -2.7, 1.21], [0.93, -3.03, 1.03], [0.95, -3.08, 0.996]]],
-    ['LPT ACC valve', [[0.97, -1.86, 1.49], [0.88, -2.25, 1.38], [0.84, -2.8, 1.1], [0.9, -3.4, 0.62], [0.99, -3.8, 0.37], [1.03, -3.9, 0.352]], [[0.97, -1.86, 1.48], [0.89, -2.25, 1.37], [0.85, -2.8, 1.09], [0.91, -3.4, 0.6], [1.0, -3.84, 0.36], [1.03, -3.94, 0.352]]],
-    ['LPT ACC valve', [[0.97, -1.86, 1.65], [0.88, -2.25, 1.76], [0.84, -2.8, 2.0], [0.9, -3.4, 2.24], [0.99, -3.8, 2.35], [1.03, -3.9, 2.348]], [[0.97, -1.86, 1.66], [0.89, -2.25, 1.77], [0.85, -2.8, 2.01], [0.91, -3.4, 2.26], [1.0, -3.84, 2.36], [1.03, -3.94, 2.348]]],
+    // over the nozzle manifolds and the igniter lead, under the cowl, to each valve's side (head outboard, rod inboard)
+    ['LPT ACC valve', [[0.97, -1.86, 1.49], [0.88, -2.25, 1.38], [0.84, -2.8, 1.1], [0.875, -3.1, 0.885], [0.96, -3.3, 0.72], [0.98, -3.42, 0.6], [0.985, -3.7, 0.43], [0.985, -3.895, 0.351]], [[0.97, -1.86, 1.48], [0.89, -2.25, 1.37], [0.85, -2.8, 1.09], [0.865, -3.1, 0.865], [0.94, -3.3, 0.7], [0.96, -3.42, 0.585], [0.95, -3.7, 0.42], [0.945, -3.945, 0.353]]],
+    ['LPT ACC valve', [[0.97, -1.86, 1.65], [0.88, -2.25, 1.76], [0.84, -2.8, 2.0], [0.875, -3.1, 2.115], [0.96, -3.3, 2.17], [0.98, -3.42, 2.22], [0.985, -3.7, 2.3], [0.985, -3.895, 2.349]], [[0.97, -1.86, 1.66], [0.89, -2.25, 1.77], [0.85, -2.8, 2.01], [0.865, -3.1, 2.135], [0.94, -3.3, 2.19], [0.96, -3.42, 2.235], [0.95, -3.7, 2.31], [0.945, -3.945, 2.347]]],
     ['booster anti-ice valve', [[0.97, -1.86, 1.55], [0.8, -2.05, 1.4], [0.73, -2.13, 1.28], [0.705, -2.15, 1.257]], null],
   ];
   const servo = [];
@@ -236,15 +237,16 @@ export function buildPlumbing(ctx) {
     explode: [0.21, -0.2, 2.03], temp: 320,
     desc: 'The fan-case looms join the FADEC to the sensors and units round it: T12, the N1 and N2 sensors, the PMA, HMU, oil and fuel sensors, the debris monitor and the PS3 transducers. Each FADEC channel has its own looms on separate routes, so one chafed harness cannot blind both.',
   }, m(merge(fan), GM.harness()));
-  const coreB = [[1.6, -1.76, 0.508], [1.2, -1.76, 0.512], [0.95, -1.78, 0.512], [0.82, -2.02, 0.48], [0.74, -2.15, 0.44], [0.72, -2.4, 0.43], [0.74, -2.8, 0.47], [0.79, -2.98, 0.52], [0.825, -3.08, 0.535], [0.825, -3.6, 0.535], [0.83, -3.74, 0.48], [0.84, -3.9, 0.36], [0.97, -3.92, 0.32]];
+  const coreB = [[1.6, -1.76, 0.508], [1.2, -1.76, 0.512], [0.95, -1.78, 0.512], [0.82, -2.02, 0.48], [0.74, -2.15, 0.44], [0.72, -2.4, 0.43], [0.74, -2.8, 0.47], [0.79, -2.98, 0.52], [0.825, -3.08, 0.535], [0.825, -3.6, 0.535], [0.83, -3.74, 0.48], [0.845, -3.88, 0.37], [0.88, -3.91, 0.33], [0.92, -3.92, 0.305]];
   const core = [
     line([[1.965, -1.395, 0.39], [1.9, -1.44, 0.47], [1.84, -1.5, 0.51], [1.77, -1.58, 0.534], [1.7, -1.64, 0.537], ...coreA], 0.014),
     line([[1.965, -1.405, 0.37], [1.88, -1.43, 0.44], [1.8, -1.48, 0.5], [1.765, -1.6, 0.497], [1.69, -1.72, 0.5], ...coreB], 0.014),
     line([[0.72, -2.1, 0.62], [0.72, -2.07, 0.7], [0.68, -2.06, 0.75]], 0.007),                                       // T25
     line([[0.825, -3.12, 0.72], [0.845, -3.17, 0.75], [0.85, -3.2, 0.775]], 0.007),                                      // T3
     line([[0.7, -2.6, 0.64], [0.69, -2.645, 0.632], [0.668, -2.66, 0.63]], 0.009),                                   // to the distributor ring
-    line([[0.825, -3.36, 0.72], [0.88, -3.37, 0.77], ...arc(0.96, -3.37, 0.82, 1.3, 0.08), [0.962, -3.32, 1.34], [0.958, -3.28, 1.355], [0.952, -3.262, 1.36]], 0.007), // fuel manifold pressure
+    line([[0.825, -3.36, 0.72], [0.88, -3.37, 0.77], ...arc(0.94, -3.37, 0.82, 1.3, 0.08), [0.945, -3.32, 1.34], [0.95, -3.28, 1.355], [0.952, -3.262, 1.36]], 0.007), // fuel manifold pressure, under the LPT cooling-air pipe
     line([[0.83, -3.95, 0.52], [0.8, -4.05, 0.6], [0.783, -4.1, 0.64]], 0.007),                                       // TCF accelerometer
+    line([[0.825, -3.08, 0.72], [0.86, -3.07, 0.74], [0.9, -3.06, 0.8], [0.912, -3.055, 0.88], [0.916, -3.05, 0.94]], 0.007), // HPT ACC valve
     line([[1.0, -1.7, 0.512], [0.92, -1.6, 0.6], [0.9, -1.5, 0.72], [0.888, -1.45, 0.75]], 0.007),                     // VBV actuator position
     line([[0.74, -2.15, 0.44], [0.705, -2.3, 0.38], [0.693, -2.32, 0.36]], 0.007),                                    // VSV actuator position
     line([[0.82, -1.98, 0.58], ...arc(0.9, -2.06, 0.62, 1.12, 0.08), [0.93, -2.1, 1.16], [0.96, -2.1, 1.18]], 0.008), // core compartment cooling valve
@@ -252,12 +254,14 @@ export function buildPlumbing(ctx) {
     hoop(0.665, -2.66, 0.012, { tubular: 100, arc: 4.3 }),
     ...Array.from({ length: 11 }, (_, k) => boxAt(0.665, -2.66, (k / 10) * 4.3, [0.01, 0.02, 0.05])),
     line([[0.665, -2.66, 3.49], [0.7, -2.6, 3.505], [0.715, -2.5, 3.51], [0.708, -2.36, 3.503], [0.697, -2.33, 3.5]], 0.007),
+    // from the ring's clamp at 2.15 rad aft along the casings, between the fuel nozzles, to the 2.4 rad LPT ACC valve
+    line([[0.665, -2.66, 2.15], [0.69, -2.7, 2.17], [0.73, -2.85, 2.2], [0.79, -3.0, 2.2], [0.825, -3.1, 2.2], [0.825, -3.6, 2.2], [0.835, -3.76, 2.27], [0.86, -3.88, 2.36], [0.92, -3.92, 2.395]], 0.007),
     line([[0.665, -2.66, 3.89], [0.72, -2.3, 3.9], [0.75, -2.05, 3.88], [0.83, -1.82, 3.84], [0.88, -1.68, 3.84], [0.89, -1.56, 3.875], [0.888, -1.5, 3.89]], 0.007),
   ];
   P('Core harnesses (W721–W739)', {
     system: 'Electrical', material: 'High-temperature looms in braided sleeves (GE W721–W724, W727–W729, W731, W732, W737–W739)', mass: 24,
     explode: [0.5, -0.9, 1.5], temp: 450,
-    desc: 'Two looms, one per FADEC channel, run down a fan-frame strut into the core compartment and along the casings to T25, T3, the fuel manifold pressure sensor, the VSV and VBV actuator position sensors, the clearance-control valves, the core compartment cooling valve, the TCF accelerometer and the EGT junction, with a ring round the compressor for the far side.',
+    desc: 'Two looms, one per FADEC channel, run down a fan-frame strut into the core compartment and along the casings to T25, T3, the fuel manifold pressure sensor, the VSV and VBV actuator position sensors, the HPT and both LPT clearance-control valves, the core compartment cooling valve, the TCF accelerometer and the EGT junction, with a ring round the compressor for the far side.',
   }, m(merge(core), GM.harness()));
   P('Nacelle harnesses (W717, W718)', {
     system: 'Electrical', material: 'Looms to the strut disconnect panel (GE W717, W718)', mass: 6, count: 2,
@@ -269,9 +273,10 @@ export function buildPlumbing(ctx) {
   P('Booster anti-ice valve', {
     system: 'Environmental control', material: 'Parker fuel-actuated valve with a duct to the splitter (routing estimated)', mass: 3,
     explode: [-0.3, -0.5, 1.0], temp: 450,
-    desc: 'Listed only for the -110B1/-113B/-115B: opened by servo fuel from the HMU, it lets warm compressor air forward through the fan hub frame to keep ice off the booster inlet. GE does not publish its routing; the duct here is drawn through the frame to the splitter.',
-  }, m(merge([axialCyl(0.66, -2.15, 1.25, 0.028, 0.07, 14), boxAt(0.695, -2.15, 1.25, [0.03, 0.05, 0.04]), radialCyl(0.56, 0.635, -2.17, 1.25, 0.018, 10),
-    line([[0.66, -2.118, 1.25], [0.665, -2.0, 1.3], [0.78, -1.84, 1.42], [0.84, -1.66, 1.46], [0.845, -1.55, 1.46], [0.87, -1.2, 1.46], [0.875, -0.82, 1.46]], 0.018, 8)]), GM.duct()));
+    desc: 'Listed only for the -110B1/-113B/-115B: opened by servo fuel from the HMU, it lets warm compressor air forward through the fan hub frame to keep ice off the booster inlet. GE does not publish its routing; the duct here is drawn through the frame and forward inside the splitter cavity to a distribution ring behind the splitter lip.',
+  }, [m(merge([axialCyl(0.66, -2.15, 1.25, 0.028, 0.07, 14), boxAt(0.695, -2.15, 1.25, [0.03, 0.05, 0.04]), radialCyl(0.56, 0.635, -2.17, 1.25, 0.018, 10),
+    line([[0.66, -2.118, 1.25], [0.665, -2.0, 1.3], [0.78, -1.84, 1.42], [0.84, -1.66, 1.46], [0.845, -1.55, 1.46], [0.87, -1.2, 1.46], [0.876, -1.005, 1.46]], 0.018, 8)]), GM.duct()),
+  C((keep) => hoop(0.876, -1.0, 0.009, { start: keep.start, arc: keep.arc, tubular: 72, radial: 6 }), GM.duct())]);
   P('Core compartment cooling valve', {
     system: 'Thermal control', material: 'Parker FADEC-commanded butterfly valve and duct (location estimated)', mass: 3,
     explode: [0.4, -0.55, 0.9], temp: 400,
