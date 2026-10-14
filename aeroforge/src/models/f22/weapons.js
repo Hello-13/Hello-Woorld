@@ -394,8 +394,8 @@ export function buildWeapons(ctx) {
     }, mesh(merge(g), F.gun()));
     // hydraulic drive behind the breech, geared to the rotor, with a flexible shaft to the conveyor
     {
-      const d = [FR.boxS(10.52, 0.05, 1.6, 0.2, 0.16, 0.16), FR.cylX(10.68, 0.05, 1.6, 0.12, 0.055, 0.05, 14)];   // gearbox, then motor; container starts at s 10.75
-      d.push(FR.pipe([[10.45, 0.04, 1.64], [10.4, 0.02, 1.7], [10.37, 0.0, 1.72]], 0.025, 8, 6));      // output to the rotor
+      const d = [FR.boxS(10.52, 0.05, 1.6, 0.2, 0.16, 0.13), FR.cylX(10.68, 0.05, 1.6, 0.12, 0.055, 0.05, 14)];   // gearbox, then motor; container starts at s 10.75
+      d.push(FR.pipe([[10.45, 0.05, 1.64], [10.41, 0.045, 1.7], [10.37, 0.02, 1.72]], 0.025, 8, 6));      // output to the rotor
       const f = [FR.pipe([[10.62, -0.03, 1.64], [10.7, -0.08, 1.66], [10.8, -0.09, 1.68]], 0.015, 6, 8)];
       P('M61A2 hydraulic gun drive & flexible shafts', {
         system: 'Weapons', material: 'Hydraulic motor and gearbox (two subassemblies in one unit), flexible drive shafts', mass: 24,

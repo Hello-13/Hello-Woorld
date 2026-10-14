@@ -91,7 +91,7 @@ export function buildPropulsion(ctx) {
     P(`Serpentine inlet duct (${R})`, {
       system: 'Propulsion', material: 'Composite duct with radar-absorbent lining', mass: 160,
       explode: [0, -0.15, 1.0 * side], callout: side > 0, anchor: [X(10.6), 0.38, 1.15 * side],
-      desc: 'The duct curves up and inward for about 7 m from the inlet to the engine. On the real jet the serpentine ducts keep the fan faces — normally the brightest radar reflectors on a jet — out of line of sight from any exterior view, and an absorbent lining soaks up energy that bounces in. The real duct shape is not published: in this model a sliver of the fan still shows from some angles ahead.',
+      desc: 'The duct curves up and inward for about 7 m from the inlet to the engine. On the real jet the serpentine ducts keep the fan faces — normally the brightest radar reflectors on a jet — out of line of sight from any exterior view, and an absorbent lining soaks up energy that bounces in. The real duct shape is not published, and the model\'s bend is gentler: looking in from a few degrees off the inlet axis, up to about a quarter of the fan face still shows.',
     }, mesh(FR.gridSurface(aft, { closed: true, uv: 'n' }), F.duct()));
     {
       // bypass (spill) door on the upper aft fuselage over the end of the duct, with the short duct to it

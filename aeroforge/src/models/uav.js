@@ -107,7 +107,7 @@ const sootStreak = () => decalTexture('mq9.soot', 512, 128, (ctx, w, h) => {
  * leg to a wider pocket for the wheel at its aft end; this outline is the strip of skin the folding leg actually crosses in
  * this model's retraction, with a margin. The skin is cut away inside it and the door covers it.
  */
-const MAIN_SLOT = [[4.87, 0.62, 1.14], [5.05, 0.57, 1.14], [5.3, 0.41, 0.9], [5.5, 0.31, 0.9], [5.75, 0.22, 0.66], [5.9, 0.12, 0.73], [6.05, 0.1, 0.72],
+const MAIN_SLOT = [[4.87, 0.62, 1.36], [5.05, 0.57, 1.36], [5.2, 0.48, 1.0], [5.3, 0.41, 0.9], [5.5, 0.31, 0.9], [5.75, 0.22, 0.8], [5.9, 0.12, 0.8], [6.05, 0.1, 0.72],
   [6.12, 0.1, 0.82], [6.17, 0.1, 1.12], [6.22, 0.1, 1.5], [6.27, 0.1, 1.58], [6.4, 0.1, 1.42], [6.5, 0.1, 1.12]];
 function slotAt(s) {
   let i = 0;
@@ -146,20 +146,24 @@ export function buildUAV() {
   const L = (geo, material, o) => mesh(geo, material, o);
 
   // ============================================================== fuselage skins
-  // the skin is cut away under the gear doors (the main-gear slots, MAIN_SLOT; the nose well s 1.92–3.11); the doors, 4 mm proud of
-  // the skin, overlap the cut-outs' edges. The loft has extra stations along the main slots so their cut edges stay close to the outline.
-  const opening = (s, y, z) => {
+  // the skin is cut away under the gear doors (the main-gear slots, MAIN_SLOT; the nose well s 1.92–3.125). The loft is finer around
+  // and along the main slots, and each main door is shaped from the very skin it replaces, so it covers its cut-out exactly.
+  const secAngle = (s, y, z) => {                    // section angle from the keel (0) round to the side (π/2)
     const { top, bot, hw, yc } = prof(s);
     const u = Math.abs(z) / hw, v = (y - yc) / ((top - bot) / 2);
-    const th = Math.atan2(Math.sign(v) * Math.abs(v) ** 1.2, u ** 1.2) + Math.PI / 2;     // section angle from the keel
-    if (s > 4.87 && s < 6.5) { const [lo, hi] = slotAt(s); if (th > lo && th < hi) return true; }
-    return s > 1.92 && s < 3.11 && th > 0.1 && th < 0.41;
+    return Math.atan2(Math.sign(v) * Math.abs(v) ** 1.2, u ** 1.2) + Math.PI / 2;
   };
-  const slotBreaks = Array.from({ length: 16 }, (_, k) => +(4.87 + k * 0.1).toFixed(2));
-  const fl = fuselageLoft(stationsWithBreaks([0.95, 1.92, 2.05, 3.11, 4.0, ...slotBreaks, 6.3, 6.5, FIREWALL_S], 0.2), 48);
+  const opening = (s, y, z) => {
+    const th = secAngle(s, y, z);
+    if (s > 4.87 && s < 6.5) { const [lo, hi] = slotAt(s); if (th > lo && th < hi) return z > 0 ? 'cutS' : 'cutP'; }
+    return s > 1.92 && s < 3.125 && th < 0.41 ? 'cutN' : null;          // the nose leg folds along the centreline
+  };
+  const slotBreaks = Array.from({ length: 33 }, (_, k) => +(4.87 + k * 0.05).toFixed(2));
+  const fl = fuselageLoft(stationsWithBreaks([0.95, 1.92, 2.05, 3.125, 4.0, ...slotBreaks, 6.3, 6.5, FIREWALL_S], 0.2), 96);
   const panels = splitTris(fl, (cx, cy, cz) => {
     const s = 5.5 - cx;
-    if (opening(s, cy, cz)) return null;
+    const cut = opening(s, cy, cz);
+    if (cut) return cut;
     if (s < 2.05 && cy > prof(Math.max(0, s)).yc - 0.02) return 'radome';
     if (s < 0.95) return 'lynx';
     if (s < 4.0) return 'fwd';
@@ -167,6 +171,15 @@ export function buildUAV() {
     if (s < FIREWALL_S) return 'aft';
     return 'cowl';
   });
+  // the starboard cut's outline, station by station (the port one is its mirror): [s, lowest, highest section angle]
+  const doorOutline = (() => {
+    const pa = panels.get('cutS').attributes.position, by = new Map();
+    for (let k = 0; k < pa.count; k++) {
+      const q = 5.5 - pa.getX(k), key = q.toFixed(3), th = secAngle(q, pa.getY(k), pa.getZ(k));
+      const e = by.get(key) || [q, 9, -9]; e[1] = Math.min(e[1], th); e[2] = Math.max(e[2], th); by.set(key, e);
+    }
+    return [...by.values()].sort((a, b) => a[0] - b[0]);
+  })();
   P('SATCOM radome', {
     system: 'Skin & fairings', skin: true, material: 'Dielectric composite shell, painted', mass: 22, explode: [1.3, 2.1, -1.3],
     desc: 'The bulbous upper nose is a radome over the Ku-band satellite dish. It is transparent to the 12–18 GHz link signal, which is why the nose shape is set by a 0.7 m-class dish rather than by aerodynamics.',
@@ -830,27 +843,30 @@ export function buildUAV() {
   };
   for (const side of [1, -1]) {
     const sd = SN(side);
-    // main door: follows the slot outline (overlapping the cut edges by 0.05 rad), with a shallow blister over the wheel pocket,
-    // hinged along its inboard edge so that it hangs open below the belly
+    // main door: shaped from the skin cut away for the slot (its outline at every loft station, smoothed over the neighbouring
+    // stations so that it covers the cut's saw-tooth edge), with a shallow blister over the wheel pocket, hinged along its
+    // inboard edge so that it hangs open below the belly
     const rows = [];
-    for (let i = 0; i <= 26; i++) {
-      const q = 4.87 + (1.63 * i) / 26, [lo, hi] = slotAt(q), t0 = lo - 0.05, t1 = hi + 0.05, row = [];
-      for (let j = 0; j <= 12; j++) {
-        const t = t0 + ((t1 - t0) * j) / 12, bl = q > 6.1 ? 0.028 * Math.sin((Math.PI * (q - 6.1)) / 0.4) * Math.sin((Math.PI * j) / 12) : 0;
+    const outline = doorOutline.map(([q, lo, hi], k, a) => [q, Math.min(lo, a[Math.max(0, k - 1)][1], a[Math.min(a.length - 1, k + 1)][1]) - 0.01, Math.max(hi, a[Math.max(0, k - 1)][2], a[Math.min(a.length - 1, k + 1)][2]) + 0.01]);
+    for (const [q, t0, t1] of outline) {
+      const row = [];
+      for (let j = 0; j <= 14; j++) {
+        const t = t0 + ((t1 - t0) * j) / 14, bl = q > 6.1 ? 0.028 * Math.sin((Math.PI * (q - 6.1)) / 0.4) * Math.sin((Math.PI * j) / 14) : 0;
         row.push(fusePoint(q, -Math.PI / 2 + t * side, -(0.004 + bl)));
       }
       rows.push(row);
     }
     const doorG = loftRings(rows, { closed: false, uvMode: 'metric' });
-    const hinge0 = new THREE.Vector3(...fusePoint(4.87, -Math.PI / 2 + (slotAt(4.87)[0] - 0.05) * side)), hinge1 = new THREE.Vector3(...fusePoint(6.5, -Math.PI / 2 + (slotAt(6.5)[0] - 0.05) * side));
+    const [first, last] = [outline[0], outline[outline.length - 1]];
+    const hinge0 = new THREE.Vector3(...fusePoint(first[0], -Math.PI / 2 + first[1] * side)), hinge1 = new THREE.Vector3(...fusePoint(last[0], -Math.PI / 2 + last[1] * side));
     const mainDoor = hingedMesh(doorG, m.skinDouble, hinge0, hinge1);
     mainDoor.mesh.castShadow = true;
     P(`Main gear door (${sd})`, {
       system: 'Landing gear', skin: true, material: 'Composite door (est.)', mass: 4, explode: [0, -0.6, 0.55 * side],
       desc: 'Photographs of USAF and GA-ASI MQ-9As show a long, narrow door over each main-gear slot, hanging open below the belly whenever the gear is down (taxiing, take-off and landing) and shut in flight, with a shallow blister at its aft end over the wheel pocket. The slot it closes runs from the trunnion at the lower corner aft and inboard along the folded leg to the pocket (hinge line, actuator and sequencing estimated).',
     }, mainDoor.pivot);
-    doors.push({ h: mainDoor, sign: -side, open: +(globalThis.process?.env?.DOOR_OPEN || 1.6) });
-    doors.push({ h: doorPart(`Nose gear door (${sd})`, 1.92, 3.11, -Math.PI / 2 + 0.02 * side, -Math.PI / 2 + 0.42 * side, 'outer', {
+    doors.push({ h: mainDoor, sign: -side, open: 1.85 });
+    doors.push({ h: doorPart(`Nose gear door (${sd})`, 1.92, 3.125, -Math.PI / 2 + 0.002 * side, -Math.PI / 2 + 0.42 * side, 'outer', {
       mass: 1.5, explode: [0, -0.55, 0.35 * side], desc: 'One of a pair of nose-gear doors hinged along the outer edge of the well, linked to open with the leg.',
     }), sign: side, open: 1.45 });
     // door actuator: from a bracket on the keel web down to a lug on the door's inner face, just outboard of the hinge
