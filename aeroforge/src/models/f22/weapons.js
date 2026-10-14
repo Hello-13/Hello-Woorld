@@ -201,7 +201,7 @@ export function buildWeapons(ctx) {
       P(`LAU-142/A AVEL launchers ×3 (${R})`, {
         system: 'Weapons', material: 'Mostly aluminium hydro-pneumatic ejector', mass: 154, massSource: 'Hydraulics & Pneumatics (1998): nearly 113 lb (51 kg) each', count: 3,
         explode: [0, -0.45, 0.35 * side],
-        desc: 'EDO\'s AMRAAM Vertical Eject Launcher is hydro-pneumatic: stored gas, boosted by aircraft hydraulics, drives two arms through a 9 in (23 cm) stroke that throws the missile clear of the bay at more than 25 ft/s (7.6 m/s) with a 40 g peak — no pyrotechnic cartridges, so less upkeep. Each weighs about 113 lb so the missile cannot move in the bay.',
+        desc: 'EDO\'s AMRAAM Vertical Eject Launcher is hydro-pneumatic: the jet\'s hydraulic power charges stored gas, which drives two arms through a 9 in (23 cm) stroke that throws the missile clear of the bay at more than 25 ft/s (7.6 m/s) with a 40 g peak — no pyrotechnic cartridges, so less upkeep. Each weighs about 113 lb so the missile cannot move in the bay.',
       }, ls);
     }
   }

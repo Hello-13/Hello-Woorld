@@ -57,26 +57,33 @@ test('maximum level speed at 7,600 m is near the published 444–482 km/h', () =
 });
 
 // ---- model checks that need no three.js: read the model source directly
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import TOUR from '../src/learn/tours/uav.js';
 
-const modelSrc = readFileSync(new URL('../src/models/uav.js', import.meta.url), 'utf8');
-const plantSrc = readFileSync(new URL('../src/models/mq9/powerplant.js', import.meta.url), 'utf8');
+const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
+const MQ9_FILES = readdirSync(new URL('../src/models/mq9/', import.meta.url)).filter((f) => f.endsWith('.js')).sort();
+const modelSrc = [read('../src/models/uav.js'), ...MQ9_FILES.map((f) => read(`../src/models/mq9/${f}`))].join('\n');
+const plantSrc = read('../src/models/mq9/powerplant.js');
 
-/** Part names declared in uav.js: P('Name', …) and P(`Name (${side})`, …) expanded to both sides. */
-function partNames() {
-  const names = new Set();
-  // the wing-station labels used in `${label} pylon (${sn})`
+/** Part names declared in the model: P('Name', …) and P(`Name (${side})`, …) expanded to both sides. */
+function expand(n) {
+  if (!n.includes('${')) return [n];
+  // the wing-station labels used in `${label} pylon (${sn})` and the trailing-edge surfaces in `${name} (${sn})`
   const labels = [...modelSrc.matchAll(/\[\s*[\d.]+,\s*[\d.]+,\s*[\d.]+,\s*'(\w+)'/g)].map((m) => m[1]);
-  for (const m of modelSrc.matchAll(/P\((['`])([^'`]+)\1/g)) {
-    const n = m[2];
-    if (!n.includes('${')) { names.add(n); continue; }
-    for (const side of ['starboard', 'port']) {
-      const s1 = n.replace(/\$\{(sn|sd|SN\([^)]*\)|sn\([^)]*\))\}/g, side);
-      if (s1.includes('${label}')) for (const l of labels) names.add(s1.replace('${label}', l));
-      else names.add(s1);
-    }
+  const surfs = [...modelSrc.matchAll(/\['([A-Z][^']+)', [\d.]+, [\d.]+, '(?:flap|ail)'/g)].map((m) => m[1]);
+  const out = [];
+  for (const side of ['starboard', 'port']) {
+    const s1 = n.replace(/\$\{(sn|sd|SN\([^)]*\))\}/g, side);
+    if (s1.includes('${label}')) for (const l of labels) out.push(s1.replace('${label}', l));
+    else if (s1.includes('${name}')) for (const l of surfs) out.push(s1.replace('${name}', l));
+    else out.push(s1);
   }
+  return out;
+}
+function partNames(system = null) {
+  const names = new Set();
+  const re = system ? new RegExp(`P\\((['\`])([^'\`]+)\\1,\\s*\\{\\s*system: '${system}'`, 'g') : /(?:\bP|doorPart)\((['`])([^'`]+)\1/g;
+  for (const m of modelSrc.matchAll(re)) for (const n of expand(m[2])) names.add(n);
   return names;
 }
 
@@ -102,18 +109,44 @@ test('stores fits use the published store and M310 launcher masses', () => {
   assert.ok(LOADOUTS.strike.mass < MQ9.maxExternal);
 });
 
-test('the fuel step shows the whole fuel system, wing tanks included', () => {
-  const fuel = new Set();
-  for (const m of modelSrc.matchAll(/P\((['`])([^'`]+)\1,\s*\{\s*system: 'Fuel'/g)) {
-    const n = m[2];
-    if (!n.includes('${')) fuel.add(n);
-    else for (const side of ['starboard', 'port']) fuel.add(n.replace(/\$\{(sn|SN\([^)]*\))\}/g, side));
-  }
-  assert.ok(fuel.has('Wing fuel tank (starboard)') && fuel.has('Wing fuel tank (port)') && fuel.size >= 12, `fuel parts: ${[...fuel].join(', ')}`);
+test('seven internal fuel tanks: three fuselage cells in line and two tanks in each wing', () => {
+  const fuel = partNames('Fuel');
+  const tanks = ['Forward fuel cell', 'Header fuel cell', 'Aft fuel cell', 'Inboard wing tank (starboard)', 'Inboard wing tank (port)', 'Outboard wing tank (starboard)', 'Outboard wing tank (port)'];
+  assert.deepEqual(tanks.filter((n) => !fuel.has(n)), [], 'missing tanks');
+  assert.ok(fuel.size >= 20, `${fuel.size} fuel parts`);
+});
+
+test('the fuel step shows the whole fuel system', () => {
+  const fuel = partNames('Fuel');
   const step = TOUR.find((s) => /fuel/i.test(s.title));
   assert.ok(step, 'a fuel step exists');
   const missing = [...fuel].filter((n) => !step.focus.includes(n));
   assert.deepEqual(missing, [], 'fuel parts left out of the fuel step');
+});
+
+test('two flaps and two ailerons on each wing, each with its own servo', () => {
+  const names = partNames();
+  const missing = [];
+  for (const sf of ['Inboard flap', 'Outboard flap', 'Inboard aileron', 'Outboard aileron']) for (const side of ['starboard', 'port']) {
+    for (const n of [`${sf} (${side})`, `${sf} servo (${side})`]) if (!names.has(n)) missing.push(n);
+  }
+  assert.deepEqual(missing, []);
+});
+
+test('McCauley 110GFA propeller: 110 in (2.79 m) across, on a gearbox output 3.53 in above the engine axis', () => {
+  const r = +plantSrc.match(/PROP_R = ([\d.]+)/)[1];
+  close(2 * r, 2.794, 0.02, 'propeller diameter m');
+  const off = +plantSrc.match(/SHAFT_Y = ENGINE_Y \+ ([\d.]+)/)[1];
+  close(off, 0.0897, 0.003, 'gearbox output offset m');
+});
+
+test('ER fuel pods: 1,202 kg more fuel for GA-ASI’s 34 h', () => {
+  assert.equal(LOADOUTS.er.fuel, 1202);
+  const p = { fuel: 1724, payload: MQ9.maxInternal, altitude: 7600 };
+  const er = best({ ...p, stores: 'er' }).endurance, clean = best({ ...p, stores: 'clean' }).endurance;
+  close(er, 34, 3, 'ER endurance h');
+  assert.ok(er > clean + 4, `ER ${er.toFixed(1)} h vs clean ${clean.toFixed(1)} h`);
+  assert.ok(LOADOUTS.er.mass + LOADOUTS.er.fuel < MQ9.maxExternal, 'two full pods are within the external limit');
 });
 
 test('about a dozen callouts at most, each anchored on its part', () => {

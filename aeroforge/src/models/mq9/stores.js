@@ -87,15 +87,40 @@ export function launcher() {
   return merge(parts);
 }
 
-/** Aerodynamic pylon: symmetric section lofted downward from the wing, with a rack and sway braces. */
+/**
+ * Aerodynamic pylon: symmetric section lofted downward from the wing, with a rack body and four sway
+ * braces (`rack`), and the release hardware under it (`release`): two suspension hooks 14 in
+ * (0.356 m) apart, the electrical umbilical connector and the arming solenoid.
+ */
 export function pylon(chord, height, t = 0.13) {
   const skin = wingPanel({ root: { le: [0, 0, 0], chord, t }, tip: { le: [-0.04, 0, height], chord: chord * 0.92, t }, stations: 2, n: 14, withChord: false });
   skin.rotateX(Math.PI / 2);             // span +z → −y, thickness → z
-  const rack = [
-    box(chord * 0.55, 0.05, 0.06, [-chord * 0.45, -height + 0.02, 0]),
-    box(0.04, 0.05, 0.03, [-chord * 0.45 + 0.178, -height - 0.015, 0]),
-    box(0.04, 0.05, 0.03, [-chord * 0.45 - 0.178, -height - 0.015, 0]),
-  ];
-  for (const s of [1, -1]) for (const dx of [0.22, -0.22]) rack.push(box(0.025, 0.05, 0.025, [-chord * 0.45 + dx, -height - 0.02, 0.07 * s], [0.5 * s, 0, 0]));
-  return { skin, rack: merge(rack) };
+  const xr = -chord * 0.45;
+  const rack = [box(chord * 0.55, 0.05, 0.06, [xr, -height + 0.02, 0])];
+  for (const s of [1, -1]) for (const dx of [0.22, -0.22]) rack.push(box(0.025, 0.05, 0.025, [xr + dx, -height - 0.02, 0.07 * s], [0.5 * s, 0, 0]));
+  const release = [];
+  for (const dx of [0.178, -0.178]) {
+    release.push(box(0.036, 0.04, 0.024, [xr + dx, -height - 0.01, 0]));
+    release.push(new THREE.TorusGeometry(0.011, 0.005, 5, 8, Math.PI).rotateZ(Math.PI).translate(xr + dx + 0.006, -height - 0.03, 0));
+  }
+  release.push(new THREE.CylinderGeometry(0.02, 0.022, 0.03, 12).translate(xr + 0.075, -height - 0.008, 0.032));      // umbilical connector
+  release.push(cylX(xr - 0.11, xr - 0.065, 0.013, 0.013, -height - 0.004, -0.03, 10));                                   // arming solenoid
+  return { skin, rack: merge(rack), release: merge(release) };
+}
+
+/**
+ * External fuel pod for the GA-ASI ER kit (shape not public): a round tank about 0.58 m across and
+ * 3.4 m long, holding ≈ 740 L. Built along +x with its suspension lugs on top at y = +radius.
+ */
+export function erPod() {
+  const R = 0.29, L = 3.4, h = L / 2;
+  const pr = [[0.001, h]];
+  for (let i = 1; i <= 8; i++) { const t = i / 8; pr.push([R * Math.sqrt(1 - (1 - t) ** 2.2), h - 0.75 * t]); }
+  pr.push([R, -h + 0.9]);
+  for (let i = 1; i <= 6; i++) { const t = i / 6; pr.push([R * (1 - 0.75 * t ** 1.6), -h + 0.9 - 0.9 * t]); }
+  pr.push([0.001, -h]);
+  const body = latheX(pr.reverse(), 28);
+  const lugs = [-0.178, 0.178].map((x) => box(0.05, 0.03, 0.025, [x, R + 0.01, 0]));
+  const fittings = [new THREE.CylinderGeometry(0.035, 0.035, 0.012, 14).translate(0.6, R - 0.003, 0), cylX(-0.3, -0.2, 0.03, 0.03, R - 0.01, 0, 10)];
+  return { body, fittings: merge([...lugs, ...fittings]), length: L, radius: R };
 }

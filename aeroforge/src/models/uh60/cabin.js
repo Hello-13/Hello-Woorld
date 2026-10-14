@@ -420,9 +420,10 @@ export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], serv
     desc: 'Driven by the APU, it powers the aircraft on the ground with the rotor stopped — for avionics checks, cabin lights and the backup hydraulic pump — and can supply all the flight-essential buses, or the blade de-ice if one main generator fails.',
   }, [mesh(cyl(0.075, 0.075, 0.16, [-2.42, 2.32, 0.17], 'x', 16), MAT.casting())]);
   P('Main battery', {
-    system: 'Electrical', material: '24 V battery (5.5 Ah NiCd or 9.5 Ah sealed lead-acid)', mass: 36, explode: [1.6, -0.3, 0.6],
-    desc: 'Powers the APU start control and ignition and keeps the essential buses alive if both converters fail: about 22 minutes by day and 14 at night from 80 % charge. The A/L manual puts it in the cabin behind the copilot; its UH-60M location is not in public sources, so it is shown in the nose bay.',
-  }, [mesh(box(0.24, 0.2, 0.28, [4.33, 0.9, 0.24]), MAT.black())]);
+    system: 'Electrical', material: '24 V battery (5.5 Ah NiCd or 9.5 Ah sealed lead-acid)', mass: 36, explode: [0.4, 0.3, -0.9],
+    desc: 'Powers the APU start control and ignition and keeps the essential buses alive if both converters fail: about 22 minutes by day and 14 at night from 80 % charge. Shown where the UH-60A/L manual and S-70A rescue charts put it, on the cabin floor behind the copilot, cabled up the closet side to the DC distribution panel; its UH-60M location is not in public sources.',
+  }, [mesh(merge([box(0.24, 0.2, 0.28, [2.24, 0.79, -0.56]), box(0.2, 0.02, 0.24, [2.24, 0.9, -0.56])]), MAT.black()),
+    mesh(merge([pipe([[2.24, 0.91, -0.62], [2.25, 1.0, -0.72], [2.25, 1.4, -0.79], [2.24, 1.85, -0.8], [2.2, 2.0, -0.6], [2.1, 2.05, -0.3]], 0.011, 5), cyl(0.022, 0.022, 0.03, [2.24, 0.915, -0.5], 'y', 8)]), MAT.wiring())]);
   P('AC/DC converters', {
     system: 'Electrical', material: 'Two 200 A transformer-rectifier units', mass: 16, count: 2, explode: [0.8, 0.8, 0],
     desc: 'Turn 115 V AC into 28 V DC for most of the aircraft\'s equipment; two 200 A units, so one can fail without losing the DC buses. There is no external DC connector — all DC comes from these and the battery.',

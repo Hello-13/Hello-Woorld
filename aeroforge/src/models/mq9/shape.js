@@ -5,7 +5,8 @@
 //
 // The profile is fitted to the USAF / GA-ASI figures (length 11 m, span 20.1 m, height 3.81 m)
 // and to published photographs: a bulbous upper nose (Ku-band SATCOM radome), a near-flat top
-// line and a bottom line that sweeps up to the pusher propeller. Section shapes are estimates.
+// line, and a deep engine section under a dorsal hump that fairs straight into the large spinner
+// of the pusher propeller. Section shapes are estimates.
 
 import * as THREE from 'three';
 import { loftRings, orientOutward, interpKeys, naca00, mergeGeometries } from '../../engine/geometry.js';
@@ -26,12 +27,17 @@ const KEYS = [
   [4.50, 1.86, 1.01, 0.42],
   [5.30, 1.86, 1.04, 0.42],
   [6.20, 1.85, 1.10, 0.41],
-  [7.10, 1.85, 1.18, 0.39],
-  [8.00, 1.85, 1.27, 0.36],
-  [8.80, 1.85, 1.36, 0.32],
-  [9.50, 1.85, 1.45, 0.27],
-  [10.00, 1.87, 1.55, 0.205],
-  [10.40, 1.88, 1.58, 0.15],
+  [7.10, 1.85, 1.17, 0.40],
+  // engine section: the TPE331 sits right ahead of the propeller under a raised dorsal hump, so the
+  // aft body stays deep (≈ 0.75 m) to the spinner instead of tapering (fitted to NASA Ikhana and
+  // USAF side-view photographs; the 0.68 m-tall reduction gearbox sets the depth at the tail)
+  [7.80, 1.865, 1.215, 0.385],
+  [8.40, 1.975, 1.265, 0.37],
+  [9.00, 2.065, 1.305, 0.355],
+  [9.60, 2.10, 1.335, 0.34],
+  [10.05, 2.10, 1.35, 0.32],
+  [10.25, 2.09, 1.37, 0.30],
+  [10.40, 2.07, 1.47, 0.285],
 ];
 const col = (c) => KEYS.map((k) => [k[0], k[c]]);
 const TOP = col(1), BOT = col(2), HW = col(3);

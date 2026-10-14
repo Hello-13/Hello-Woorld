@@ -495,14 +495,15 @@ export function buildMainRotor({ A, parent }) {
   const fixedG = [];
   const servos = SERVO_AZ.map((a) => {
     const base = V3(RB * Math.cos(a), YB, -RB * Math.sin(a));
-    const radial = V3(Math.cos(a), 0, -Math.sin(a)), tang = V3(-Math.sin(a), 0, -Math.cos(a));
+    const tang = V3(-Math.sin(a), 0, -Math.cos(a));
     // bracket from the main-module case flange out to the servo's lower clevis
     fixedG.push(tube(V3(0.42 * Math.cos(a), YB + 0.01, -0.42 * Math.sin(a)), base.clone().add(V3(0, -0.01, 0)), 0.025, 8),
       box(0.14, 0.025, 0.12, [base.x, base.y - 0.035, base.z]).rotateY(0),
       box(0.05, 0.08, 0.012, [0, 0, 0]).translate(base.x + tang.x * 0.04, base.y, base.z + tang.z * 0.04),
       box(0.05, 0.08, 0.012, [0, 0, 0]).translate(base.x - tang.x * 0.04, base.y, base.z - tang.z * 0.04));
-    // input pilot-valve lever: a short bellcrank on the manifold, its free end where the deck rod connects
-    const lv0 = base.clone().addScaledVector(tang, -0.06).add(V3(0, 0.07, 0)), lv1 = lv0.clone().addScaledVector(radial, 0.13).add(V3(0, -0.03, 0));
+    // input pilot-valve lever: a short bellcrank on the manifold, its free end pointing forward to
+    // where the deck rod from the mixing unit connects (clear of the pump modules beside the servos)
+    const lv0 = base.clone().addScaledVector(tang, -0.06).add(V3(0, 0.07, 0)), lv1 = lv0.clone().add(V3(0.12, -0.03, 0));
     fixedG.push(tube(lv0, lv1, 0.012, 8), cyl(0.02, 0.02, 0.04, [lv1.x, lv1.y, lv1.z], 'y', 8));
     const g = new THREE.Group();
     g.add(mesh(bodyG, MAT.hydraulic()));

@@ -884,7 +884,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   const fwdAttachY = 41.8, aftAttachY = 2.75;
   if (centre) {
     const gap0 = R, gap1 = 4.27 - R;                       // centre-core skin → side-booster skin
-    const sepSup = [];
+    const sepFwd = [], sepAft = [];
     for (const s of [1, -1]) {
       const label = s > 0 ? 'A' : 'B';
       const f = [], a = [];
@@ -908,17 +908,23 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
       }, mesh(merge(a), FM.aluDark()));
       // helium supply for this side's pushers: a bottle by each pair, lines through the skin
       const fa = s > 0 ? 350 : 170, aa = s > 0 ? 10 : 190;
-      sepSup.push(bottle(...at(1.45, fa, 41.75), 0.15, 0.6, 14), new THREE.SphereGeometry(0.12, 14, 10).translate(...at(1.42, aa, 2.7)));
+      sepFwd.push(bottle(...at(1.45, fa, 41.75), 0.15, 0.6, 14));
+      sepAft.push(new THREE.SphereGeometry(0.12, 14, 10).translate(...at(1.42, aa, 2.7)));
       for (const dz of [-0.42, 0.42]) {
-        sepSup.push(pipe([at(1.45, fa, 41.95), [s * 1.62, 41.95, dz * 0.8], [s * (gap0 - 0.02), fwdAttachY + 0.1, dz]], 0.012, { seg: 4, tubular: 8 }));
-        sepSup.push(pipe([at(1.42, aa, 2.75), [s * 1.6, 2.76, dz * 0.7], [s * (gap0 - 0.02), aftAttachY + 0.05, dz]], 0.012, { seg: 4, tubular: 8 }));
+        sepFwd.push(pipe([at(1.45, fa, 41.95), [s * 1.62, 41.95, dz * 0.8], [s * (gap0 - 0.02), fwdAttachY + 0.1, dz]], 0.012, { seg: 4, tubular: 8 }));
+        sepAft.push(pipe([at(1.42, aa, 2.75), [s * 1.6, 2.76, dz * 0.7], [s * (gap0 - 0.02), aftAttachY + 0.05, dz]], 0.012, { seg: 4, tubular: 8 }));
       }
     }
-    P('booster-separation helium supply', {
-      system: 'Separation', count: 4, material: 'Helium bottles and stainless lines', mass: 30,
-      desc: 'A bottle beside each pair of pushers holds the helium that releases them and drives the push, with short lines through the skin into the pusher housings. The supply is not described publicly; bottle sizes and positions are estimates.',
+    P('forward booster-separation helium bottles', {
+      system: 'Separation', count: 2, material: 'Composite-overwrapped helium bottles and stainless lines in the LOX tank\'s forward skirt', mass: 20,
+      desc: 'A bottle beside each forward pusher pair holds the helium that releases the fittings and drives the push, with short lines through the skin into the pusher housings — the same all-pneumatic principle as the stage and fairing separation. The supply is not described publicly; bottle size and position are estimates.',
       explode: [0, 1.0, 3.4],
-    }, mesh(merge(sepSup), FM.copv()));
+    }, mesh(merge(sepFwd), FM.copv()));
+    P('aft booster-separation helium bottles', {
+      system: 'Separation', count: 2, material: 'Helium bottles and stainless lines in the engine bay', mass: 10,
+      desc: 'Feed the aft pusher pairs at the base engine mounts, which shove the side boosters\' engine sections sideways so the bases clear the centre core. Bottle size and position are estimates.',
+      explode: [0, -1.0, 3.4],
+    }, mesh(merge(sepAft), FM.copv()));
   } else {
     // the booster halves of the attach fittings: they leave with the booster at separation
     const xin = -attachSide;                                 // inboard direction in this booster's frame

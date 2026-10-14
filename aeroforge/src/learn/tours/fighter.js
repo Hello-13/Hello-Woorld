@@ -42,7 +42,7 @@ export default [
     body: 'Behind a frequency-selective radome sits a fixed array of about 2,000 transmit/receive modules. Its beam is steered electronically, and the array is tilted back so its flat face never squares up to another radar. Liquid coolant carries away the heat.',
     key: 'Electronic steering moves the beam in microseconds; a mechanically scanned dish needs seconds.',
     focus: ['Radome', 'AN/APG-77 AESA array', 'APG-77 array mount & coolant manifold', 'APG-77 receiver / exciter & power supply', 'Radar bulkhead', 'Forward avionics racks',
-      'Common integrated processor (CIP 1)', 'Common integrated processor (CIP 2)', 'PAO cooling loop 1 (radar & CIPs)', 'Avionics data buses'],
+      'Common integrated processor (CIP 1)', 'Common integrated processor (CIP 2)', 'PAO cooling loop 1 (radar & CIPs)'],
     mode: 'xray', explode: 0.3, view: { dir: [1, 0.35, 0.8] },
   },
   {
@@ -84,7 +84,7 @@ export default [
       ...BOTH('Engine feed line'), 'Air-refuelling receptacle', 'Refuelling manifold', 'Fuel thermal-management lines', ...BOTH('Fuel–ram-air cooler'),
       'Fuel–PAO heat exchanger (loop 1)', 'Fuel–PAO heat exchanger (loop 2)', 'PAO cooling loop 1 (radar & CIPs)', 'PAO cooling loop 2 (CNI & EW)',
       'PAO pump & reservoir (loop 1)', 'PAO pump & reservoir (loop 2)', 'Vapour-cycle refrigeration pack'],
-    mode: 'systems', view: { dir: [-0.5, 0.82, 0.29], fill: 0.8 },
+    mode: 'systems', view: { dir: [-0.5, 0.82, 0.29], fill: 1.12 },
   },
   {
     title: 'Power without engines',
@@ -93,7 +93,7 @@ export default [
     focus: ['Auxiliary power unit (APU)', 'APU inlet & exhaust ducts', 'APU inlet & exhaust doors', 'Stored-energy system (SES)', 'SES air re-charge compressor', 'APU start path to AMADs',
       ...BOTH('Airframe-mounted accessory drive'), ...BOTH('Power take-off shaft'), ...BOTH('Generator'), 'Hydraulic pumps (right AMAD)', 'Hydraulic pumps (left AMAD)', 'Batteries',
       'Aft power distribution centres', 'Forward power distribution centres', 'Converter-regulators (270 V → 28 V DC)', 'Main wiring harnesses'],
-    mode: 'systems', view: { dir: [-0.45, 0.8, -0.4], fill: 0.85 },
+    mode: 'systems', view: { dir: [-0.45, 0.85, 0.27], fill: 1.1 },
   },
   {
     title: 'Heat is a signature',

@@ -109,7 +109,7 @@ export function buildRocket() {
   // legs would cross, and in flight each core deploys its legs only after separation, just before
   // touchdown. While the legs are out the launch mount, its clamps, masts and spray rings step
   // aside, since the stance reaches below the deck.
-  let legK = 0, legTarget = 0, legDelay = 0, legDemoClock = null;
+  let legK = 0, legTarget = 0, legDelay = 0, legDemoClock = null, inFrame = false;
   const setLegsAll = (k) => { legK = k; boosters[0].setLegs(k); };
   Object.defineProperty(base, 'visible', { get: () => legK < 0.005, set() {}, configurable: true });
 
@@ -258,15 +258,19 @@ export function buildRocket() {
     /**
      * The tour's 'deploy' demonstration (see learn/tour.js): a value below 1 starts it — the legs
      * swing out after the camera has arrived — and the next call with 1 ends it and stows them,
-     * except the tour's own call 1.4–1.5 s into the step, which is ignored. The step clock counts
-     * the same frame time the tour does, so the two agree however slowly frames are drawn.
+     * except the tour's own call 1.4–1.5 s into the step, which is ignored. That call comes from
+     * the tour's per-frame update, straight after this vehicle's update in the same frame, while
+     * leaving the step comes from a click or key between frames; the step clock counts the same
+     * frame time the tour does, so the two agree however slowly frames are drawn.
      */
     setDeploy(k) {
       if (k < 1) { legDemoClock = 0; legTarget = 1; legDelay = 1.0; return; }
-      if (legDemoClock != null && legDemoClock > 1.35 && legDemoClock < 1.6) return;
+      if (inFrame && legDemoClock != null && legDemoClock > 1.3 && legDemoClock < 1.7) return;
       legDemoClock = null; legTarget = 0; legDelay = 0;
     },
     update(dt, t) {
+      // true until the rest of this frame's synchronous work (the tour's update) has run
+      if (!inFrame) { inFrame = true; queueMicrotask(() => { inFrame = false; }); }
       if (legDemoClock != null) legDemoClock += dt;
       if (legDelay > 0) legDelay = Math.max(0, legDelay - dt);
       else if (legK !== legTarget) {

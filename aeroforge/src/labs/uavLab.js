@@ -20,7 +20,7 @@ export function mountUavLab(root, ctx) {
     label: 'Stores fit',
     options: Object.entries(LOADOUTS).map(([k, l]) => [k, l.label]),
     value: p.stores,
-    onChange: (k) => { p.stores = k; dirty = true; v.setStores?.(k); ctx.log(v.designation, `Stores: ${LOADOUTS[k].detail} · ${fmt.n(LOADOUTS[k].mass)} kg`, 'info'); },
+    onChange: (k) => { p.stores = k; dirty = true; v.setStores?.(k); ctx.log(v.designation, `Stores: ${LOADOUTS[k].detail} · ${fmt.n(LOADOUTS[k].mass + (LOADOUTS[k].fuel || 0))} kg`, 'info'); },
   });
   const sAlt = slider({ label: 'Loiter altitude', min: 0, max: 15240, step: 100, value: p.altitude, format: (x) => `${fmt.n(x)} m (${fmt.n(x * 3.2808)} ft)`, onInput: set('altitude') });
   const sSpd = slider({ label: 'True airspeed', min: 40, max: 140, step: 1, value: p.speed, format: (x) => `${x} m/s (${Math.round(x * 1.944)} kt)`, onInput: set('speed') });
@@ -36,7 +36,7 @@ export function mountUavLab(root, ctx) {
   const hub = new THREE.Vector3(...(v.propHub || [-5.0, 1.73, 0]));
   function placeForces() {
     if (!last || !forces.group.visible) return;
-    const W = (last.takeoffMass - p.fuel * (1 - MQ9.reserve) / 2) * 9.80665, D = W / last.lOverD;
+    const W = (last.takeoffMass - last.totalFuel * (1 - MQ9.reserve) / 2) * 9.80665, D = W / last.lOverD;
     const k = 4.5 / W;
     const air = v.root.children[0].position;           // the airframe group: rises when airborne
     const o = cg.clone().add(air);

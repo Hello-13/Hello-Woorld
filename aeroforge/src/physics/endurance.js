@@ -29,10 +29,14 @@ export const MQ9 = {
 
 // Stores fits. Masses: GBU-12 ≈ 230 kg, AGM-114 ≈ 49 kg and the M310 two-rail launcher ≈ 43 kg
 // (42 kg / 92 lb empty, Lockheed Martin) are published; every drag area (f = ΔCD0 · S) is an estimate.
+// The ER fit's `fuel` is external fuel burned with the internal load: GA-ASI gives 6,450 lb with the
+// two ER pods against 3,800 lb internal, so 2,650 lb (1,202 kg) in the pods; the pods' empty mass is
+// an estimate.
 export const LOADOUTS = {
   clean: { label: 'Clean', detail: 'sensors only', mass: 0, dragArea: 0 },
   hellfire: { label: '4 × Hellfire', detail: '4 × AGM-114 on two M310 launchers', mass: 4 * 49 + 2 * 43, dragArea: 2 * 0.035 },
   strike: { label: '+ 2 × GBU-12', detail: '2 × GBU-12 + 4 × AGM-114', mass: 2 * 230 + 4 * 49 + 2 * 43, dragArea: 2 * 0.026 + 2 * 0.035 },
+  er: { label: 'ER fuel pods', detail: '2 × ER fuel pods (1,202 kg of extra fuel)', mass: 2 * 45, fuel: 1202, dragArea: 2 * 0.045 },
 };
 
 const AR = (MQ9.span ** 2) / MQ9.wingArea;
@@ -63,8 +67,9 @@ export function mission({ fuel = 1300, payload = 250, stores = 'clean', altitude
   const S = MQ9.wingArea;
   const fit = LOADOUTS[stores] || LOADOUTS.clean;
   const cd0 = MQ9.cd0 + fit.dragArea / S;
-  const W0 = (MQ9.massEmpty + fuel + payload + fit.mass) * G0;
-  const W1 = (MQ9.massEmpty + payload + fit.mass + fuel * MQ9.reserve) * G0;
+  const totalFuel = fuel + (fit.fuel || 0);                 // internal + external (ER pods)
+  const W0 = (MQ9.massEmpty + totalFuel + payload + fit.mass) * G0;
+  const W1 = (MQ9.massEmpty + payload + fit.mass + totalFuel * MQ9.reserve) * G0;
   const Wmid = Math.sqrt(W0 * W1);
   const q = 0.5 * atm.rho * speed * speed;
   const cl = Wmid / (q * S);
@@ -92,9 +97,10 @@ export function mission({ fuel = 1300, payload = 250, stores = 'clean', altitude
     powerKW: powerReq / 1000,
     powerAvailKW,
     takeoffMass: W0 / G0,
-    storesMass: fit.mass,
+    storesMass: fit.mass + (fit.fuel || 0),
+    totalFuel,
     overweight: W0 / G0 > MQ9.mtow,
-    overPayload: payload > MQ9.maxInternal || fit.mass > MQ9.maxExternal,
+    overPayload: payload > MQ9.maxInternal || fit.mass + (fit.fuel || 0) > MQ9.maxExternal,
     vStall,
     vMinPower,
     // best-endurance and best-range speeds, held above 1.2 × stall speed: on this long wing the

@@ -56,6 +56,15 @@ export function buildHelicopter() {
   role(['AC generators', 'APU generator', 'No. 1 hydraulic pump module (left)', 'No. 2 hydraulic pump module (right)', 'Backup hydraulic pump', 'Primary servos', 'Tail rotor servo', 'Boost servos', 'AVCS force generators', 'Ventilation blower'], 'equipment');
   role(['Flight management & display computers', 'Embedded GPS/INS units', 'Digital AFCS computers', 'Communication radios & IFF', 'Health monitoring & data recorders', 'AC/DC converters', 'Power distribution panels', 'Generator control units', 'Instrument panel & multifunction displays', 'AVCS controller', 'CMWS electronic control unit', 'APU electronic sequence unit', 'Blade de-ice controller & junction box', 'Hydraulic logic modules'], 'avionics');
 
+  // X-ray: dim the stacked hardware round the rotor head and the thin runs so the control chain
+  // (blades, swashplates, horns, pitch rods, servos) stays the brightest thing in the view
+  const xw = { 'Blade cuffs & quick-release pins': 0.6, 'Blade spindles': 0.6, 'Lead-lag dampers': 0.6, 'Droop stops & flap restrainers': 0.5,
+    'Main rotor de-ice harness': 0.5, 'Main rotor blade heater blankets': 0.5, 'Main rotor slip ring': 0.6, 'De-ice distributor': 0.6, 'Main rotor shaft': 0.6,
+    'Swashplate guide': 0.5, 'Uniball & sliding sleeve': 0.5, 'Swashplate duplex bearing': 0.5, 'Rotating scissors': 0.7, 'Stationary scissors': 0.7,
+    'Generator feeders, current transformers & limiters': 0.6, 'Generator cooling-oil lines': 0.6, 'Oil cooler lines & thermostatic valve': 0.6,
+    'Fire extinguisher discharge lines': 0.6, 'Tail drive shaft disc couplings': 0.6, 'Control bellcranks & cable pulleys': 0.7, 'Cabin door posts': 0.4 };
+  for (const [n, w] of Object.entries(xw)) { const p = byName(n); if (p) p.userData.part.xrayWeight = w; }
+
   // estimated masses scaled together to the published 5,675 kg empty weight (GE's engine figure kept)
   const fixed = (p) => /^T700 |^Inlet particle separator/.test(p.userData.part.name);
   const sum = (list) => list.reduce((a, p) => a + (p.userData.part.mass || 0), 0);

@@ -46,7 +46,7 @@ export default [
     title: 'The Merlin 1D cycle',
     body: 'Here the centre engine is broken out. One shaft carries the LOX pump, the RP-1 pump and a turbine, which a small gas generator spins by burning a fuel-rich trickle of both propellants; its exhaust is dumped overboard — an open gas-generator cycle, simpler than staged combustion for a few seconds of Isp. Past the main valves (a servo butterfly valve trims the mixture) the propellants meet at a pintle injector and burn at about 9.7 MPa. The steering actuators run on high-pressure RP-1 from the same pump.',
     key: 'One shaft, two impellers, one turbine. The often-quoted 36,000 rpm and ≈ 10,000 hp are the Merlin 1C pump\'s; no Merlin 1D figure is published. TEA-TEB, which ignites on contact with LOX, lights the engine and allows restarts.',
-    focus: ENGINE, explode: 0.85, view: { dir: [0.85, 0.42, 1.4], fill: 1.15 },
+    focus: ENGINE, explode: 0.85, view: { dir: [0.85, 0.42, 1.4], fill: 0.95 },
   },
   {
     title: 'Octaweb and engine-out',
@@ -67,8 +67,8 @@ export default [
     title: 'Holding three cores together',
     body: 'The side boosters ride on the centre core, which has thicker tank walls and a reinforced interstage. Each booster is held at two levels: two pneumatic pusher mechanisms fasten it to the top of the centre core\'s LOX tank (shown here), and two more join the engine sections at the base engine mounts. About 2½ minutes in, the boosters shut down, the fittings release and the pushers shove them clear; each booster takes its half of the fittings with it.',
     key: 'Pneumatic separation gives a low-shock push over a long stroke and can be tested on the real flight hardware — explosive bolts cannot. The 2 + 2 count is the Falcon User\'s Guide\'s; the fittings\' shape and helium supply are estimates.',
-    focus: [`${CORE} forward attach & pushers (A)`, `${CORE} forward attach & pushers (B)`, `${SBA} forward attach fitting`, 'Side booster B forward attach fitting', `${CORE} booster-separation helium supply`],
-    mode: 'systems', view: { dir: [0.25, 0.3, 1.4], fill: 1.6 },
+    focus: [`${CORE} forward attach & pushers (A)`, `${CORE} forward attach & pushers (B)`, `${SBA} forward attach fitting`, 'Side booster B forward attach fitting', `${CORE} forward booster-separation helium bottles`],
+    mode: 'systems', view: { dir: [0.25, 0.3, 1.4], fill: 1.5 },
   },
   {
     title: 'Coming home: fins and thrusters',
