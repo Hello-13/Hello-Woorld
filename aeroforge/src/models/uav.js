@@ -825,7 +825,7 @@ export function buildUAV() {
     // door actuator: from a bracket inside the well, below the hinge line, out to a lug on the door's inner face
     const act = makeActuator(0.016, 0.009, 0.12, m.darkMetal);
     const anchor = new THREE.Vector3(X(DOOR_ACT[0]), DOOR_ACT[1], DOOR_ACT[2] * side);
-    const lugClosed = new THREE.Vector3(...fusePoint(DOOR_ACT[0], -Math.PI / 2 + 1.25 * side, 0.012));
+    const lugClosed = new THREE.Vector3(...fusePoint(DOOR_ACT[0], -Math.PI / 2 + 1.25 * side, -0.003));   // on the door's inner face
     const p0 = mainDoor.pivot.position.clone();
     P(`Main gear door actuator (${sd})`, {
       system: 'Landing gear', material: 'Small linear actuator (est.)', mass: 1, explode: [0, -0.2, 0.45 * side],

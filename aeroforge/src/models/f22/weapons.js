@@ -72,11 +72,13 @@ export function buildWeapons(ctx) {
   // ------------------------------------------------------------------ main weapons bay structure
   {
     const { s0, s1, z } = FR.MAIN_BAY;
+    // toward the aft end the ceiling's sloping strip starts further inboard, under the duct floor (FR.bayCeilAt)
     const prof = (s) => {
       const D = FR.bD(s);
-      return [[z, -D], [z, -0.45], [0.55, -0.24], [-0.55, -0.24], [-z, -0.45], [-z, -D]].map(([zz, y]) => [X(s), y, zz]);
+      const zb = 0.55 + (FR.BAY_AFT.zBreak - 0.55) * FR.smooth(FR.BAY_AFT.s0, FR.BAY_AFT.s1, s);
+      return [[z, -D], [z, -0.45], [zb, -0.24], [-zb, -0.24], [-z, -0.45], [-z, -D]].map(([zz, y]) => [X(s), y, zz]);
     };
-    const st = [s0, (s0 + s1) / 2, s1];
+    const st = [s0, 9.4, 10.4, FR.BAY_AFT.s0, 11.7, FR.BAY_AFT.s1, s1];
     const liner = FR.gridSurface(st.map(prof), { closed: false, uv: 'n' });
     const ends = [];
     for (const s of [s0, s1]) {
@@ -93,7 +95,7 @@ export function buildWeapons(ctx) {
         const a = p[k], b = p[k + 1];
         const len = Math.hypot(a[1] - b[1], a[2] - b[2]);
         const g = new THREE.BoxGeometry(0.05, len, 0.06);
-        g.rotateX(-Math.atan2(b[2] - a[2], b[1] - a[1]));
+        g.rotateX(Math.atan2(b[2] - a[2], b[1] - a[1]));             // +y → along the segment a → b
         g.translate(a[0], (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
         ribs.push(g);
       }
@@ -144,21 +146,38 @@ export function buildWeapons(ctx) {
       }, ho.pivot);
       bay.bifold.push({ outer: ho, inner: hi });
 
-      // drive: hydraulic power drive unit turning a torque shaft along the hinge line, with geared
-      // rotary actuators that swing the outer panel (the fold linkage follows it)
-      const zd = side * 0.737, g = [], c = [];
-      g.push(FR.cylX((8.6 + 12.2) / 2, -0.80, zd, 3.6, 0.02, 0.02, 8));                      // torque shaft
-      g.push(FR.boxS(9.65, -0.785, side * 0.735, 0.32, 0.13, 0.085));                         // power drive unit
-      g.push(FR.cylX(9.88, -0.77, side * 0.735, 0.14, 0.04, 0.04, 12));                       // hydraulic motor
-      for (const s of [8.9, 10.4, 11.9]) {
-        g.push(FR.cylX(s, -0.835, side * 0.742, 0.12, 0.05, 0.05, 14));                      // rotary actuator
-        c.push(FR.boxS(s, -0.862, side * 0.762, 0.06, 0.03, 0.05));                           // output crank to the door
+      // drive: a hydraulic power drive unit turns a torque shaft along the bay sill, just above the edge
+      // longeron and outboard of the bay's outer missile; three geared rotary actuators on the shaft each swing
+      // a crank, and a link from the crank to a fitting on the outer panel moves the door (the fold follows)
+      const BD = FR.BAY_DRIVE, zd = side * BD.z, g = [], br = [];
+      g.push(FR.cylX((BD.s0 + BD.s1) / 2, BD.y, zd, BD.s1 - BD.s0, BD.shaftR, BD.shaftR, 10));          // torque shaft
+      g.push(FR.boxS(9.65, -0.765, side * 0.825, 0.3, 0.07, 0.07));                                    // power drive unit
+      g.push(FR.cylX(9.88, -0.765, side * 0.83, 0.16, 0.03, 0.03, 12));                                // hydraulic motor
+      const hp0 = V(X(s0), -FR.bD(s0), side * z), hp1 = V(X(s1), -FR.bD(s1), side * z);
+      const cranks = [];
+      for (const s of BD.stations) {
+        g.push(FR.cylX(s, BD.y, zd, 0.12, BD.r, BD.r, 14));                                           // rotary actuator
+        br.push(FR.boxS(s + 0.075, -0.8, side * 0.815, 0.03, 0.05, 0.04));                             // mounting lug on the longeron
+        const H = hp0.clone().lerp(hp1, (s - s0) / (s1 - s0));                                        // on the door hinge line
+        const arm = V(0, BD.fit[1], side * BD.fit[0]);
+        const crank = unitRod(0.012, F.steel()), link = unitRod(0.008, F.steel());
+        cranks.push({ A: V(X(s), BD.y, zd), H, arm, crank, link });
       }
       P(`Main bay door drive (${R})`, {
-        system: 'Weapons', material: 'Hydraulic power drive unit (4,000 psi), steel torque shaft, three geared rotary actuators', mass: 30,
+        system: 'Weapons', material: 'Hydraulic power drive unit (4,000 psi), steel torque shaft, three geared rotary actuators with cranks and links', mass: 30,
         explode: [0.2, -1.05, 0.75 * side],
-        desc: 'The doors have to snap open in a fraction of a second so a missile can leave the bay. A hydraulic power drive unit turns a torque shaft along the door hinge line, and three geared rotary actuators on it swing the door (arrangement approximate). Vickers built the development main- and side-bay door actuation systems; Curtiss-Wright later supplied the production weapons-bay-door actuation.',
-      }, [mesh(merge(g), F.hyd()), mesh(merge(c), F.steel())]);
+        desc: 'The doors have to snap open in a fraction of a second so a missile can leave the bay. A hydraulic power drive unit turns a torque shaft along the bay sill, and three geared rotary actuators on it swing the outer door panel through cranks and links (arrangement approximate). Vickers built the development main- and side-bay door actuation systems; Curtiss-Wright later supplied the production weapons-bay-door actuation.',
+      }, [mesh(merge(g), F.hyd()), mesh(merge(br), F.tiDull()), ...cranks.flatMap((k) => [k.crank, k.link])]);
+      const v = new THREE.Vector3(), cP = new THREE.Vector3(), dP = new THREE.Vector3();
+      bay.links.push(() => {
+        for (const k of cranks) {
+          v.copy(k.arm).applyQuaternion(ho.pivot.quaternion);
+          cP.copy(k.A).add(v);
+          dP.copy(k.H).add(v);
+          place(k.crank, k.A, cP);
+          place(k.link, cP, dP);
+        }
+      });
     }
   }
 
@@ -201,7 +220,7 @@ export function buildWeapons(ctx) {
       P(`LAU-142/A AVEL launchers ×3 (${R})`, {
         system: 'Weapons', material: 'Mostly aluminium hydro-pneumatic ejector', mass: 154, massSource: 'Hydraulics & Pneumatics (1998): nearly 113 lb (51 kg) each', count: 3,
         explode: [0, -0.45, 0.35 * side],
-        desc: 'EDO\'s AMRAAM Vertical Eject Launcher is hydro-pneumatic: the jet\'s hydraulic power charges stored gas, which drives two arms through a 9 in (23 cm) stroke that throws the missile clear of the bay at more than 25 ft/s (7.6 m/s) with a 40 g peak — no pyrotechnic cartridges, so less upkeep. Each weighs about 113 lb so the missile cannot move in the bay.',
+        desc: 'EDO\'s AMRAAM Vertical Eject Launcher is a hydropneumatic launcher with a 9 in (23 cm) stroke: it ejects the missile out of the bay at more than 25 ft/s (7.6 m/s), peaking at 40 g, and needs no pyrotechnics, so it takes less logistics support than cartridge launchers. Mostly aluminium and nearly 113 lb, it is built substantial to minimise missile movement in the bay (the two arms drawn are approximate).',
       }, ls);
     }
   }
@@ -340,9 +359,10 @@ export function buildWeapons(ctx) {
       w.push(FR.pipe([[8.38, -0.5, side * 0.62], [8.6, -0.27, side * 0.62], [10.0, -0.26, side * 0.6]], 0.008, 5));
       w.push(FR.pipe([[8.6, -0.27, side * 0.6], [8.9, -0.255, side * 0.4], [9.25, -0.25, side * 0.373]], 0.007, 5));
       w.push(FR.pipe([[8.6, -0.27, side * 0.55], [8.95, -0.255, side * 0.25], [9.25, -0.25, side * 0.213]], 0.007, 5));
-      w.push(FR.pipe([[8.38, -0.56, side * 0.68], [8.8, -0.7, side * 0.74], [9.48, -0.75, side * 0.735]], 0.008, 5));
-      // out to the side-bay launcher and door
-      w.push(FR.pipe([[8.38, -0.5, side * 0.66], [8.7, -0.42, side * 1.0], [9.4, -0.42, side * 1.3], [10.0, -0.41, side * 1.35]], 0.008, 5));
+      w.push(FR.pipe([[8.38, -0.56, side * 0.68], [8.8, -0.68, side * 0.74], [9.3, -0.745, side * 0.77], [9.52, -0.76, side * 0.81]], 0.008, 5));
+      // out under the duct floor to the side-bay trapeze actuator and the side-bay door actuator
+      w.push(FR.pipe([[8.38, -0.5, side * 0.66], [8.7, -0.5, side * 1.0], [9.4, -0.46, side * 1.18], [10.2, -0.43, side * 1.15], [10.56, -0.405, side * 1.12]], 0.008, 5, 30));
+      w.push(FR.pipe([[10.2, -0.43, side * 1.15], [10.1, -0.415, side * 1.38], [10.05, -0.395, side * 1.47]], 0.007, 5, 10));
     }
     P('Stores management system', {
       system: 'Weapons', material: 'Stores-management processor and two weapon interface units, shielded wiring', mass: 22, count: 3,
@@ -373,7 +393,7 @@ export function buildWeapons(ctx) {
     }, mesh(merge(g), F.gun()));
     // hydraulic drive behind the breech, geared to the rotor, with a flexible shaft to the conveyor
     {
-      const d = [FR.boxS(10.57, 0.05, 1.6, 0.3, 0.16, 0.16), FR.cylX(10.78, 0.05, 1.6, 0.14, 0.055, 0.05, 14)];
+      const d = [FR.boxS(10.52, 0.05, 1.6, 0.2, 0.16, 0.16), FR.cylX(10.68, 0.05, 1.6, 0.12, 0.055, 0.05, 14)];   // gearbox, then motor; container starts at s 10.75
       d.push(FR.pipe([[10.45, 0.04, 1.64], [10.4, 0.02, 1.7], [10.37, 0.0, 1.72]], 0.025, 8, 6));      // output to the rotor
       const f = [FR.pipe([[10.62, -0.03, 1.64], [10.7, -0.08, 1.66], [10.8, -0.09, 1.68]], 0.015, 6, 8)];
       P('M61A2 hydraulic gun drive & flexible shafts', {
