@@ -312,7 +312,7 @@ export function buildAccessories(ctx) {
     system: 'Drive system', material: 'Locking filler cap (Safran), listed for the -110B1/-113B/-115B', mass: 0.3,
     explode: [0.23, -0.1, 2.0], temp: 340,
     desc: 'The gravity-filler cap. Oil is added within about half an hour of shutdown, while it is still warm and the level reading is valid; a cap left unlocked can let the tank empty in flight.',
-  }, m(merge([radialCyl(1.93, 1.955, -1.12, 0.2, 0.026, 14), boxAt(1.962, -1.12, 0.2, [0.01, 0.045, 0.012])]), GM.red()));
+  }, m(merge([radialCyl(1.924, 1.955, -1.12, 0.2, 0.026, 14), boxAt(1.962, -1.12, 0.2, [0.01, 0.045, 0.012])]), GM.red()));
   P('Oil level sensor', {
     system: 'Sensors', material: 'Ametek float-type level transmitter', mass: 1,
     explode: [0.23, -0.2, 2.03], temp: 340,
