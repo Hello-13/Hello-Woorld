@@ -66,8 +66,20 @@ export function ring(s, n = 44, d = 0) {
 }
 
 /** Fuselage outer skin as one smooth loft; split it into panels afterwards with splitTris. */
-export function fuselageLoft(stations, n = 44) {
-  return orientOutward(loftRings(stations.map((s) => ring(s, n)), { capStart: true, capEnd: true, uvMode: 'metric-x' }));
+export function fuselageLoft(stations, n = 44, adjust = null) {
+  // adjust(s, ring) may move ring vertices onto a panel edge (keeping their order round the ring)
+  const g = loftRings(stations.map((s) => { const r = ring(s, n); return (adjust && adjust(s, r)) || r; }), { capStart: true, capEnd: true, uvMode: 'metric-x' });
+  // split the port half's quads along the mirror image of the starboard diagonals, so the skin mesh is mirror-symmetric
+  // and an edge that drifts across the columns is followed exactly on both sides
+  const idx = g.index.array;
+  for (let i = 0; i < stations.length - 1; i++) {
+    for (let j = n / 2; j < n; j++) {
+      const q = (i * n + j) * 6, a = idx[q], c = idx[q + 1], b = idx[q + 2], d = idx[q + 5];
+      idx[q] = a; idx[q + 1] = c; idx[q + 2] = d; idx[q + 3] = a; idx[q + 4] = d; idx[q + 5] = b;
+    }
+  }
+  g.computeVertexNormals();
+  return orientOutward(g);
 }
 
 /** Station list with breaks exactly at the given panel joints. */
@@ -83,14 +95,14 @@ export function stationsWithBreaks(breaks, step = 0.2) {
   return out;
 }
 
-/** Split a geometry's triangles into buckets by classify(cx, cy, cz) → key (normals and UVs kept). */
+/** Split a geometry's triangles into buckets by classify(cx, cy, cz, pos, t) → key (normals and UVs kept); pos[t..t+8] are the triangle's corners. */
 export function splitTris(geo, classify) {
   const g = geo.index ? geo.toNonIndexed() : geo;
   const pos = g.attributes.position.array, nor = g.attributes.normal.array, uv = g.attributes.uv?.array;
   const buckets = new Map();
   for (let t = 0; t < pos.length; t += 9) {
     const cx = (pos[t] + pos[t + 3] + pos[t + 6]) / 3, cy = (pos[t + 1] + pos[t + 4] + pos[t + 7]) / 3, cz = (pos[t + 2] + pos[t + 5] + pos[t + 8]) / 3;
-    const k = classify(cx, cy, cz);
+    const k = classify(cx, cy, cz, pos, t);
     if (k == null) continue;
     if (!buckets.has(k)) buckets.set(k, { p: [], n: [], u: [] });
     const b = buckets.get(k);
