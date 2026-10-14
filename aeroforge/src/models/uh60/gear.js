@@ -13,14 +13,15 @@ import { halfWidthAt, section } from './fuselage.js';
 
 const AXLE = { x: 2.3, y: 0.33, z: 1.355 };   // track 2.71 m
 
-function tire(r, w, seg = 36) {
+/** Tyre of outer radius r and width w whose beads (radius `bead`) seat on the wheel's rim. */
+function tire(r, w, bead, seg = 36) {
   const prof = [];
   for (let k = 0; k <= 12; k++) {
     const a = -Math.PI / 2 + (Math.PI * k) / 12;
     prof.push([r - w * 0.32 + Math.cos(a) * w * 0.32, Math.sin(a) * w * 0.5]);
   }
-  prof.unshift([r * 0.62, -w * 0.46]);
-  prof.push([r * 0.62, w * 0.46]);
+  prof.unshift([bead, -w * 0.46]);
+  prof.push([bead, w * 0.46]);
   const g = lathe(prof, seg);
   g.rotateX(Math.PI / 2);   // axle along z
   return g;
@@ -73,8 +74,8 @@ export function buildGear({ A, P }) {
       desc: 'A two-stage shock strut. The lower stage alone absorbs landings up to 10 ft/s (3 m/s); above that the upper and lower stages combine to absorb impacts up to 39 ft/s (11.9 m/s, about 11.25 g) before the airframe has to.',
     }, holder);
     oleos.push({ pistonGroup, dir: bot.clone().sub(top).normalize() });
-    const wheel = [tire(0.33, 0.25)];
-    const hubG = [cyl(0.16, 0.16, 0.2, [0, 0, 0], 'z', 24), cyl(0.07, 0.07, 0.26, [0, 0, 0], 'z', 16)];
+    const wheel = [tire(0.33, 0.25, 0.15)];   // beads seated inside the rim flanges
+    const hubG = [cyl(0.16, 0.16, 0.24, [0, 0, 0], 'z', 24), cyl(0.07, 0.07, 0.26, [0, 0, 0], 'z', 16)];
     for (const g of wheel) g.translate(AXLE.x, AXLE.y, zW);
     for (const g of hubG) g.translate(AXLE.x, AXLE.y, zW);
     P(`Main wheel & tyre ${R}`, {
@@ -103,7 +104,7 @@ export function buildGear({ A, P }) {
   P('Tail wheel & tyre', {
     system: 'Landing gear', material: 'Aluminium wheel, 15 × 6 class tyre (size approximate)', mass: 10, explode: [0, -1.3, 0],
     desc: 'A single castoring tail wheel, about 8.8 m behind the main wheels. It keeps the tail rotor clear of the ground on landing.',
-  }, [mesh(tire(0.22, 0.15).translate(tw.x, tw.y, 0), MAT.rubber()), mesh(cyl(0.11, 0.11, 0.13, [tw.x, tw.y, 0], 'z', 18), MAT.casting())]);
+  }, [mesh(tire(0.22, 0.15, 0.1).translate(tw.x, tw.y, 0), MAT.rubber()), mesh(cyl(0.11, 0.11, 0.145, [tw.x, tw.y, 0], 'z', 18), MAT.casting())]);
   P('Tail wheel lock actuator', {
     system: 'Landing gear', material: 'Electrically actuated lock pin at the swivel', mass: 2, explode: [0.3, -0.4, 0.4],
     desc: 'A cockpit switch drives a pin into the swivel to hold the tail wheel straight for take-off, running landings and parking on slopes; unlocked, the wheel castors freely.',
@@ -111,9 +112,9 @@ export function buildGear({ A, P }) {
 
   // brake plumbing: master cylinders on the pilots' pedals, lines along the floor and the drag beams
   const brk = [], mc = [];
-  for (const z of [0.53, -0.53]) for (const dz of [0.12, -0.12]) mc.push(cyl(0.018, 0.018, 0.12, [3.62, 0.74, z + dz], 'x', 8));
+  for (const z of [0.53, -0.53]) for (const dz of [0.12, -0.12]) mc.push(cyl(0.018, 0.018, 0.12, [3.62, 0.74, z + dz + 0.032 * Math.sign(dz)], 'x', 8));   // beside each pedal's arm
   for (const s of [1, -1]) {
-    brk.push(pipe([[3.58, 0.72, 0.65 * s], [3.57, 0.66, 0.66 * s], [3.54, 0.618, 0.66 * s], [3.38, 0.618, 0.6 * s], [3.2, 0.618, 0.64 * s], [3.0, 0.618, 0.86 * s], [2.97, 0.595, 0.97 * s], [2.85, 0.56, 1.02 * s], [2.7, 0.525, 1.06 * s], [2.45, 0.48, 1.13 * s], [2.43, 0.405, 1.235 * s]], 0.007, 5));   // down through the floor, under it, out through the belly skin aft of the beam pivot and along the top of the beam
+    brk.push(pipe([[3.65, 0.724, 0.682 * s], [3.652, 0.66, 0.68 * s], [3.56, 0.618, 0.66 * s], [3.38, 0.618, 0.6 * s], [3.2, 0.618, 0.64 * s], [3.0, 0.618, 0.86 * s], [2.97, 0.595, 0.97 * s], [2.85, 0.56, 1.02 * s], [2.7, 0.525, 1.06 * s], [2.45, 0.48, 1.13 * s], [2.43, 0.405, 1.235 * s]], 0.007, 5));   // down through the floor, under it, out through the belly skin aft of the beam pivot and along the top of the beam
   }
   brk.push(box(0.08, 0.05, 0.08, [3.25, 0.613, 0.28]));   // parking-brake valve, under the cockpit floor
   P('Brake master cylinders & lines', {
@@ -143,7 +144,8 @@ export function buildGear({ A, P }) {
     const z = (a, b) => (s > 0 ? [a, b] : [-b, -a]);
     const [fz0, fz1] = z(0.05, 0.92), [rz0, rz1] = z(0.05, 0.56);   // rear outboard corner clear of the transition frame
     const g = cell({ x: -1.84, y0: 0.56, y1: 1.5, z0: fz0, z1: fz1 }, { x: -3.0, y0: 0.84, y1: 1.5, z0: rz0, z1: rz1 });
-    const fittings = [cyl(0.06, 0.06, 0.06, [-2.3, 1.52, 0.5 * s], 'y', 14), cyl(0.05, 0.05, 0.05, [-2.6, 0.9, 0.5 * s], 'y', 12)];
+    const floorAt = (x) => 0.56 + ((0.84 - 0.56) * (-1.84 - x)) / 1.16;
+    const fittings = [cyl(0.06, 0.06, 0.06, [-2.3, 1.52, 0.5 * s], 'y', 14), cyl(0.07, 0.07, 0.025, [-2.65, floorAt(-2.65) + 0.004, 0.45 * s], 'y', 14)];   // top access fitting; floor fitting (on the left, the prime/boost pump's mount)
     P(side > 0 ? 'Fuel cell (right)' : 'Fuel cell (left)', {
       system: 'Fuel', material: 'Crash-resistant, self-sealing rubberised-fabric bladder', mass: 40, explode: [-0.3, -1.4, 0.9 * s],
       desc: 'One of two interchangeable cells holding 360 US gal (1,360 L, ≈1,090 kg of JP-8) between them, aft of the cabin under the stowage compartments. Each must survive a 20 m (65 ft) drop test full of water without leaking, and the self-sealing layers close up after small-arms penetration. Mass shown is the empty cell.',
@@ -198,26 +200,28 @@ export function buildGear({ A, P }) {
   const selG = [];
   for (const s of [1, -1]) {
     selG.push(cyl(0.04, 0.04, 0.1, [-0.85, 2.42, 0.47 * s], 'x', 12), box(0.06, 0.04, 0.07, [-0.85, 2.47, 0.47 * s]), box(0.14, 0.12, 0.012, [-0.85, 2.43, 0.44 * s]));
-    selG.push(pipe([[-0.86, 2.47, 0.47 * s], [-0.84, 2.53, 0.44 * s], [-0.75, 2.52, 0.4 * s], [-0.55, 2.48, 0.4 * s]], 0.006, 4));           // push-pull cable toward the overhead levers
+    selG.push(pipe([[-0.86, 2.47, 0.47 * s], [-0.84, 2.53, 0.44 * s], [-0.75, 2.52, 0.4 * s], [-0.55, 2.48, 0.4 * s]], 0.006, 4), box(0.03, 0.03, 0.025, [-0.555, 2.48, 0.408 * s]));   // push-pull cable toward the overhead levers, in a clamp on the firewall
   }
   // crossfeed between the two valves, under the tail drive shaft, with a check valve in each half
   selG.push(pipe([[-0.86, 2.4, 0.43], [-0.92, 2.34, 0.36], [-0.92, 2.32, 0.15], [-0.92, 2.32, -0.15], [-0.92, 2.34, -0.36], [-0.86, 2.4, -0.43]], 0.012));
   for (const s of [1, -1]) selG.push(cyl(0.022, 0.022, 0.06, [-0.92, 2.32, 0.26 * s], 'z', 10));
   P('Fuel selector valves', {
     system: 'Fuel', material: 'Cable-operated selector valves on the engine-bay firewalls, crossfeed line with check valves', mass: 4, count: 2, explode: [-0.8, 0.9, 0],
-    desc: 'One on the firewall of each engine bay, set by low-friction push-pull cables from the overhead ENG FUEL SYS levers to OFF, DIR (direct from its own cell) or XFD (crossfeed from the other cell). A check valve in each half of the crossfeed stops air from a dead engine\'s line being drawn into the running engine.',
+    desc: 'One on the firewall of each engine bay, set by low-friction push-pull cables (clamped along the firewall on their way forward) from the overhead ENG FUEL SYS levers to OFF, DIR (direct from its own cell) or XFD (crossfeed from the other cell). A check valve in each half of the crossfeed stops air from a dead engine\'s line being drawn into the running engine.',
   }, [mesh(merge(selG), MAT.red())]);
   P('Fuel prime/boost pump', {
     system: 'Fuel', material: 'Electric pump in the left cell (location approximate)', mass: 4, explode: [-0.6, -0.3, -1.1],
     desc: 'An electric pump primes the engine fuel lines before a start and feeds the APU, which draws from the left cell; in flight the engines\' own pumps do the work.',
-  }, [mesh(merge([cyl(0.06, 0.06, 0.14, [-2.65, 0.95, -0.45], 'y', 14), pipe(   // riser outboard of the aft avionics shelf to the APU fuel shutoff
-      [[-2.65, 1.02, -0.45], [-2.62, 1.45, -0.52], [-2.58, 1.75, -0.54], [-2.5, 2.0, -0.46], [-2.4, 2.2, -0.32], [-2.1, 2.29, -0.32], [-1.98, 2.3, -0.32]], 0.008)]), MAT.casting())]);
+  }, [mesh(merge([cyl(0.06, 0.06, 0.14, [-2.65, cellBot(-2.65) + 0.085, -0.45], 'y', 14), pipe(   // on the cell-floor fitting; riser outboard of the aft avionics shelf to the APU fuel shutoff
+      [[-2.65, cellBot(-2.65) + 0.15, -0.45], [-2.63, 1.2, -0.5], [-2.62, 1.45, -0.52], [-2.58, 1.75, -0.54], [-2.5, 2.0, -0.46], [-2.4, 2.2, -0.32], [-2.1, 2.29, -0.32], [-2.01, 2.3, -0.32]], 0.008)]), MAT.casting())]);
   P('APU fuel shutoff valve', {
     system: 'Fuel', material: 'Solenoid shutoff valve on the APU compartment firewall', mass: 1, explode: [-0.9, 1.3, -1.0],
     desc: 'The prime/boost pump\'s shutoff valve doubles as the APU\'s firewall fuel shutoff: it closes the APU feed at the compartment wall, and the APU fire T-handle shuts it.',
   }, [mesh(merge([cyl(0.03, 0.03, 0.07, [-1.98, 2.3, -0.32], 'x', 12), box(0.04, 0.05, 0.04, [-1.98, 2.35, -0.32]), pipe([[-1.95, 2.3, -0.32], [-1.93, 2.33, -0.26], [-1.92, 2.37, -0.2]], 0.007, 4)]), MAT.red())]);
   const probes = [];
-  for (const s of [1, -1]) probes.push(cyl(0.02, 0.02, 0.86, [-2.3, 1.06, 0.38 * s], 'y', 8), cyl(0.03, 0.03, 0.05, [-2.3, 1.5, 0.38 * s], 'y', 10), cyl(0.018, 0.018, 0.05, [-2.75, 0.9, 0.3 * s], 'x', 8));
+  // probe from just above the cell floor to its head on the cell top; the low-level sensor clamped
+  // on the probe near its foot
+  for (const s of [1, -1]) probes.push(cyl(0.02, 0.02, 0.81, [-2.3, cellBot(-2.3) + 0.015 + 0.405, 0.38 * s], 'y', 8), cyl(0.03, 0.03, 0.05, [-2.3, 1.5, 0.38 * s], 'y', 10), cyl(0.03, 0.03, 0.045, [-2.3, cellBot(-2.3) + 0.09, 0.38 * s], 'y', 10));
   P('Fuel quantity probes', {
     system: 'Fuel', material: 'Capacitance probes and low-level sensors', mass: 2, count: 4, explode: [-0.2, -0.9, 0.4],
     desc: 'A capacitance probe standing in each cell measures the fuel height for the cockpit gauge. A low-level sensor on each probe flashes FUEL LOW when about 172 lb (78 kg) is left in that tank — a quantity, not a fixed time, since endurance depends on power.',

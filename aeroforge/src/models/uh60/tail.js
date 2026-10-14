@@ -6,7 +6,7 @@
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
-import { wingPanel, mirrorZ, loftRings, orientOutward, airfoilLoop } from '../../engine/geometry.js';
+import { wingPanel, mirrorZ, loftRings, orientOutward, airfoilLoop, lathe } from '../../engine/geometry.js';
 import { MAT, DEG, V3, merge, box, cyl, tube, pipe, pchip, unitRod, aimRod, TAIL, pylonLean, strobeMat, DEICE, TR_CTL } from './common.js';
 
 /** Grid surface: fn(u, v) → Vector3 over u, v ∈ [0, 1]; skip(p) drops a quad. Normals computed. */
@@ -109,6 +109,32 @@ function rearSparAt(y) {
   return V3(x0 + ((x1 - x0) * (y - y0)) / (y1 - y0), y, pylonLean(y) + 0.012 * Math.min(1, Math.max(0, (y - 1.97) / 0.33)));
 }
 
+/**
+ * Pylon drive shaft cover: a raised fairing along the straight pylon shaft line from inside the 42°
+ * gearbox fairing to inside the 90° gearbox fairing. The shaft is straight while the pylon above the
+ * tail cone is cambered and leans 20° to port, so the cover bulges out of the port face over the
+ * shaft, its couplings and the gearbox housings; on the starboard side it stays inside the pylon,
+ * clear of the servo and the cable quadrant behind the shaft. D-shaped section: semi-axis `a` out to
+ * port, 3 cm to starboard, half-width a + 0.04 m along the chord.
+ */
+function pylonShaftCover() {
+  const igb = V3(...TAIL.igb), tgb = V3(...TAIL.tgb), d = tgb.clone().sub(igb), L = d.length();
+  d.normalize();
+  const lat = V3(0, 0, 1).addScaledVector(d, -d.z).normalize(), chord = d.clone().cross(lat).normalize();
+  const aAt = (t) => (t < 0.14 ? 0.11 : t < 0.2 ? 0.11 - ((t - 0.14) / 0.06) * 0.025 : t < 0.82 ? 0.085 : t < 0.87 ? 0.085 + ((t - 0.82) / 0.05) * 0.03 : 0.115);
+  const rings = [];
+  for (let k = 0; k <= 36; k++) {
+    const t = 0.04 + (0.9 * k) / 36, a = aAt(t), b = a + 0.04, c = igb.clone().addScaledVector(d, t * L), ring = [];
+    for (let j = 0; j < 20; j++) {
+      const th = (j / 20) * Math.PI * 2, ct = Math.cos(th), st = Math.sin(th);
+      const p = c.clone().addScaledVector(lat, ct * (ct < 0 ? a : 0.03)).addScaledVector(chord, st * b);
+      ring.push([p.x, p.y, p.z]);
+    }
+    rings.push(ring);
+  }
+  return orientOutward(loftRings(rings, { capStart: true, capEnd: true }));
+}
+
 export function buildTail({ A, P, air, roofY }) {
   const paint = MAT.paint();
 
@@ -138,9 +164,9 @@ export function buildTail({ A, P, air, roofY }) {
   const cover = fairing([[-8.45, 0.13, roofY(-8.45) + 0.18], [-6.0, 0.15, roofY(-6.0) + 0.2], [-3.6, 0.17, roofY(-3.6) + 0.18]], roofY, { nu: 50, nv: 16 });
   const igbFair = new THREE.SphereGeometry(1, 20, 14).scale(0.36, 0.2, 0.2).translate(TAIL.igb[0] + 0.05, TAIL.igb[1] + 0.02, 0);
   P('Tail drive shaft cover', {
-    system: 'Skin & fairings', skin: true, material: 'Hinged aluminium/composite cover', mass: 14, explode: [-2.4, 1.8, 0],
-    desc: 'A hinged cover over the tail drive shaft along the top of the tail cone, ending in the fairing over the 42° intermediate gearbox.',
-  }, [mesh(merge([cover, igbFair]), paint)]);
+    system: 'Skin & fairings', skin: true, material: 'Hinged aluminium/composite covers', mass: 16, explode: [-2.4, 1.8, 0],
+    desc: 'A hinged cover over the tail drive shaft along the top of the tail cone, ending in the fairing over the 42° intermediate gearbox. From there the pylon drive shaft cover runs up the pylon over the last shaft section to the tail gearbox fairing; the operator\'s manual puts a VHF-FM antenna inside its leading-edge fairing. (Pylon cover shape approximate.)',
+  }, [mesh(merge([cover, igbFair, pylonShaftCover()]), paint)]);
 
   // ------------------------------------------------------------------ pylon
   // GenHel (NASA CR-166309) planform: root chord 6 ft (1.83 m), tip 2.83 ft (0.86 m), quarter-chord
@@ -158,7 +184,7 @@ export function buildTail({ A, P, air, roofY }) {
     return g;
   };
   lean(pyl);
-  const tgbBulge = new THREE.SphereGeometry(1, 20, 14).scale(0.42, 0.26, 0.17).translate(TAIL.tgb[0] + 0.02, TAIL.tgb[1] + 0.02, TAIL.tgb[2] + 0.06);
+  const tgbBulge = new THREE.SphereGeometry(1, 20, 14).scale(0.42, 0.26, 0.22).translate(TAIL.tgb[0] + 0.02, TAIL.tgb[1] + 0.02, TAIL.tgb[2] + 0.035);   // round the 90° box's case
   P('Tail pylon', {
     system: 'Skin & fairings', skin: true, material: 'Aluminium skins, cambered NACA 0021 (mod) section, Kevlar leading edge', mass: 70, explode: [-2.9, 0.5, 0],
     desc: 'The swept vertical fin (41° at the quarter chord) is cambered so that in forward flight it makes a side force that unloads the tail rotor. Above the tail cone it leans 20° to port, which tilts the tail-rotor shaft and lets the tail rotor help lift the tail.',
@@ -306,16 +332,21 @@ export function buildTail({ A, P, air, roofY }) {
   }, [mesh(merge([cyl(0.068, 0.068, 0.06, [0, -0.13, 0], 'y', 20), cyl(0.074, 0.074, 0.01, [0, -0.15, 0], 'y', 20)]), MAT.casting()),
     mesh(pipe([toTr(DEICE.tailEnd), toTr([-8.64, 2.08, -0.05]), ...[[0.2], [0.4], [0.6], [0.75, 0.1], [0.88, 0.09]].map(([t, o]) => toTr(shaftSide(t, o))), toTr([-9.86, 3.42, -0.24]), toTr([-9.9, 3.49, -0.215]), V3(0.05, -0.13, 0.06)], 0.009, 5), MAT.wiring())], trFrame);
   const bladeG = trBladeGeometry();
+  // root of each blade, feathering with it: a torque tube round the crossbeam spar (clear of it at
+  // any pitch) whose pitch horn juts to the leading side, where the pitch link's upper end is pinned
+  const HORN = [0.3, 0.025, -0.1];
+  const torqueTube = lathe([[0.056, 0.19], [0.064, 0.19], [0.064, 0.31], [0.056, 0.31], [0.056, 0.19]], 18).rotateZ(-Math.PI / 2);   // a closed annulus along x
+  const hornG = merge([torqueTube, tube([0.3, 0.004, -0.06], HORN, 0.011, 8), cyl(0.016, 0.016, 0.03, HORN, 'y', 10)]);
   trPart('Tail rotor blades', {
-    system: 'Rotor system', material: 'Graphite/glass skins over the crossbeam spars, nickel erosion strips', mass: 32, count: 4, explode: [-3.1, 1.1, 0],
-    desc: 'Four blades, 3.35 m across, turning at 1,190 rpm. Thrust to starboard balances the main rotor\'s torque; because the shaft is canted 20° up, sin 20° ≈ a third of that thrust (about 2.5 kN in a heavy hover) also lifts the tail: the operator\'s manual gives the tail rotor 2.5 % of the total lifting force in a hover.',
+    system: 'Rotor system', material: 'Graphite/glass skins over the crossbeam spars, nickel erosion strips; torque tubes with pitch horns', mass: 32, count: 4, explode: [-3.1, 1.1, 0],
+    desc: 'Four blades, 3.35 m across, turning at 1,190 rpm. Each blade root is a torque tube round its spar, with a pitch horn for the pitch link: turning the tube twists the spar to change pitch. Thrust to starboard balances the main rotor\'s torque; because the shaft is canted 20° up, sin 20° ≈ a third of that thrust (about 2.5 kN in a heavy hover) also lifts the tail: the operator\'s manual gives the tail rotor 2.5 % of the total lifting force in a hover.',
     callout: true, anchor: [0, 0.25, -0.3],     // just above the hub, over the blade roots
   }, (s) => {
     for (let i = 0; i < 4; i++) {
       const az = new THREE.Group(); az.rotation.y = (i * Math.PI) / 2;
       const f = new THREE.Group();
       az.add(f); s.add(az);
-      f.add(mesh(bladeG, MAT.blade()));
+      f.add(mesh(bladeG, MAT.blade()), mesh(hornG, MAT.titanium()));
       feathers.push(f);
     }
   });
@@ -323,16 +354,20 @@ export function buildTail({ A, P, air, roofY }) {
     system: 'Rotor system', material: 'Two continuous graphite-epoxy crossbeam spars clamped between titanium hub plates', mass: 24, explode: [-3.1, 0.7, 0],
     desc: 'Bearingless: two flexible composite spars cross at the hub, each forming a pair of opposite blades. Flapping and pitch change come from the spars bending and twisting — no bearings, no lubrication.',
   }, (s) => {
-    s.add(mesh(merge([box(0.9, 0.022, 0.1, [0, 0.03, 0]), box(0.1, 0.022, 0.9, [0, -0.03, 0]), cyl(0.15, 0.15, 0.03, [0, 0.065, 0], 'y', 24), cyl(0.15, 0.15, 0.03, [0, -0.065, 0], 'y', 24), cyl(0.06, 0.06, 0.38, [0, -0.2, 0], 'y', 16)]), MAT.titanium()));
+    // the two spars stacked crosswise, clamped between the hub plates by four bolts through the
+    // crossing; the hub's shaft from the gearbox output ends on the lower plate
+    const bolts = [];
+    for (const [bx, bz] of [[0.033, 0.033], [-0.033, 0.033], [0.033, -0.033], [-0.033, -0.033]]) bolts.push(cyl(0.008, 0.008, 0.13, [bx, 0, bz], 'y', 8), cyl(0.014, 0.014, 0.008, [bx, 0.056, bz], 'y', 8), cyl(0.014, 0.014, 0.008, [bx, -0.056, bz], 'y', 8));
+    s.add(mesh(merge([box(0.9, 0.022, 0.1, [0, 0.011, 0]), box(0.1, 0.022, 0.9, [0, -0.011, 0]), cyl(0.15, 0.15, 0.03, [0, 0.037, 0], 'y', 24), cyl(0.15, 0.15, 0.03, [0, -0.037, 0], 'y', 24), cyl(0.06, 0.06, 0.34, [0, -0.222, 0], 'y', 16), ...bolts]), MAT.titanium()));
   });
   const links = [];
   const spider = new THREE.Group();
   trPart('Tail rotor pitch-change beam & links', {
     system: 'Flight controls', material: 'Steel pitch beam (spider) and four pitch links', mass: 5, explode: [-3.1, 1.5, 0],
-    desc: 'The pitch-change shaft pushes this spider in and out along the rotor axis; its four links twist the blades\' torque tubes together, changing all four pitches at once for yaw control.',
+    desc: 'The pitch-change shaft, sliding through the hollow gearbox output and the hub centre, pushes this spider in and out along the rotor axis; its four links pull on the blades\' pitch horns, twisting their torque tubes together and changing all four pitches at once for yaw control.',
   }, (s) => {
     s.add(spider);
-    spider.add(mesh(merge([cyl(0.04, 0.04, 0.08, [0, 0, 0], 'y', 12), ...[0, 1, 2, 3].map((i) => { const g = box(0.24, 0.02, 0.03, [0.12, 0, 0]); g.rotateY((i * Math.PI) / 2 - 0.35); return g; })]), MAT.steel()));
+    spider.add(mesh(merge([cyl(0.04, 0.04, 0.08, [0, 0, 0], 'y', 12), cyl(0.018, 0.018, 0.13, [0, -0.085, 0], 'y', 10), ...[0, 1, 2, 3].map((i) => { const g = box(0.24, 0.02, 0.03, [0.12, 0, 0]); g.rotateY((i * Math.PI) / 2 + 0.35); return g; })]), MAT.steel()));
     for (let i = 0; i < 4; i++) { const m = mesh(unitRod(8), MAT.steel()); s.add(m); links.push({ i, m }); }
   });
 
@@ -343,19 +378,22 @@ export function buildTail({ A, P, air, roofY }) {
     desc: 'A red beacon on the pylon tip and one under the belly flash about once a second so other aircraft see the helicopter from any direction; they can be dimmed or switched to infrared for night-vision operations.',
   }, [mesh(new THREE.SphereGeometry(0.05, 12, 8).translate(tip.le[0] - 0.3, 4.05, pylonLean(4.05)), strobe, { cast: false }),
     mesh(new THREE.SphereGeometry(0.045, 12, 8).translate(-0.8, 0.45, 0), strobe, { cast: false })]);
+  // the side lights on the outboard face of each main gear's upper support fitting (its box:
+  // x 2.18–2.29, y 1.20–1.32, outboard face at |z| 1.33), in a small housing above the strut
+  const navSide = (s) => [box(0.07, 0.045, 0.024, [2.245, 1.295, 1.341 * s]), new THREE.SphereGeometry(0.02, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(s * Math.PI / 2).translate(2.245, 1.295, 1.352 * s)];
+  const [gHouse, gLens] = navSide(1), [rHouse, rLens] = navSide(-1);
   P('Position lights', {
-    system: 'Electrical', material: 'Red, green and white navigation lights', mass: 1.5, count: 3, explode: [-1.0, 1.4, 1.2],
-    desc: 'Red on the left, green on the right on the upper cabin sides, white at the aft tip of the pylon: other pilots can tell which way the helicopter is pointing at night.',
+    system: 'Electrical', material: 'Red, green and white navigation lights in small housings', mass: 1.5, count: 3, explode: [0.2, 0.3, 1.2],
+    desc: 'Red on the left and green on the right, outboard of each main landing gear support, and white on the top of the tail pylon — where the operator\'s manual puts them — so other pilots can tell which way the helicopter is pointing at night. Infrared position lights sit close by for flying on night-vision goggles.',
   }, [mesh(new THREE.SphereGeometry(0.035, 10, 8).translate(tip.le[0] - tip.chord + 0.04, 3.97, pylonLean(3.97)), MAT.navWhite(), { cast: false }),
-    mesh(new THREE.SphereGeometry(0.04, 10, 8).translate(-1.05, 2.12, 1.12), MAT.navGreen(), { cast: false }),
-    mesh(new THREE.SphereGeometry(0.04, 10, 8).translate(-1.05, 2.12, -1.12), MAT.navRed(), { cast: false })]);
+    mesh(merge([gHouse, rHouse]), MAT.paintDark()), mesh(gLens, MAT.navGreen(), { cast: false }), mesh(rLens, MAT.navRed(), { cast: false })]);
   P('Formation lights', {
     system: 'Electrical', material: 'Low-intensity electroluminescent strips (NVG compatible)', mass: 1, count: 3, explode: [-2.4, 0.8, 0.6],
     desc: 'Dim green strips on the tail cone sides and the pylon let pilots on night-vision goggles hold position in close formation without the glare of the navigation lights.',
   }, [mesh(merge([box(0.5, 0.05, 0.012, [-6.0, 1.75, 0.395]), box(0.5, 0.05, 0.012, [-6.0, 1.75, -0.395]), box(0.5, 0.06, 0.012, [-9.45, 3.4, pylonLean(3.4) + 0.1])]), MAT.formation(), { cast: false })]);
 
   const trSt = { phi: 0, pitch: 12 * DEG };
-  const lead = 0.35;
+  const lead = -0.35;   // spider arms 20° ahead of each blade, so the links run out to the leading-side horns
   function update(phi, pitch) {
     trSt.phi = phi; trSt.pitch = pitch;
     for (const s of spins) s.rotation.y = phi;
@@ -365,8 +403,8 @@ export function buildTail({ A, P, air, roofY }) {
       const a = (l.i * Math.PI) / 2;
       const ca = Math.cos(a - lead), sa = Math.sin(a - lead);
       const top = V3(0.24 * ca, spider.position.y, -0.24 * sa);
-      // horn on the leading side of each blade root, rising with pitch
-      const hl = V3(0.3, 0.075 * Math.sin(pitch) + 0.02, -0.075 * Math.cos(pitch)).applyAxisAngle(V3(0, 1, 0), a);
+      // the horn's pin (HORN in the blade's feathering frame), turned with pitch and azimuth
+      const hl = V3(HORN[0], HORN[1] * Math.cos(pitch) - HORN[2] * Math.sin(pitch), HORN[1] * Math.sin(pitch) + HORN[2] * Math.cos(pitch)).applyAxisAngle(V3(0, 1, 0), a);
       aimRod(l.m, top, hl, 0.012);
     }
   }

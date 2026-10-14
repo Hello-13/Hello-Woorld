@@ -8,7 +8,7 @@
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
-import { MAT, pchip, merge, tube, pipe, box, bar, V3, mirror } from './common.js';
+import { MAT, pchip, merge, tube, pipe, box, cyl, bar, V3, mirror } from './common.js';
 
 const K = {
   yB: [[-9.35, 1.62], [-8.75, 1.52], [-8.0, 1.43], [-6.5, 1.29], [-5.0, 1.14], [-4.0, 1.0], [-3.2, 0.8], [-2.6, 0.62], [-2.0, 0.51], [-1.6, 0.47], [2.4, 0.47], [3.2, 0.49], [3.8, 0.53], [4.2, 0.6], [4.5, 0.7], [4.7, 0.84], [4.81, 1.0]],
@@ -354,7 +354,11 @@ export function buildFuselage({ A, P }) {
     const skinG = patch(G, { only: [door], holes: wins, off: 0.012 });
     const glass = patch(G, { only: wins, off: 0.008 });
     const holder = new THREE.Group();
-    holder.add(mesh(skinG, paint), liner(skinG), mesh(glass, MAT.glass(), { cast: false }), mesh(merge([...wins.map((w) => outline(w, 0.016, 0.013)), box(0.16, 0.035, 0.04, [-0.32, 1.25, side * 1.205])]), MAT.black()));
+    // roller arms at the door's top and bottom edges, fore and aft, running in the upper and lower tracks
+    const rollers = [];
+    const sa = (a) => (side > 0 ? a : Math.PI - a);
+    for (const x of [door.x0 + 0.12, door.x1 - 0.12]) for (const [ae, at] of [[0.85, 0.9], [-0.71, -0.76]]) rollers.push(tube(surfPoint(x, sa(ae), 0.012), surfPoint(x, sa(at), 0.012), 0.012, 6), cyl(0.02, 0.02, 0.03, [0, 0, 0], 'x', 10).translate(...surfPoint(x, sa(at), 0.012).toArray()));
+    holder.add(mesh(skinG, paint), liner(skinG), mesh(glass, MAT.glass(), { cast: false }), mesh(merge([...wins.map((w) => outline(w, 0.016, 0.013)), box(0.16, 0.035, 0.04, [-0.32, 1.25, side * 1.205]), ...rollers]), MAT.black()));
     const part = P(side > 0 ? 'Cabin door (right)' : 'Cabin door (left)', {
       system: 'Skin & fairings', skin: true, material: 'Aluminium honeycomb panel on roller tracks, two acrylic windows', mass: 38, explode: [-0.6, 0, 1.5 * side],
       desc: 'Slides aft on upper and lower tracks to open a 1.75 m-wide doorway. Each door has two windows that can be jettisoned for an emergency exit. Doors usually fly open or removed on assault missions; the opening also takes litters.',
@@ -367,7 +371,7 @@ export function buildFuselage({ A, P }) {
     const aTop = side > 0 ? 0.9 : Math.PI - 0.9, aBot = side > 0 ? -0.76 : Math.PI + 0.76;
     for (const a of [aTop, aBot]) {
       const pts = [];
-      for (let i = 0; i <= 8; i++) pts.push(surfPoint(-2.35 + (1.6 * i) / 8 + 0.2, a, 0.012));
+      for (let i = 0; i <= 12; i++) pts.push(surfPoint(-2.15 + (3.57 * i) / 12, a, 0.012));   // from the transition section to the doorway's front post
       tracks.push(pipe(pts, 0.018, 5));
     }
   }
@@ -384,7 +388,8 @@ export function buildFuselage({ A, P }) {
     return g;
   };
   const ckFrames = [], cabFrames = [], trFrames = [], tcFrames = [];
-  for (const x of [2.25, 2.75, 3.38, 3.95]) ckFrames.push(...hoop(x, gapsCab(x)));
+  // (the frame at 3.95, under the windshields, is only its lower arcs; they lie against the skin)
+  for (const x of [2.25, 2.75, 3.38, 3.95]) ckFrames.push(...hoop(x, gapsCab(x), x > 3.9 ? 0.032 : 0.06));
   // the frames beside the cabin doorway stop at its heavy door posts (which take their place round the
   // opening), and the two frames under the main module stop at the roof beams either side of the
   // transmission well, where the gearbox case and sump hang through the deck
@@ -397,6 +402,8 @@ export function buildFuselage({ A, P }) {
   for (const x of [-1.78, -1.2, -0.44, 0.3, 1.0, 1.44, 1.86, 2.2]) cabFrames.push(...hoop(x, [...gapsCab(x), ...extraGaps(x)]));
   for (const a of [0.9, Math.PI - 0.9, -0.76, Math.PI + 0.76, 1.25, Math.PI - 1.25]) cabFrames.push(stringer(-1.78, 2.2, a));
   for (const x of [-2.3, -2.85, -3.38]) trFrames.push(...hoop(x, [], 0.05, 0.026));
+  // cross-beams of the two aft frames that carry the aft avionics shelf, just above the fuel cells
+  for (const [x, hw] of [[-2.85, 0.862], [-3.38, 0.682]]) trFrames.push(box(0.04, 0.018, 2 * hw, [x, 1.562, 0]));
   for (const x of [-4.0, -4.7, -5.4, -6.1, -6.8, -7.5, -8.2, -8.9]) tcFrames.push(...hoop(x, [], 0.035, 0.02));
   for (const a of [0.5, Math.PI - 0.5, -0.6, Math.PI + 0.6, Math.PI / 2 - 0.15, Math.PI / 2 + 0.15]) tcFrames.push(stringer(-9.0, -3.38, a, 0.035, 0.016));
   for (const a of [0.6, Math.PI - 0.6, -0.5, Math.PI + 0.5]) trFrames.push(stringer(-3.38, -1.78, a, 0.05, 0.02));
@@ -472,7 +479,7 @@ export function buildFuselage({ A, P }) {
   }
   P('Keel beams & crushable belly', {
     system: 'Structure', material: 'Aluminium keel beams, crushable sub-floor structure', mass: 170, explode: [0, -1.0, 0], xrayWeight: 0.5,
-    desc: 'Two keel beams and a crushable sub-floor. In a survivable crash the gear, the belly and the stroking seats share the work of stopping the occupants — the airframe is built to keep a living space at vertical impacts of about 11.6 m/s (38 ft/s).',
+    desc: 'Two keel beams and a crushable sub-floor. In a survivable crash the gear, the belly and the stroking seats share the work of stopping the occupants — the airframe is built to keep a living space for the occupants in a severe vertical impact.',
   }, [mesh(merge(keel), MAT.primer())]);
 
   return {

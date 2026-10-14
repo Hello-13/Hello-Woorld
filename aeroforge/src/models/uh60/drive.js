@@ -171,7 +171,7 @@ export function buildDrive({ A, P, roofY }) {
   P('Transmission oil pressure & temperature switches', {
     system: 'Drive system', material: 'Pressure switch, temperature switch', mass: 0.5, count: 2, explode: [0.4, 0.9, -0.8],
     desc: 'The oil-pressure switch sits on the left accessory module because it is the farthest point from the pumps: if pressure there drops to 14 ± 2 psi the MAIN XMSN OIL PRESS caution comes on (normal continuous pressure is 30–65 psi). The temperature sensor at the oil-cooler inlet to the main module, near the tail take-off flange, lights MAIN XMSN OIL TEMP at 120 °C.',
-  }, [mesh(merge([cyl(0.02, 0.02, 0.07, [0.5, 2.66, -0.5], 'y', 10), cyl(0.018, 0.018, 0.06, [cx - 0.56, 2.36, 0.14], 'y', 10)]), MAT.yellow())]);
+  }, [mesh(merge([cyl(0.02, 0.02, 0.07, [0.5, 2.66, -0.5], 'y', 10), cyl(0.018, 0.018, 0.06, [cx - 0.56, 2.365, 0.183], 'y', 10)]), MAT.yellow())]);   // the temperature sensor on the cooler line
 
   // ------------------------------------------------------------------ input and accessory modules
   for (const side of [1, -1]) {
@@ -209,7 +209,7 @@ export function buildDrive({ A, P, roofY }) {
     desc: 'Counts gear teeth passing in the right accessory module and so measures rotor speed for the cockpit rotor-rpm display; on the L and M a second sensor on the left module also feeds the engine controls for better droop response.',
   }, [mesh(merge([cyl(0.02, 0.02, 0.08, [0.52, 2.65, 0.5], 'y', 10), cyl(0.026, 0.026, 0.02, [0.52, 2.69, 0.5], 'y', 10)]), MAT.yellow())]);
   const gco = [];
-  for (const s of [1, -1]) gco.push(pipe([[0.48, 2.61, 0.58 * s], [0.58, 2.64, 0.6 * s], [0.68, 2.63, 0.58 * s]], 0.0075, 5), pipe([[0.48, 2.42, 0.6 * s], [0.6, 2.41, 0.6 * s], [0.7, 2.43, 0.58 * s]], 0.0075, 5));
+  for (const s of [1, -1]) gco.push(pipe([[0.48, 2.61, 0.58 * s], [0.58, 2.64, 0.6 * s], [0.66, 2.625, 0.585 * s], [0.69, 2.601, 0.558 * s]], 0.0075, 5), pipe([[0.48, 2.42, 0.6 * s], [0.6, 2.41, 0.6 * s], [0.67, 2.43, 0.585 * s], [0.7, 2.449, 0.565 * s]], 0.0075, 5));   // into ports on each generator's case
   P('Generator cooling-oil lines', {
     system: 'Drive system', material: 'Steel oil lines', mass: 0.5, count: 2, explode: [1.3, 0.9, 0],
     desc: 'The AC generators are oil-cooled: transmission oil flows from each accessory module through its generator and back.',
@@ -300,7 +300,10 @@ export function buildDrive({ A, P, roofY }) {
       desc: 'On top of the engine\'s front frame, driven off the gas generator by a radial shaft. It carries the air-turbine starter (spun by bleed air from the APU, the other engine or a ground cart), an alternator that powers the ignition and the DEC, the oil pump, cooler and filter, and the particle separator\'s blower.',
     }, [mesh(merge(ag), MAT.casting())]);
     // hydromechanical unit, engine-driven boost pump and filter, fuel manifold to the injectors
-    const fuelLines = [pipe([[at(0.5), ENG.y + 0.2, z + 0.15 * s], [at(0.7), ENG.y + 0.22, z + 0.22 * s], [at(0.88), ENG.y + 0.16, z + 0.2 * s]], 0.011), pipe([[at(0.35), ENG.y + 0.18, z - 0.14 * s], [at(0.5), ENG.y + 0.13, z - 0.2 * s], [at(0.7), ENG.y + 0.12, z - 0.21 * s], [at(0.88), ENG.y + 0.14, z - 0.2 * s]], 0.009)];
+    // from the HMU: one manifold half down the outboard side, the other under the gearbox and down the
+    // inboard side, each ending on the combustor case at the injector ring
+    const fuelLines = [pipe([[at(0.575), ENG.y + 0.2, z + 0.15 * s], [at(0.62), ENG.y + 0.215, z + 0.225 * s], onCase(0.76, 0.24, 0.72), onCase(0.81, 0.216, 0.72)], 0.011),
+      pipe([[at(0.52), ENG.y + 0.16, z + 0.15 * s], [at(0.47), ENG.y + 0.19, z + 0.06 * s], [at(0.42), ENG.y + 0.185, z - 0.08 * s], [at(0.5), ENG.y + 0.14, z - 0.2 * s], [at(0.7), ENG.y + 0.12, z - 0.21 * s], onCase(0.81, 0.214, 2.53)], 0.009)];
     const hmuP = P(`T700 fuel control & pump ${R}`, {
       system: 'Propulsion', material: 'Hydromechanical unit (HMU), engine-driven boost pump, fuel filter, copper/steel lines', mass: 14, explode: [0.6, 1.4, 2.1 * s],
       desc: 'The engine-driven boost pump draws fuel by suction from the cell (a cut line sucks air rather than spraying fuel), the barrier filter cleans it and the HMU meters it to the injectors on the DEC\'s commands, with a hydromechanical backup if the electronics fail.',
@@ -338,7 +341,7 @@ export function buildDrive({ A, P, roofY }) {
     ];
     P(`Inlet particle separator ${R}`, {
       system: 'Propulsion', material: 'Steel swirl vanes, aluminium collector scroll and front frame', mass: 10, explode: [0.8, 1.1, 1.7 * s], xrayWeight: 0.6,
-      desc: 'Built into the T700\'s front frame: swirl vanes spin the incoming air so sand and dust are flung outward into a collector scroll, removing roughly 85 % of the sand before it can erode the compressor; only clean air turns inward to the compressor.',
+      desc: 'Built into the T700\'s front frame: swirl vanes spin the incoming air so sand and dust are flung outward into a collector scroll, removing most of the sand and coarse dust before it can erode the compressor (the finest dust still gets through); only the cleaned air turns inward to the compressor.',
     }, [mesh(merge(ipsG), MAT.darkMetal())]);
     // blower drum on a pad on the gearbox's outboard face, just aft of the scroll case (between the
     // starter-side alternator and the boost pump, inside the cowl): axial inlet from the scroll's
@@ -346,14 +349,14 @@ export function buildDrive({ A, P, roofY }) {
     const bc = [at(0.33), ENG.y + 0.295, z + 0.14 * s];
     const blower = [cyl(0.06, 0.06, 0.06, bc, 'z', 18), cyl(0.045, 0.045, 0.012, [bc[0], bc[1], bc[2] - 0.033 * s], 'z', 14)];
     const ipsIn = pipe([onCase(0.16, 0.255, 0.97), [at(0.2), ENG.y + 0.29, z + 0.215 * s], [at(0.28), ENG.y + 0.3, z + 0.215 * s], [bc[0], bc[1], bc[2] + 0.045 * s]], 0.028, 10);
-    const scav = pipe([[bc[0] + 0.03, bc[1] + 0.035, bc[2] + 0.012 * s], [at(0.38), ENG.y + 0.32, z + 0.17 * s], [at(0.5), ENG.y + 0.312, z + 0.195 * s], [at(0.8), ENG.y + 0.29, z + 0.2 * s], [at(1.0), ENG.y + 0.27, z + 0.2 * s], [at(1.2), ENG.y + 0.22, z + 0.2 * s]], 0.03, 10);
+    const scav = pipe([[bc[0] + 0.03, bc[1] + 0.035, bc[2] + 0.012 * s], [at(0.38), ENG.y + 0.32, z + 0.17 * s], [at(0.5), ENG.y + 0.312, z + 0.195 * s], [at(0.8), ENG.y + 0.29, z + 0.2 * s], [at(1.0), ENG.y + 0.27, z + 0.2 * s], [at(1.2), ENG.y + 0.22, z + 0.2 * s], [-1.76, ENG.y + 0.19, z + 0.18 * s], [-1.8, ENG.y + 0.145, z + 0.16 * s]], 0.03, 10);   // ending on the exhaust duct
     P(`T700 IPS blower & scavenge duct ${R}`, {
       system: 'Propulsion', material: 'Gear-driven centrifugal blower, inlet and scavenge ducts', mass: 3, explode: [0.45, 2.0, 1.75 * s],
       desc: 'A gear-driven blower on a pad on the outboard face of the accessory gearbox sucks the sand and dust out of the separator\'s collector scroll through a short inlet duct and blows it aft along the top of the engine, to be dumped overboard around the exhaust.',
     }, [mesh(merge(blower), MAT.casting()), mesh(merge([ipsIn, scav]), MAT.darkMetal())]);
 
     // upturned exhaust (UES): out of the cowling's aft opening, through the cooling grid, then up
-    const path = [V3(ENG.rear - 0.02, ENG.y, z), V3(-2.0, ENG.y + 0.01, z), V3(-2.2, ENG.y + 0.1, z + 0.02 * s), V3(-2.31, ENG.y + 0.27, z + 0.04 * s), V3(-2.34, ENG.y + 0.42, z + 0.05 * s)];
+    const path = [V3(ENG.rear - 0.005, ENG.y, z), V3(-2.0, ENG.y + 0.01, z), V3(-2.2, ENG.y + 0.1, z + 0.02 * s), V3(-2.31, ENG.y + 0.27, z + 0.04 * s), V3(-2.34, ENG.y + 0.42, z + 0.05 * s)];
     const ues = bentDuct(path.slice().reverse(), 0.25, 0.19, 0.29, 0.19, 4.2, 2);
     const top = path[path.length - 1];
     const plates = [];
@@ -401,9 +404,12 @@ export function buildDrive({ A, P, roofY }) {
   const deck = [deckPiece(-0.73, -1), deckPiece(0.63, 1)];
   for (const z of [0.345, -0.345]) deck.push(box(0.12, 0.1, 0.09, [-0.42, 2.365, z]));   // aft pads, on the deck against the case
   for (const z of [0.17, -0.17]) deck.push(box(0.08, 0.06, 0.08, [0.42, 2.345, z]));     // forward pads, between the primary servos
+  // left forward extension carrying the backup pump and utility module, joined to the deck by a strip
+  // inboard of the left generator feeder's drop through the roof
+  deck.push(box(0.575, 0.03, 0.34, [1.0775, 2.3, -0.455]), box(0.18, 0.03, 0.07, [0.71, 2.3, -0.325]));
   P('Upper deck, firewalls & mounts', {
     system: 'Structure', material: 'Titanium firewalls, steel engine mount links, primed aluminium deck with transmission mounting pads', mass: 95, explode: [0, 0.12, 0], xrayWeight: 0.5,
-    desc: 'The deck above the cabin roof carries the transmission on four pads and each engine on tubular links; titanium firewalls separate the engines from the gearbox and from each other.',
+    desc: 'The deck above the cabin roof carries the transmission on four pads and each engine on tubular links; titanium firewalls separate the engines from the gearbox and from each other. Ahead of the gearbox on the left it carries the backup hydraulic pump and the utility module.',
   }, [mesh(merge(fw), MAT.titanium()), mesh(merge(deck), MAT.primer())]);
 
   // ------------------------------------------------------------------ tail take-off: gust lock, rotor brake
@@ -476,7 +482,7 @@ export function buildDrive({ A, P, roofY }) {
     cyl(0.032, 0.032, 0.03, [-2.12, 2.51, -0.18], 'y', 14)];
   P('Auxiliary power unit', {
     system: 'Propulsion', material: 'T-62T-40-1 gas turbine with gearbox, exhaust duct to the left side', mass: 45, explode: [-1.1, 1.8, -0.6],
-    desc: 'A small gas turbine aft of the main transmission. It supplies bleed air to start the main engines and heat the cabin, and drives its own generator and the hydraulic start motor\'s recharge, so the helicopter needs no ground cart; its exhaust leaves through a port on the left side of the aft fairing. It is not qualified for normal use in flight.',
+    desc: 'A small gas turbine aft of the main transmission. It supplies bleed air to start the main engines and heat the cabin, and drives its own AC generator for ground and emergency power, so the helicopter needs no ground cart. Once that generator is on line the backup hydraulic pump runs for about 90 seconds to recharge the accumulator for the next APU start. Its exhaust leaves through a port on the left side of the aft fairing. It is not qualified for normal use in flight.',
   }, [mesh(merge(apuG), MAT.darkMetal())]).userData.part.thermalRole = 'apu';
   P('APU electronic sequence unit', {
     system: 'Propulsion', material: 'Electronic sequence unit with BITE indicators', mass: 3, explode: [0.5, 0.5, -0.6],
@@ -497,14 +503,18 @@ export function buildDrive({ A, P, roofY }) {
     pn.push(pipe([[-1.15, 2.5, 0.42 * s], [-1.17, 2.6, 0.5 * s], [-1.16, 2.7, 0.53 * s], [-1.12, 2.765, 0.575 * s]], 0.02, 6));       // engine bleed port (cross-bleed / heater source), into the engine's bleed valve
     pnFeed[s] = pts;
   }
-  pn.push(pipe([[-1.72, 2.44, -0.25], [-1.95, 2.42, -0.3], [-2.08, 2.36, -0.33], [-2.2, 2.33, -0.345], [-2.22, 2.33, -0.37]], 0.022, 6));   // external pneumatic port, over the APU fuel valve and beside the APU
+  // external pneumatic connector flush in the left flank of the aft deck fairing, at x −2.22, y 2.33
+  let ga0 = Math.PI / 2, ga1 = Math.PI;
+  for (let k = 0; k < 30; k++) { const m = (ga0 + ga1) / 2; if (aftDeckPoint(roofY, -2.22, m).p.y > 2.33) ga0 = m; else ga1 = m; }
+  const gp = aftDeckPoint(roofY, -2.22, ga0);
+  pn.push(pipe([[-1.72, 2.44, -0.25], [-1.95, 2.42, -0.3], [-2.08, 2.36, -0.33], [-2.2, 2.33, -0.345], gp.p.clone().addScaledVector(gp.n, -0.012)], 0.022, 6));   // to the external pneumatic port, over the APU fuel valve and beside the APU
   pn.push(pipe([[-1.6, 2.49, 0.24], [-1.615, 2.477, 0.258], [-1.62, 2.46, 0.27]], 0.024, 6));                                // heater branch into the mixing valve
   const valves = [tube([-1.88, 2.507, -0.205], [-1.8, 2.481, -0.216], 0.04, 14), cyl(0.03, 0.03, 0.07, [-2.15, 2.338, -0.338], 'x', 12)];   // APU-outlet check valve on the duct ahead of the APU
   for (const s of [1, -1]) valves.push(cyl(0.035, 0.035, 0.07, [-1.165, 2.585, 0.5 * s], 'y', 12), box(0.09, 0.08, 0.08, [-1.0, 2.478, 0.41 * s]), box(0.04, 0.05, 0.04, [-1.0, 2.538, 0.41 * s]));   // check valve on the bleed branch, shutoff above the fuel line
   P('Pneumatic start ducts', {
     system: 'Propulsion', material: 'Stainless-steel bleed-air ducts with V-band joints, external ground connector', mass: 9, explode: [-0.9, 1.0, -0.2], xrayWeight: 0.6,
     desc: 'One pneumatic system, fed by either engine\'s compressor bleed, the APU or a ground cart through a connector on the left side, drives both engines\' air-turbine starters and the cabin heater. Bleed from a running engine can start the other one (a cross-bleed start).',
-  }, [mesh(merge(pn), MAT.steel()), mesh(cyl(0.04, 0.04, 0.02, [-2.22, 2.33, -0.375], 'z', 14), MAT.yellow())]);
+  }, [mesh(merge(pn), MAT.steel()), mesh(tube(gp.p.clone().addScaledVector(gp.n, -0.016), gp.p.clone().addScaledVector(gp.n, -0.001), 0.04, 14), MAT.yellow())]);
   P('Bleed-air check & shutoff valves', {
     system: 'Propulsion', material: 'Flapper check valves, motor-operated shutoff valves', mass: 4, count: 6, explode: [-0.6, 1.5, -0.2],
     desc: 'A check valve at every source — the APU, each engine\'s bleed port and the ground connector — stops air flowing backwards into a source that is not running, and a shutoff valve at each engine isolates that engine\'s side of the system.',
@@ -512,7 +522,7 @@ export function buildDrive({ A, P, roofY }) {
 
   // ------------------------------------------------------------------ fire protection
   const det = [];
-  for (const s of [1, -1]) det.push(cyl(0.025, 0.025, 0.06, [-1.28, 2.48, 0.455 * s], 'z', 10), cyl(0.025, 0.025, 0.06, [-1.25, 2.27, 0.92 * s], 'y', 10));
+  for (const s of [1, -1]) det.push(cyl(0.025, 0.025, 0.06, [-1.28, 2.48, 0.455 * s], 'z', 10), cyl(0.025, 0.025, 0.06, [-1.25, 2.26, 0.925 * s], 'y', 10));
   det.push(cyl(0.025, 0.025, 0.06, [-2.25, 2.46, -0.02], 'y', 10));
   P('Fire detectors', {
     system: 'Propulsion', material: 'Solid-state infrared flame detectors', mass: 1, count: 5, explode: [-0.4, 0.75, 0.2],

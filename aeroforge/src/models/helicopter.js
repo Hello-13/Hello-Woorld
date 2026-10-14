@@ -99,7 +99,7 @@ export function buildHelicopter() {
     name: 'BLACK HAWK',
     role: 'Utility helicopter',
     tagline: 'Twin-turbine assault and utility · 11 troops or a 4-tonne sling load · built to survive',
-    summary: 'The US Army\'s medium utility helicopter. A four-blade articulated rotor on elastomeric bearings, a canted tail rotor and a modular transmission fed by two T700 turboshafts lift 11 equipped troops or a 4-tonne sling load, while crashworthy seats, gear and fuel cells — and an airframe built to keep its shape in a 38 ft/s impact — are designed to bring the crew home from a crash.',
+    summary: 'The US Army\'s medium utility helicopter. A four-blade articulated rotor on elastomeric bearings, a canted tail rotor and a modular transmission fed by two T700 turboshafts lift 11 equipped troops or a 4-tonne sling load, while crashworthy seats, gear and fuel cells — and an airframe built to keep its shape in a severe impact — are designed to bring the crew home from a crash.',
     specs: [
       ['Main rotor', '16.36 m, 4 blades, 258 rpm'], ['Tail rotor', '3.35 m, 4 blades, canted 20°'],
       ['Length', '19.76 m rotors turning · fuselage 15.26 m'], ['Height', '5.13 m'],
