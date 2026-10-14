@@ -431,8 +431,9 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   }, mesh(merge(t0), FM.aluDark()));
   // gaseous-nitrogen purge: a ring in the engine bay fed from the T-0 plate
   // (just inside the skin, outboard of the Octaweb's corner posts and webs; nozzles between the posts)
-  const purge = [hoop(1.795, 0.0125, 2.37, { seg: 96, tube: 4 }), pipe([at(R - 0.03, t0Az - 4.07, T0_Y - 0.18), at(1.8, t0Az - 4.07, 2.9), at(1.797, t0Az - 4.3, 2.39)], 0.0125, { seg: 4, tubular: 12 })];
-  for (let i = 0; i < 12; i++) purge.push(post(...polar(1.79, i * 30 + 7.5), 2.31, 2.36, 0.012, 5));
+  // (below the side boosters' aft attach fittings)
+  const purge = [hoop(1.795, 0.0125, 2.3, { seg: 96, tube: 4 }), pipe([at(R - 0.03, t0Az - 4.07, T0_Y - 0.18), at(1.8, t0Az - 4.07, 2.9), at(1.797, t0Az - 4.3, 2.32)], 0.0125, { seg: 4, tubular: 12 })];
+  for (let i = 0; i < 12; i++) purge.push(post(...polar(1.79, i * 30 + 7.5), 2.24, 2.29, 0.012, 5));
   P('GN₂ purge manifold', {
     system: 'Environmental control', material: 'Stainless purge ring with nozzles', mass: 6,
     desc: 'Gaseous nitrogen from the ground (one of the supplies at the T-0 plate) flushes the closed engine bay before ignition, keeping out oxygen boiled off from the LOX and moist Florida air. Use inferred from the ground-supply list; layout estimated.',
