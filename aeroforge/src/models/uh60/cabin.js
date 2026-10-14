@@ -250,7 +250,17 @@ export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], serv
   P('Mixing unit', {
     system: 'Flight controls', material: 'Mechanical bellcrank and walking-beam assembly', mass: 14, explode: [0.6, 1.9, 0],
     desc: 'Mechanically blends the pilot\'s inputs four ways: collective into tail-rotor pitch (to cancel the extra torque), collective into lateral and into fore-aft cyclic, and yaw into pitch, so the pilot does not have to make those corrections by hand. An electronic collective/airspeed-to-yaw coupling through the yaw trim adds to the first.',
-  }, [mesh(merge([box(0.42, 0.2, 0.36, [1.35, 2.43, -0.05]), cyl(0.03, 0.03, 0.42, [1.35, 2.55, -0.05], 'z', 8)]), MAT.casting())]);
+  }, [mesh(merge([box(0.42, 0.2, 0.36, [1.35, 2.43, -0.05]), cyl(0.03, 0.03, 0.42, [1.35, 2.55, -0.05], 'z', 8)]), MAT.casting()),
+    // the linkage on and around the case: input cross-shaft and levers forward (from the boost
+    // servos), four walking beams on top (one per mix), output cranks aft (to the primary-servo rods
+    // and the tail-rotor cable quadrant)
+    mesh(merge([
+      cyl(0.016, 0.016, 0.3, [1.585, 2.47, -0.2], 'z', 8),
+      ...[-0.3, -0.2, -0.1].map((z) => box(0.02, 0.07, 0.025, [1.585, 2.45, z])),
+      ...[-0.17, -0.07, 0.03, 0.11].flatMap((z) => [box(0.34, 0.025, 0.02, [1.35, 2.585, z]), cyl(0.012, 0.012, 0.04, [1.35, 2.575, z], 'z', 6)]),
+      cyl(0.016, 0.016, 0.32, [1.12, 2.45, -0.03], 'z', 8),
+      ...[-0.18, -0.05, 0.08].map((z) => box(0.025, 0.07, 0.025, [1.115, 2.43, z])),
+    ]), MAT.steel())]);
   const bsG = [], sasG = [];
   for (const z of [-0.38, -0.26, -0.14]) {
     bsG.push(cyl(0.04, 0.04, 0.3, [1.87, 2.43, z], 'x', 12), cyl(0.014, 0.014, 0.12, [1.66, 2.43, z], 'x', 8), box(0.07, 0.06, 0.08, [2.05, 2.43, z]));
