@@ -174,19 +174,24 @@ export function buildAccessories(ctx) {
     system: 'Propulsion', material: 'Pneumatic butterfly valve with solenoid control and manual override (aircraft equipment)', mass: 9,
     explode: [0.35, 0.5, 1.95], temp: 300,
     desc: 'Opens when the pilot selects start, letting duct air into the starter, and closes when the FADEC sees the engine accelerating on its own at about 50 % N2. A square drive lets a mechanic open it by hand if its solenoid fails.',
-  }, m(merge([axialCyl(1.99, -0.5, 0.62, 0.05, 0.14, 18), boxAt(2.03, -0.5, 0.66, [0.05, 0.08, 0.06]), radialCyl(1.96, 1.99, -0.45, 0.62, 0.04, 14)]), GM.aluminium()));
+  }, m(merge([axialCyl(2.02, -0.48, 0.62, 0.045, 0.14, 18), boxAt(2.03, -0.48, 0.655, [0.05, 0.08, 0.05]), radialCyl(1.955, 1.985, -0.44, 0.62, 0.035, 14)]), GM.aluminium()));
   P('Starter control valve', {
     system: 'Propulsion', material: 'Solenoid pilot valve (Safran), listed for the -110B1/-113B/-115B', mass: 2,
     explode: [0.35, 0.6, 2.05], temp: 300,
-    desc: 'A small solenoid valve beside the starter air valve: it ports duct pressure to the big valve\'s actuator, so the starter air valve opens and closes on command. GE lists it separately from the Honeywell starter air valve and the air turbine starter.',
-  }, m(merge([boxAt(2.045, -0.605, 0.6, [0.05, 0.055, 0.05]), radialCyl(2.07, 2.085, -0.605, 0.6, 0.012, 8), tube([P3(2.03, -0.585, 0.615), P3(2.04, -0.55, 0.64)], 0.006, { seg: 6, radial: 5 })]), GM.connector()));
+    desc: 'A small solenoid valve beside the starter air valve: a sense tube brings it duct pressure, which it ports to the big valve\'s actuator, so the starter air valve opens and closes on command. GE lists it separately from the Honeywell starter air valve and the air turbine starter.',
+  }, m(merge([boxAt(2.035, -0.48, 0.695, [0.05, 0.055, 0.045]), radialCyl(2.06, 2.074, -0.48, 0.695, 0.011, 8),
+    tube([P3(2.035, -0.48, 0.686), P3(2.035, -0.48, 0.662)], 0.006, { seg: 4, radial: 5 }),
+    tube([P3(2.03, -0.6, 0.62), P3(2.045, -0.57, 0.66), P3(2.04, -0.525, 0.69), P3(2.035, -0.5, 0.695)], 0.005, { seg: 10, radial: 5 })]), GM.connector()));
   // starter duct: from the strut down the viewer's side of the fan case to the valve
-  const starterPath = [P3(2.0, -0.92, UP - 0.06), P3(1.99, -0.72, UP + 0.08), ...arc(1.99, -0.68, UP + 0.16, TAU + 0.5, 0.1), P3(1.99, -0.6, TAU + 0.6)];
+  // (out of the strut aft of the fuel line and nacelle looms, under the fan cowl's frame, then across
+  // the tank end outside the lines that run aft from the FADEC, into the valve's aft face)
+  const starterPath = [P3(2.03, -1.2, UP - 0.05), P3(2.02, -1.12, UP + 0.07), P3(1.99, -1.0, UP + 0.18), P3(1.975, -0.84, UP + 0.28), P3(1.975, -0.74, UP + 0.36), P3(1.995, -0.68, UP + 0.44), P3(2.025, -0.65, UP + 0.54),
+    ...arc(2.03, -0.65, UP + 0.62, TAU + 0.48, 0.1), P3(2.03, -0.65, TAU + 0.53), P3(2.025, -0.62, TAU + 0.6), P3(2.02, -0.58, TAU + 0.618), P3(2.02, -0.545, TAU + 0.62)];
   P('Starter duct', {
     system: 'Propulsion', material: 'Stainless-steel duct with flexible joints', mass: 14,
     explode: [0.3, 0.5, 2.1], temp: 300,
-    desc: 'Brings starting air from the 777\'s pneumatic manifold in the strut down the side of the fan case to the starter air valve, about 15 cm across so the starter gets enough flow (the duct is cut away with the case here).',
-  }, C((keep) => cutTube(starterPath, 0.05, keep, { radial: 12 }), GM.duct()));
+    desc: 'Brings starting air from the 777\'s pneumatic manifold in the strut down the side of the fan case to the starter air valve, about 10 cm across so the starter gets enough flow (the duct is cut away with the case here; routing estimated).',
+  }, C((keep) => cutTube(starterPath, 0.048, keep, { radial: 12 }), GM.duct()));
   P('Main fuel pump', {
     system: 'Fuel', material: 'Aluminium housing, centrifugal boost stage and gear stage', mass: 32,
     explode: [0.35, 0.35, 1.89], temp: 300,
