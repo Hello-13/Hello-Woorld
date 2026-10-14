@@ -348,7 +348,7 @@ export function simulateAscent({
       upperIgnition = t + vehicle.sesDelay;
     } else if (phase === 'COAST' && coreAttached && t >= coastUntil) {
       coreAttached = false;
-      ev('SEP', 'Stage separation (collets release, pneumatic pusher)');
+      ev('SEP', 'Stage separation (latches release, pneumatic pushers)');
     } else if (phase === 'COAST' && !coreAttached && t >= upperIgnition) {
       phase = 'UPPER';
       hSES = r - R_EARTH;

@@ -371,7 +371,7 @@ export function buildDrive({ A, P, roofY }) {
   const deck = [box(1.36, 0.03, 0.7, [-0.05, 2.3, 0])];
   for (const [x, z] of [[0.26, 0.37], [0.26, -0.37], [-0.42, 0.37], [-0.42, -0.37]]) deck.push(box(0.12, 0.1, 0.1, [x, 2.34, z]));
   P('Upper deck, firewalls & mounts', {
-    system: 'Structure', material: 'Titanium firewalls, steel engine mount links, primed aluminium deck with transmission mounting pads', mass: 95, explode: [0, 0.12, 0],
+    system: 'Structure', material: 'Titanium firewalls, steel engine mount links, primed aluminium deck with transmission mounting pads', mass: 95, explode: [0, 0.12, 0], xrayWeight: 0.5,
     desc: 'The deck above the cabin roof carries the transmission on four pads and each engine on tubular links; titanium firewalls separate the engines from the gearbox and from each other.',
   }, [mesh(merge(fw), MAT.titanium()), mesh(merge(deck), MAT.primer())]);
 
@@ -459,7 +459,7 @@ export function buildDrive({ A, P, roofY }) {
   const valves = [cyl(0.04, 0.04, 0.08, [-1.95, 2.42, -0.18], 'x', 14), cyl(0.035, 0.035, 0.07, [-2.17, 2.39, -0.33], 'x', 12)];
   for (const s of [1, -1]) valves.push(cyl(0.035, 0.035, 0.07, [-1.15, ENG.y + 0.1, (ENG.z - 0.2) * s], 'y', 12), box(0.09, 0.08, 0.08, [-1.0, 2.46, 0.41 * s]), box(0.04, 0.05, 0.04, [-1.0, 2.52, 0.41 * s]));
   P('Pneumatic start ducts', {
-    system: 'Propulsion', material: 'Stainless-steel bleed-air ducts with V-band joints, external ground connector', mass: 9, explode: [-0.9, 1.0, -0.2],
+    system: 'Propulsion', material: 'Stainless-steel bleed-air ducts with V-band joints, external ground connector', mass: 9, explode: [-0.9, 1.0, -0.2], xrayWeight: 0.6,
     desc: 'One pneumatic system, fed by either engine\'s compressor bleed, the APU or a ground cart through a connector on the left side, drives both engines\' air-turbine starters and the cabin heater. Bleed from a running engine can start the other one (a cross-bleed start).',
   }, [mesh(merge(pn), MAT.steel()), mesh(cyl(0.04, 0.04, 0.02, [-2.22, 2.39, -0.375], 'z', 14), MAT.yellow())]);
   P('Bleed-air check & shutoff valves', {
@@ -470,7 +470,7 @@ export function buildDrive({ A, P, roofY }) {
   // ------------------------------------------------------------------ fire protection
   const det = [];
   for (const s of [1, -1]) det.push(cyl(0.025, 0.025, 0.06, [-0.95, 2.48, 0.455 * s], 'z', 10), cyl(0.025, 0.025, 0.06, [-1.25, 2.27, 0.92 * s], 'y', 10));
-  det.push(cyl(0.025, 0.025, 0.06, [-2.42, 2.55, -0.28], 'y', 10));
+  det.push(cyl(0.025, 0.025, 0.06, [-2.25, 2.46, -0.02], 'y', 10));
   P('Fire detectors', {
     system: 'Propulsion', material: 'Solid-state infrared flame detectors', mass: 1, count: 5, explode: [-0.4, 0.75, 0.2],
     desc: 'Five radiation-sensing flame detectors — two in each engine bay, one on the firewall and one on the deck, and one in the APU compartment — watch continuously for the infrared of a flame. A detection lights the matching fire T-handle and the master FIRE lights; the warning resets itself when the flame stops.',
@@ -478,15 +478,15 @@ export function buildDrive({ A, P, roofY }) {
   P('Engine fire extinguisher bottles', {
     system: 'Propulsion', material: 'Steel containers of liquid agent pressurised with nitrogen, each with a gauge', mass: 12, count: 2, explode: [-0.4, 1.95, 0.55],
     desc: 'Main and reserve bottles above the upper deck behind the right engine compartment. Each has dual outlets, so together they give two shots into either engine bay or the APU compartment; each carries a pressure gauge checked on the preflight walk-round.',
-  }, [mesh(merge([new THREE.SphereGeometry(0.085, 16, 12).translate(-2.05, 2.45, 0.28), new THREE.SphereGeometry(0.085, 16, 12).translate(-1.85, 2.45, 0.28)]), MAT.red()),
-    mesh(merge([cyl(0.02, 0.02, 0.02, [-2.05, 2.545, 0.28], 'y', 10), cyl(0.02, 0.02, 0.02, [-1.85, 2.545, 0.28], 'y', 10)]), MAT.lens())]);
+  }, [mesh(merge([new THREE.SphereGeometry(0.085, 16, 12).translate(-2.05, 2.42, 0.24), new THREE.SphereGeometry(0.085, 16, 12).translate(-1.85, 2.42, 0.24)]), MAT.red()),
+    mesh(merge([cyl(0.02, 0.02, 0.02, [-2.05, 2.515, 0.24], 'y', 10), cyl(0.02, 0.02, 0.02, [-1.85, 2.515, 0.24], 'y', 10)]), MAT.lens())]);
   const dl = [];
   for (const x of [-2.05, -1.85]) {
-    dl.push(pipe([[x, 2.4, 0.33], [x + 0.2, 2.38, 0.38], [-1.2, 2.42, 0.42], [-1.0, 2.44, 0.46]], 0.01, 5));
-    dl.push(pipe([[x, 2.4, 0.23], [x + 0.15, 2.38, 0.05], [x + 0.25, 2.38, -0.2], [-1.4, 2.43, -0.38], [-1.0, 2.44, -0.46]], 0.01, 5));
-    dl.push(pipe([[x, 2.4, 0.22], [-2.2, 2.4, 0.08], [-2.35, 2.48, -0.05], [-2.4, 2.5, -0.1]], 0.009, 5));
+    dl.push(pipe([[x, 2.37, 0.29], [x + 0.2, 2.36, 0.36], [-1.2, 2.42, 0.42], [-1.0, 2.44, 0.46]], 0.01, 5));
+    dl.push(pipe([[x, 2.37, 0.19], [x + 0.15, 2.36, 0.05], [x + 0.25, 2.37, -0.2], [-1.4, 2.43, -0.38], [-1.0, 2.44, -0.46]], 0.01, 5));
+    dl.push(pipe([[x, 2.37, 0.18], [-2.2, 2.38, 0.06], [-2.3, 2.44, -0.0], [-2.32, 2.46, -0.04]], 0.009, 5));
   }
-  dl.push(pipe([[-2.0, 2.48, 0.34], [-2.0, 2.46, 0.42], [-1.98, 2.42, 0.44]], 0.008, 5));
+  dl.push(pipe([[-2.0, 2.44, 0.3], [-2.0, 2.44, 0.4], [-1.98, 2.42, 0.44]], 0.008, 5));
   P('Fire extinguisher discharge lines', {
     system: 'Propulsion', material: 'Stainless-steel discharge tubing, thermal discharge indicator', mass: 3, explode: [-0.4, 1.7, 0.85],
     desc: 'Tubing from both bottles to nozzles in each engine bay and the APU compartment. A thermal-discharge safety port vents a bottle that overheats and ruptures a red indicator disc on the right side of the fuselage, so the crew can see from outside that a bottle has emptied.',

@@ -14,10 +14,10 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { rod, mergeGeometries } from '../../engine/geometry.js';
-import { ST, RAD, az, deg, axial, tube, annulus, shellPatch, patchFrame, ni, cablePath, arcPts, pathLength } from './layout.js';
+import { ST, RAD, az, deg, axial, tube, annulus, shellPatch, patchFrame, ix, cablePath, arcPts, pathLength } from './layout.js';
 import { HM } from './materials.js';
 
-const merge = (list) => mergeGeometries(list.map(ni));
+const merge = (list) => mergeGeometries(list.map(ix));
 
 /**
  * An outer shell as two half-cylinders, the +V3 (Sun) side and the −V3 (shadow) side, each with

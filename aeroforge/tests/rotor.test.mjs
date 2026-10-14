@@ -4,6 +4,9 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import { GEARS, SPEEDS, ratio } from '../src/models/uh60/gears.js';
+import TOUR from '../src/learn/tours/helicopter.js';
 import {
   UH60, SHP, KT, FPM, rotorGeometry, airData, inducedVelocity, hoverInducedVelocity, groundEffect, rotorPower,
   figureOfMerit, powerRequired, powerAvailable, hoverCeiling, speedSchedule, autorotation, rotorEnergy,
@@ -217,4 +220,43 @@ test('heliPerformance summarises a condition consistently', () => {
   assert.ok(Math.abs(r.fwd.shp * SHP - r.fwd.total) < 1e-6);
   assert.equal(r.overweight, false);
   assert.equal(heliPerformance({ mass: 10200 }).overweight, true);
+});
+
+test('main transmission: three reduction stages, NASA TP-2626 tooth counts', () => {
+  close(ratio('input'), 80 / 22, 1e-12, 'input bevel 22:80');
+  close(ratio('comb'), 81 / 17, 1e-12, 'combining bevel 17:81');
+  close(ratio('planetary'), 1 + 228 / 62, 1e-12, 'planetary: fixed 228-tooth ring, 62-tooth sun');
+  close(ratio(), 81.042, 0.001, 'overall reduction (TP-2626: 81.042 : 1)');
+  close(SPEEDS.input / ratio(), 258, 0.05, 'rotor speed from 20,909 rpm');
+  close(SPEEDS.inputGear, 5750, 1, 'input gear / combining pinion rpm');
+  close(SPEEDS.mainBevel, 1207, 1, 'main bevel gear rpm');
+  close(SPEEDS.tailOutput, 4117, 1, 'tail take-off rpm from the 116-tooth upper face and 34-tooth pinion');
+  close(SPEEDS.oilPump, 3268, 1, 'lube-pump pinion rpm');
+  // the planets must fit between sun and ring: ring = sun + 2 × planet (teeth)
+  assert.equal(GEARS.ring, GEARS.sun + 2 * GEARS.planet);
+  assert.equal(GEARS.planets, 5);
+  // the tail drive turns faster than the rotor by the same factor at the tail rotor end as the model's
+  // published 1,190 rpm needs: tail gearboxes reduce 4,117 rpm by about 3.5
+  close(SPEEDS.tailOutput / 1190, 3.46, 0.01, 'IGB × TGB reduction to 1,190 rpm');
+});
+
+test('guided tour: every focus name is a part the model declares', () => {
+  const dir = new URL('../src/models/uh60/', import.meta.url);
+  const src = [readFileSync(new URL('../src/models/helicopter.js', import.meta.url), 'utf8'),
+    ...readdirSync(dir).filter((f) => f.endsWith('.js')).map((f) => readFileSync(new URL(f, dir), 'utf8'))].join('\n');
+  const literals = new Set([...src.matchAll(/'((?:[^'\\\n]|\\.)+)'/g)].map((m) => m[1].replace(/\\'/g, "'")));
+  const esc = (t) => t.replace(/[.*+?^()|[\]\\]/g, '\\$&');
+  // template names: a placeholder stands for a side "(right)"/"(left)", "right"/"left" or a number
+  const templates = [...src.matchAll(/`([^`$]*(?:\$\{[^}]+\}[^`$]*)+)`/g)].map((m) => new RegExp(`^${m[1].split(/\$\{[^}]+\}/).map(esc).join('(?:\\((?:right|left)\\)|right|left|\\d+)')}$`));
+  const modes = new Set(['studio', 'xray', 'blueprint', 'systems', 'thermal', 'pressure']);
+  const demos = new Set(['surfaces', 'flow', 'bay']);
+  assert.ok(TOUR.length >= 10 && TOUR.length <= 16, `${TOUR.length} tour steps`);
+  for (const [i, step] of TOUR.entries()) {
+    assert.ok(step.title && step.body && step.key, `step ${i + 1} has a title, body and key idea`);
+    if (step.mode) assert.ok(modes.has(step.mode), `step ${i + 1}: mode ${step.mode}`);
+    if (step.demo) assert.ok(demos.has(step.demo), `step ${i + 1}: demo ${step.demo}`);
+    for (const name of step.focus || []) assert.ok(literals.has(name) || templates.some((re) => re.test(name)), `step ${i + 1}: no part named "${name}"`);
+  }
+  // the parts this vehicle's rotor-head lesson depends on are all declared
+  for (const n of ['Swashplate duplex bearing', 'Uniball & sliding sleeve', 'Stationary scissors', 'Main rotor blade heater blankets', 'Tail drive shaft disc couplings']) assert.ok(literals.has(n), n);
 });

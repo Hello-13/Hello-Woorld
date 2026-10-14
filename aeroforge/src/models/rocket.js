@@ -104,10 +104,13 @@ export function buildRocket() {
   const siteShown = () => onPad && !exploded() && (!probe || !probe.userData.studio || probe.material === probe.userData.studio);
   Object.defineProperty(site, 'visible', { get: siteShown, set() {}, configurable: true });
   Object.defineProperty(bed, 'visible', { get: () => onPad, set() {}, configurable: true });
-  // Landing legs: every core's four legs swing together (0 stowed, 1 landing stance). While they
-  // are out the launch mount, clamps and masts step aside, since the stance reaches below the deck.
+  // Landing legs: side booster A's four legs swing out to the landing stance (0 stowed, 1 deployed).
+  // The other cores' stay folded: with the three cores side by side, neighbouring cores' inboard
+  // legs would cross, and in flight each core deploys its legs only after separation, just before
+  // touchdown. While the legs are out the launch mount, its clamps, masts and spray rings step
+  // aside, since the stance reaches below the deck.
   let legK = 0, legTarget = 0, legDelay = 0, legDemoClock = null;
-  const setLegsAll = (k) => { legK = k; centre.setLegs(k); for (const b of boosters) b.setLegs(k); };
+  const setLegsAll = (k) => { legK = k; boosters[0].setLegs(k); };
   Object.defineProperty(base, 'visible', { get: () => legK < 0.005, set() {}, configurable: true });
 
   const st = {
@@ -147,7 +150,7 @@ export function buildRocket() {
       ['Fairing', '13.2 m × 5.2 m (Falcon User\'s Guide; SpaceX\'s Falcon Heavy page gives 13.1 m)'], ['Propellants', 'RP-1 / LOX'], ['Pad', 'LC-39A, Kennedy Space Center'],
     ],
     heroStats: [['63.8', 't', 'Payload to LEO'], ['22,819', 'kN', 'Liftoff thrust'], ['27', '', 'Merlin engines at liftoff']],
-    sources: 'SpaceX Falcon Heavy and Falcon 9 vehicle pages and Falcon User\'s Guide; NASA KSC LC-39 fact sheets (FSS, flame trench, lightning protection); NASA Commercial Crew blog (crew access arm); Spaceflight Now Falcon Heavy launch timelines (Arabsat-6A) and its February 2026 report on the crew-arm removal; NASASpaceflight; Wikipedia: Falcon Heavy (specification table after Espace & Exploration no. 51: per-core 287.4 t LOX, 123.5 t RP-1, 22.2 t dry; fairing 1.7 t), Falcon 9, Falcon 9 Full Thrust, SpaceX Merlin, Kennedy Space Center LC-39A, AMOS-6 and CRS-7 investigations.',
+    sources: 'SpaceX Falcon Heavy and Falcon 9 vehicle pages; SpaceX Falcon User\'s Guide (May 2025: separation systems, avionics, T-0 disconnects and payload harnesses, fairing, pad operations, 2.9° ramp, instrument bay); NASA KSC Launch Complex 39 fact sheet (2008: FSS and lightning mast, flame trench, LOX sphere, water tower, Pad Terminal Connection Room); NASA Commercial Crew blog (crew access arm); Spaceflight Now Falcon Heavy launch timelines (Arabsat-6A) and its February 2026 report on the crew-arm removal; NASASpaceflight; Wikipedia: Falcon Heavy (specification table after Espace & Exploration no. 51: per-core 287.4 t LOX, 123.5 t RP-1, 22.2 t dry; fairing 1.7 t), Falcon 9, Falcon 9 Full Thrust, Falcon 9 v1.1 (Spaceflight Now 2010 on the T-0 supplies), Falcon 9 Block 5, SpaceX Merlin, SpaceX reusable launch system development program (landing legs), Kennedy Space Center LC-39A, AMOS-6 and CRS-7 investigations.',
     fleetTag: '63.8 t LEO',
     root: A.root,
     rigPivot, stack, ground,
@@ -246,7 +249,7 @@ export function buildRocket() {
         p.visible = t < 16;
       }
     },
-    /** Landing legs: k 0 (stowed) … 1 (landing stance); animate eases there over ≈ 2.5 s. */
+    /** Side booster A's landing legs: k 0 (stowed) … 1 (landing stance); animate eases there over ≈ 2.5 s. */
     setLegs(k, { animate = true } = {}) {
       legTarget = Math.min(1, Math.max(0, k)); legDelay = 0;
       if (!animate) setLegsAll(legTarget);

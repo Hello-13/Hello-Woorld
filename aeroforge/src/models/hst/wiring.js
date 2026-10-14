@@ -11,11 +11,11 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { mergeGeometries } from '../../engine/geometry.js';
-import { az, deg, ni, arcPts, cablePath, pathLength } from './layout.js';
+import { az, deg, ix, arcPts, cablePath, pathLength } from './layout.js';
 import { BAY_PHI, CONN, X_EQ0, X_EQ1 } from './ssm.js';
 import { HM } from './materials.js';
 
-const merge = (list) => mergeGeometries(list.map(ni));
+const merge = (list) => mergeGeometries(list.map(ix));
 const A = (a, r, x) => az(deg(a), r, x);
 const BAY = (k) => (BAY_PHI[k] * 180) / Math.PI;
 

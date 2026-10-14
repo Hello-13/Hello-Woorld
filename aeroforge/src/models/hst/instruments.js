@@ -15,10 +15,10 @@ import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { rod, beam, mergeGeometries } from '../../engine/geometry.js';
 import { decal, stencilText } from '../../engine/decals.js';
-import { RAD, OPT, az, deg, shellPatch, ni, cablePath } from './layout.js';
+import { RAD, OPT, az, deg, shellPatch, ix, cablePath } from './layout.js';
 import { HM } from './materials.js';
 
-const merge = (list) => mergeGeometries(list.map(ni));
+const merge = (list) => mergeGeometries(list.map(ix));
 const X_SI0 = 0.35, X_SI1 = 2.55;               // axial instrument envelope, 0.9 × 0.9 × 2.2 m
 
 /** Wedge (trapezoid section) at azimuth φ: inner width w0 at r0, outer width w1 at r1, x0..x1. */
@@ -107,7 +107,7 @@ export function buildInstruments(P, root) {
           geo: [['al', [Q.box(0.52, 0.36, 0.014, 0.75, 0.72, 0.957)]], ['box', [Q.box(0.06, 0.05, 0.03, 0.53, 0.62, 0.975), Q.box(0.06, 0.05, 0.03, 0.97, 0.62, 0.975)]], ['kapton', Q.cable([[0.62, 0.84, 0.965], [0.62, 0.84, 1.02], [0.88, 0.84, 1.02], [0.88, 0.84, 0.965]], 0.01)]] },
         { name: 'STIS MAMA heat pipes & radiator plate', system: 'Thermal control', material: 'Internal heat pipes to a copper radiator plate on the aft bulkhead', temp: 285,
           desc: 'STIS\'s own cooling path: heat pipes carry the MAMA detectors\' heat to a copper radiator plate on the instrument\'s aft bulkhead, which radiates into the aft shroud. A 2000 design to plug it into a shroud cooling system never flew.',
-          geo: [['copper', [Q.box(0.012, 0.14, 0.3, 0.343, 0.15, 0.3)]], ['copper', [...Q.cable([[1.3, 0.3, 0.6], [0.9, 0.2, 0.45], [0.36, 0.15, 0.4]], 0.008), ...Q.cable([[1.3, 0.6, 0.3], [0.9, 0.4, 0.2], [0.36, 0.15, 0.2]], 0.008)]]] },
+          geo: [['copper', [Q.box(0.012, 0.14, 0.3, 0.343, 0.15, 0.3), ...Q.cable([[1.3, 0.3, 0.6], [0.9, 0.2, 0.45], [0.36, 0.15, 0.4]], 0.008), ...Q.cable([[1.3, 0.6, 0.3], [0.9, 0.4, 0.2], [0.36, 0.15, 0.2]], 0.008)]]] },
       ],
     },
     {
@@ -151,10 +151,10 @@ export function buildInstruments(P, root) {
           geo: [['box', [Q.box(0.32, 0.3, 0.13, 0.6, 0.62, 0.86)]], ['copper', [Q.box(0.26, 0.22, 0.02, 0.6, 0.62, 0.935)]]] },
         { name: 'ACS LVPS-R (2009)', material: 'Replacement low-voltage power supply on the outside of the enclosure', temp: 298,
           desc: 'A new power supply bolted to the outside of ACS on its −V2 face. It runs the new cartridge and bypasses both failed electronics boxes, which brought the Wide Field Channel back.',
-          geo: [['box', [Q.box(0.35, 0.28, 0.09, 1.0, 0.25, 1.0)]], ['al', [Q.box(0.4, 0.33, 0.012, 1.0, 0.25, 0.956)]]] },
+          geo: [['box', [Q.box(0.35, 0.28, 0.09, 0.97, 0.18, 1.0)]], ['al', [Q.box(0.38, 0.33, 0.012, 0.97, 0.18, 0.956)]]] },
         { name: 'ACS PIE harness (2009)', system: 'Electrical', material: 'Power input harness with a tee at the input power connector', temp: 290,
           desc: 'Carries power from the LVPS-R round the aft edge of the enclosure to a tee at the ACS input power connector, so the new supply draws from the instrument\'s own feed.',
-          mat: 'cable', geo: [...Q.cable([[0.82, 0.15, 1.0], [0.42, 0.15, 1.0], [0.32, 0.15, 0.9], [0.31, 0.6, 0.52]], 0.012), Q.box(0.04, 0.06, 0.08, 0.31, 0.6, 0.52)] },
+          mat: 'cable', geo: [...Q.cable([[0.79, 0.15, 1.0], [0.42, 0.15, 1.0], [0.32, 0.15, 0.9], [0.31, 0.6, 0.52]], 0.012), Q.box(0.04, 0.06, 0.08, 0.31, 0.6, 0.52)] },
       ],
     },
     {
@@ -216,10 +216,12 @@ export function buildInstruments(P, root) {
     }
     const p = P(si.name, {
       system: 'Payload', material: si.material, mass: si.mass, massSource: si.massSource, temp: si.temp, explode: [-3.4, qy * 0.25, qz * 0.25], xrayWeight: 0.45,
-      desc: si.desc, callout: true, anchor: [X_SI0 + 0.05, cy + qy * 0.46, cz + qz * 0.46],
+      desc: si.desc, callout: si.short === 'COS', anchor: [X_SI0 + 0.05, cy + qy * 0.46, cz + qz * 0.46],
     }, [shellMesh, detMesh, frameMesh, mesh(ap, HM.black()), mesh(merge(handles), HM.handrail())]);
     p.userData.part.short = si.short;
-    p.userData.part.tourLabel = true;            // internal: labelled only while a tour focuses it
+    // internal: COS (the tour's example of an instrument swap) is labelled only while a tour step
+    // focuses it; the other three are named by the stencils on their aft faces
+    p.userData.part.tourLabel = true;
     const tail = `Part of ${si.short}; mass included in the instrument.`;
     for (const s of si.subs(Q)) sub(p, { ...s, tail }, [0, qy * 0.9, qz * 0.9], s.geo);
 
@@ -296,7 +298,8 @@ export function buildInstruments(P, root) {
   rad.userData.part.thermalRole = 'radiator';
 
   // three Fine Guidance Sensors at 90° intervals (units after SM4: FGS-1R, FGS-2R2, FGS-3); each a
-  // 0.5 × 1 × 1.6 m box (SM4 Fig. 4-12), long along V1, 1 m deep radially, 0.5 m wide
+  // 0.5 × 1 × 1.6 m box (SM4 Fig. 4-12). The guide does not say which way each dimension runs; drawn
+  // long along V1, 1 m deep radially and 0.5 m wide, an assumption the desc states
   const FGS = [
     { n: 1, phi: 90, side: '−V2', ama: true, note: 'FGS-1R (1997) is the most stable and serves as Hubble\'s astrometer, measuring star positions to about a milliarcsecond.' },
     { n: 2, phi: 0, side: '+V3', ama: true, note: 'The unit installed in 2009, FGS-2R2, is a refurbished sensor returned from an earlier mission.' },
@@ -314,7 +317,7 @@ export function buildInstruments(P, root) {
     for (const x of [2.2, 3.05]) hh.push(...cablePath([rpt(phi, x - 0.12, 2.02, -0.14), rpt(phi, x - 0.12, 2.07, -0.14), rpt(phi, x + 0.12, 2.07, -0.14), rpt(phi, x + 0.12, 2.02, -0.14)], 0.014, 6));
     const p = P(`Fine Guidance Sensor ${f.n}`, {
       system: 'Attitude control', material: 'Optical bench with star selectors, Koesters-prism interferometers and photomultipliers; 0.5 × 1 × 1.6 m', mass: 220, massSource: 'NASA SM4 Media Guide (485 lb)', temp: 292,
-      explode: az(phi, 1.8), xrayWeight: 0.45, desc: `Radial bay on the ${f.side} side. Its pick-off mirror takes a 90° arc at the edge of the field; it finds a guide star there and holds it to a few milliarcseconds, 40 times a second. It also houses one of the optical control (wavefront) sensors. ${f.note}`,
+      explode: az(phi, 1.8), xrayWeight: 0.45, desc: `Radial bay on the ${f.side} side. Its pick-off mirror takes a 90° arc at the edge of the field; it finds a guide star there and holds it to a few milliarcseconds, 40 times a second. It also houses one of the optical control (wavefront) sensors. ${f.note} NASA gives the box as 0.5 × 1 × 1.6 m without saying which way each side runs, so its orientation here (long along the telescope axis) is uncertain.`,
       callout: f.n === 1, anchor: az(phi, 2.0, 2.6),
     }, [body, mesh(merge(det), HM.box()), mesh(merge(hh), HM.handrail())]);
     if (f.n === 1) p.userData.part.tourLabel = true;
@@ -329,7 +332,7 @@ export function buildInstruments(P, root) {
     sub(p, {
       name: `FGS ${f.n} star selectors & interferometers`, system: 'Attitude control', material: 'Optics train on a graphite-epoxy bench: aspheric collimator, two star-selector servos with encoders, corrector group, deviation prism, two Koesters prisms, four pinhole/lens assemblies and photomultipliers', temp: 292, count: 2,
       desc: 'Each star selector is an optical gimbal, one servo moving north–south and one east–west, that steers a 5″ detector field across the 60 arcmin² field in a spiral search for the guide star. The Koesters prisms then split its wavefront; comparing the light in the photomultipliers measures the star\'s position to milliarcseconds. Layout inside the enclosure schematic.', tail,
-    }, az(phi, 0.5), [['grEp', bench], ['mirror', optics], ['box', servos], ['al', prisms], ['box', pmts]]);
+    }, az(phi, 0.5), [['grEp', bench], ['mirror', optics], ['box', [...servos, ...pmts]], ['al', prisms]]);
     if (f.ama) {
       sub(p, {
         name: `FGS ${f.n} fold-flat actuator (AMA)`, system: 'Attitude control', material: 'Articulating mirror assembly on fold flat #3', temp: 292,

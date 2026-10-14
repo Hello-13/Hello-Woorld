@@ -190,13 +190,13 @@ export function buildGear({ A, P }) {
   const bv = [];
   for (const s of [1, -1]) bv.push(cyl(0.035, 0.035, 0.06, [-2.22, 1.62, 0.55 * s], 'y', 12), cyl(0.03, 0.03, 0.05, [-1.89, 2.18, 0.34 * s], 'y', 10), cyl(0.03, 0.03, 0.05, [-1.2, 2.4, 0.38 * s], 'x', 10));
   P('Fuel lines & breakaway valves', {
-    system: 'Fuel', material: 'Self-sealing hoses, frangible breakaway valves', mass: 20, explode: [-0.6, -0.6, 0],
+    system: 'Fuel', material: 'Self-sealing hoses, frangible breakaway valves', mass: 20, explode: [-0.6, -0.6, 0], xrayWeight: 0.6,
     desc: 'Each cell feeds its own engine, which draws the fuel by suction, so a cut line sucks air instead of spraying fuel. Self-sealing breakaway valves at every structural joint (here at the cell outlets, where the lines pass through the roof and where they enter the engine bay) seal both ends if a line is torn out in a crash — the main reason post-crash fires are rare in H-60s.',
   }, [mesh(merge(lines), MAT.hydraulic()), mesh(merge(bv), MAT.red())]);
   const selG = [];
   for (const s of [1, -1]) {
     selG.push(cyl(0.04, 0.04, 0.1, [-0.85, 2.42, 0.47 * s], 'x', 12), box(0.06, 0.04, 0.07, [-0.85, 2.47, 0.47 * s]), box(0.14, 0.12, 0.012, [-0.85, 2.43, 0.44 * s]));
-    selG.push(pipe([[-0.86, 2.47, 0.47 * s], [-0.9, 2.56, 0.45 * s], [-0.9, 2.6, 0.32 * s], [-0.85, 2.7, 0.2 * s]], 0.006, 4));           // push-pull cable toward the overhead levers
+    selG.push(pipe([[-0.86, 2.47, 0.47 * s], [-0.84, 2.53, 0.44 * s], [-0.75, 2.52, 0.4 * s], [-0.55, 2.48, 0.4 * s]], 0.006, 4));           // push-pull cable toward the overhead levers
   }
   // crossfeed between the two valves, under the tail drive shaft, with a check valve in each half
   selG.push(pipe([[-0.86, 2.4, 0.43], [-0.92, 2.34, 0.36], [-0.92, 2.32, 0.15], [-0.92, 2.32, -0.15], [-0.92, 2.34, -0.36], [-0.86, 2.4, -0.43]], 0.012));

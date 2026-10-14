@@ -12,10 +12,10 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { rod, lathe, mergeGeometries } from '../../engine/geometry.js';
-import { RAD, ST, az, deg, ni, cablePath } from './layout.js';
+import { RAD, ST, az, deg, ix, cablePath } from './layout.js';
 import { HM } from './materials.js';
 
-const merge = (list) => mergeGeometries(list.map(ni));
+const merge = (list) => mergeGeometries(list.map(ix));
 
 export const SA = { x: 6.3, rDrive: RAD.shell, mast: 0.75, wing: 7.1, width: 2.6 };
 export const HGA = { x: 6.95, mast: 3.3, dish: 0.65 };

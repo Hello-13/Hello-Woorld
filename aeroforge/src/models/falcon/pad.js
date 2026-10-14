@@ -270,18 +270,27 @@ export function buildPad(A, site, base, bed) {
     desc: 'If every engine is healthy, the hydraulic release system is triggered at T-0 (Falcon User\'s Guide): each clamp\'s cylinder pulls its jaw clear and the vehicle rises. Lines under the deck feed the cylinders from a hydraulic unit on it. Cylinder count, sizes and routing estimated.',
   }, [mesh(merge(rel), FM.steelLine()), mesh(merge(relLine), FM.steelLine()), mesh(merge(hpu), FM.teWhite())], base);
 
-  const tsm = [];
+  // tail service masts: a mast outboard of each side booster, a short retracting arm carrying the
+  // ground half of the booster's T-0 plate, its lines, and the blast hood that closes after T-0
+  const tsm = [], tsmLines = [], hood = [];
+  const hoodMat = new THREE.MeshStandardMaterial({ color: 0x6c7176, roughness: 0.6, metalness: 0.55, side: THREE.DoubleSide });
   for (const s of [1, -1]) {
-    const x = s * (BOOSTER_X + R + 1.55);
+    const x = s * (BOOSTER_X + R + 2.17);                                          // mast centre, clear of the clamp
+    const xp = s * (BOOSTER_X + R + 0.23);                                         // carrier plate on the T-0 plate
     tsm.push(block(x, DECK + 2.2, 0, 2.0, 4.4, 2.0));
-    tsm.push(block(x - s * 0.95, DECK + 2.0, 0, 0.3, 0.9, 1.2));                 // umbilical carrier plate
-    tsm.push(pipe([[x, DECK + 3.6, 0.6], [x - s * 0.6, DECK + 3.0, 0.6], [s * (BOOSTER_X + R + 0.04), DECK + 2.0, 0.55]], 0.09, { seg: 8 }));
-    tsm.push(pipe([[x, DECK + 3.6, -0.6], [x - s * 0.6, DECK + 3.0, -0.6], [s * (BOOSTER_X + R + 0.04), DECK + 2.0, -0.55]], 0.11, { seg: 8 }));
+    tsm.push(block(xp, DECK + 2.0, 0, 0.2, 0.8, 1.3));                            // carrier plate
+    for (const z of [-0.5, 0.5]) tsm.push(beam([x - s * 1.0, DECK + 2.3, z], [xp + s * 0.1, DECK + 2.15, z * 0.9], 0.14, 0.2));   // retract arm
+    tsm.push(block(x - s * 1.05, DECK + 2.3, 0, 0.1, 0.5, 1.4));                  // arm pivot plate on the mast
+    const lines = [[-0.42, 0.09], [-0.16, 0.07], [0.1, 0.035], [0.3, 0.03], [0.48, 0.04]];   // LOX, RP-1, GN₂, He, TEA-TEB
+    for (const [z, r] of lines) tsmLines.push(pipe([[x - s * 0.6, DECK + 4.4, z], [x - s * 0.9, DECK + 3.4, z], [xp + s * 0.6, DECK + 2.35, z * 0.9], [xp + s * 0.11, DECK + 2.1, z * 0.85]], r, { seg: 8, tubular: 12 }));
+    const h = new THREE.CylinderGeometry(0.5, 0.5, 1.6, 14, 1, true, -Math.PI / 2, Math.PI);   // half-pipe hood over the lines
+    h.rotateX(-Math.PI / 2); h.translate(x - s * 0.75, DECK + 4.4, 0);
+    hood.push(h);
   }
   G('Tail service masts', {
-    skin: true, count: 2, material: 'Steel masts with retracting umbilical plates', mass: null,
-    desc: 'Feed RP-1, LOX, helium and power into the base of each side booster until T-0, then retract and close a protective hood against the exhaust. The layout of the Falcon Heavy mount\'s side-booster umbilicals is not documented publicly; shown simplified.',
-  }, mesh(merge(tsm), FM.teWhite()), base);
+    skin: true, count: 2, material: 'Steel masts, retracting arms with umbilical carrier plates, blast hoods', mass: null,
+    desc: 'Feed LOX, RP-1, helium, nitrogen, igniter fluid, power and data into the base of each side booster through its T-0 plate until liftoff; then the arm swings the carrier plate back into the mast and a hood closes over it against the exhaust. The layout of the Falcon Heavy mount\'s side-booster umbilicals is not documented publicly; shown simplified.',
+  }, [mesh(merge(tsm), FM.teWhite()), mesh(merge(tsmLines), FM.water()), mesh(merge(hood), hoodMat)], base);
 
   // pad EGSE room: like the shuttle-era Pad Terminal Connection Room, a reinforced concrete room on
   // the west side of the trench under the hardstand fill (the hardstand ghosts in X-ray to show it)
@@ -398,7 +407,7 @@ export function buildPad(A, site, base, bed) {
 
   // payload air conditioning: the pad plant's duct comes up the strongback to the fairing inlet
   const [ix, iz] = polar(2.73, 280);
-  const yAc = STACK0 + 59.6;
+  const yAc = STACK0 + 60.4;
   const acx = 1.25, acz = -4.05;
   const ac = [pipe([[ix, yAc, iz], [ix + 0.2, yAc, iz - 0.5], [acx - 0.15, yAc - 0.15, acz + 0.35], [acx, yAc - 0.6, acz], [acx, STACK0 + 30, acz], [acx, DECK + 2.2, acz], [acx, DECK + 1.45, -4.6], [acx, DECK + 1.3, -5.3]], 0.15, { seg: 12, tubular: 90, tension: 0.05 })];
   ac.push(block(acx, DECK + 1.45, -5.6, 0.7, 0.5, 0.7));                                  // connection to the ground duct
@@ -474,16 +483,20 @@ export function buildPad(A, site, base, bed) {
   }, mesh(merge(caa), FM.teWhite()));
 
   // ------------------------------------------------------------------ water deluge / sound suppression
-  const wd = [];
-  for (const x of [-BOOSTER_X, 0, BOOSTER_X]) wd.push(hoop(2.25, 0.07, DECK + 0.08, { x, seg: 48, tube: 6 }));
+  const wd = [], rings = [];
+  for (const x of [-BOOSTER_X, 0, BOOSTER_X]) rings.push(hoop(2.25, 0.07, DECK + 0.08, { x, seg: 48, tube: 6 }));
+  G('Deck water-spray rings', {
+    count: 3, material: 'Perforated steel spray rings round the exhaust openings', mass: null,
+    desc: 'Ring the three exhaust openings on the mount deck and spray water across them at ignition, the first layer of the sound-suppression deluge. Ring size estimated.',
+  }, mesh(merge(rings), FM.water()), base);
   for (const [x, z] of [[13, 8], [-13, 8], [13, -9], [-19, 2]]) {
     wd.push(post(x, z, H, H + 3.4, 0.32, 12));
     wd.push(pipe([[x, H + 3.2, z], [x * 0.94, H + 3.9, z * 0.92], [x * 0.86, H + 4.0, z * 0.86]], 0.28, { seg: 10, tubular: 8 }));
     wd.push(pipe([[x, H + 0.3, z], [x, H + 0.3, z + Math.sign(z) * 8], [x * 1.5, H + 0.3, z + Math.sign(z) * 8]], 0.3, { seg: 8, tubular: 16, tension: 0 }));
   }
   G('Water deluge & sound suppression', {
-    material: 'Steel headers, deck spray rings and "rainbird" nozzles', mass: null,
-    desc: 'At ignition water floods the mount, the trench and the deck from big rainbird nozzles. Turning to steam absorbs heat and damps the acoustic energy that would otherwise reflect back onto the vehicle. The water is stored in the pad\'s 290 ft water tower.',
+    material: 'Steel headers and "rainbird" nozzles', mass: null,
+    desc: 'At ignition water floods the mount, the trench and the deck from big rainbird nozzles fed by these headers. Turning to steam absorbs heat and damps the acoustic energy that would otherwise reflect back onto the vehicle. The water is stored in the pad\'s 290 ft water tower.',
   }, mesh(merge(wd), FM.water()));
 
   // ------------------------------------------------------------------ lightning protection, water tower, propellant farm
@@ -556,7 +569,7 @@ export function buildPad(A, site, base, bed) {
   const toPad = (x, z0, r, yb) => {
     const pts = [];
     for (const z of [z0, -120, -80, -50, -23]) if (z >= z0) pts.push(onRamp(x, z, r));
-    pts.push([x, H + r + 0.15, -7.3], [x, yb, -7.3], [1.6, yb, -7.3]);
+    pts.push([x, H + r + 0.15, -8.5], [x, yb, -8.5], [2.4, yb, -8.5], [1.6, yb, -6.9]);
     return pts;
   };
   const toe = (z) => RAIL_X + 3.2 + 1.5 * rampY(z);

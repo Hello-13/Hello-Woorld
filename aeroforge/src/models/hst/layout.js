@@ -97,8 +97,19 @@ export function plate(w, h, t, p, n, up = [1, 0, 0]) {
   return g;
 }
 
-/** Non-indexed copy so geometries of mixed index state can be merged. */
-export const ni = (g) => (g.index ? g.toNonIndexed() : g);
+/**
+ * Give a geometry an index if it has none (in place), so geometries of mixed index state can be
+ * merged. Indexed merges keep each primitive's shared vertices: about a third of the vertex data of
+ * a non-indexed merge, and quicker to build.
+ */
+export function ix(g) {
+  if (g.index) return g;
+  const n = g.attributes.position.count;
+  const a = new (n > 65535 ? Uint32Array : Uint16Array)(n);
+  for (let i = 0; i < n; i++) a[i] = i;
+  g.setIndex(new THREE.BufferAttribute(a, 1));
+  return g;
+}
 
 /**
  * Curved skin patch on a cylinder of radius r around the x axis: x0..x1, azimuth φ0..φ1 (rad).

@@ -26,8 +26,8 @@ export function mountRocketLab(root, ctx) {
 
   const forces = v.forces || (v.forces = new ForceArrows(v.root, { radius: 0.9 }));
   const tForces = toggle({ label: 'Force vectors', value: false, onChange: (on) => { forces.setVisible(on); ctx.muteCallouts?.(on); placeForces(lastSample); } });
-  // landing legs: swing all twelve out to the landing stance (the mount steps aside while they are out)
-  const tLegs = toggle({ label: 'Landing legs', value: false, onChange: (on) => { v.setLegs?.(on ? 1 : 0); ctx.log(v.designation, on ? 'Landing legs deployed: nested helium pistons, ≈ 18 m stance' : 'Landing legs stowed', 'info'); } });
+  // landing legs: swing side booster A's legs out to the landing stance (the mount steps aside while they are out)
+  const tLegs = toggle({ label: 'Booster A landing legs', value: false, onChange: (on) => { v.setLegs?.(on ? 1 : 0); ctx.log(v.designation, on ? 'Side booster A landing legs deployed: nested helium pistons, ≈ 18 m stance' : 'Landing legs stowed', 'info'); } });
   let lastSample = null;
   function placeForces(s) {
     if (!s || !forces.group.visible) return;

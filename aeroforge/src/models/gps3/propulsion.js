@@ -181,7 +181,7 @@ export function buildPropulsion(P) {
   fdv('Helium fill valve', 0.0, 'Charging port for the helium, loaded last, after the propellants (position estimated).');
   P('Fill lines', {
     system: 'Fuel', material: 'Titanium tubing', mass: 0.8, count: 3, temp: 290, explode: [-0.3, 0, -0.7],
-    desc: 'Run from the three service valves into the bus: the fuel line joins the hydrazine feed, the oxidiser line the NTO tee, and the helium line climbs the −X bay, clear of the oxidiser tank, to the −X helium tank; the +X tank fills through the manifold (routing estimated).',
+    desc: 'Run from the three service valves into the bus: the fuel line joins the hydrazine feed, the oxidiser line the −X tank\'s line on its way to the NTO tee, and the helium line climbs the −X bay, clear of the oxidiser tank, to the −X helium tank; the +X tank fills through the manifold (routing estimated).',
   }, mesh(merge([
     pipeG([[FV, 0.15, AFT], [FV, 0.15, zo + 0.02], [0.1, 0.15, zo + 0.02]], r),
     pipeG([[FV, -0.15, AFT], [FV, -0.15, zo - 0.012], [-0.45, -0.15, zo - 0.012], [-0.4, -0.15, zo]], r),

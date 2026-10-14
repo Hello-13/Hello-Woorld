@@ -44,7 +44,7 @@ const arc = (r, y, a0, a1, n = 8) => Array.from({ length: n + 1 }, (_, i) => at(
 // landing-leg geometry (estimates sized from photographs; see the 'landing legs' desc)
 const LEG = {
   hingeR: R + 0.1, hingeY: 1.5,   // hinge on the engine-section skirt
-  len: 9.2,                       // stowed from y 1.35 to 10.55
+  len: 9.1,                       // stowed from y 1.45 to 10.55
   deployDeg: 115,                 // deployed: 25° below horizontal, feet ≈ 2.3 m below the nozzle exits
   pistonB: [R + 0.13, 3.4],       // piston's stage fitting [r, y] at the top of the engine section
   pistonL: [7.6, 0.12],           // piston's leg fitting: distance along the leg, offset outward
@@ -393,8 +393,9 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     explode: [t0x * 0.8, -1.0, t0z * 0.8],
   }, mesh(merge(t0), FM.aluDark()));
   // gaseous-nitrogen purge: a ring in the engine bay fed from the T-0 plate
-  const purge = [hoop(1.62, 0.0125, 2.22, { seg: 64, tube: 4 }), pipe([at(R - 0.03, t0Az - 4, T0_Y - 0.18), at(1.7, t0Az - 5, 2.8), at(1.62, t0Az - 6, 2.24)], 0.0125, { seg: 4, tubular: 10 })];
-  for (let i = 0; i < 12; i++) purge.push(post(...polar(1.6, i * 30 + 15), 2.16, 2.21, 0.012, 5));
+  // (between the TVC lines below and the TEA-TEB tank and Octaweb ring above)
+  const purge = [hoop(1.55, 0.0125, 2.37, { seg: 64, tube: 4 }), pipe([at(R - 0.03, t0Az - 4, T0_Y - 0.18), at(1.72, t0Az - 5, 2.85), at(1.55, t0Az - 6, 2.39)], 0.0125, { seg: 4, tubular: 10 })];
+  for (let i = 0; i < 12; i++) purge.push(post(...polar(1.54, i * 30 + 15), 2.31, 2.36, 0.012, 5));
   P('GN₂ purge manifold', {
     system: 'Environmental control', material: 'Stainless purge ring with nozzles', mass: 6,
     desc: 'Gaseous nitrogen from the ground (one of the supplies at the T-0 plate) flushes the closed engine bay before ignition, keeping out oxygen boiled off from the LOX and moist Florida air. Use inferred from the ground-supply list; layout estimated.',
@@ -692,7 +693,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   // at the top of the skirt to a point near the foot is the A-frame's diagonal. setLegs(k) swings
   // the legs from stowed (0) to the landing stance (1) and extends the pistons with them.
   const legGeo = legGeometry(LEG.len);
-  legGeo.translate(0, LEG.hingeY - 0.15, 0);
+  legGeo.translate(0, LEG.hingeY - 0.05, 0);         // starts at the hinge, so it swings clear of the skirt
   const footGeo = new THREE.CylinderGeometry(0.36, 0.4, 0.12, 20);
   const legPivots = [], legStatic = [], pistons = [], collets = [];
   const thd = (LEG.deployDeg * Math.PI) / 180;
@@ -781,7 +782,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   // ------------------------------------------------------------------ attitude control
   const cgY = centre ? 46.6 : Y.s1Top + 1.0;
   const cg = [], n2 = [], n2l = [];
-  const n2Y = 42.3;
+  const n2Y = 42.05;                     // below the battery packs in the forward skirt
   for (const a of [90, 270]) {
     cg.push(unit(R + 0.12, a, cgY, 0.5, 0.62, 0.26));
     for (const dy of [-0.18, 0.18]) for (const dt of [-0.14, 0.14]) {

@@ -45,16 +45,16 @@ export function buildHelicopter() {
   const drive = buildDrive({ A, P, roofY: fus.roofY });
   const tail = buildTail({ A, P, air, roofY: fus.roofY });
   const gear = buildGear({ A, P });
-  const cab = buildCabin({ A, P, surfPoint: fus.surfPoint, surfNormal });
+  const cab = buildCabin({ A, P, surfPoint: fus.surfPoint, surfNormal, servoInputs: rotor.servoInputs, servoBases: rotor.servoBases });
 
   // thermal roles for the Thermal view
   const byName = (n) => A.parts.find((p) => p.name === n);
   const role = (names, r) => { for (const n of names) { const p = byName(n); if (p) p.userData.part.thermalRole = r; } };
-  role(['Main module (main transmission)', 'Main bevel gear & combining pinions', 'Planetary reduction stage', 'Main transmission lubrication & chip detectors', 'Input module (right)', 'Input module (left)', 'Accessory module (right)', 'Accessory module (left)', 'Intermediate gearbox (42°)', 'Tail rotor gearbox (90°)'], 'gearbox');
-  role(['Transmission oil cooler & blower', 'Viscous-damped hanger bearings', 'Rotor brake'], 'warm');
+  role(['Main module (main transmission)', 'Main bevel gear & combining pinions', 'Planetary reduction stage', 'Main transmission oil pumps', 'Main transmission oil filter', 'Input module (right)', 'Input module (left)', 'Input bevel gears (right)', 'Input bevel gears (left)', 'Freewheel unit (right)', 'Freewheel unit (left)', 'Accessory module (right)', 'Accessory module (left)', 'Intermediate gearbox (42°)', 'Tail rotor gearbox (90°)'], 'gearbox');
+  role(['Transmission oil cooler & blower', 'Oil cooler lines & thermostatic valve', 'Viscous-damped hanger bearings', 'Rotor brake', 'Generator cooling-oil lines', 'Pneumatic start ducts', 'Bleed-air check & shutoff valves', 'Heater mixing valve & overtemperature sensors'], 'warm');
   role(['Engine cowling (right)', 'Engine cowling (left)', 'Inlet particle separator (right)', 'Inlet particle separator (left)'], 'cowl');
-  role(['AC generators', 'APU generator', 'No. 1 hydraulic pump module (left)', 'No. 2 hydraulic pump module (right)', 'Backup hydraulic pump', 'Primary servos', 'Tail rotor servo', 'AVCS force generators'], 'equipment');
-  role(['Flight management & display computers', 'Embedded GPS/INS units', 'Digital AFCS computers', 'Communication radios & IFF', 'Health monitoring & data recorders', 'AC/DC converters', 'Power distribution panels', 'Instrument panel & multifunction displays', 'AVCS controller', 'CMWS electronic control unit'], 'avionics');
+  role(['AC generators', 'APU generator', 'No. 1 hydraulic pump module (left)', 'No. 2 hydraulic pump module (right)', 'Backup hydraulic pump', 'Primary servos', 'Tail rotor servo', 'Boost servos', 'AVCS force generators', 'Ventilation blower'], 'equipment');
+  role(['Flight management & display computers', 'Embedded GPS/INS units', 'Digital AFCS computers', 'Communication radios & IFF', 'Health monitoring & data recorders', 'AC/DC converters', 'Power distribution panels', 'Generator control units', 'Instrument panel & multifunction displays', 'AVCS controller', 'CMWS electronic control unit', 'APU electronic sequence unit', 'Blade de-ice controller & junction box', 'Hydraulic logic modules'], 'avionics');
 
   // estimated masses scaled together to the published 5,675 kg empty weight (GE's engine figure kept)
   const fixed = (p) => /^T700 |^Inlet particle separator/.test(p.userData.part.name);

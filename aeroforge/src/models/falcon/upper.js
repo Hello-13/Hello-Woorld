@@ -270,8 +270,8 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   }, mesh(merge(he), FM.steelLine()));
 
   // ------------------------------------------------------------------ mission-extension kit hardware
-  const mekC = [sideBottle(1.6, 350, 47.78, 0.13, 0.6), sideBottle(1.6, 100, 47.78, 0.13, 0.6)];
-  const mekL = [pipe([at(1.6, 339.5, 47.78), at(1.6, 339.5, 47.7), at(1.6, 340, 47.68)], 0.012, { seg: 4, tubular: 4 }),
+  const mekC = [sideBottle(1.6, 5, 47.78, 0.13, 0.6), sideBottle(1.6, 100, 47.78, 0.13, 0.6)];
+  const mekL = [pipe([at(1.6, 354.6, 47.78), at(1.61, 348, 47.72), at(1.6, 341, 47.685)], 0.012, { seg: 4, tubular: 6 }),
     pipe([at(1.6, 89, 47.78), at(1.45, 92, 47.6), at(1.0, 150, 47.45), [hxAt[0] + 0.02, hxAt[1] + 0.08, hxAt[2] + 0.1]], 0.012, { seg: 4, tubular: 14 })];
   P('Second stage mission-extension kit COPVs', {
     system: 'Fuel', count: 2, material: 'Composite-overwrapped helium bottles and lines', mass: 2 * 30,
@@ -591,7 +591,7 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
         explode: [6.0, 2.4, 0.6],
       }, [mesh(dr, FM.fairing()), mesh(merge([fr, ...bolts]), FM.aluDark())], grp);
       // payload air-conditioning inlet facing the transporter-erector's duct
-      const iA = 280, iY = 59.6;
+      const iA = 280, iY = 60.4;                        // above the lower pusher pair
       const door = new THREE.CylinderGeometry(0.2, 0.2, 0.02, 24); door.rotateX(Math.PI / 2); door.rotateY(radialYaw(iA)); door.translate(...at(2.605, iA, iY));
       const collar = new THREE.CylinderGeometry(0.15, 0.17, 0.12, 20); collar.rotateX(Math.PI / 2); collar.rotateY(radialYaw(iA)); collar.translate(...at(2.66, iA, iY));
       const diff = new THREE.CylinderGeometry(0.16, 0.12, 0.08, 16); diff.rotateX(Math.PI / 2); diff.rotateY(radialYaw(iA)); diff.translate(...at(2.5, iA, iY));

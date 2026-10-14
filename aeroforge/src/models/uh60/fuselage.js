@@ -330,13 +330,20 @@ export function buildFuselage({ A, P }) {
     }, [mesh(skinG, paint), liner(skinG), mesh(glass, MAT.glass(), { cast: false }), mesh(merge([outline(win, 0.008, 0.012), handle]), MAT.black())]);
   }
 
-  // gunner (crew chief) windows
+  // gunner (crew chief) windows: forward-sliding hatch windows split vertically into two panels
   for (const side of [1, -1]) {
     const r = { ...O.gunner, side };
+    const xm = 0.5 * (r.x0 + r.x1);
+    const fore = { ...r, x0: xm + 0.01 }, aft = { ...r, x1: xm - 0.01 };
+    const aMid = 0.5 * (r.a0 + r.a1), aS = side > 0 ? aMid : Math.PI - aMid;
+    const latch = surfPoint(aft.x0 + 0.06, aS, 0.012);
+    const bars = [];
+    for (let i = 0; i <= 6; i++) bars.push(surfPoint(xm, side > 0 ? r.a0 + ((r.a1 - r.a0) * i) / 6 : Math.PI - r.a0 - ((r.a1 - r.a0) * i) / 6, 0.008));
     P(side > 0 ? 'Gunner window (right)' : 'Gunner window (left)', {
-      system: 'Skin & fairings', skin: true, material: 'Acrylic in a hinged aluminium frame', mass: 9, explode: [0.2, 0.3, 1.2 * side],
-      desc: 'The crew chief\'s window at the front of the cabin swings open for the window gun mount and for a clear view of the tail and the landing zone.',
-    }, [mesh(patch(G, { only: [r], off: 0.0 }), MAT.glass(), { cast: false }), mesh(outline(r, 0.006, 0.016), MAT.black())]);
+      system: 'Skin & fairings', skin: true, material: 'Acrylic panels in sliding aluminium frames', mass: 9, explode: [0.2, 0.3, 1.2 * side],
+      desc: 'The crew chief/gunner window at the front of the cabin is a forward-sliding hatch split vertically into two panels, with a security latch on the aft panel. Slid open it clears the window gun mount and gives a view of the tail and the landing zone.',
+    }, [mesh(patch(G, { only: [fore, aft], off: 0.0 }), MAT.glass(), { cast: false }),
+      mesh(merge([outline(fore, 0.006, 0.014), outline(aft, 0.006, 0.014), pipe(bars, 0.012, 5), box(0.05, 0.03, 0.025, [latch.x, latch.y, latch.z])]), MAT.black())]);
   }
 
   // sliding cabin doors
@@ -386,7 +393,7 @@ export function buildFuselage({ A, P }) {
   for (const a of [0.6, Math.PI - 0.6, -0.5, Math.PI + 0.5]) trFrames.push(stringer(-3.38, -1.78, a, 0.05, 0.02));
 
   P('Cockpit frames & canopy bow', {
-    system: 'Structure', material: '7075 aluminium frames, steel canopy-bow and roll-over structure', mass: 140, explode: [1.6, 0.6, 0],
+    system: 'Structure', material: '7075 aluminium frames, steel canopy-bow and roll-over structure', mass: 140, explode: [1.6, 0.6, 0], xrayWeight: 0.35,
     desc: 'Frames and the canopy bows around the windshields form a roll-over structure, so the cockpit keeps its shape if the aircraft turns over in a crash.',
   }, [mesh(merge(ckFrames), MAT.primer())]);
   // roof beams that carry the main transmission, plus cabin frames
@@ -395,17 +402,35 @@ export function buildFuselage({ A, P }) {
   // way along (they end at the transition section, where the roof is too narrow for them)
   for (const z of [-0.5, 0.5]) roof.push(bar([-2.1, 2.12, z], [2.6, 2.12, z], 0.1, 0.14));
   for (const x of [-0.5, 0.5]) roof.push(bar([x, 2.12, -0.62], [x, 2.12, 0.62], 0.1, 0.1));
-  P('Cabin frames & roof beams', {
-    system: 'Structure', material: 'Aluminium frames, machined roof beams, titanium transmission fittings', mass: 330, explode: [0, 0.8, 0],
-    desc: 'Ring frames around the cabin and two deep longitudinal roof beams that carry the main transmission and engines. They are designed to hold the 1-tonne-plus gearbox and rotor head in place in a hard crash rather than let them collapse into the cabin.',
-    callout: false,
-  }, [mesh(merge([...cabFrames, ...roof]), MAT.primer())]);
+  for (const x of [-0.5, 0.5]) for (const z of [-0.5, 0.5]) roof.push(box(0.14, 0.05, 0.12, [x, 2.19, z]));   // transmission/deck fittings
+  P('Main roof beams', {
+    system: 'Structure', material: 'Two machined aluminium longitudinal beams, two cross beams, titanium transmission fittings', mass: 150, explode: [0, 1.05, 0],
+    desc: 'The main transmission sits on top of the cabin between the engines, so these two deep roof beams and their cross beams carry the whole rotor lift — and the engines — into the airframe. They are designed to hold the 1-tonne-plus gearbox and rotor head in place in a hard crash rather than let them collapse into the cabin.',
+  }, [mesh(merge(roof), MAT.primer())]);
+  P('Cabin frames & stringers', {
+    system: 'Structure', material: 'Aluminium ring frames and stringers', mass: 150, explode: [0, 0.8, 0], xrayWeight: 0.3,
+    desc: 'Ring frames about every 0.6 m round the cabin, broken by the door openings and tied together by stringers, give the cabin its shape and its crash strength.',
+  }, [mesh(merge(cabFrames), MAT.primer())]);
+  const posts = [];
+  for (const side of [1, -1]) for (const x of [O.cabDoor.x0 - 0.03, O.cabDoor.x1 + 0.03]) {
+    const pts = [];
+    for (let i = 0; i <= 10; i++) { const a = O.cabDoor.a0 - 0.04 + ((O.cabDoor.a1 - O.cabDoor.a0 + 0.08) * i) / 10; pts.push(surfPoint(x, side > 0 ? a : Math.PI - a, -0.05)); }
+    posts.push(pipe(pts, 0.035, 6));
+  }
+  P('Cabin door posts', {
+    system: 'Structure', material: 'Heavy aluminium door-frame posts and sills', mass: 30, count: 4, explode: [0, 0.5, 0.6],
+    desc: 'The 1.75 m sliding-door openings cut right through the ring frames, so heavy posts at the front and rear of each opening carry the loads round the hole.',
+  }, [mesh(merge(posts), MAT.primer())]);
+  P('Aft cabin bulkhead', {
+    system: 'Structure', material: 'Aluminium bulkhead at the rear of the cabin', mass: 25, explode: [-0.5, 0.2, 0],
+    desc: 'Closes the back of the cabin. Behind it sit the stowage compartments, opening through doors in the bulkhead, with the two fuel cells beneath them.',
+  }, [mesh(aftBulkhead(), MAT.primer())]);
   P('Transition section frames', {
-    system: 'Structure', material: 'Aluminium frames and the aft cabin bulkhead', mass: 90, explode: [-0.9, 0.3, 0],
-    desc: 'Carries the aft cabin bulkhead, the fuel-cell bays below and the avionics shelf above, and joins the tail cone to the cabin.',
-  }, [mesh(merge([...trFrames, aftBulkhead()]), MAT.primer())]);
+    system: 'Structure', material: 'Aluminium frames and stringers', mass: 65, explode: [-0.9, 0.3, 0], xrayWeight: 0.3,
+    desc: 'Carries the fuel-cell bays below and the stowage compartments and aft avionics compartment above, and joins the tail cone to the cabin.',
+  }, [mesh(merge(trFrames), MAT.primer())]);
   P('Tail cone frames & longerons', {
-    system: 'Structure', material: 'Aluminium frames and extruded longerons', mass: 120, explode: [-2.4, 0.4, 0],
+    system: 'Structure', material: 'Aluminium frames and extruded longerons', mass: 120, explode: [-2.4, 0.4, 0], xrayWeight: 0.3,
     desc: 'Semi-monocoque tail cone: frames every ~0.7 m tied by longerons. It reacts the tail-rotor thrust as torsion and the tail-wheel loads as bending.',
   }, [mesh(merge(tcFrames), MAT.primer())]);
 
@@ -424,7 +449,7 @@ export function buildFuselage({ A, P }) {
   const tieDowns = [];
   for (let x = -1.5; x <= 2.0; x += 0.5) for (const z of [-0.85, -0.3, 0.3, 0.85]) tieDowns.push(new THREE.TorusGeometry(0.025, 0.006, 4, 10).rotateX(Math.PI / 2).translate(x, 0.625, z));
   P('Cabin floor', {
-    system: 'Structure', material: 'Aluminium honeycomb panels with tie-down rings', mass: 160, explode: [0, -0.5, 0],
+    system: 'Structure', material: 'Aluminium honeycomb panels with tie-down rings', mass: 160, explode: [0, -0.5, 0], xrayWeight: 0.5,
     desc: 'Flat floor 0.6 m above the ground for quick loading; tie-down rings rated for cargo restraint. Beneath it the lower fuselage is a crushable structure.',
   }, [mesh(merge(floor), MAT.interiorFront()), mesh(merge(tieDowns), MAT.steel())]);
   const keel = [];
@@ -437,7 +462,7 @@ export function buildFuselage({ A, P }) {
     if (w1 > 0.1) keel.push(box(0.04, 0.05, 2 * w1, [x, 0.572, 0]));
   }
   P('Keel beams & crushable belly', {
-    system: 'Structure', material: 'Aluminium keel beams, crushable sub-floor structure', mass: 170, explode: [0, -1.0, 0],
+    system: 'Structure', material: 'Aluminium keel beams, crushable sub-floor structure', mass: 170, explode: [0, -1.0, 0], xrayWeight: 0.5,
     desc: 'Two keel beams and a crushable sub-floor. In a survivable crash the gear, the belly and the stroking seats share the work of stopping the occupants — the airframe is built to keep a living space at vertical impacts of about 11.6 m/s (38 ft/s).',
   }, [mesh(merge(keel), MAT.primer())]);
 

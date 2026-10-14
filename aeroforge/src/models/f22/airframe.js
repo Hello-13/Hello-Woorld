@@ -296,11 +296,14 @@ export function buildAirframe(ctx) {
   for (const side of [1, -1]) {
     const g = [];
     const rings = [];
-    for (const s of [12.8, 13.6, 14.6, 15.6, 16.6, 17.4]) rings.push(FR.superRing(X(s), side * 1.5, 0.05, 0.22, 0.5, 12, 6));
+    // the box section tapers in depth aft, staying under the upper skin as the fuselage thins toward the nozzles
+    const boomTop = (s) => Math.min(0.3, FR.topAt(s, 1.5) - 0.025), boomBot = -0.2;
+    const ring = (s, dw = 0, dh = 0) => FR.superRing(X(s), side * 1.49, (boomTop(s) + boomBot) / 2, 0.2 + dw, boomTop(s) - boomBot + dh, 12, 6);
+    for (const s of [12.8, 13.6, 14.6, 15.6, 16.2, 16.8, 17.4]) rings.push(ring(s));
     g.push(FR.gridSurface(rings, { closed: true }));
     // machined forward, middle and end frames that the isogrid panels are welded to
     const frames = [];
-    for (const s of [12.8, 15.1, 17.4]) frames.push(FR.gridSurface([FR.superRing(X(s - 0.03), side * 1.5, 0.05, 0.25, 0.53, 12, 6), FR.superRing(X(s + 0.03), side * 1.5, 0.05, 0.25, 0.53, 12, 6)], { closed: true, uv: 'n' }));
+    for (const s of [12.8, 15.1, 17.37]) frames.push(FR.gridSurface([ring(s - 0.03, 0.025, 0.02), ring(s + 0.03, 0.025, 0.02)], { closed: true, uv: 'n' }));
     // boom-end fairing behind the fuselage: tapers to the stabilator trailing edge
     const fr = [];
     const keys = [[17.35, 1.485, 0.0, 0.31, 0.62], [17.6, 1.49, 0.0, 0.29, 0.58], [18.0, 1.5, -0.03, 0.26, 0.44], [18.35, 1.51, -0.06, 0.2, 0.3], [18.62, 1.52, -0.08, 0.1, 0.12]];

@@ -9,10 +9,10 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { rod, beam, mergeGeometries } from '../../engine/geometry.js';
-import { RAD, OPT, pmSurface, smSurface, az, deg, axial, tube, annulus, ni, cablePath } from './layout.js';
+import { RAD, OPT, pmSurface, smSurface, az, deg, axial, tube, annulus, ix, cablePath } from './layout.js';
 import { HM } from './materials.js';
 
-const merge = (list) => mergeGeometries(list.map(ni));
+const merge = (list) => mergeGeometries(list.map(ix));
 
 export function buildOTA(P) {
   const out = {};
@@ -37,7 +37,7 @@ export function buildOTA(P) {
     system: 'Optics', material: 'Corning ULE (titanium-silicate) glass; 65 nm aluminium + 25 nm MgF₂ coating', mass: 828, massSource: 'NASA (1,825 lb, whole mirror; the SM3A guide rounds it to 1,800 lb, 818 kg)', temp: 294, explode: [0.7, 0, 0],
     desc: '2.4 m concave hyperboloid, f/2.3, radius of curvature 11.04 m, polished to about 10 nm. In 1990 it proved to be 2.2 µm too flat at the edge — spherical aberration from a mis-spaced test instrument — corrected optically in 1993. NASA quotes 1,800–1,825 lb (818–828 kg) for the whole mirror, core and rear plate included; a solid blank would have weighed about 8,000 lb.',
     callout: true, anchor: [xPM + 0.05, 0.9, 0.7],
-  }, [face, mesh(axial(plate.slice().reverse(), 96), HM.ule()), mesh(merge(bands), HM.ule())]);
+  }, [face, mesh(merge([axial(plate.slice().reverse(), 96), ...bands]), HM.ule())]);
   out.pm.userData.part.tourLabel = true;          // internal: labelled only while a tour focuses it
 
   // lightweighted egg-crate core between the plates (cell pitch simplified to 0.2 m)
@@ -172,7 +172,7 @@ export function buildOTA(P) {
   out.truss = P('Metering truss', {
     system: 'Structure', material: 'Graphite fibre-reinforced epoxy struts and rings, titanium end fittings; aluminised-Mylar MLI inside', mass: 114, temp: 292, explode: [0, 0, 0], xrayWeight: 0.5,
     desc: 'A cage of 48 struts and three rings, 4.8 m long and 2.7 m across, that holds the secondary mirror 4.906 m in front of the primary to within 2.5 µm. Graphite-epoxy barely expands with temperature, but it slowly sheds absorbed water, so the secondary has been refocused by a few micrometres over the years.',
-  }, [mesh(merge(struts), HM.grEp()), mesh(merge(ringsGeo), HM.grEp()), mesh(merge(fittings), HM.fitting())]);
+  }, [mesh(merge([...struts, ...ringsGeo]), HM.grEp()), mesh(merge(fittings), HM.fitting())]);
 
   // ------------------------------------------------------------------ baffles
   const mb = [tube(1.3, 4.12, 8.92, { seg: 72 })];
@@ -344,7 +344,7 @@ export function buildOTA(P) {
   latchPart('Axial instrument A-latches', la, 4, 'At the forward end of each axial bay, beside the instrument\'s aperture: a ball fitting on the instrument is clamped in a titanium spherical seat by moving jaws, fixing all three axes. It takes 38 ft-lb in 12–16 turns. Positions approximate.', [-1.4, 0, 0]);
   latchPart('Axial instrument B-latches', lb, 4, 'At the aft end, driven from the ±V2 side through the shroud doors: a plunger pushed into a ball joint drives the instrument onto its A and C fittings and goes over centre in 10–12 turns. In 2009 COS carried a B-latch alignment aid. Positions approximate.', [-3.0, 0, 0]);
   latchPart('Axial instrument C-latches', lc, 4, 'A self-aligning stabiliser ball at the aft end of each axial instrument that engages by itself as the B latch drives the instrument home. Positions approximate.', [-3.0, 0, 0]);
-  latchPart('Radial instrument A-latches', lr, 4, 'Each radial instrument (WFC3 and the three Fine Guidance Sensors) has one A latch: a bolt at its outboard end pulls it inboard onto preload springs, 32–35 ft-lb in 20–22 turns, under the bay door. Positions approximate.', [-2.4, 0, 0]);
+  latchPart('Radial instrument A-latches', lr, 4, 'Each radial instrument (WFC3 and the three Fine Guidance Sensors) has one A latch: a bolt at its outboard end pulls it inboard onto preload springs, 32–35 ft-lb in 20–22 turns. The guiders\' bolts are reached under their bay doors; WFC3 has no door, so its bolt sits under the aft end of its radiator panel. Positions approximate.', [-2.4, 0, 0]);
 
   // the FPS science-instrument connector panels where the harness ends meet each instrument's cables
   const cp = [];
@@ -419,13 +419,13 @@ function buildLightPath() {
   for (let i = 0; i < 8; i++) add(1.1, deg(22.5 + i * 45));
   for (let i = 0; i < 4; i++) add(0.62, deg(i * 90 + 45));
   // each element twice: a bright depth-tested pass and a faint ghost that shows through solid parts
-  const rayGeo = mergeGeometries(rays.map(ni));
+  const rayGeo = mergeGeometries(rays.map(ix));
   const cone1 = axial([[OPT.rPM, pmSurface(OPT.rPM)], [OPT.rPM * k, smSurface(OPT.rPM * k)]], 64);
   const cone2 = axial([[OPT.rPM * k, smSurface(OPT.rPM * k)], [0.002, OPT.xFocus]], 48);
   const focusGeo = new THREE.SphereGeometry(0.035, 16, 10).translate(OPT.xFocus, 0, 0);
   const list = [
     [rayGeo, HM.ray(), 6], [rayGeo, HM.rayGhost(), 5],
-    [mergeGeometries([cone1, cone2].map(ni)), HM.beam(), 5],
+    [mergeGeometries([cone1, cone2].map(ix)), HM.beam(), 5],
     [focusGeo, HM.focus(), 7], [focusGeo, HM.focusGhost(), 6],
     [new THREE.RingGeometry(0.0, OPT.rField, 48).rotateY(Math.PI / 2).translate(OPT.xFocus, 0, 0), HM.beam(), 5],
   ];

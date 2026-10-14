@@ -124,7 +124,7 @@ function bladeMaterial() {
 /** Thin spherical shell (cap facing +x) about the focal point: radius rho, thickness t, polar angles a0…a1. */
 function shell(rho, t, a0, a1, seg = 28) {
   const prof = [];
-  const n = 5;
+  const n = 4;
   for (let k = 0; k <= n; k++) { const a = a0 + ((a1 - a0) * k) / n; prof.push([rho * Math.sin(a), rho * Math.cos(a)]); }
   for (let k = n; k >= 0; k--) { const a = a0 + ((a1 - a0) * k) / n; prof.push([(rho + t) * Math.sin(a), (rho + t) * Math.cos(a)]); }
   prof.push(prof[0]);
@@ -244,7 +244,7 @@ export function buildMainRotor({ A, parent }) {
   const RHO0 = 0.058, LAYER = 0.0026, TH_MAX = 70 * DEG, HOLE = 0.048;
   for (let k = 0; k < 13; k++) {
     const rho = RHO0 + k * LAYER;
-    const g = shell(rho, LAYER * 0.92, Math.asin(Math.min(0.99, HOLE / rho)), TH_MAX, 28);
+    const g = shell(rho, LAYER * 0.92, Math.asin(Math.min(0.99, HOLE / rho)), TH_MAX, 22);
     onArms(k % 2 ? steel : rubber, g);
   }
   const rhoOut = RHO0 + 13 * LAYER;
@@ -375,7 +375,7 @@ export function buildMainRotor({ A, parent }) {
     desc: 'Carries de-ice power across the turning joint: brushes on the stationary side rub on rings that turn with the hub. Its stationary lead runs up the centre of the hollow rotor shaft from the cabin-roof harness. The controller\'s commands pass through it to the distributor above.',
   }, [mesh(merge([cyl(0.1, 0.1, 0.07, [0, 0.375, 0], 'y', 24), cyl(0.104, 0.104, 0.012, [0, 0.35, 0], 'y', 24), cyl(0.104, 0.104, 0.012, [0, 0.39, 0], 'y', 24)]), MAT.casting()),
     mesh(pipe(leadH, 0.014, 6), MAT.wiring())], head);
-  const dist = P('De-ice distributor', {
+  P('De-ice distributor', {
     system: 'Electrical', material: 'Rotating solid-state power distributor', mass: 5, explode: [0, UPX + 1.75, 0],
     desc: 'Turns with the rotor and switches power to the blade heater zones one after another, so only part of the rotor is heated at a time and the generators are not overloaded. The heater-on time lengthens as the outside air gets colder.',
   }, [mesh(merge([cyl(0.08, 0.08, 0.04, [0, 0.43, 0], 'y', 22), cyl(0.05, 0.08, 0.02, [0, 0.46, 0], 'y', 20)]), MAT.casting())]);
@@ -581,5 +581,5 @@ export function buildMainRotor({ A, parent }) {
     for (const m of bifMasses) m.children[0].rotation.y = k;
   }
   update(st);
-  return { head, spin, update, R, E, servoInputs: servos.map((s) => s.input), headToAir, distributor: dist };
+  return { head, spin, update, R, E, servoInputs: servos.map((s) => s.input), servoBases: servos.map((s) => headToAir(s.base)) };
 }
