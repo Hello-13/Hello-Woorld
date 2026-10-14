@@ -248,10 +248,16 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
     desc: 'Like each first-stage Merlin, the Merlin Vacuum has its own controller of three computers that check each other, running its start, throttle, relight and shutdown sequences. It hangs on a bracket from the underside of the thrust cone beside the powerhead (position estimated).',
     explode: [0.6, -0.6, 1.4],
   }, [mesh(unit(0.86, ctlAz, gimbalY + 0.1, 0.16, 0.2, 0.12), FM.avionics()), mesh(unit(0.86, ctlAz, gimbalY + 0.22, 0.08, 0.06, 0.04), FM.aluDark())]);
-  const tt = [sideBottle(1.6, 180, 47.76, 0.1, 0.45), pipe([at(1.5, 180, 47.76), at(0.9, 182, 47.5), [-0.36, ex + 2.05 + dy, 0.12]], 0.015, { seg: 6, tubular: 12 })];
+  // supply line: under the thrust cone, then round the −z side of the powerhead below the cone's
+  // struts, in under the gimbal ring and up beside the powerhead to the top of the MVac igniter
+  // valve (kit block(−0.3, 2.32, 0.1), turned by π), as each first-stage relight line does
+  const igTop = [0.3, ex + 2.36 + dy, -0.1];
+  const ttLine = [at(1.5, 180, 47.76), at(1.42, 192, 47.7), at(1.38, 212, 47.66), at(1.1, 222, 47.4), at(0.84, 228, 47.19), at(0.82, 260, 47.17),
+    at(0.82, 300, 47.17), at(0.78, 333, 47.17), at(0.6, 343, 47.18), at(0.47, 345, 47.3), at(0.45, 344, 47.55), [igTop[0], igTop[1] + 0.07, igTop[2]], igTop];
+  const tt = [sideBottle(1.6, 180, 47.76, 0.1, 0.45), pipe(ttLine, 0.015, { seg: 6, tubular: 64 })];
   V('Second stage TEA-TEB ignition tank', {
     material: 'Stainless pressure vessel', mass: 12,
-    desc: 'Ignition-fluid supply for the Merlin Vacuum\'s relights, sized for the mission\'s burns (the mission-extension kit adds more). Placement estimated.',
+    desc: 'Ignition-fluid supply for the Merlin Vacuum\'s relights, sized for the mission\'s burns (the mission-extension kit adds more). Its line runs round the powerhead to the engine\'s igniter valve, which sends a slug of TEA-TEB to the gas generator and the chamber for each start. Placement and routing estimated.',
     explode: [0, -1.0, 2.0],
   }, mesh(merge(tt), FM.steelLine()));
 

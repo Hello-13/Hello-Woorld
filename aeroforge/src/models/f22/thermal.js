@@ -25,7 +25,7 @@ export function buildThermal(ctx) {
     const g = [box(6.78, -0.26, 0.42, 0.34, 0.17, 0.26)];
     g.push(FR.cylX(6.7, -0.14, 0.39, 0.16, 0.05, 0.05, 14));                                 // refrigerant compressor
     g.push(box(6.86, -0.14, 0.5, 0.14, 0.07, 0.1));                                          // expansion valve block
-    const l = [FR.pipe([[6.62, -0.31, 0.42], [6.55, -0.41, 0.41], [6.5, -0.51, 0.37]], 0.016, 6, 6),            // evaporator ↔ PAO loop 1
+    const l = [FR.pipe([[6.62, -0.31, 0.42], [6.56, -0.41, 0.37], [6.5, -0.51, 0.33]], 0.016, 6, 6),            // evaporator ↔ PAO loop 1 (inboard of the batteries)
       // condenser ↔ fuel: outboard of the main harness and the bleed duct, under the front of F-1
       FR.pipe([[6.94, -0.29, 0.52], [7.0, -0.33, 0.6], [7.04, -0.46, 0.63], [7.1, -0.53, 0.65]], 0.016, 6, 8)];
     P('Vapour-cycle refrigeration pack', {
@@ -47,7 +47,7 @@ export function buildThermal(ctx) {
       system: 'Environmental control', material: 'Electric coolant pump, pressurised reservoir', mass: 10,
       explode: [0.6, -1.65, 0.75 * side],
       desc: `Each liquid loop has its own pump and reservoir, so one failure cannot stop all liquid cooling; the reservoir takes up the coolant's expansion as it heats.`,
-    }, mesh(merge([FR.cylX(6.95, -0.6, z * 0.35, 0.22, 0.07, 0.07, 14), new THREE.SphereGeometry(0.065, 14, 10).translate(X(6.95), -0.47, z * 0.35)]), F.boxLight()));
+    }, mesh(merge([FR.cylX(6.8, -0.65, z * 0.32, 0.22, 0.07, 0.07, 14), new THREE.SphereGeometry(0.065, 14, 10).translate(X(6.8), -0.62, z * 0.47)]), F.boxLight()));   // under the bleed duct, forward of the bulkhead at s 7.0
   }
   {
     // loop 1: radar array cold plates and the CIP racks (supply and return pair on the right)
@@ -103,7 +103,7 @@ export function buildThermal(ctx) {
     for (const side of [1, -1]) {
       const z = side;
       // cool fuel from the transfer gallery forward and down to the exchanger
-      g.push(FR.pipe([[8.6, -0.12, z * 0.26], [8.2, -0.5, z * 0.3], [7.7, -0.62, z * 0.35], [7.52, -0.62, z * 0.35]], 0.02, 6, 14));
+      g.push(FR.pipe([[8.6, -0.12, z * 0.26], [8.4, -0.17, z * 0.28], [8.2, -0.5, z * 0.3], [7.7, -0.62, z * 0.35], [7.52, -0.62, z * 0.35]], 0.02, 6, 16));   // over the main bay's forward wall
       // warm fuel out of the exchanger: up to the ram-air cooler …
       g.push(FR.pipe([[7.18, -0.66, z * 0.42], [7.3, -0.55, z * 0.85], [7.6, -0.2, z * 0.97], [7.85, 0.2, z * 1.06], [8.0, 0.29, z * 1.06]], 0.018, 6, 20));
       // … and from the cooler back into F-1 (recirculation)

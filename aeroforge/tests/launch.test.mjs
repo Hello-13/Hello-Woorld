@@ -175,6 +175,21 @@ test('station plan matches the published Falcon Heavy dimensions', () => {
   close(ST.fairingTop - ST.fairingBase, 13.15, 0.06, 'fairing height m (13.1–13.2 m published)');
 });
 
+test('landing-leg stance matches the ≈ 18 m (60 ft) span the desc and the tour quote', () => {
+  const core = readFileSync(new URL('../src/models/falcon/core.js', import.meta.url), 'utf8');
+  const leg = core.match(/const LEG = \{([\s\S]*?)\n\};/)[1];
+  const num = (k) => Number(leg.match(new RegExp(`\\b${k}:\\s*([\\d.]+)`))[1]);
+  const len = num('len'), hingeY = num('hingeY'), th = (num('deployDeg') * Math.PI) / 180;
+  // foot pad (radius 0.4 m) centred 0.18 m outboard of the hinge line and 0.32 m short of the leg's
+  // tip; the hinge sits 0.1 m outside the skin (core.js landing legs)
+  const rFoot = CORE_R + 0.1 + 0.18 * Math.cos(th) + (len - 0.32) * Math.sin(th) + 0.4;
+  const yFoot = hingeY + (len - 0.32) * Math.cos(th) - 0.18 * Math.sin(th);
+  close(2 * rFoot, 18.3, 0.5, 'deployed span m');
+  assert.ok(yFoot < -1 && yFoot > -2.5, `foot pads ${yFoot.toFixed(2)} m below the nozzle exits`);
+  assert.match(core, /about 18 m \(60 ft\) across/, 'landing-leg desc quotes the span');
+  assert.ok(TOUR.some((s) => s.demo === 'deploy' && /about 18 m across/.test(s.body)), 'the leg tour step quotes the span');
+});
+
 test('guided tour: every focused part exists in the model source', () => {
   const read = (f) => readFileSync(new URL(`../src/models/${f}`, import.meta.url), 'utf8');
   const core = read('falcon/core.js');

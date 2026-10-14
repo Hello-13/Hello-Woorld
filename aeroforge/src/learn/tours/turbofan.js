@@ -87,13 +87,13 @@ export default [
     title: 'Oil and fuel: one loop cools the other',
     body: 'Trace the lubrication loop: tank, anti-leak valve, the lubrication unit\'s pressure element, filter, then the bearing sumps; scavenge elements suck the oil back through a filter and the debris monitor, which counts metal particles from wearing bearings. The hot oil then gives its heat to the fuel in the main heat exchanger on its way to the pump\'s high-pressure stage, the HMU and the burners — and to the servo lines that move every actuator.',
     key: 'Heat into the fuel: Q = ṁ_fuel·c_p,fuel·ΔT ≈ 4.6 kg/s × 2 kJ/(kg·K) × 15 K ≈ 140 kW at take-off (illustrative).',
-    focus: OIL_FUEL, view: { dir: [0.75, -0.4, 1], fill: 0.45, lift: -0.1 },
+    focus: OIL_FUEL, view: { dir: [0.45, -0.12, 1], fill: 0.8 },
   },
   {
     title: 'Down the strut to the core',
     body: 'The fan-case units reach the core through the hollow 6 o\'clock fan-frame strut. Oil supply lines run on to the forward, turbine-center-frame and aft sumps, and scavenge lines bring the oil back up the next strut. The metered fuel line runs to the tee on the nozzle manifolds. Every fuel-powered actuator gets a pair of servo-fuel tubes, one to each side of its piston: the VBV and VSV actuators, the clearance-control valves and the booster anti-ice valve.',
     key: 'A servo ram\'s force is F = Δp·A: 7 MPa across a 4 cm bore (12.6 cm²) pushes about 8.8 kN (illustrative figures).',
-    focus: CORE_RUNS, mode: 'systems', view: { dir: [0.35, -0.25, 1] },
+    focus: CORE_RUNS, mode: 'systems', view: { dir: [0.3, 0.1, 1], fill: 1.25 },
   },
   {
     title: 'Follow the flow',

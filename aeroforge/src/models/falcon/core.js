@@ -41,17 +41,24 @@ const toCore = (a, [lx, ly, lz]) => {
 /** Points round an arc at radius r and height y from azimuth a0 to a1 (deg), n steps. */
 const arc = (r, y, a0, a1, n = 8) => Array.from({ length: n + 1 }, (_, i) => at(r, a0 + ((a1 - a0) * i) / n, y));
 
-// landing-leg geometry (estimates sized from photographs; see the 'landing legs' desc)
+// landing-leg geometry: the deployed stance matches the published ≈ 18 m (60 ft) span; leg length,
+// hinge and piston fittings are estimates sized from photographs (see the 'landing legs' desc)
 const LEG = {
   hingeR: R + 0.1, hingeY: 1.5,   // hinge on the engine-section skirt
-  len: 9.1,                       // stowed from y 1.45 to 10.55
-  deployDeg: 115,                 // deployed: 25° below horizontal, feet ≈ 2.3 m below the nozzle exits
+  len: 7.9,                       // stowed from y 1.45 to 9.35
+  deployDeg: 115,                 // deployed: 25° below horizontal, foot pads ≈ 9.1 m from the axis (≈ 18.3 m across), ≈ 2 m below the nozzle exits
   pistonB: [R + 0.13, 3.4],       // piston's stage fitting [r, y] at the top of the engine section
-  pistonL: [7.6, 0.12],           // piston's leg fitting: distance along the leg, offset outward
+  pistonL: [6.6, 0.12],           // piston's leg fitting: distance along the leg, offset outward
   tube: [3.0, 3.0, 3.0],          // nested piston sections (outer, middle, inner)
 };
 
 const pistonB = (a) => at(LEG.pistonB[0], a, LEG.pistonB[1]);
+
+// Octaweb centre hub (layout estimated): an open ring wide enough for the centre engine's turbopump
+// and its RP-1 inlet (out to r ≈ 0.67 m on the pump side) to pass up through it, and inboard of the
+// outer engines' inner TVC actuators (r ≈ 0.89 m). Two spokes clear of the powerhead carry the centre
+// engine's gimbal mount; two clevis brackets carry the upper ends of its TVC actuators.
+const HUB = { r: 0.76, tube: 0.06, y: 2.08, spokes: [207.5, 297.5], clevis: [125, 235] };
 
 /**
  * The engine section is identical on all three cores (nine Merlins and their plumbing, the TEA-TEB
@@ -110,11 +117,11 @@ function engineGeometry() {
     }
   }
   const ec = OUTER.map((a) => unit(1.64, a + 8, 1.8, 0.16, 0.2, 0.12));
-  ec.push(unit(0.55, 180, 1.7, 0.16, 0.2, 0.12));
+  ec.push(unit(HUB.r - 0.06, 180, 1.7, 0.16, 0.2, 0.12));
   // mounts: a standoff from each outer controller to the engine-section wall; the centre engine's
   // hangs from a strap under the Octaweb's centre hub ring
   const ecb = OUTER.map((a) => unit(1.755, a + 8, 1.8, 0.1, 0.14, 0.11));
-  ecb.push(block(-0.47, 1.92, 0, 0.06, 0.28, 0.08), block(-0.53, 1.795, 0, 0.1, 0.03, 0.1));
+  ecb.push(block(-(HUB.r - 0.03), 1.91, 0, 0.06, 0.26, 0.08), block(-(HUB.r - 0.06), 1.795, 0, 0.12, 0.03, 0.1));
   ENGINE_GEO = {
     bells: merge(ring.bells), pump: merge(ring.pump), gg: merge(ring.gg), duct: merge(ring.duct),
     lines: merge([...ring.line, ...ring.ign]), valves: merge(ring.valve), act: merge(ring.act),
@@ -438,7 +445,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   for (const [x, , z] of oct(1.7, 0)) ow.push(beam([x, 1.45, z], [x, 3.05, z], 0.14, 0.14), beam([x, 3.05, z], [x * 1.04, 3.24, z * 1.04], 0.1, 0.1));
   for (const a of OUTER) {
     const [x, z] = polar(ENGINE_RING, a);
-    const [ix, iz] = polar(0.42, a);
+    const [ix, iz] = polar(HUB.r, a);
     ow.push(beam([ix, 2.08, iz], [x, 2.08, z], 0.12, 0.18));                // radial web to the engine mount
     for (const s of [-22.5, 22.5]) {
       const [vx, vz] = polar(1.7, a + s);
@@ -447,10 +454,16 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     ow.push(block(x, 2.08, z, 0.3, 0.14, 0.3));                             // gimbal mount pad
   }
   // attachment ring at the dome-to-barrel junction (the tank's Y-ring)
-  ow.push(hoop(0.42, 0.07, 2.08, { seg: 24, tube: 6 }), block(0, 2.08, 0, 0.32, 0.14, 0.32), hoop(R - 0.04, 0.04, 3.3, { seg: 64, tube: 6 }));
+  ow.push(hoop(R - 0.04, 0.04, 3.3, { seg: 64, tube: 6 }));
+  // centre hub (see HUB): the ring, the centre engine's gimbal mount on two spokes, actuator clevises
+  ow.push(hoop(HUB.r, HUB.tube, HUB.y, { seg: 40, tube: 8 }));
+  ow.push(post(0, 0, HUB.y - 0.05, HUB.y + 0.07, 0.15, 20), post(0, 0, Y.engineTop - 0.005, HUB.y - 0.045, 0.1, 16));   // gimbal mount plate and boss
+  const spoke = (a, r0, r1, y, w, h) => unit((r0 + r1) / 2, a, y, w, h, r1 - r0);   // radial bar, w tangential × h high
+  for (const a of HUB.spokes) ow.push(spoke(a, 0.12, HUB.r - 0.04, HUB.y, 0.08, 0.09));
+  for (const a of HUB.clevis) ow.push(spoke(a, 0.47, HUB.r - 0.04, 2.155, 0.09, 0.09));
   P('Octaweb', {
     system: 'Structure', xrayWeight: 0.4, material: 'Bolted aluminium thrust structure (Block 5)', mass: Math.round(1150 * k),
-    desc: 'Octagonal thrust structure: eight Merlins on a ring around a ninth. It carries ≈ 7.6 MN of sea-level thrust into the tank wall at the aft Y-ring and makes engine-out tolerable — any one engine can shut down and the others gimbal to compensate.',
+    desc: 'Octagonal thrust structure: eight Merlins on a ring around a ninth. It carries ≈ 7.6 MN of sea-level thrust into the tank wall at the aft Y-ring and makes engine-out tolerable — any one engine can shut down and the others gimbal to compensate. Its centre hub is an open ring, so the centre engine\'s turbopump and feed lines pass up through it; the centre engine hangs from a mount on two spokes (hub layout estimated).',
     callout: centre, anchor: [1.75, 2.6, 0.5], explode: [0, -2.2, 0],
   }, mesh(merge(ow), FM.aluDark()));
 
@@ -776,7 +789,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   }
   const legs = P('landing legs', {
     system: 'Recovery', count: 4, xrayWeight: 0.5, material: 'Carbon fibre over aluminium honeycomb under Block 5 black thermal protection; hinge fittings; foot pads', mass: 4 * 500,
-    desc: 'Four A-frame legs, carbon fibre with aluminium honeycomb, together under 2,100 kg. They lie folded against the stage for ascent and swing down on helium-driven pistons in the last seconds of the landing burn to a stance SpaceX quotes as about 18 m (60 ft) across; Block 5 added a black thermal-protection layer and legs that can be stowed again after landing. Deployed angle and leg length here are estimates.',
+    desc: 'Four A-frame legs, carbon fibre with aluminium honeycomb, together under 2,100 kg. They lie folded against the stage for ascent and swing down on helium-driven pistons in the last seconds of the landing burn to a stance about 18 m (60 ft) across, the span SpaceX gives; Block 5 added a black thermal-protection layer and legs that can be stowed again after landing. Leg length (≈ 7.9 m here) and the deployed angle (25° below horizontal) are estimates chosen to give that span.',
     callout: !centre && attachSide > 0, anchor: [polar(R + 0.35, 45)[0], 8.0, polar(R + 0.35, 45)[1]], explode: [0, -1.6, 0],
   }, [...legPivots.map((h) => h.pivot), mesh(merge(legStatic), FM.black())]);
   legs.userData.part.thermalRole = 'ambient';
@@ -861,7 +874,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   for (const a of OUTER) wh.push(pipe([at(1.66, a + 8, 2.9), at(1.64, a + 8, 1.9)], 0.015, { seg: 4, tubular: 4 }));
   // the centre engine's controller: in over the LOX manifold beside the TEA-TEB relight line, then
   // down past the Octaweb hub to the box hanging under it
-  wh.push(pipe([at(1.66, 104, 2.9), at(1.4, 103, 2.72), at(0.95, 108, 2.44), at(0.6, 135, 2.44), at(0.52, 157, 2.32), at(0.55, 170, 2.1), at(0.56, 178, 1.83), at(0.56, 180, 1.79)], 0.015, { seg: 4, tubular: 24 }));
+  wh.push(pipe([at(1.66, 104, 2.9), at(1.4, 103, 2.72), at(0.95, 108, 2.44), at(0.6, 135, 2.44), at(0.52, 157, 2.32), at(0.55, 170, 2.1), at(0.6, 177, 1.86), at(HUB.r - 0.1, 180, 1.8)], 0.015, { seg: 4, tubular: 24 }));
   for (const a of [15, 75, 135, 195, 255, 315]) wh.push(pipe([at(1.6, a, fwdY - 0.22), at(1.52, a, fwdY - 0.12)], 0.015, { seg: 4, tubular: 4 }));
   for (const a of [45, 225]) wh.push(pipe([at(1.6, a, fwdY - 0.22), at(1.52, a, fwdY - 0.07)], 0.015, { seg: 4, tubular: 4 }));          // S-band transmitters
   for (const a of [45, 165, 285]) wh.push(pipe([at(1.6, a + 5, fwdY - 0.22), at(1.64, a + 5, fwdY + 0.05), at(1.53, a + 4, fwdY + 0.29)], 0.015, { seg: 4, tubular: 8 }));   // battery packs

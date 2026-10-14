@@ -209,7 +209,7 @@ export function buildTail({ A, P, air, roofY }) {
   }, [mesh(merge([tube(igb.clone().addScaledVector(pyDir, 0.2), tgb.clone().addScaledVector(pyDir, -0.2), 0.045, 12)]), MAT.steel())]);
   P('Tail rotor gearbox (90°)', {
     system: 'Drive system', material: 'Magnesium case, bevel gears, pitch-change shaft through the output', mass: 38, explode: [-3.0, 0.9, -0.3],
-    desc: 'Turns the drive 90° into the tail-rotor shaft and reduces it to 1,190 rpm — 4.6 times main-rotor speed — with the tail rotor\'s pitch-change shaft passing through its hollow output. Its housing is magnesium; it mounts the tail rotor and the tail-rotor servo, and like the 42° box it can run 30 minutes with no oil.',
+    desc: 'Turns the drive 90° into the tail-rotor shaft and reduces it to 1,190 rpm — 4.6 times main-rotor speed — with the tail rotor\'s pitch-change shaft passing through its hollow output. Its housing is magnesium; it carries the tail rotor, the tail-rotor servo below it works the pitch-change shaft through it, and like the 42° box it can run 30 minutes with no oil.',
   }, [mesh(merge([tube(tgb.clone().addScaledVector(n, -0.08), tgb.clone().addScaledVector(n, 0.2), 0.15, 18), tube(tgb, tgb.clone().addScaledVector(pyDir, -0.24), 0.1, 14)]), MAT.casting())]);
   // tail-rotor servo aft of the rear spar (the pylon shaft climbs just ahead of the spar): a trunnion
   // link to the spar at its lower end, and its output rod reaching up to the 90° gearbox from behind
@@ -257,7 +257,7 @@ export function buildTail({ A, P, air, roofY }) {
   const qInv = trFrame.quaternion.clone().invert();
   const toTr = (p) => V3(...p).sub(hub).applyQuaternion(qInv);
   // the feed climbs the pylon beside the pylon drive shaft, 0.115 m to starboard of its axis
-  // (closing in near the top, where the pylon thins, passing aft of the tail-rotor servo)
+  // (closing in near the top, where the pylon thins; the tail-rotor servo and quadrant sit behind the rear spar)
   const shaftSide = (t, off = 0.115) => [TAIL.igb[0] + (TAIL.tgb[0] - TAIL.igb[0]) * t, TAIL.igb[1] + (TAIL.tgb[1] - TAIL.igb[1]) * t, TAIL.igb[2] + (TAIL.tgb[2] - TAIL.igb[2]) * t + off];
   P('Tail rotor slip ring', {
     system: 'Electrical', material: 'Slip-ring assembly on the tail-rotor shaft, feed cable up the pylon', mass: 3, explode: [-2.9, 1.7, -0.4],

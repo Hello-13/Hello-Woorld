@@ -432,10 +432,10 @@ export function buildSystems(ctx) {
     // stored-energy system: two high-pressure air bottles stacked inside the wing-root envelope ahead of the
     // APU, a start / control valve behind them and a line to the APU's air-turbine starter
     const b = [];
-    const bs = 10.96, bz = -1.645, by = [-0.15, 0.02];
+    const bs = 10.96, bz = -1.645, by = [-0.165, -0.01];   // the upper bottle stays under the refuelling manifold's wing branch
     for (const y of by) b.push(new THREE.CapsuleGeometry(0.075, 0.37, 4, 14).rotateZ(Math.PI / 2).translate(X(bs), y, bz));
     b.push(FR.boxS(11.26, -0.06, -1.58, 0.06, 0.08, 0.08));                                                               // start / control valve
-    const l = [FR.pipe([[11.2, by[0], bz], [11.235, -0.12, -1.62], [11.255, -0.085, -1.595]], 0.014, 6, 4), FR.pipe([[11.2, by[1], bz], [11.235, -0.01, -1.62], [11.255, -0.035, -1.595]], 0.014, 6, 4)];
+    const l = [FR.pipe([[11.2, by[0], bz], [11.235, -0.13, -1.62], [11.255, -0.085, -1.595]], 0.014, 6, 4), FR.pipe([[11.2, by[1], bz], [11.235, -0.02, -1.62], [11.255, -0.04, -1.595]], 0.014, 6, 4)];
     l.push(FR.pipe([[11.29, -0.05, -1.58], [11.42, -0.01, -1.59], [11.5, 0.03, -1.605], [11.58, ay + 0.1, az + 0.09]], 0.016, 6, 8));
     P('Stored-energy system (SES)', {
       system: 'Electrical', material: 'High-pressure air bottles, start / control valve and line to the APU starter', mass: 30,
