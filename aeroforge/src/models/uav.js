@@ -131,15 +131,15 @@ export function buildUAV() {
   const L = (geo, material, o) => mesh(geo, material, o);
 
   // ============================================================== fuselage skins
-  // the skin is cut away under the gear doors (main wells s 4.9–6.5 from the keel strip up the lower side; nose well s 1.92–3.11);
+  // the skin is cut away under the gear doors (main wells s 4.87–6.5 from the keel strip up the lower side; nose well s 1.92–3.11);
   // the doors, 4 mm proud of the skin, overlap the cut-outs' edges
   const opening = (s, y, z) => {
     const { top, bot, hw, yc } = prof(s);
     const u = Math.abs(z) / hw, v = (y - yc) / ((top - bot) / 2);
     const th = Math.atan2(Math.sign(v) * Math.abs(v) ** 1.2, u ** 1.2) + Math.PI / 2;     // section angle from the keel
-    return (s > 4.9 && s < 6.5 && th > 0.1 && th < 1.45) || (s > 1.92 && s < 3.11 && th > 0.1 && th < 0.41);
+    return (s > 4.87 && s < 6.5 && th > 0.1 && th < 1.45) || (s > 1.92 && s < 3.11 && th > 0.1 && th < 0.41);
   };
-  const fl = fuselageLoft(stationsWithBreaks([0.95, 1.92, 2.05, 3.11, 4.0, 4.9, 6.3, 6.5, FIREWALL_S], 0.2), 48);
+  const fl = fuselageLoft(stationsWithBreaks([0.95, 1.92, 2.05, 3.11, 4.0, 4.87, 5.06, 6.3, 6.5, FIREWALL_S], 0.2), 48);
   const panels = splitTris(fl, (cx, cy, cz) => {
     const s = 5.5 - cx;
     if (opening(s, cy, cz)) return null;
@@ -801,8 +801,10 @@ export function buildUAV() {
 
   // gear doors: conformal skin patches over the cut-outs; the nose doors hinge on their outer edges, the main doors on their upper edges
   const doors = [];
-  const doorPart = (name, s0, s1, th0, th1, hingeOn, { nt = 6, ...info }) => {
-    const g = skinPatch(s0, s1, th0, th1, 0.004, 6, nt);
+  const doorPart = (name, s0, s1, th0, th1, hingeOn, { nt = 6, notch = null, ...info }) => {
+    // notch [s, thA, thB]: the door's forward end leaves a slot between thA and thB up to station s (where a leg passes)
+    const g = notch ? merge([skinPatch(notch[0], s1, th0, th1, 0.004, 6, nt), skinPatch(s0, notch[0], th0, notch[1], 0.004, 2, 4), skinPatch(s0, notch[0], notch[2], th1, 0.004, 2, 2)])
+      : skinPatch(s0, s1, th0, th1, 0.004, 6, nt);
     const th = hingeOn === 'outer' ? th1 : th0;
     const p0 = new THREE.Vector3(...fusePoint(s0, th)), p1 = new THREE.Vector3(...fusePoint(s1, th));
     const h = hingedMesh(g, m.skinDouble, p0, p1);
@@ -812,11 +814,11 @@ export function buildUAV() {
   };
   for (const side of [1, -1]) {
     const sd = SN(side);
-    const mainDoor = doorPart(`Main gear door (${sd})`, 4.9, 6.5, -Math.PI / 2 + 0.035 * side, -Math.PI / 2 + 1.45 * side, 'outer', {
-      mass: 6, explode: [0, -0.6, 0.55 * side], nt: 12,
-      desc: 'A long door that closes the main-gear well in flight to keep the underside smooth. It wraps from the keel strip round the lower corner, because the leg folds into a slot there and the wheel into a pocket at the aft end, and it hinges along its upper edge, under the lower longeron, so it swings out clear of the leg. It opens before the leg moves and closes after it is up (shape, hinge line and sequencing estimated).',
+    const mainDoor = doorPart(`Main gear door (${sd})`, 4.87, 6.5, -Math.PI / 2 + 0.035 * side, -Math.PI / 2 + 1.45 * side, 'outer', {
+      mass: 6, explode: [0, -0.6, 0.55 * side], nt: 12, notch: [5.06, -Math.PI / 2 + 0.66 * side, -Math.PI / 2 + 1.3 * side],
+      desc: 'A long door over the main-gear well. It wraps from the keel strip round the lower corner, because the leg folds into the well there and the wheel into a pocket at the aft end, and it hinges along its upper edge, under the lower longeron, so it swings out clear of the leg. It is shut on the ground and in flight, leaving only a slot at its forward end where the strut leaves the body, as photographs of parked and flying aircraft show; it swings open only while the leg moves (shape, hinge line and sequencing estimated).',
     });
-    doors.push({ h: mainDoor, sign: side, open: 1.6 });
+    doors.push({ h: mainDoor, sign: side, open: 1.6, main: true });
     doors.push({ h: doorPart(`Nose gear door (${sd})`, 1.92, 3.11, -Math.PI / 2 + 0.02 * side, -Math.PI / 2 + 0.42 * side, 'outer', {
       mass: 1.5, explode: [0, -0.55, 0.35 * side], desc: 'One of a pair of nose-gear doors hinged along the outer edge of the well, linked to open with the leg.',
     }), sign: side, open: 1.45 });
@@ -1264,7 +1266,9 @@ export function buildUAV() {
       noseLeg.rotation.z = NG.stow * g;
       // each main leg turns as one rigid unit about its fixed hinge axis: slerp from identity keeps that axis
       for (const ml of mainLegs) ml.piv.quaternion.slerpQuaternions(qI, ml.q, g);
-      for (const dr of doors) dr.h.setAngle(dr.open * (1 - d) * dr.sign);
+      // the main doors are shut with the gear down too and open only while the legs travel; the nose doors stay open with the leg down
+      const dm = smooth(0, 0.05, a);
+      for (const dr of doors) dr.h.setAngle(dr.open * (1 - d) * (dr.main ? dm : 1) * dr.sign);
       for (const fn of movers) fn();
       // propeller: shown at a slow, alias-free rate (the real one turns ≈ 1,600 rpm)
       state.propA += dt * (5 + state.throttle * 22);

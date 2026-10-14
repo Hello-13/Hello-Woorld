@@ -159,7 +159,8 @@ export function ringA(s) {
   const right = [];
   // upper: inner samples cover the cockpit opening, outer ones run to the chine
   const sw = sillW(s);
-  const hole = s > HOLE_S0 && s < HOLE_S1;
+  // the ring at HOLE_S1 closes the opening at the sill line, so no slit is left beside the canopy's aft end
+  const hole = s > HOLE_S0 && s <= HOLE_S1;
   const zIn = hole ? Math.max(0.05, sw - 0.03) : 0.32 * w;
   const NI = 5;
   for (let k = 0; k <= NU; k++) {
@@ -491,6 +492,16 @@ export function toothedGrid(point, stations, { width, pitch = 0.2, fore = true, 
 /** Main-bay ceiling height at lateral position z (flat inboard, sloping down to the bay wall at 0.78). */
 export const bayCeil = (z) => (Math.abs(z) < 0.55 ? -0.24 : -0.24 - ((Math.abs(z) - 0.55) / 0.23) * 0.21);
 /**
+ * Toward the aft end of the bay each inlet duct turns down and inboard to its engine, so there the sloping
+ * outboard strip of the ceiling starts further in (break at zBreak by s1) and the bay stays under the duct floor.
+ */
+export const BAY_AFT = { s0: 11.3, s1: 12.1, zBreak: 0.42 };
+export function bayCeilAt(s, z) {
+  const zb = lerp(0.55, BAY_AFT.zBreak, smooth(BAY_AFT.s0, BAY_AFT.s1, s));
+  const az = Math.abs(z);
+  return az < zb ? -0.24 : -0.24 - ((az - zb) / (0.78 - zb)) * 0.21;
+}
+/**
  * AIM-120C stations in the right half of the main bay: [z, y, fin angle in the z–y plane]. Solved
  * numerically (simulated annealing) so the three missiles, their 44.7 cm wings and fins, the AVEL
  * hangers and ejector arms clear each other, the centre-line web, the bay wall and the closed doors,
@@ -505,6 +516,13 @@ export const DIVIDER = { half: 0.015, cap: 0.03 };
 /** AVEL ejection stroke (9 in) and the inboard face of the open, folded doors below the belly. */
 export const AVEL_STROKE = 9 * 0.0254;
 export const OPEN_DOOR_Z = 0.715;
+/**
+ * Main-bay door drive (right side; z mirrors): the torque shaft and its geared rotary actuators run along the
+ * bay sill just above the edge longeron and clear of the bay's outboard missile, axis at (z, y). Each actuator
+ * turns a crank that a link ties to a fitting on the outer door panel, `fit` (dz, dy) from the door hinge on
+ * the panel's inner face; crank and fitting arm stay parallel, so the link keeps its length through the swing.
+ */
+export const BAY_DRIVE = { z: 0.805, y: -0.765, r: 0.035, shaftR: 0.016, stations: [8.9, 10.4, 11.9], s0: 8.84, s1: 11.96, fit: [-0.03, 0.033] };
 
 // ------------------------------------------------------------------ lighting
 /**
