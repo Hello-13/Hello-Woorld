@@ -61,7 +61,7 @@ export function mountUavLab(root, ctx) {
   });
 
   root.append(
-    el('p', { class: 'lab-intro', text: `Plan a Reaper sortie. Endurance follows the Breguet equation for a propeller aircraft at constant altitude and airspeed, using the wing's drag polar at mid-mission weight (aspect ratio ${aspectRatio.toFixed(1)}) and keeping a 5 % fuel reserve. Masses and limits are the published MQ-9A figures; drag, propeller efficiency and fuel burn are calibrated estimates that reproduce the published 27 h, 15,240 m and 444 km/h.` }),
+    el('p', { class: 'lab-intro', text: `Plan a Reaper sortie. Endurance follows the Breguet equation for a propeller aircraft at constant altitude and airspeed, using the wing's drag polar at mid-mission weight and keeping a 5 % fuel reserve. Masses and limits are the published MQ-9A figures; the wing area (≈ 24 m², aspect ratio ${aspectRatio.toFixed(1)}: the area is not published), drag, propeller efficiency, the engine's power lapse with altitude and fuel burn are estimates, calibrated to reproduce the published 27 h, 15,240 m and 444 km/h.` }),
     section('Sortie', sFuel.el, sPay.el, el('div', { class: 'ctl' }, el('span', { class: 'ctl-head' }, el('span', { class: 'ctl-label', text: 'Stores fit' })), sStores.el), sAlt.el, sSpd.el, sTr.el),
     status,
     section('Performance', ro.el),

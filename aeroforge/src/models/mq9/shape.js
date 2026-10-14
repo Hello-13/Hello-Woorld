@@ -174,10 +174,25 @@ export function tubeBetween(p0, p1, r = 0.02, seg = 10) {
   return g.translate(m.x, m.y, m.z);
 }
 
-/** Smooth tube through a polyline (fuel lines, harnesses). */
-export function pipe(points, r = 0.012, seg = 6, tubular = null) {
+/** Smooth tube through a polyline (fuel lines, harnesses). caps: { start, end } closes those ends with a flat disc (a fitting's face). */
+export function pipe(points, r = 0.012, seg = 6, tubular = null, caps = null) {
   const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(...p)), false, 'centripetal');
-  return new THREE.TubeGeometry(curve, tubular || Math.max(8, points.length * 8), r, seg, false);
+  const tube = new THREE.TubeGeometry(curve, tubular || Math.max(8, points.length * 8), r, seg, false);
+  if (!caps) return tube;
+  // a fan on the tube's own end ring, so the closed end is watertight; wound to face out along the tube
+  const pos = tube.attributes.position, n = seg + 1, last = pos.count / n - 1;
+  const disc = (ring, u, sgn) => {
+    const c = curve.getPoint(u), out = curve.getTangent(u).multiplyScalar(sgn), v = [];
+    const a = new THREE.Vector3(), b = new THREE.Vector3();
+    for (let j = 0; j < seg; j++) {
+      a.fromBufferAttribute(pos, ring * n + j); b.fromBufferAttribute(pos, ring * n + j + 1);
+      const flip = a.clone().sub(c).cross(b.clone().sub(c)).dot(out) < 0;
+      v.push(c.x, c.y, c.z, ...(flip ? [b.x, b.y, b.z, a.x, a.y, a.z] : [a.x, a.y, a.z, b.x, b.y, b.z]));
+    }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); g.computeVertexNormals();
+    return g;
+  };
+  return merge([tube, caps.start && disc(0, 0, -1), caps.end && disc(last, 1, 1)]);
 }
 
 /** Lathe about the x axis: profile [[r, x], …] with x increasing toward the nose. */

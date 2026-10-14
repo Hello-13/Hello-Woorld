@@ -20,7 +20,7 @@ import { ENGINE_Y, SHAFT_Y, PROP_X, STATIONS } from './mq9/powerplant.js';
 import { buildPropulsion, FIREWALL_S } from './mq9/propulsion.js';
 import { buildFuel, buildFuelLines } from './mq9/fuel.js';
 import { buildLynx, buildAirData, buildLinks } from './mq9/sensors.js';
-import { gbu12, hellfire, launcher, pylon, erPod, GBU_R, ER_R, LAUNCHER_TOP, LAUNCHER_BOX_TOP } from './mq9/stores.js';
+import { gbu12, hellfire, launcher, pylon, erPod, GBU_R, ER_R, LAUNCHER_TOP, HOOK_DX } from './mq9/stores.js';
 
 const deg = Math.PI / 180;
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -272,7 +272,9 @@ export function buildUAV() {
     // the lower pair steps up over the main-gear wells to run above the doors' upper edges
     const lift = (s) => (th < 0 ? smooth(4.5, 4.8, s) * (1 - smooth(6.52, 6.82, s)) * 0.62 : 0);
     // the upper pair starts at the s 2.05 frame behind the SATCOM radome (no carbon in the dish's view), the lower pair at the s 0.95 ring
-    for (let s = th > 0 ? 2.05 : 0.95; s <= (th > 0 ? FIREWALL_S : 10.3) + 1e-6; s += 0.125) pts.push(fusePoint(s, th > -1 ? th + lift(s) : th - lift(s), 0.04));
+    const s1 = th > 0 ? FIREWALL_S : 10.3;
+    for (let s = th > 0 ? 2.05 : 0.95; s <= s1 + 1e-6; s += 0.125) pts.push(fusePoint(s, th > -1 ? th + lift(s) : th - lift(s), 0.04));
+    if (th > 0 && 5.5 - pts[pts.length - 1][0] < s1 - 1e-6) pts.push(fusePoint(s1, th, 0.04));          // the upper pair ends on the firewall
     return pipe(pts, 0.012, 6, 160);
   });
   P('Fuselage longerons', {
@@ -460,7 +462,7 @@ export function buildUAV() {
     const stnInfo = [], rel = [];
     // sway-brace pads set on each store's shoulders (pylon frame; stores hang 1.2 cm under the hooks' line, yBot − 0.012)
     const onRound = (R, h) => () => { const zc = 0.062, yc = -h - 0.042 - R, y = yc + Math.sqrt(R * R - zc * zc); return { z: zc, y, nz: zc / R, ny: (y - yc) / R }; };
-    const onLauncher = (h) => (dx) => (dx > 0 ? { z: 0.062, y: -h - 0.1 + LAUNCHER_BOX_TOP, nz: 0, ny: 1 } : { z: 0.046, y: -h - 0.1 + LAUNCHER_TOP, nz: 0, ny: 1 });
+    const onLauncher = (h) => () => ({ z: 0.046, y: -h - 0.042, nz: 0, ny: 1 });     // on the strongback's top, beside the lugs
     STN.forEach(([z, chord, h, label, mass, desc], k) => {
       const le = wpt(z, 0.04, 0), yTop = wpt(z, 0.32, -1)[1] + 0.03;
       const pg = pylon(chord, h);
@@ -474,7 +476,7 @@ export function buildUAV() {
         system: 'Weapons', material: 'Aluminium pylon with bomb rack, release unit and sway braces (mass est.)', mass, explode: [0, -0.75, 1.9 * side],
         desc,
       }, [L(f(pg.skin.translate(le[0], yTop, z)), m.skin), L(f(pg.rack.translate(le[0], yTop, z)), m.darkMetal), ...sets]);
-      stnInfo.push({ x: le[0] - chord * 0.45, yBot: yTop - h - 0.03, z });
+      stnInfo.push({ x: le[0] + pg.xr, yBot: yTop - h - 0.03, z });
     });
     P(`Store release hardware (${sn})`, {
       system: 'Weapons', material: 'Steel suspension hooks, umbilical connectors and arming solenoids (rack type not public)', mass: 6, count: 3, explode: [0, -0.45, 2.3 * side],
@@ -484,7 +486,7 @@ export function buildUAV() {
     // GBU-12 on the inboard station
     const g = gbu12();
     const gb = stnInfo[0];
-    const gy = gb.yBot - g.radius - 0.012, gx = gb.x;               // lugs on the two hooks
+    const gy = gb.yBot - g.radius - 0.012, gx = gb.x + HOOK_DX;     // its lugs on the two hooks
     const place = (geo) => f(geo.clone().translate(gx, gy, gb.z));
     storeParts.gbu.push(P(`GBU-12 Paveway II (${sn})`, {
       system: 'Weapons', material: 'Mk 82 steel bomb body, laser guidance kit', mass: 230, massSource: 'Published GBU-12 figure (≈ 230 kg)', explode: [0, -1.1, 2.1 * side],
@@ -494,7 +496,7 @@ export function buildUAV() {
 
     // GA-ASI ER kit: a fuel pod on the inboard station instead of the bomb (shown in the 'er' fit)
     const er = erPod();
-    const ey = gb.yBot - er.radius - 0.012, ex = gb.x;
+    const ey = gb.yBot - er.radius - 0.012, ex = gb.x + HOOK_DX;
     const pp = (geo) => f(geo.clone().translate(ex, ey, gb.z));
     const erPart = P(`ER fuel pod (${sn})`, {
       system: 'Fuel', material: 'Aluminium/composite external tank (shape and structure not public)', mass: 45, explode: [0, -1.1, 2.1 * side],
@@ -506,7 +508,7 @@ export function buildUAV() {
     // two Hellfires on a two-rail launcher, middle station
     const md = stnInfo[1];
     const lg = launcher();
-    const ly = md.yBot - 0.07, lx = md.x - 0.05;
+    const ly = md.yBot - 0.012 - LAUNCHER_TOP, lx = md.x + HOOK_DX;   // its lugs on the hooks, its top 1.2 cm under the rack line like the other stores
     storeParts.launcher.push(P(`M310 launcher (${sn})`, {
       system: 'Weapons', material: 'Aluminium launcher with electronics assembly', mass: 43, massSource: 'Lockheed Martin M299 product card: 2-rail 42 kg (92 lb) empty; Marvin Engineering 96 lb', explode: [0, -0.9, 2.0 * side],
       desc: 'An M310 two-rail Hellfire launcher, the two-rail member of the M299/M310 family (the M299 itself has four rails). Its electronics pass the laser code and power to each missile before launch.',
@@ -746,8 +748,10 @@ export function buildUAV() {
   const ngAct = makeActuator(0.024, 0.014, 0.32, m.darkMetal);
   // its line of action is at z 0.15, outboard of the steering unit (which reaches z 0.11), so the two never meet as the leg folds
   const ngAnchor = new THREE.Vector3(X(2.6), 1.42, 0.15), ngHorn = new THREE.Vector3(0, 0.08, 0.15);
-  const ngBracket = merge([box(0.05, NFLOOR - 0.007 - 1.42 + 0.012, 0.012, [ngAnchor.x, (NFLOOR - 0.007 + 1.42 - 0.012) / 2, ngAnchor.z + 0.031]), box(0.05, NFLOOR - 0.007 - 1.42 + 0.012, 0.012, [ngAnchor.x, (NFLOOR - 0.007 + 1.42 - 0.012) / 2, ngAnchor.z - 0.031]),
-    new THREE.CylinderGeometry(0.006, 0.006, 0.074, 8).rotateX(Math.PI / 2).translate(ngAnchor.x, ngAnchor.y, ngAnchor.z)]);   // clevis plates and pin
+  // clevis plates hanging from the floor's underside (y 1.483) beside the well wall, and the pin through them
+  const brkTop = NFLOOR - 0.0075, brkBot = ngAnchor.y - 0.012;
+  const ngBracket = merge([-1, 1].map((k) => box(0.05, brkTop - brkBot, 0.012, [ngAnchor.x, (brkTop + brkBot) / 2, ngAnchor.z + 0.0285 * k])).concat(
+    new THREE.CylinderGeometry(0.006, 0.006, 0.07, 8).rotateX(Math.PI / 2).translate(ngAnchor.x, ngAnchor.y, ngAnchor.z)));
   P('Nose gear retraction actuator', {
     system: 'Landing gear', material: 'Electromechanical or electro-hydraulic actuator (type not public)', mass: 3, explode: [0, 0.35, 0.5],
     desc: 'Pushes on a horn above the trunnion to swing the leg aft and up; in this model it also braces the leg fore and aft when locked down. Its fixed end hangs from a clevis bracket under the avionics floor. The real linkage and actuator type are not published.',
@@ -855,7 +859,7 @@ export function buildUAV() {
     P(`Brake servo (${sd})`, {
       system: 'Landing gear', material: 'Electromechanical brake servo (est.)', mass: 1.2, explode: [0.35, -1.1, 1.2 * side],
       desc: 'Each main brake has its own servo, so the crew can brake differentially to help steer. It rides on the trailing arm beside the wheel and folds with it. After a 2022 hard landing an MQ-9A needed new landing gear, retract drivers and brake servos (USAF investigation; position estimated).',
-    }, L(merge([servoG, tubeBetween(bs.clone().addScaledVector(armDir, 0.044).toArray(), [Ax.x + 0.025, Ax.y + 0.07, Ax.z - 0.008 * side], 0.006, 5)]), m.lruOlive), piv);
+    }, L(merge([servoG, tubeBetween(bs.clone().addScaledVector(armDir, 0.044).toArray(), [Ax.x + 0.025, Ax.y + 0.07, Ax.z - 0.0135 * side], 0.006, 5)]), m.lruOlive), piv);   // lead ends at the brake's inboard face
     const drv = [X(5.16), MROOF[0] - 0.035, 0.25 * side];
     P(`Main gear retract driver (${sd})`, {
       system: 'Landing gear', material: 'Motor driver electronics on the well roof (est.)', mass: 1.5, explode: [0.1, 0.65, 0.75 * side],
@@ -1091,7 +1095,7 @@ export function buildUAV() {
   const topRun = (s0, s1, side, inset = 0.02, step = 0.25) => { const pts = []; for (let q = s0; q <= s1 + 1e-6; q += step) pts.push(fusePoint(q, Math.PI / 2 - 0.5 * side, inset)); return pts; };
   const avh = [];
   for (const zs of [1, -1]) {
-    avh.push(pipe(topRun(1.49, 3.45, zs), 0.012, 6, 60));
+    avh.push(pipe(topRun(1.49, 3.45, zs, 0.02, 0.245), 0.012, 6, 60));   // on to s 3.45, where the main power feeders begin
     // down the side just aft of the dish's sweep and ahead of the floor racks, outboard of the air data lines, to the radar bay
     avh.push(pipe([fusePoint(1.49, Math.PI / 2 - 0.5 * zs, 0.02), [X(1.5), 1.62, 0.335 * zs], [X(1.52), 1.43, 0.335 * zs], [X(1.545), 1.33, 0.28 * zs], [X(1.55), 1.3, 0.25 * zs]], 0.009, 5, 24));
     // drops to each rack: the outer and inner computers, the GPS/INS units, and the radios or the datalink transceiver
@@ -1182,7 +1186,7 @@ export function buildUAV() {
   fsh.push(pipe([[X(5.276), 1.48, -0.022], [X(5.1), 1.48, -0.022], [X(4.9), 1.478, -0.025], [X(4.8), 1.475, -0.07], [X(4.75), 1.476, -0.12], [X(4.5), 1.48, -0.12], [X(4.313), 1.485, -0.12]], 0.005, 5, 30));
   fsh.push(pipe([fusePoint(3.85, Math.PI / 2 - 0.5, 0.034), [X(3.85), 1.77, 0.17], [X(3.85), 1.736, 0.122]], 0.005, 5, 10));   // from the starboard feeder's surface
   for (const zs of [1, -1]) for (const z of [1.6, 3.4, 6.4]) {
-    const pts = [wpt(z - 0.1, 0.705, 0), wpt(z - 0.06, 0.64, 1, 0.032), wpt(z - 0.02, 0.47, 1, 0.032), wpt(z - 0.011, 0.42, 1, 0.035)];
+    const pts = [wpt(z + 0.1, 0.705, 0), wpt(z + 0.06, 0.64, 1, 0.032), wpt(z + 0.02, 0.47, 1, 0.032), wpt(z + 0.011, 0.42, 1, 0.035)];   // from outboard of the probe, clear of the flap servos
     fsh.push(pipe(pts.map((p) => [p[0], p[1], p[2] * zs]), 0.004, 5, 16));
   }
   P('Fuel system harness', {
@@ -1223,13 +1227,15 @@ export function buildUAV() {
     desc: 'Pulls air through the bay on the ground, where there is no ram air; on a hot ramp it is what keeps the electronics inside their temperature limits (size estimated).',
   }, L(merge([cylX(X(2.45), X(2.25), 0.06, 0.06, 1.22, -0.255, 18), cylX(X(2.4), X(2.3), 0.035, 0.035, 1.22, -0.255, 12),
     ...[0, 1, 2, 3].map((k) => { const a = Math.PI / 4 + (k * Math.PI) / 2; return box(0.012, 0.027, 0.006, [X(2.35), 1.22 + Math.cos(a) * 0.0475, -0.255 + Math.sin(a) * 0.0475], [a, 0, 0]); })]), m.alu));   // casing, motor hub, struts
+  const toRadar = [[X(2.25), 1.22, -0.255], [X(2.0), 1.235, -0.255], [X(1.82), 1.215, -0.235], [X(1.72), 1.205, -0.2]];
+  const toCband = [[X(2.45), 1.22, -0.255], [X(2.6), 1.28, -0.27], [X(2.8), 1.36, -0.28], [X(2.88), 1.47, -0.285], [X(2.93), 1.56, -0.28], [X(3.05), 1.6, -0.225], [X(3.125), 1.61, -0.2]];
   P('Avionics cooling ducts', {
     system: 'Environmental control', material: 'Aluminium and composite ducts (layout approximate)', mass: 4, explode: [0.55, -0.35, -0.55],
     desc: 'Duct the cooling air forward over the radar electronics’ finned, conduction-cooled side wall, up to the flight computers and aft to the C-band datalink transceiver. At altitude the air is cold but thin, so the ducts are sized for hot days on the ramp (layout approximate).',
   }, L(merge([
-    pipe([[X(2.25), 1.22, -0.255], [X(2.0), 1.235, -0.255], [X(1.82), 1.215, -0.235], [X(1.72), 1.205, -0.2]], 0.033, 8, 24),   // forward past the well, blowing over the radar electronics' port cooling fins
+    pipe(toRadar, 0.033, 8, 24, { end: true }),   // forward past the well; its outlet grille blows over the radar electronics' port cooling fins
     pipe([[X(2.15), 1.25, -0.27], [X(2.05), 1.36, -0.28], [X(2.0), 1.47, -0.25]], 0.025, 8, 12),
-    pipe([[X(2.45), 1.22, -0.255], [X(2.6), 1.28, -0.27], [X(2.8), 1.36, -0.28], [X(2.88), 1.47, -0.285], [X(2.93), 1.56, -0.28], [X(3.05), 1.6, -0.225], [X(3.125), 1.61, -0.2]], 0.028, 8, 28),   // up through the floor to the C-band transceiver's front face
+    pipe(toCband, 0.028, 8, 28, { end: true }),   // up through the floor to the C-band transceiver's front face
   ]), m.alu));
   const louvre = [skinPatch(2.9, 3.12, 0.3, 0.5, 0.003, 2, 3)];
   for (let k = 0; k < 4; k++) { const p = fusePoint(2.93 + k * 0.055, 0.4, -0.006); louvre.push(box(0.012, 0.012, 0.13, [p[0], p[1], p[2]], [0.35, 0, 0])); }

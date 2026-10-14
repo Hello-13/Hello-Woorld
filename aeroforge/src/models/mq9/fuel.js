@@ -212,8 +212,8 @@ export function buildFuelLines({ P, L, m }, fu, prop) {
       under(6.62, 0.035), under(6.95, 0.04), under(7.25, 0.045), [X(7.36), 1.26, 0.12], [X(7.42), 1.32, 0.16], [heaterP[0] + 0.1, heaterP[1], heaterP[2]]], 0.011, 6, 80),
     pipe([[heaterP[0] - 0.1, heaterP[1], heaterP[2]], [X(8.0), 1.38, 0.22], [X(8.5), 1.41, 0.21], [fsovP[0] + 0.035, fsovP[1], fsovP[2]]], 0.011, 6, 30),
     // over the starboard mount strut, under the engine's hot end and inboard of the port rear mount pad, into the engine's fuel heater
-    pipe([[fsovP[0] - 0.035, fsovP[1], fsovP[2]], [X(9.0), 1.44, 0.165], [X(9.06), 1.448, 0.105], [X(9.15), 1.425, 0.0], [X(9.24), 1.398, -0.12], [X(9.31), 1.392, -0.19], [X(9.345), 1.408, -0.2], [hp[0] + prop.heatHL - 0.025, hp[1] - 0.044, hp[2]]], 0.011, 6, 40),
-    pipe([[hp[0] - prop.heatHL - 0.004, hp[1], hp[2]], [X(9.5), 1.5, -0.235], [X(9.56), 1.68, -0.25], [X(9.62), 1.82, -0.16], [X(9.68), 1.89, -0.06], [pump[0], pump[1] - 0.005, pump[2] - 0.038]], 0.009, 6, 40),
+    pipe([[fsovP[0] - 0.035, fsovP[1], fsovP[2]], [X(9.0), 1.44, 0.165], [X(9.06), 1.448, 0.105], [X(9.15), 1.425, 0.0], [X(9.24), 1.398, -0.12], [X(9.31), 1.392, -0.19], [X(9.345), 1.408, -0.2], [hp[0] + prop.heatHL - 0.025, hp[1] - 0.044, hp[2]]], 0.011, 6, 40, { end: true }),
+    pipe([[hp[0] - prop.heatHL - 0.004, hp[1], hp[2]], [X(9.5), 1.5, -0.235], [X(9.56), 1.68, -0.25], [X(9.62), 1.82, -0.16], [X(9.68), 1.89, -0.06], [pump[0], pump[1] - 0.005, pump[2] - 0.038]], 0.009, 6, 40, { start: true }),
   ]), m.pipe));
   // fuselage-cell vents, sump drains, quantity probes, refuel ports and the dump system
   const top = (s) => fusePoint(s, Math.PI / 2 - 0.62, 0.05);
@@ -253,6 +253,6 @@ export function buildFuelLines({ P, L, m }, fu, prop) {
   P('Fuel dump valve & outlet', {
     system: 'Fuel', material: 'Motorised dump valve, 20 mm line and a small outlet mast', mass: 1.2, explode: [0, -1.55, -0.45],
     desc: 'A valve on the header pumps’ outlet sends fuel overboard through a line along the keel, between the main-gear wells, to a small outlet mast on the centreline just aft of them, where the fuel falls clear of the gear, the doors and the engine. After an engine warning in 2018 a crew dumped fuel before an emergency landing, cutting the weight and the energy the brakes would have to absorb (USAF investigation; the outlet’s real position is not public, so it is estimated here).',
-  }, [L(merge([lru(0.06, 0.05, 0.05, dv), pipe([dv, [X(4.72), 1.095, -0.05], lo(4.8, -0.028, 0.047), lo(4.95, -0.014, 0.022), lo(5.4, -0.012, 0.013), lo(6.0, -0.012), lo(6.45, -0.011), lo(6.53, -0.006), mastTop], 0.01, 6, 60), tubeBetween(mastTop, mastTip, 0.013, 8)]), m.darkMetal),
+  }, [L(merge([lru(0.06, 0.05, 0.05, dv), pipe([[dv[0] - 0.026, dv[1] - 0.006, dv[2] + 0.004], [X(4.72), 1.095, -0.05], lo(4.8, -0.028, 0.047), lo(4.95, -0.014, 0.022), lo(5.4, -0.012, 0.013), lo(6.0, -0.012), lo(6.45, -0.011), lo(6.53, -0.006), mastTop], 0.01, 6, 60), tubeBetween(mastTop, mastTip, 0.013, 8)]), m.darkMetal),
     L(pipe([[X(4.66), dv[1] + 0.022, dv[2]], [X(4.71), dv[1] + 0.035, -0.08], [X(4.748), dv[1] + 0.037, -0.09]], 0.004, 5, 8), m.harness)]);
 }

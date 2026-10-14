@@ -36,6 +36,14 @@ export const GBU_R = 0.1365, ER_R = 0.29;
 /** Two-rail launcher: top of the strongback and of the electronics housing above the launcher's centre line (m). */
 export const LAUNCHER_TOP = 0.065, LAUNCHER_BOX_TOP = 0.07;
 
+/**
+ * Suspension lug at x on a store whose top is at y = top: an arch open fore and aft (two posts and a crossbar), so the rack's hook
+ * passes under the crossbar, through the lug, without touching the store. Lugs come in pairs 14 in apart (MIL-STD-8591).
+ */
+export function lugArch(x, top) {
+  return merge([-1, 1].map((k) => box(0.008, 0.022, 0.004, [x, top + 0.009, 0.0105 * k])).concat(box(0.008, 0.005, 0.025, [x, top + 0.0165, 0])));
+}
+
 /** GBU-12 Paveway II: MAU-169-class guidance section, Mk 82 bomb body, folded airfoil group. */
 export function gbu12() {
   const R = GBU_R, L = 3.27, h = L / 2;
@@ -49,7 +57,7 @@ export function gbu12() {
   const dome = latheX([[0.072, 1.46], [0.07, 1.5], [0.058, 1.56], [0.034, 1.61], [0.001, h]], 20);
   const canards = fins(4, Math.PI / 4, 1.33, 0.2, 0.08, 0.1, 0.1, 0.086);
   const wings = fins(4, Math.PI / 4, -1.2, 0.42, 0.34, 0.19, 0.04, 0.104);
-  const lugs = [-0.178, 0.178].map((x) => box(0.05, 0.03, 0.025, [x, R + 0.012, 0]));
+  const lugs = [-0.178, 0.178].map((x) => lugArch(x, R));
   return {
     body: merge([body, ...wings, ...lugs]),
     guidance: merge([guidance, ring, ...strut, ...canards]),
@@ -88,10 +96,13 @@ export function launcher() {
     parts.push(box(1.45, 0.04, 0.05, [-0.02, -0.075, 0.12 * s]));     // rail
     parts.push(box(1.2, 0.03, 0.14, [-0.05, -0.05, 0.06 * s]));       // rail arm
   }
+  parts.push(...[-0.178, 0.178].map((x) => lugArch(x, LAUNCHER_TOP)));   // suspension lugs on the strongback
   return merge(parts);
 }
 
-/** Sway braces: fore and aft of the rack centre (m), and the z of the bolts under the arms' outer ends. */
+/** Sway braces: fore and aft of the rack centre (m; 0.2 on a light-store pylon), and the z of the bolts under the arms' outer ends. */
+/** The hooks' throats are this far ahead of their release units; a store's lug pair is centred on them. */
+export const HOOK_DX = 0.006;
 export const SWAY = { dx: 0.22, z: 0.066 };
 
 /**
@@ -104,31 +115,34 @@ export const SWAY = { dx: 0.22, z: 0.066 };
 export function pylon(chord, height, t = 0.13) {
   const skin = wingPanel({ root: { le: [0, 0, 0], chord, t }, tip: { le: [-0.04, 0, height], chord: chord * 0.92, t }, stations: 2, n: 14, withChord: false });
   skin.rotateX(Math.PI / 2);             // span +z → −y, thickness → z
-  const xr = -chord * 0.45;
-  const rack = [box(chord * 0.55, 0.05, 0.06, [xr, -height + 0.02, 0])];
+  // the rack body is long enough for the 14 in hooks and the sway braces outside them (a light-store pylon's braces sit a little
+  // closer), and lies within the pylon's lower chord
+  const dx = chord < 0.6 ? 0.2 : SWAY.dx, half = Math.max(chord * 0.275, dx + 0.015);
+  const xr = Math.min(-chord * 0.45, -0.045 - half);
+  const rack = [box(2 * half, 0.05, 0.06, [xr, -height + 0.02, 0])];
   // each arm leaves the side of the rack body and reaches out over the store's shoulder
-  for (const s of [1, -1]) for (const dx of [SWAY.dx, -SWAY.dx]) rack.push(box(0.03, 0.018, 0.058, [xr + dx, -height - 0.006, 0.056 * s]));
+  for (const s of [1, -1]) for (const ddx of [dx, -dx]) rack.push(box(0.03, 0.018, 0.058, [xr + ddx, -height - 0.006, 0.056 * s]));
   const release = [];
   for (const dx of [0.178, -0.178]) {
     release.push(box(0.036, 0.04, 0.024, [xr + dx, -height - 0.01, 0]));
-    release.push(new THREE.TorusGeometry(0.011, 0.005, 5, 8, Math.PI).rotateZ(Math.PI).translate(xr + dx + 0.006, -height - 0.03, 0));
+    release.push(new THREE.TorusGeometry(0.011, 0.005, 5, 8, Math.PI).rotateZ(Math.PI).translate(xr + dx + HOOK_DX, -height - 0.024, 0));   // through the store's lug
   }
   release.push(new THREE.CylinderGeometry(0.02, 0.022, 0.03, 12).translate(xr + 0.075, -height - 0.008, 0.032));      // umbilical connector
   release.push(cylX(xr - 0.11, xr - 0.065, 0.013, 0.013, -height - 0.004, -0.03, 10));                                   // arming solenoid
   const braces = (contact) => {
     const g = [];
-    for (const s of [1, -1]) for (const dx of [SWAY.dx, -SWAY.dx]) {
-      const c = contact ? contact(dx) : { z: SWAY.z, y: -height - 0.03, nz: 0, ny: 1 };
+    for (const s of [1, -1]) for (const ddx of [dx, -dx]) {
+      const c = contact ? contact(ddx) : { z: SWAY.z, y: -height - 0.03, nz: 0, ny: 1 };
       const n = new THREE.Vector3(0, c.ny, c.nz * s).normalize();
-      const pad = new THREE.Vector3(xr + dx, c.y, c.z * s).addScaledVector(n, 0.003);       // pad centre, its face on the store
-      const top = new THREE.Vector3(xr + dx, -height - 0.013, SWAY.z * s);                    // under the arm
+      const pad = new THREE.Vector3(xr + ddx, c.y, c.z * s).addScaledVector(n, 0.003);      // pad centre, its face on the store
+      const top = new THREE.Vector3(xr + ddx, -height - 0.013, SWAY.z * s);                   // under the arm
       const d = pad.clone().sub(top), len = d.length();
       g.push(new THREE.CylinderGeometry(0.0065, 0.0065, len, 8).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())).translate((top.x + pad.x) / 2, (top.y + pad.y) / 2, (top.z + pad.z) / 2));
       g.push(new THREE.CylinderGeometry(0.014, 0.014, 0.006, 12).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n)).translate(pad.x, pad.y, pad.z));
     }
     return merge(g);
   };
-  return { skin, rack: merge(rack), release: merge(release), braces };
+  return { skin, rack: merge(rack), release: merge(release), braces, xr };
 }
 
 /**
@@ -143,7 +157,7 @@ export function erPod() {
   for (let i = 1; i <= 6; i++) { const t = i / 6; pr.push([R * (1 - 0.75 * t ** 1.6), -h + 0.9 - 0.9 * t]); }
   pr.push([0.001, -h]);
   const body = latheX(pr.reverse(), 28);
-  const lugs = [-0.178, 0.178].map((x) => box(0.05, 0.03, 0.025, [x, R + 0.01, 0]));
+  const lugs = [-0.178, 0.178].map((x) => lugArch(x, R));
   const fittings = [new THREE.CylinderGeometry(0.035, 0.035, 0.012, 14).translate(0.6, R - 0.003, 0), cylX(-0.3, -0.2, 0.03, 0.03, R - 0.01, 0, 10)];
   return { body, fittings: merge([...lugs, ...fittings]), length: L, radius: R };
 }
