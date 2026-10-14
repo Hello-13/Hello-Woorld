@@ -456,7 +456,7 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
     explode: [0, 3.8, 2.4],
   }, mesh(merge(busIn), M.titanium()));
   P('Payload solar arrays (stowed)', {
-    system: 'Power', count: 2, material: 'Folded solar array wings on hold-down points', mass: 2 * 160,
+    system: 'Power', count: 2, xrayWeight: 0.6, material: 'Folded solar array wings on hold-down points', mass: 2 * 160,
     desc: 'Folded against the bus for launch and released after separation.',
     explode: [0, 4.4, 0.9],
   }, mesh(merge([1, -1].map((s) => block(0, py0 + 2.6, s * 1.24, 2.0, 4.6, 0.26))), M.solar()));
