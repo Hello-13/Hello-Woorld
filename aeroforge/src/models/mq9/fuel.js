@@ -77,7 +77,7 @@ function jetPump(p, len = 0.12) {
 export function buildFuel({ P, L, m }) {
   const litres = {};
   const L_PER_KG = 1 / 0.81;
-  const cellTop = (s) => (s < 4.1 ? prof(s).top - 0.1 : WING_TOP);
+  const cellTop = (s) => (s < 4.1 || s > CELLS.aft[0] ? prof(s).top - 0.1 : WING_TOP);   // forward and aft cells under the skin, the header under the wing box
   // ---- fuselage cells
   const fwdG = cellGeo(...CELLS.fwd, cellTop), hdrG = cellGeo(...CELLS.header, () => WING_TOP), aftG = cellGeo(...CELLS.aft, (s) => prof(s).top - 0.1);
   litres.fwd = volume(fwdG) * 1000 * 0.97; litres.header = volume(hdrG) * 1000 * 0.97; litres.aft = volume(aftG) * 1000 * 0.97;
@@ -231,7 +231,7 @@ export function buildFuelLines({ P, L, m }, fu, prop) {
     desc: 'A drain at the low point of each of the seven tanks, opened before flight to check for water and sediment, which sink below the fuel (positions estimated).',
   }, L(merge(drains), m.darkMetal));
   const FQ = [];
-  for (const [s, z] of [[3.85, 0.12], [4.3, -0.12], [6.9, 0.12]]) FQ.push(tubeBetween([X(s), prof(s).bot + 0.08, z], [X(s), (s > 4.1 && s < 4.8 ? 1.5 : fu.cellTop(s) - 0.02), z], 0.012, 8));
+  for (const [s, z] of [[3.85, 0.12], [4.3, -0.12], [7.05, -0.1]]) FQ.push(tubeBetween([X(s), prof(s).bot + 0.08, z], [X(s), (s > 4.1 && s < 4.8 ? 1.5 : fu.cellTop(s) - 0.02), z], 0.012, 8));
   for (const zs of [1, -1]) for (const z of [1.6, 3.4, 6.4]) FQ.push(tubeBetween(W(z, 0.42, 1, 0.025, zs), W(z, 0.42, -1, 0.025, zs), 0.01, 6));
   P('Fuel quantity probes', {
     system: 'Fuel', material: 'Capacitance probes', mass: 1.2, count: 9, xrayWeight: 0.5, explode: [0, 1.1, 0],

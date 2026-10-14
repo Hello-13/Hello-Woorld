@@ -313,7 +313,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   for (const dz of [0.05, 0.1]) {
     const pts = [[1.2, 2.4, dz], [0.95, 2.28, dz + 0.1], [0.75, 2.12, dz + 0.12], [0.5, 2.055, dz + 0.12], [0.0, 2.1, dz + 0.12], [-0.5, 2.055, dz + 0.12], [-1.0, 2.1, dz + 0.12], [-1.6, 2.13, dz + 0.1], [-2.4, 2.15, dz + 0.05], [-3.6, 2.12, dz]];
     for (let x = -4.4; x >= -8.2; x -= 0.95) pts.push([x, 1.98 - (x + 4.4) * -0.015, dz]);
-    // under the 42° gearbox, past the right side of the pylon's rear spar and up behind it to the
+    // under the 42° gearbox and up the pylon, behind the drive shaft and ahead of the rear spar, to the
     // quadrant's two cable-end fittings
     const [qx, qy, qz] = TR_CTL.quadrant;
     pts.push([-8.5, 1.83, dz], [-8.8, 1.98, dz], [-9.05, 2.25, dz * 0.5], [-9.3, 2.6, -0.1], dz === 0.05 ? [qx - 0.02, qy - 0.11, qz] : [qx + 0.09, qy - 0.08, qz]);
@@ -397,9 +397,8 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   const sv = servoBases.length ? servoBases.map((p) => [p.x - 0.02, p.y + 0.04, p.z]) : [[0.45, 2.33, -0.3], [0.5, 2.33, 0], [0.45, 2.33, 0.3]];
   // tail-rotor servo ports: No. 1 (dz 0) at its lower end, backup (dz 0.2) 0.1 m up the body
   const trPort = (dz) => { const [a, b] = [V3(...TR_CTL.servoLo), V3(...TR_CTL.servoHi)]; return dz ? a.clone().addScaledVector(b.sub(a).normalize(), 0.1) : a; };
-  // along the tail cone, under the 42° gearbox, up the pylon beside the right face of its rear spar,
-  // then aft over the cable quadrant to the servo behind the spar; the pylon drive shaft, which
-  // climbs ahead of the spar, stays clear of them
+  // along the tail cone, under the 42° gearbox, up the pylon behind the drive shaft and ahead of the
+  // rear spar, then aft over the cable quadrant to the servo, which hangs between them
   const tailRun = (dz) => [[-1.0, 2.3, -0.36 + dz * 0.2], [-2.0, 2.28, -0.2 + dz], [-3.0, 2.12 - dz * 0.25, -0.16 + dz], [-5.0, 1.97 - dz * 0.25, -0.14 + dz], [-7.5, 1.86 - dz * 0.2, -0.1 + dz], [-8.3, 1.83, -0.08 + dz * 0.8], [-8.62, 1.95, -0.03 + dz * 0.4], [-9.0, 2.5, -0.08 + dz * 0.3],
     dz ? [-9.25, 2.72, -0.04] : [-9.25, 2.72, -0.08], dz ? [-9.4, 2.97, -0.15] : [-9.44, 2.88, -0.13], trPort(dz)];
   // transfer module → round the outside of the main-module case → over the servo deck brackets to
@@ -419,7 +418,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   // pump module → transfer module, low along the case bowl (inboard of the oil filter)
   const pumpRun = (s) => pipe([[0.24, 2.31, 0.5 * s], [0.1, 2.285, 0.47 * s], [0.0, 2.278, 0.455 * s], [-0.08, 2.275, 0.44 * s], [-0.16, 2.275, 0.425 * s], [-0.25, 2.29, 0.425 * s], [-0.3, 2.33, 0.45 * s]], 0.01);
   const no1 = [pumpRun(-1), ...toServos(-1), pipe([[-0.36, 2.33, -0.45], ...tailRun(0)], 0.007)];
-  const no2 = [pumpRun(1), ...toServos(1), pipe([[-0.25, 2.36, 0.45], [-0.04, 2.345, 0.465], [0.1, 2.355, 0.455], [0.18, 2.355, 0.425], [0.26, 2.36, 0.405], [0.4, 2.37, 0.42], [0.55, 2.37, 0.42], [0.85, 2.36, 0.33], [1.4, 2.36, 0.18], [1.75, 2.4, -0.05], [1.9, 2.42, -0.2]], 0.008)];
+  const no2 = [pumpRun(1), ...toServos(1), pipe([[-0.25, 2.36, 0.45], [-0.04, 2.345, 0.465], [0.1, 2.355, 0.455], [0.18, 2.355, 0.425], [0.26, 2.36, 0.405], [0.4, 2.37, 0.42], [0.55, 2.37, 0.42], [0.85, 2.36, 0.33], [1.4, 2.36, 0.2], [1.58, 2.36, 0.17], [1.66, 2.37, 0.08], [1.68, 2.395, -0.08], [1.7, 2.4, -0.2], [1.8, 2.405, -0.2], [1.9, 2.41, -0.235]], 0.008)];   // round the right-rear corner of the mixing unit, under the boost-servo input rods, into the servos
   const bk = [pipe([[0.86, 2.36, -0.5], [0.88, 2.33, -0.58], [0.92, 2.33, -0.6]], 0.009),
     pipe([[0.86, 2.33, -0.66], [0.4, 2.32, -0.66], [0.0, 2.32, -0.62], [-0.16, 2.33, -0.585], [-0.26, 2.33, -0.53], [-0.3, 2.33, -0.48]], 0.008),   // outboard of the oil filter
     pipe([[-0.26, 2.33, -0.53], [-0.42, 2.31, -0.525], [-0.55, 2.272, -0.35], [-0.58, 2.272, 0.0], [-0.55, 2.272, 0.35], [-0.42, 2.3, 0.47], [-0.33, 2.33, 0.46]], 0.008),   // aft of the main module, under the deck plate, to No. 2

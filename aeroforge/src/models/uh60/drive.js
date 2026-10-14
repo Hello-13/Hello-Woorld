@@ -412,7 +412,7 @@ export function buildDrive({ A, P, roofY }) {
 
   // ------------------------------------------------------------------ tail drive shaft: six sections
   const ry = (x) => roofY(x) + 0.08;
-  const J = [V3(tto.x - 0.14, 2.45, 0), V3(-1.55, 2.43, 0), V3(-3.6, ry(-3.6), 0), V3(-5.15, ry(-5.15), 0), V3(-6.7, ry(-6.7), 0), V3(TAIL.igb[0] + 0.12, TAIL.igb[1], 0)];
+  const J = [V3(tto.x - 0.14, 2.45, 0), V3(-1.55, 2.43, 0), V3(-3.6, ry(-3.6), 0), V3(-5.15, ry(-5.15), 0), V3(-6.7, ry(-6.7), 0), V3(TAIL.igb[0] + 0.295, TAIL.igb[1], 0)];   // the last joint on the 42° box's input flange, outside its case
   const igb = V3(...TAIL.igb), tgb = V3(...TAIL.tgb);
   const pyDir = tgb.clone().sub(igb).normalize();
   const secs = [
@@ -431,7 +431,8 @@ export function buildDrive({ A, P, roofY }) {
   });
   const cpl = [];
   for (let k = 0; k < J.length; k++) cpl.push(...discCoupling(J[k], (J[k + 1] || igb).clone().sub(J[k - 1] || J[k]), 0.075, 0.05));
-  cpl.push(...discCoupling(igb.clone().addScaledVector(pyDir, 0.2), pyDir, 0.07, 0.05), ...discCoupling(tgb.clone().addScaledVector(pyDir, -0.2), pyDir, 0.07, 0.05));
+  // pylon shaft couplings on the 42° box's output flange and the 90° box's input flange, just outside their housings
+  cpl.push(...discCoupling(igb.clone().addScaledVector(pyDir, 0.265), pyDir, 0.07, 0.05), ...discCoupling(tgb.clone().addScaledVector(pyDir, -0.265), pyDir, 0.07, 0.05));
   P('Tail drive shaft disc couplings', {
     system: 'Drive system', material: 'Stainless-steel multiple-disc flexible couplings', mass: 8, count: 8, explode: [-2.4, 1.65, 0],
     desc: 'Flexible couplings made of packs of thin steel discs join the sections instead of universal joints. The discs flex to take up the angle between sections and the bending of the tail cone in flight, need no lubrication, and turn at a constant speed where a universal joint would not.',
@@ -448,8 +449,18 @@ export function buildDrive({ A, P, roofY }) {
   }, [mesh(merge(hangers), MAT.casting())]);
 
   // ------------------------------------------------------------------ APU
-  const apuG = [cyl(0.12, 0.12, 0.55, [-2.35, 2.38, -0.18], 'x', 22), cyl(0.08, 0.08, 0.2, [-2.0, 2.38, -0.18], 'x', 18), pipe([[-2.6, 2.38, -0.18], [-2.66, 2.4, -0.24], [-2.67, 2.44, -0.33]], 0.06, 12),
-    cyl(0.075, 0.075, 0.02, [-2.67, 2.44, -0.35], 'z', 18)];
+  // exhaust: a short bend from the turbine end out to an outlet ring flush in the left side of the aft
+  // deck fairing; bleed air leaves through an outlet on top of the compressor end
+  let ea0 = Math.PI / 2, ea1 = Math.PI;
+  for (let k = 0; k < 30; k++) { const m = (ea0 + ea1) / 2; if (aftDeckPoint(roofY, -2.69, m).p.y > 2.395) ea0 = m; else ea1 = m; }
+  const exo = aftDeckPoint(roofY, -2.69, ea0);
+  // outlet bead: a closed ring lying on the fairing surface round the duct's end (flush by construction)
+  const daPerM = 0.01 / aftDeckPoint(roofY, -2.69, ea0 + 0.01).p.distanceTo(exo.p), bead = [];
+  for (let k = 0; k < 20; k++) { const t = (k / 20) * Math.PI * 2; bead.push(aftDeckPoint(roofY, -2.69 + 0.058 * Math.cos(t), ea0 + 0.058 * daPerM * Math.sin(t), -0.001).p); }
+  const exOut = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(bead, true), 40, 0.006, 6, true);
+  const apuG = [cyl(0.12, 0.12, 0.5, [-2.33, 2.38, -0.18], 'x', 22), cyl(0.08, 0.08, 0.2, [-2.0, 2.38, -0.18], 'x', 18),
+    pipe([V3(-2.56, 2.38, -0.18), V3(-2.645, 2.385, -0.205), exo.p.clone().addScaledVector(exo.n, -0.045), exo.p.clone().addScaledVector(exo.n, -0.012)], 0.05, 12), exOut,
+    cyl(0.032, 0.032, 0.03, [-2.12, 2.51, -0.18], 'y', 14)];
   P('Auxiliary power unit', {
     system: 'Propulsion', material: 'T-62T-40-1 gas turbine with gearbox, exhaust duct to the left side', mass: 45, explode: [-1.1, 1.8, -0.6],
     desc: 'A small gas turbine aft of the main transmission. It supplies bleed air to start the main engines and heat the cabin, and drives its own generator and the hydraulic start motor\'s recharge, so the helicopter needs no ground cart; its exhaust leaves through a port on the left side of the aft fairing. It is not qualified for normal use in flight.',
@@ -462,7 +473,8 @@ export function buildDrive({ A, P, roofY }) {
   // ------------------------------------------------------------------ pneumatic start system
   // one manifold fed by either engine, the APU or a ground cart: check valves at each source and a
   // shutoff valve at each engine; branches to both starters and to the heater mixing valve
-  const pn = [pipe([[-1.92, 2.42, -0.18], [-1.8, 2.43, -0.2], [-1.72, 2.44, -0.25]], 0.028, 8)];
+  // from the APU's bleed outlet forward over its gearbox and hydraulic start motor to the manifold tee
+  const pn = [pipe([[-2.12, 2.515, -0.18], [-2.07, 2.535, -0.185], [-1.95, 2.525, -0.195], [-1.84, 2.495, -0.21], [-1.77, 2.46, -0.235], [-1.72, 2.44, -0.25]], 0.028, 8)];
   const pnFeed = {};
   for (const s of [1, -1]) {
     const pts = s < 0
@@ -474,7 +486,7 @@ export function buildDrive({ A, P, roofY }) {
   }
   pn.push(pipe([[-1.72, 2.44, -0.25], [-2.0, 2.4, -0.3], [-2.2, 2.39, -0.33], [-2.22, 2.39, -0.37]], 0.022, 6));               // external pneumatic port
   pn.push(pipe([[-1.6, 2.49, 0.24], [-1.615, 2.477, 0.258], [-1.62, 2.46, 0.27]], 0.024, 6));                                // heater branch into the mixing valve
-  const valves = [cyl(0.04, 0.04, 0.08, [-1.95, 2.42, -0.18], 'x', 14), cyl(0.035, 0.035, 0.07, [-2.17, 2.39, -0.33], 'x', 12)];
+  const valves = [tube([-1.88, 2.507, -0.205], [-1.8, 2.481, -0.216], 0.04, 14), cyl(0.035, 0.035, 0.07, [-2.17, 2.39, -0.33], 'x', 12)];   // APU-outlet check valve on the duct ahead of the APU
   for (const s of [1, -1]) valves.push(cyl(0.035, 0.035, 0.07, [-1.15, ENG.y + 0.1, (ENG.z - 0.2) * s], 'y', 12), box(0.09, 0.08, 0.08, [-1.0, 2.46, 0.41 * s]), box(0.04, 0.05, 0.04, [-1.0, 2.52, 0.41 * s]));
   P('Pneumatic start ducts', {
     system: 'Propulsion', material: 'Stainless-steel bleed-air ducts with V-band joints, external ground connector', mass: 9, explode: [-0.9, 1.0, -0.2], xrayWeight: 0.6,

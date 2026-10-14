@@ -66,7 +66,7 @@ export default [
   },
   {
     title: 'The tail drive: six shafts and two gearboxes',
-    body: 'The upper face of the main bevel gear drives the tail take-off at 4,117 rpm. Six dynamically balanced aluminium shafts carry it aft: the first through the oil-cooler blower, which cools the gearbox whenever the rotor turns, then along the top of the tail cone on four viscous-damped hanger bearings. Flexible disc couplings at every joint take up the angles and the tail cone\'s bending, with no universal joints. At the base of the pylon the 42° gearbox turns the drive up the fin; at the top the 90° gearbox turns it into the tail-rotor shaft at 1,190 rpm.',
+    body: 'The upper face of the main bevel gear drives the tail take-off at 4,117 rpm. Six dynamically balanced aluminium shafts carry it aft: the first through the oil-cooler blower, which cools the gearbox whenever the rotor turns, then back over the transition section and along the top of the tail cone, carried on four viscous-damped hanger bearings. Flexible disc couplings at every joint take up the angles and the tail cone\'s bending, with no universal joints. At the base of the pylon the 42° gearbox turns the drive up the fin; at the top the 90° gearbox turns it into the tail-rotor shaft at 1,190 rpm.',
     key: 'The tail rotor turns 4.6 times as fast as the main rotor, and the two are geared together: their speeds can never drift apart.',
     focus: [...TAILDRIVE, 'Tail drive shaft disc couplings', 'Viscous-damped hanger bearings', 'Transmission oil cooler & blower', 'Rotor brake', 'Main rotor gust lock', 'Intermediate gearbox (42°)', 'Tail rotor gearbox (90°)'],
     view: { dir: [0.15, 0.45, 1], fill: 1.0 },

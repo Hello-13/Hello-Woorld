@@ -19,7 +19,7 @@ import { mesh } from '../../engine/assembly.js';
 import { latticePanel, loftRings, rod, beam, lathe, ogiveProfile, hingedMesh } from '../../engine/geometry.js';
 import { SKIN } from '../../engine/materials.js';
 import { R, Y, ENGINE_RING, T0_Y, polar } from './dims.js';
-import { merge, barrel, dome, domeY, pipe, hoop, post, block, bottle, radialYaw, perforatedDisc } from './util.js';
+import { merge, barrel, dome, domeY, pipe, hoop, post, block, bottle, radialYaw, perforatedDisc, bar } from './util.js';
 import { merlinBell, merlinNozzle, merlinChamber, merlinKit, pintleInjector, placeAll } from './merlin.js';
 import { FM, stagePaint, tankMaterial } from './materials.js';
 
@@ -99,12 +99,9 @@ function engineGeometry() {
   // pneumatic helium bottles and the leg-deployment lines to the base of each piston
   const pb = [22.5, 202.5].map((a) => new THREE.SphereGeometry(0.12, 16, 10).translate(...at(1.58, a, 2.7)));
   const legHe = [];
-  // the run round the bay dips under the side boosters' LOX fill & drain valve (at 352° on A, 172°
-  // on B); the geometry is shared, so the centre core's lines dip there too
-  const heY = (a) => {
-    const d = Math.min(...[352, 172].map((c) => Math.abs(((a - c + 540) % 360) - 180)));
-    return 2.95 - 0.22 * (1 - smooth((d - 5) / 8));
-  };
+  // the run round the bay passes over the fill & drain valves and inboard of the RP-1 fill risers
+  // (see the fill & drain valves below)
+  const heY = () => 2.95;
   const heArc = (a0, a1) => {
     const n = Math.max(2, Math.ceil(Math.abs(a1 - a0) / 3));
     return Array.from({ length: n + 1 }, (_, i) => { const a = a0 + ((a1 - a0) * i) / n; return at(1.45, a, heY(a)); });
@@ -156,23 +153,6 @@ function legGeometry(len) {
   return loftRings(rings, { capStart: true, capEnd: true });
 }
 
-/**
- * Straight bar from p0 to p1 with a level section: w across it in the horizontal plane, h in the
- * vertical plane through it (engine/geometry's beam() rolls its section with the bar's heading).
- */
-function bar(p0, p1, w, h) {
-  const a = new THREE.Vector3(...p0), b = new THREE.Vector3(...p1);
-  const along = b.clone().sub(a), len = along.length();
-  along.divideScalar(len);
-  const side = new THREE.Vector3(0, 1, 0).cross(along);
-  if (side.lengthSq() < 1e-8) side.set(1, 0, 0);
-  side.normalize();
-  const up = along.clone().cross(side).normalize();
-  const g = new THREE.BoxGeometry(w, h, len);
-  g.applyMatrix4(new THREE.Matrix4().makeBasis(side, up, along));
-  const m = a.add(b).multiplyScalar(0.5);
-  return g.translate(m.x, m.y, m.z);
-}
 /** A small box mounted at radius r, azimuth a, height y, facing outward (w tangential, d radial). */
 const unit = (r, a, y, w, h, d) => { const [x, z] = polar(r, a); return block(x, y, z, w, h, d, radialYaw(a)); };
 /**
@@ -322,8 +302,11 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   // helium lines: bottle → down the inside wall → heat exchanger → back up to the LOX and RP-1 ullage
   const [cx, cz] = polar(1.05, 270), [px, pz] = polar(1.7, hxAz - 8), [qx, qz] = polar(1.7, hxAz + 8);
   const press = [
-    pipe([[cx, 36.4, cz], [px * 0.9, 35.5, pz * 0.9], [px, 30, pz], [px, Y.commonDome + 0.3, pz], [px, Y.commonDome - 0.4, pz], [px, Y.engSectionTop + 0.2, pz], [hxx * 1.12, 2.92, hxz * 1.12]], 0.035, { seg: 6, tubular: 80 }),
-    pipe([[hxx * 1.12, 2.9, hxz * 1.05], [qx, Y.engSectionTop + 0.3, qz], [qx, Y.commonDome - 0.5, qz], [qx, Y.commonDome + 0.4, qz], [qx, Y.loxTop - 0.2, qz], [qx * 0.7, Y.loxTop + 0.5, qz * 0.7]], 0.03, { seg: 6, tubular: 80 }),
+    // (each riser leaves the aft dome inside the Octaweb's upper ring, then drops to the exchanger)
+    pipe([[cx, 36.4, cz], [px * 0.9, 35.5, pz * 0.9], [px, 30, pz], [px, Y.commonDome + 0.3, pz], [px, Y.commonDome - 0.4, pz], [px, Y.engSectionTop + 0.2, pz],
+      at(1.58, hxAz - 7, 3.5), at(1.4, hxAz - 5, 3.22), at(1.3, hxAz - 4, 3.0), at(1.27, hxAz - 4, 2.88)], 0.035, { seg: 6, tubular: 90 }),
+    pipe([at(1.27, hxAz + 4, 2.88), at(1.3, hxAz + 4, 3.0), at(1.4, hxAz + 5, 3.22), at(1.58, hxAz + 7, 3.5), [qx, Y.engSectionTop + 0.3, qz], [qx, Y.commonDome - 0.5, qz],
+      [qx, Y.commonDome + 0.4, qz], [qx, Y.loxTop - 0.2, qz], [qx * 0.7, Y.loxTop + 0.5, qz * 0.7]], 0.03, { seg: 6, tubular: 90 }),
     // RP-1 ullage feed: a branch off the riser into the top of the fuel tank, under the common dome
     pipe([[qx, Y.commonDome - 1.2, qz], [qx * 0.9, Y.commonDome - 1.0, qz * 0.9], [qx * 0.82, Y.commonDome - 0.95, qz * 0.82]], 0.025, { seg: 6, tubular: 8 }),
     // diffusers: perforated cans that spread the incoming gas so it does not jet onto the propellant
@@ -399,8 +382,10 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     desc: 'LOX loads from the T-0 plate through this valve into the feed manifold and up the transfer tube. On Falcon Heavy first-stage LOX loading starts about 45 minutes before liftoff (NASA\'s countdown for Psyche, 2023; 35 minutes on Falcon 9). Because the densified LOX keeps boiling off, it is topped up until the last minutes. Line routing simplified.',
     explode: [0, -0.8, 4.8],
   }, mesh(merge([
-    pipe([at(R - 0.05, t0Az - 8, T0_Y - 0.05), at(1.45, t0Az - 8, 2.95), at(0.98, t0Az - 4, 2.64)], 0.06, { seg: 8, tubular: 10 }),
-    unit(1.45, t0Az - 8, 2.95, 0.2, 0.2, 0.2),
+    // from the plate's lower port down beside the skin, outboard of the Octaweb's upper ring and
+    // under the Y-ring, then in under the harness ring to the valve and the LOX manifold
+    pipe([at(R - 0.05, t0Az + 12.5, T0_Y - 0.18), at(1.745, t0Az + 12.5, 2.98), at(1.745, t0Az + 12.3, 2.8), at(1.55, t0Az + 11, 2.72), at(1.2, t0Az + 9, 2.68), at(0.98, t0Az + 6, 2.64)], 0.06, { seg: 8, tubular: 28 }),
+    unit(1.55, t0Az + 11, 2.72, 0.2, 0.2, 0.2),
   ]), FM.steelLine()));
   lfd.userData.part.thermalRole = 'lox';
   const rfd = P('RP-1 fill & drain valve', {
@@ -408,8 +393,10 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     desc: 'RP-1 loads through this valve into the bottom of the fuel tank from the T-0 plate; on Falcon Heavy first-stage RP-1 loading starts about 50 minutes before liftoff, just ahead of the LOX. The same path drains the stage after a scrub.',
     explode: [0, -0.6, 5.4],
   }, mesh(merge([
-    pipe([at(R - 0.05, t0Az + 8, T0_Y + 0.05), at(1.5, t0Az + 8, 3.12), at(1.3, t0Az + 8, aftDomeY(1.3) + 0.04)], 0.05, { seg: 8, tubular: 10 }),
-    unit(1.52, t0Az + 8, 3.12, 0.18, 0.16, 0.18),
+    // the same way down and in from the other lower port, then up into the aft dome inside the upper ring
+    pipe([at(R - 0.05, t0Az - 12.5, T0_Y - 0.18), at(1.745, t0Az - 12.5, 2.98), at(1.745, t0Az - 12.3, 2.82), at(1.55, t0Az - 10, 2.78), at(1.37, t0Az - 10, 2.84),
+      at(1.35, t0Az - 10, aftDomeY(1.35) + 0.05)], 0.05, { seg: 8, tubular: 28 }),
+    unit(1.55, t0Az - 10, 2.78, 0.18, 0.16, 0.18),
   ]), FM.steelLine()));
   rfd.userData.part.thermalRole = 'rp1';
   const ventTop = Y.loxTop + D;
@@ -443,9 +430,9 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     explode: [t0x * 0.8, -1.0, t0z * 0.8],
   }, mesh(merge(t0), FM.aluDark()));
   // gaseous-nitrogen purge: a ring in the engine bay fed from the T-0 plate
-  // (between the TVC lines below and the TEA-TEB tank and Octaweb ring above)
-  const purge = [hoop(1.55, 0.0125, 2.37, { seg: 64, tube: 4 }), pipe([at(R - 0.03, t0Az - 4, T0_Y - 0.18), at(1.72, t0Az - 5, 2.85), at(1.55, t0Az - 6, 2.39)], 0.0125, { seg: 4, tubular: 10 })];
-  for (let i = 0; i < 12; i++) purge.push(post(...polar(1.54, i * 30 + 15), 2.31, 2.36, 0.012, 5));
+  // (just inside the skin, outboard of the Octaweb's corner posts and webs; nozzles between the posts)
+  const purge = [hoop(1.795, 0.0125, 2.37, { seg: 96, tube: 4 }), pipe([at(R - 0.03, t0Az - 4.07, T0_Y - 0.18), at(1.8, t0Az - 4.07, 2.9), at(1.797, t0Az - 4.3, 2.39)], 0.0125, { seg: 4, tubular: 12 })];
+  for (let i = 0; i < 12; i++) purge.push(post(...polar(1.79, i * 30 + 7.5), 2.31, 2.36, 0.012, 5));
   P('GN₂ purge manifold', {
     system: 'Environmental control', material: 'Stainless purge ring with nozzles', mass: 6,
     desc: 'Gaseous nitrogen from the ground (one of the supplies at the T-0 plate) flushes the closed engine bay before ignition, keeping out oxygen boiled off from the LOX and moist Florida air. Use inferred from the ground-supply list; layout estimated.',
@@ -455,11 +442,12 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   // ------------------------------------------------------------------ Octaweb thrust structure
   const ow = [];
   const oct = (r, y) => Array.from({ length: 8 }, (_, i) => { const [x, z] = polar(r, i * 45); return [x, y, z]; });
-  for (const [y, h] of [[1.45, 0.2], [3.05, 0.16]]) {
-    const v = oct(1.7, y);
+  // the lower ring is set out to a 1.75 m vertex radius, clear of the outboard TVC actuators' lower ends
+  for (const [y, h, rv] of [[1.45, 0.2, 1.75], [3.05, 0.16, 1.7]]) {
+    const v = oct(rv, y);
     for (let i = 0; i < 8; i++) ow.push(bar(v[i], v[(i + 1) % 8], 0.12, h));
   }
-  for (const [x, , z] of oct(1.7, 0)) ow.push(beam([x, 1.45, z], [x, 3.05, z], 0.14, 0.14), bar([x, 3.05, z], [x * 1.04, 3.24, z * 1.04], 0.1, 0.1));
+  oct(1.7, 0).forEach(([x, , z], i) => ow.push(block(x, 2.25, z, 0.14, 1.6, 0.14, radialYaw(i * 45)), bar([x, 3.05, z], [x * 1.04, 3.24, z * 1.04], 0.1, 0.1)));   // corner posts, square to the axis
   for (const a of OUTER) {
     const [x, z] = polar(ENGINE_RING, a);
     const [ix, iz] = polar(HUB.r, a);
@@ -882,14 +870,20 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     desc: 'External tunnel that carries power, data and flight-safety cables up the outside of the tanks between the engine bay and the forward avionics, so no wiring has to pass through the propellant. Block 5 gave it, like the legs, a black thermal-protection layer. Shown midway between two landing legs; its exact azimuth on each core is estimated.',
     callout: !centre && attachSide > 0, anchor: at(R + 0.16, rwA, 30.0), explode: [0, 0, 1.6],
   }, mesh(merge(rw), FM.racewayBlack()));
+  // engine-bay harness ring radius at azimuth a: inboard of the corner posts, and of the fill & drain
+  // lines coming down beside the T-0 plate
+  const harnessR = (a) => {
+    const d = Math.abs(((a + 22.5) % 45) - 22.5), dT = Math.abs(((a - t0Az + 540) % 360) - 180);
+    return 1.55 + 0.11 * smooth(d / 15) * smooth(dT / 24);
+  };
   const wh = [
     hoop(1.6, 0.025, fwdY - 0.22, { seg: 64, tube: 4 }),
     // engine-bay ring: it ducks inboard of the eight Octaweb corner posts
-    pipe(Array.from({ length: 64 }, (_, i) => { const a = i * 5.625, d = Math.abs(((a + 22.5) % 45) - 22.5); return at(1.55 + 0.11 * smooth(d / 15), a, 2.9); }), 0.025, { seg: 4, tubular: 128, closed: true }),
+    pipe(Array.from({ length: 64 }, (_, i) => at(harnessR(i * 5.625), i * 5.625, 2.9)), 0.025, { seg: 4, tubular: 128, closed: true }),
     pipe([at(R + 0.06, rwA, Y.s1Top - 0.25), at(R - 0.05, rwA, Y.s1Top - 0.4), at(1.62, rwA, fwdY - 0.1), at(1.6, rwA - 4, fwdY - 0.22)], 0.03, { seg: 6, tubular: 10 }),
     pipe([at(R + 0.06, rwA, rwBottom + 0.1), at(R - 0.02, rwA + 4, 2.6), at(1.7, rwA + 8, 2.75), at(1.66, rwA + 12, 2.9)], 0.03, { seg: 6, tubular: 10 }),   // round the Octaweb corner post
   ];
-  for (const a of OUTER) wh.push(pipe([at(1.66, a + 8, 2.9), at(1.64, a + 8, 1.9)], 0.015, { seg: 4, tubular: 4 }));
+  for (const a of OUTER) wh.push(pipe([at(harnessR(a + 8), a + 8, 2.9), at(1.64, a + 8, 1.9)], 0.015, { seg: 4, tubular: 4 }));
   // the centre engine's controller: in over the LOX manifold beside the TEA-TEB relight line, then
   // down past the Octaweb hub to the box hanging under it
   wh.push(pipe([at(1.66, 104, 2.9), at(1.4, 103, 2.72), at(0.95, 108, 2.44), at(0.6, 135, 2.44), at(0.52, 157, 2.32), at(0.55, 170, 2.1), at(0.6, 177, 1.86), at(HUB.r - 0.1, 180, 1.8)], 0.015, { seg: 4, tubular: 24 }));

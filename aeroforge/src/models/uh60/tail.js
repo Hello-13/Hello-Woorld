@@ -97,6 +97,18 @@ function trBladeGeometry() {
 
 const WELL = 0.58;
 
+/** Pylon rear spar, [x, y] in the pylon mid-plane: from a foot fitting on the tail cone (on the line
+ *  of 62 % root chord) it angles back to 88–90 % chord behind the pylon drive shaft, the cable
+ *  quadrant and the servo, ending on the 90° gearbox. */
+const REAR_SPAR = [[-8.843, 1.97], [-9.208, 2.3], [-9.585, 2.64], [-9.66, 2.76], [-9.755, 2.95], [-9.875, 3.15], [-9.96, 3.29]];
+function rearSparAt(y) {
+  let k = 0;
+  while (k < REAR_SPAR.length - 2 && y > REAR_SPAR[k + 1][1]) k++;
+  const [x0, y0] = REAR_SPAR[k], [x1, y1] = REAR_SPAR[k + 1];
+  // on the fin's cambered mid-surface, about 1.2 cm to starboard of the lean line this far aft
+  return V3(x0 + ((x1 - x0) * (y - y0)) / (y1 - y0), y, pylonLean(y) + 0.012 * Math.min(1, Math.max(0, (y - 1.97) / 0.33)));
+}
+
 export function buildTail({ A, P, air, roofY }) {
   const paint = MAT.paint();
 
@@ -153,18 +165,31 @@ export function buildTail({ A, P, air, roofY }) {
     callout: true, anchor: [-8.9, 3.0, pylonLean(3.0) + 0.1],   // mid-fin, right face
   }, [mesh(merge([pyl, tgbBulge]), paint)]);
 
+  // Front spar at 18 % chord; its foot forks round the last tail-shaft joint and the 42° gearbox's
+  // input housing where they lie on top of the tail cone. The pylon drive shaft climbs from 36 % chord
+  // at the 42° box to 71 % at the 90° box, so the rear spar, at 62 % chord at the root, angles back
+  // behind the shaft, the cable quadrant and the servo (about 88 % chord) and ends on the 90° box.
   const spar = [];
-  for (const cf of [0.18, 0.62]) {
-    const a = V3(root.le[0] - cf * root.chord, root.le[2], 0), b = V3(tip.le[0] - cf * tip.chord, tip.le[2] - 0.05, 0);
+  {
+    const a = V3(root.le[0] - 0.18 * root.chord, root.le[2], 0), b = V3(tip.le[0] - 0.18 * tip.chord, tip.le[2] - 0.05, 0);
     const pts = [];
     for (let k = 0; k <= 6; k++) { const p = a.clone().lerp(b, k / 6); p.z = pylonLean(p.y); pts.push(p); }
-    for (let k = 0; k < 6; k++) spar.push(tube(pts[k], pts[k + 1], 0.03, 6));
+    for (let k = 2; k < 6; k++) spar.push(tube(pts[k], pts[k + 1], 0.03, 6));
+    const at = (y) => a.clone().lerp(b, (y - a.y) / (b.y - a.y));
+    // the two legs stand on fittings on the tail cone's top frame, above the cable and harness runs
+    // (the port leg closer in: the fin is cambered to starboard)
+    for (const lz of [0.115, -0.103]) {
+      const p0 = at(1.97), p1 = at(2.15);
+      spar.push(tube(V3(p0.x, p0.y, lz), V3(p1.x, p1.y, lz), 0.014, 6), tube(V3(p1.x, p1.y, lz), pts[2], 0.014, 6), box(0.07, 0.016, 0.045, [p0.x - 0.01, p0.y - 0.006, lz]));
+    }
   }
+  for (let k = 0; k < REAR_SPAR.length - 1; k++) spar.push(tube(rearSparAt(REAR_SPAR[k][1]), rearSparAt(REAR_SPAR[k + 1][1]), k < 2 ? 0.022 : 0.019, 6));
+  spar.push(box(0.08, 0.016, 0.1, [REAR_SPAR[0][0] - 0.01, REAR_SPAR[0][1] - 0.008, 0]));   // its foot fitting on the tail cone's top frame
   // fold-hinge knuckles on the right side of the pylon, just above its joint with the tail cone
   for (const y of [1.99, 2.21]) spar.push(cyl(0.028, 0.028, 0.09, [-8.47, y, 0.135], 'y', 12), box(0.1, 0.07, 0.012, [-8.53, y, 0.125]));
   P('Pylon spars & fold hinge', {
     system: 'Structure', material: 'Aluminium spars, steel fold-hinge fittings', mass: 45, explode: [-2.9, 0.2, 0.6],
-    desc: 'Two spars carry the tail-rotor thrust and gearbox loads down into the tail cone. A hinge at the joint lets the pylon fold alongside the tail cone so the aircraft fits inside a C-130 or C-17.',
+    desc: 'Two spars carry the tail-rotor thrust and gearbox loads down into the tail cone: the front spar, whose foot forks round the tail drive shaft where it enters the 42° gearbox, and the rear spar, which angles back behind the pylon drive shaft and the tail-rotor controls to the 90° gearbox. A hinge at the joint lets the pylon fold alongside the tail cone so the aircraft fits inside a C-130 or C-17. (Spar layout approximate.)',
   }, [mesh(merge(spar), MAT.primer())]);
 
   // ------------------------------------------------------------------ stabilator
@@ -206,7 +231,7 @@ export function buildTail({ A, P, air, roofY }) {
   P('Tail drive shaft section 6', {
     system: 'Drive system', material: 'Dynamically balanced aluminium-alloy tube', mass: 6, explode: [-2.8, 0.6, 0],
     desc: 'The sixth and last section climbs the inside of the pylon from the intermediate to the tail gearbox, with a disc coupling at each end.',
-  }, [mesh(merge([tube(igb.clone().addScaledVector(pyDir, 0.2), tgb.clone().addScaledVector(pyDir, -0.2), 0.045, 12)]), MAT.steel())]);
+  }, [mesh(merge([tube(igb.clone().addScaledVector(pyDir, 0.285), tgb.clone().addScaledVector(pyDir, -0.285), 0.045, 12)]), MAT.steel())]);   // between the couplings on the two gearbox flanges
   P('Tail rotor gearbox (90°)', {
     system: 'Drive system', material: 'Magnesium case, bevel gears, pitch-change shaft through the output', mass: 38, explode: [-3.0, 0.9, -0.3],
     desc: 'Turns the drive 90° into the tail-rotor shaft and reduces it to 1,190 rpm — 4.6 times main-rotor speed — with the tail rotor\'s pitch-change shaft passing through its hollow output. Its housing is magnesium; it carries the tail rotor, the tail-rotor servo below it works the pitch-change shaft through it, and like the 42° box it can run 30 minutes with no oil.',
@@ -214,12 +239,12 @@ export function buildTail({ A, P, air, roofY }) {
   // tail-rotor servo aft of the rear spar (the pylon shaft climbs just ahead of the spar): a trunnion
   // link to the spar at its lower end, and its output rod reaching up to the 90° gearbox from behind
   const sLo = V3(...TR_CTL.servoLo), sHi = V3(...TR_CTL.servoHi), sRod = V3(-9.98, 3.36, -0.38);
-  const sparAt = (y) => { const f = (y - 1.62) / 2.35; return V3(-8.455 - 1.728 * f, y, pylonLean(y)); };   // rear-spar axis (see the spars above)
+  const sparAt = rearSparAt;   // rear-spar axis (see the spars above), here behind the servo
   P('Tail rotor servo', {
     system: 'Flight controls', material: 'Dual-stage hydraulic actuator on a trunnion link to the pylon rear spar', mass: 9, explode: [-3.0, 0.4, -0.5],
-    desc: 'Driven by cables from the pedals through the quadrant below it, it moves the tail rotor\'s pitch-change shaft through the tail gearbox. Two stages: the first on the No. 1 hydraulic system, the second on the backup pump. Shown behind the pylon\'s rear spar, clear of the drive shaft (exact position approximate).',
+    desc: 'Driven by cables from the pedals through the quadrant below it, it moves the tail rotor\'s pitch-change shaft through the tail gearbox. Two stages: the first on the No. 1 hydraulic system, the second on the backup pump. The operator\'s manual describes it as mounted on the tail gear box; it is shown just below the box, between the pylon drive shaft and the rear spar, its output rod reaching up into the box (exact position approximate).',
   }, [mesh(merge([tube(sLo, sHi, 0.04, 12), tube(sHi, sRod, 0.012, 8), cyl(0.045, 0.045, 0.03, [sHi.x, sHi.y, sHi.z], 'y', 12).translate(0, -0.01, 0),
-    tube(sparAt(sLo.y).add(V3(-0.02, 0, 0.005)), sLo.clone().add(V3(0.02, 0, 0)), 0.014, 8), cyl(0.02, 0.02, 0.07, [sLo.x, sLo.y, sLo.z], 'x', 10)]), MAT.hydraulic())]);
+    tube(sparAt(sLo.y).add(V3(0.018, 0, 0.005)), sLo.clone().add(V3(-0.035, 0, 0)), 0.014, 8), cyl(0.02, 0.02, 0.07, [sLo.x, sLo.y, sLo.z], 'x', 10)]), MAT.hydraulic())]);
   // gearbox chip/temperature sensors, sight gauges and filler caps
   const tc = tgb.clone().addScaledVector(n, 0.06), dn = V3(0, -Math.cos(TAIL.cant), Math.sin(TAIL.cant));
   P('Tail gearbox chip/temperature sensors & sight gauges', {
@@ -234,7 +259,7 @@ export function buildTail({ A, P, air, roofY }) {
     system: 'Flight controls', material: 'Aluminium cable quadrant on a pivot, tension spring, microswitches', mass: 2, explode: [-2.4, 0.2, -0.7],
     desc: 'The two tail-rotor cables end on this quadrant, which turns the servo\'s input. Spring tension keeps it working normally if one cable is cut, and microswitches then light TAIL ROTOR QUADRANT; if control is lost altogether, the spring sets the blades to a pitch that roughly balances cruise power. (Location approximate.)',
   }, [mesh(merge([sector, cyl(0.016, 0.016, 0.07, [qd.x, qd.y, qd.z], 'z', 10), box(0.04, 0.03, 0.03, [qd.x + 0.09, qd.y - 0.08, qd.z]), box(0.04, 0.03, 0.03, [qd.x - 0.02, qd.y - 0.11, qd.z]),
-      tube(sparAt(qd.y).add(V3(-0.02, 0, -0.005)), V3(qd.x, qd.y, qd.z - 0.042), 0.012, 8), cyl(0.024, 0.024, 0.012, [qd.x, qd.y, qd.z - 0.04], 'z', 10)]), MAT.casting()),   // pivot bracket on the rear spar
+      tube(sparAt(qd.y).add(V3(0.018, 0, -0.005)), V3(qd.x, qd.y, qd.z - 0.042), 0.012, 8), cyl(0.024, 0.024, 0.012, [qd.x, qd.y, qd.z - 0.04], 'z', 10)]), MAT.casting()),   // pivot bracket forward from the rear spar
     // output link up to the servo's input lever, and the centring spring to the bracket
     mesh(merge([tube([qd.x, qd.y + 0.075, qd.z], sLo.clone().addScaledVector(sHi.clone().sub(sLo).normalize(), 0.06).add(V3(0, 0, 0.045)), 0.009, 6),
       cyl(0.014, 0.014, 0.03, [qd.x, qd.y + 0.075, qd.z], 'z', 8), tube([qd.x + 0.05, qd.y - 0.02, qd.z - 0.02], [qd.x + 0.13, qd.y, qd.z - 0.035], 0.007, 6)]), MAT.steel())]);
@@ -257,13 +282,13 @@ export function buildTail({ A, P, air, roofY }) {
   const qInv = trFrame.quaternion.clone().invert();
   const toTr = (p) => V3(...p).sub(hub).applyQuaternion(qInv);
   // the feed climbs the pylon beside the pylon drive shaft, 0.115 m to starboard of its axis
-  // (closing in near the top, where the pylon thins; the tail-rotor servo and quadrant sit behind the rear spar)
+  // (closing in near the top, where the pylon thins; the tail-rotor servo and quadrant sit behind the shaft)
   const shaftSide = (t, off = 0.115) => [TAIL.igb[0] + (TAIL.tgb[0] - TAIL.igb[0]) * t, TAIL.igb[1] + (TAIL.tgb[1] - TAIL.igb[1]) * t, TAIL.igb[2] + (TAIL.tgb[2] - TAIL.igb[2]) * t + off];
   P('Tail rotor slip ring', {
     system: 'Electrical', material: 'Slip-ring assembly on the tail-rotor shaft, feed cable up the pylon', mass: 3, explode: [-2.9, 1.7, -0.4],
     desc: 'Carries de-ice power onto the turning tail-rotor shaft between the gearbox and the hub. The controller switches the tail-rotor power itself and sends it through here to all four blades at once, so unlike the main rotor the tail rotor needs no distributor. Its cable branches off the tail-cone harness and climbs the pylon.',
   }, [mesh(merge([cyl(0.068, 0.068, 0.06, [0, -0.13, 0], 'y', 20), cyl(0.074, 0.074, 0.01, [0, -0.15, 0], 'y', 20)]), MAT.casting()),
-    mesh(pipe([toTr(DEICE.tailEnd), toTr([-8.64, 2.08, -0.05]), ...[[0.2], [0.4], [0.6], [0.75, 0.1], [0.88, 0.07]].map(([t, o]) => toTr(shaftSide(t, o))), toTr([-9.86, 3.42, -0.24]), toTr([-9.9, 3.49, -0.215]), V3(0.05, -0.13, 0.06)], 0.009, 5), MAT.wiring())], trFrame);
+    mesh(pipe([toTr(DEICE.tailEnd), toTr([-8.64, 2.08, -0.05]), ...[[0.2], [0.4], [0.6], [0.75, 0.1], [0.88, 0.09]].map(([t, o]) => toTr(shaftSide(t, o))), toTr([-9.86, 3.42, -0.24]), toTr([-9.9, 3.49, -0.215]), V3(0.05, -0.13, 0.06)], 0.009, 5), MAT.wiring())], trFrame);
   const bladeG = trBladeGeometry();
   trPart('Tail rotor blades', {
     system: 'Rotor system', material: 'Graphite/glass skins over the crossbeam spars, nickel erosion strips', mass: 32, count: 4, explode: [-3.1, 1.1, 0],

@@ -329,6 +329,102 @@ export const DUCT = [
   [FAN_S, ENG_Z, ENG_Y, 0.98, 0.98, 1.0],
 ];
 
+let ductCache = null;
+/**
+ * Duct liner rings (right side) as [x, y, z] points: the lip ring shrunk by the lip thickness (raked, so
+ * its stations vary round the ring), then S-duct rings every 0.22 m from s 7.6 to the fan face, each a
+ * blend from the lip's shape toward a circle. The propulsion module lofts the liner through these rings;
+ * ductSection() / ductDepth() cut the same surface so other modules can keep out of the air path.
+ */
+export function ductRings() {
+  if (ductCache) return ductCache;
+  const lip = cowlRing(0);
+  const n = lip.length;
+  let cz = 0, cy = 0;
+  for (const p of lip) { cz += p[2]; cy += p[1]; }
+  cz /= n; cy /= n;
+  const inner = lip.map((p) => {
+    const dz = p[2] - cz, dy = p[1] - cy, L = Math.hypot(dz, dy) || 1;
+    const k = Math.max(0, 1 - 0.04 / L);
+    return [p[0] - 0.03, cy + dy * k, cz + dz * k];
+  });
+  const rel = inner.map((p) => [p[2] - cz, p[1] - cy]);
+  const ang = rel.map(([dz, dy]) => Math.atan2(dy, dz));
+  const w0 = Math.max(...rel.map((r) => r[0])) - Math.min(...rel.map((r) => r[0]));
+  const h0 = Math.max(...rel.map((r) => r[1])) - Math.min(...rel.map((r) => r[1]));
+  const cols = [1, 2, 3, 4, 5].map((c) => DUCT.map((row) => [row[0], row[c]]));
+  const rings = [inner];
+  const st = [];
+  for (let s = DUCT[0][0]; s < FAN_S - 0.01; s += 0.22) st.push(s);
+  st.push(FAN_S);
+  for (const s of st) {
+    const [zc, yc, w, h, r] = cols.map((k) => mono(k, s));
+    rings.push(rel.map(([dz, dy], j) => {
+      const a = ang[j];
+      const e = [Math.cos(a) * w / 2, Math.sin(a) * h / 2];
+      const l = [(dz * w) / w0, (dy * h) / h0];
+      return [X(s), yc + lerp(l[1], e[1], r), zc + lerp(l[0], e[0], r)];
+    }));
+  }
+  ductCache = { lip, inner, rings, st: [null, ...st] };
+  return ductCache;
+}
+
+/** Air-passage cross-section of the (right) duct at station s as [z, y] points, or null outside lip → fan face. */
+export function ductSection(s) {
+  const { inner, rings } = ductRings();
+  const R0 = rings[1], s0 = SN - R0[0][0];
+  const sLip = Math.min(...inner.map((p) => SN - p[0]));
+  if (s < sLip || s > FAN_S) return null;
+  if (s < s0) {
+    // between the raked lip and the first S-duct ring; ahead of the lip the section is the lip itself
+    return inner.map((p, j) => {
+      const sj = SN - p[0];
+      const t = s > sj ? (s - sj) / (s0 - sj) : 0;
+      return [lerp(p[2], R0[j][2], t), lerp(p[1], R0[j][1], t)];
+    });
+  }
+  let i = 1;
+  while (i < rings.length - 2 && s > SN - rings[i + 1][0][0]) i++;
+  const a = rings[i], b = rings[i + 1], sa = SN - a[0][0], sb = SN - b[0][0];
+  const t = clamp((s - sa) / (sb - sa), 0, 1);
+  return a.map((p, j) => [lerp(p[2], b[j][2], t), lerp(p[1], b[j][1], t)]);
+}
+
+/**
+ * Signed distance (m) from the duct wall at station s: > 0 inside the engine air passage, < 0 outside
+ * (either duct; z may be signed). A point is clear of the air path when ductDepth < −(its radius + gap).
+ */
+export function ductDepth(s, y, z) {
+  const poly = ductSection(s);
+  if (!poly) return -1;
+  const az = Math.abs(z);
+  let inside = false, d = Infinity;
+  for (let k = 0, m = poly.length; k < m; k++) {
+    const [z1, y1] = poly[k], [z2, y2] = poly[(k + 1) % m];
+    if ((y1 > y) !== (y2 > y) && az < z1 + ((y - y1) * (z2 - z1)) / (y2 - y1)) inside = !inside;
+    const dz = z2 - z1, dy = y2 - y1, L2 = dz * dz + dy * dy || 1;
+    const u = clamp(((az - z1) * dz + (y - y1) * dy) / L2, 0, 1);
+    d = Math.min(d, Math.hypot(az - z1 - u * dz, y - y1 - u * dy));
+  }
+  return inside ? d : -d;
+}
+
+/** Lowest (floor) and highest (roof) duct-wall heights at station s and lateral position z, or null. */
+export function ductSpan(s, z) {
+  const poly = ductSection(s);
+  if (!poly) return null;
+  const az = Math.abs(z);
+  let lo = Infinity, hi = -Infinity;
+  for (let k = 0, m = poly.length; k < m; k++) {
+    const [z1, y1] = poly[k], [z2, y2] = poly[(k + 1) % m];
+    if ((z1 - az) * (z2 - az) > 0 || z1 === z2) continue;
+    const y = y1 + ((az - z1) / (z2 - z1)) * (y2 - y1);
+    lo = Math.min(lo, y); hi = Math.max(hi, y);
+  }
+  return lo <= hi ? { lo, hi } : null;
+}
+
 // ------------------------------------------------------------------ wing, tails
 const tan = Math.tan;
 export const WING = {

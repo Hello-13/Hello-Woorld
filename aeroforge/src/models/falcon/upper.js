@@ -13,13 +13,15 @@ import { mesh } from '../../engine/assembly.js';
 import { lathe, rod, beam, ogiveProfile } from '../../engine/geometry.js';
 import { SKIN, M } from '../../engine/materials.js';
 import { R, Y, polar } from './dims.js';
-import { merge, barrel, dome, domeY, pipe, hoop, post, block, bottle, radialYaw, revolve } from './util.js';
+import { merge, barrel, dome, domeY, pipe, hoop, post, block, bottle, radialYaw, revolve, bar } from './util.js';
 import { MVAC, mvacChamber, mvacRegen, mvacExtension, mvacKit, placeAll } from './merlin.js';
 import { FM, stagePaint, tankMaterial } from './materials.js';
 
 const D = Y.s2DomeDepth;
-// helium pass-throughs in the thrust cone: radius and azimuths (cell centres of its 96-segment grid)
+// grommeted pass-throughs in the thrust cone, at one radius: the helium lines' and the thruster
+// nitrogen lines' azimuths (cell centres of the cone's 96-segment grid)
 const HE_PASS = { r: 1.62, az: [331.875, 28.125] };
+const N2_PASS = [133.125, 316.875];          // above the nitrogen bottles at 135° and 315°
 const at = (r, a, y) => { const [x, z] = polar(r, a); return [x, y, z]; };
 const unit = (r, a, y, w, h, d) => { const [x, z] = polar(r, a); return block(x, y, z, w, h, d, radialYaw(a)); };
 /** Capsule bottle lying tangentially at radius r, azimuth a, height y. */
@@ -190,21 +192,27 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   const coneSeg = 96, cell = (2 * Math.PI) / coneSeg;
   const passR = HE_PASS.r, rA = passR + 0.036, rB = passR - 0.036;
   const band = (ra, rb, k0 = 0, n = coneSeg) => revolve([[ra, coneY(ra)], [rb, coneY(rb)]], n, k0 * cell, n * cell);
-  const winK = HE_PASS.az.map((a) => Math.round((((90 - a) % 360 + 360) % 360) / 3.75 - 0.5)).sort((a, b) => a - b);
+  const passAz = [...HE_PASS.az, ...N2_PASS];
+  const winK = passAz.map((a) => Math.round((((90 - a) % 360 + 360) % 360) / 3.75 - 0.5)).sort((a, b) => a - b);
   const cone = [band(coneR0, rA), band(rB, coneR1)];
   for (let i = 0; i < winK.length; i++) {
     const k0 = winK[i] + 1, k1 = i + 1 < winK.length ? winK[i + 1] : winK[0] + coneSeg;
     cone.push(band(rA, rB, k0, k1 - k0));
   }
   const slope = Math.atan2(coneY0 - coneY1, coneR0 - coneR1);
-  const grommet = HE_PASS.az.map((a) => {
+  const grommet = passAz.map((a) => {
     const g = new THREE.TorusGeometry(0.05, 0.012, 6, 20);
     g.rotateX(Math.PI / 2); g.rotateZ(slope); g.rotateY((-a * Math.PI) / 180);
     return g.translate(...at(passR, a, coneY(passR)));
   });
   const ts = [merge(cone), hoop(R - 0.08, 0.05, Y.s2AftSkirt - 0.32, { seg: 64, tube: 6 }), hoop(0.62, 0.05, gimbalY + 0.1, { seg: 32, tube: 6 }), ...grommet];
   for (let i = 0; i < 8; i++) ts.push(beam(at(R - 0.1, i * 45 + 22.5, Y.interTop + 0.06), at(0.62, i * 45 + 22.5, gimbalY + 0.08), 0.07, 0.07));
-  for (const a of [45, 135, 225, 315]) ts.push(beam(at(0.62, a, gimbalY + 0.1), at(0.12, a, gimbalY - 0.02), 0.08, 0.1));
+  // gimbal mount, as at the first stage's centre engine: a plate on a boss over the gimbal block,
+  // carried to the gimbal ring on two spokes clear of the powerhead (layout estimated), and clevis
+  // brackets from the ring for the upper ends of the two TVC actuators
+  ts.push(post(0, 0, gimbalY + 0.03, gimbalY + 0.15, 0.15, 20), post(0, 0, gimbalY - 0.005, gimbalY + 0.035, 0.1, 16));
+  for (const a of [120, 275]) ts.push(bar(at(0.12, a, gimbalY + 0.09), at(0.6, a, gimbalY + 0.1), 0.08, 0.09));
+  for (const a of [55, 305]) ts.push(unit(0.535, a, gimbalY + 0.155, 0.09, 0.09, 0.13));
   P('Second stage thrust structure', {
     system: 'Structure', xrayWeight: 0.5, material: 'Aluminium thrust cone, struts and gimbal ring', mass: 260,
     desc: 'Carries the Merlin Vacuum\'s ≈ 981 kN from the gimbal into the aft skirt. The cone sits under the aft dome; the powerhead pokes up through its central ring, and two grommeted pass-throughs let the helium pressurisation lines down to the engine (positions estimated).',
@@ -337,8 +345,13 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
       rcs.push(post(nx, nz, podY - 0.22, podY - 0.12, 0.03, 8), post(nx, nz, podY + 0.12, podY + 0.22, 0.03, 8));
     }
     n2.push(sideBottle(1.62, a + 45, 47.77, 0.12, 0.7));
-    n2l.push(pipe([at(1.62, a + 45, 47.89), at(1.74, a + 20, 47.97), at(R - 0.03, a, podY)], 0.018, { seg: 6, tubular: 12 }));
-    n2r.push(unit(1.7, a + 30, 47.95, 0.07, 0.07, 0.07));                                   // regulator
+    // up from the bottle through the cone's pass-through, round in the gap under the aft dome, then
+    // out over the cone's rim to the pod
+    const w = N2_PASS[a === 90 ? 0 : 1], sg = Math.sign(w - a);
+    const run = Array.from({ length: 7 }, (_, i) => at(1.64, w - sg * 4 - ((w - sg * 4 - (a + sg * 6)) * i) / 6, 48.01));
+    n2l.push(pipe([at(1.62, w, 47.86), at(1.62, w, 47.9), at(1.62, w, 47.97), at(1.625, w - sg * 1.5, 48.0), ...run, at(1.69, a + sg * 4.5, 48.045), at(1.705, a + sg * 3.8, 48.07),
+      at(1.72, a + sg * 3, 48.098), at(1.74, a + sg * 2.2, 48.115), at(1.77, a + sg * 1.4, 48.135), at(1.8, a + sg * 0.5, 48.17), at(R - 0.005, a, 48.2)], 0.018, { seg: 6, tubular: 48 }));
+    n2r.push(unit(1.64, w - sg * 12, 48.01, 0.06, 0.06, 0.06));                              // regulator on the run
   }
   P('Second stage cold-gas thrusters', {
     system: 'Attitude control', count: 2, material: 'Nitrogen thruster pods', mass: 50,
@@ -436,13 +449,15 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   // ------------------------------------------------------------------ T-0 quick disconnect and harnesses
   const qd = [unit(R + 0.01, qdAz, qdY, 0.9, 0.7, 0.04)];
   for (const dyq of [-0.16, 0.16]) for (const dt of [-0.3, -0.1, 0.1, 0.3]) qd.push(unit(R + 0.04, qdAz + (dt * 180) / (Math.PI * R), qdY + dyq, 0.1, 0.1, 0.04));
-  const qdCover = [unit(R + 0.045, qdAz, (qdY + 0.35 + 52.62) / 2, 0.16, 52.62 - qdY - 0.35, 0.08), unit(R + 0.045, 258, (qdY - 0.2 + 48.3) / 2, 0.12, qdY - 0.2 - 48.3, 0.07),
+  const qdCover = [unit(R + 0.045, qdAz, (qdY + 0.35 + 52.62) / 2, 0.16, 52.62 - qdY - 0.35, 0.08), unit(R + 0.045, 258, (qdY - 0.2 + 47.88) / 2, 0.12, qdY - 0.2 - 47.88, 0.07),
     pipe([at(R + 0.04, qdAz - 6, qdY - 0.3), at(R + 0.05, 262, qdY - 0.25), at(R + 0.045, 258, qdY - 0.25)], 0.03, { seg: 6, tubular: 6 })];
   const qdLines = [
     pipe([at(R - 0.02, qdAz - 2, qdY + 0.05), at(1.55, qdAz - 2, qdY + 0.05)], 0.035, { seg: 6, tubular: 3 }),                 // RP-1 fill / drain
     pipe([at(R + 0.02, qdAz + 2, 52.6), at(R - 0.06, qdAz + 2, 52.62), at(1.55, qdAz + 2, 52.5)], 0.035, { seg: 6, tubular: 4 }),   // LOX fill / drain
-    pipe([at(R + 0.03, 258, 48.32), at(R - 0.06, 258, 48.2), at(1.74, 270, 47.95), ...arc(1.74, 47.95, 285, 300, 3)], 0.01, { seg: 4, tubular: 12 }),   // GN₂ fill → 315° tank
-    pipe([at(1.74, 258, 47.95), ...arc(1.74, 47.95, 250, 152, 8)], 0.01, { seg: 4, tubular: 16 }),                                // → 135° tank
+    // GN₂ fill: in through the skin below the thrust cone's rim, then round under the rim to the end
+    // caps of the 315° and 135° tanks
+    pipe([at(R + 0.03, 258, 47.92), at(1.8, 258, 47.92), at(1.74, 264, 47.92), ...arc(1.74, 47.92, 275, 297, 3), at(1.7, 301, 47.86), at(1.66, 303.5, 47.8)], 0.01, { seg: 4, tubular: 16 }),
+    pipe([at(1.74, 262, 47.92), ...arc(1.74, 47.92, 250, 155, 8), at(1.7, 150, 47.86), at(1.66, 146.5, 47.8)], 0.01, { seg: 4, tubular: 20 }),
   ];
   P('Second stage T-0 quick disconnect', {
     system: 'Fuel', material: 'Quick-disconnect plate; RP-1, LOX, helium, nitrogen, power, data and payload connectors; external line covers', mass: 35,

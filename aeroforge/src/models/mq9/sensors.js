@@ -103,11 +103,11 @@ export function buildAirData({ P, L, m }, adc) {
       const tail = zs > 0
         ? [[X(1.45), 1.42 + dy, 0.33], [X(1.62), 1.44 + dy, 0.22], [X(1.64), 1.52, 0.2 + dy]]
         : [[X(1.45), 1.42 + dy, -0.33], [X(1.55), 1.43 + dy, 0.0], [X(1.62), 1.44 + dy, 0.16], [X(1.65), 1.52, 0.15 + dy]];
-      lines.push(pipe([off(fusePoint(0.62, th, 0.025)), off(fusePoint(0.9, th, 0.03)), off(fusePoint(1.25, th + 0.12 * zs, 0.035)), ...tail], 0.003, 4, 40));
+      lines.push(pipe([off(fusePoint(0.62, th, 0.006)), off(fusePoint(0.75, th, 0.025)), off(fusePoint(0.9, th, 0.03)), off(fusePoint(1.25, th + 0.12 * zs, 0.035)), ...tail], 0.003, 4, 40));
     }
   }
   // OAT wire forward along the starboard side; AoA wire aft from the vane
-  lines.push(pipe([fusePoint(3.0, -0.9, 0.025), fusePoint(2.85, -0.2, 0.03), fusePoint(2.0, -0.15, 0.035), [X(1.75), 1.44, 0.3], [X(1.72), 1.52, adc[2] + 0.11]], 0.0035, 4, 40));
+  lines.push(pipe([fusePoint(3.0, -0.9, 0.004), fusePoint(2.95, -0.75, 0.025), fusePoint(2.85, -0.2, 0.03), fusePoint(2.0, -0.15, 0.035), [X(1.75), 1.44, 0.3], [X(1.72), 1.52, adc[2] + 0.11]], 0.0035, 4, 40));
   lines.push(pipe([fusePoint(0.85, -0.05, 0.05), fusePoint(1.2, -0.08, 0.04), [X(1.5), 1.43, 0.31], [X(1.66), 1.52, adc[2] + 0.1]], 0.0035, 4, 30));
   P('Air data lines', {
     system: 'Sensors', material: 'Nylon pressure tubing, 6 mm; shielded sensor wires', mass: 0.6, count: 6, xrayWeight: 0.6, explode: [1.0, 0.2, 0.25],
@@ -144,11 +144,11 @@ export function buildLinks({ P, L, m }, at) {
   const coax = [];
   const c = (pts, r = 0.0035) => coax.push(pipe(pts, r, 4, Math.max(16, pts.length * 10)));
   // C-band: upper blade along the roof to the transceiver; lower blade up past the floor's aft edge
-  c([roof(2.5, -0.06, 0.03), roof(2.9, -0.08), [X(3.18), 1.79, -0.1], [X(3.2), at.cband[1] + 0.112, -0.1]], 0.004);
-  c([keel(3.3, 0, 0.02), [X(3.36), 1.2, -0.02], [X(3.41), 1.45, -0.05], [X(3.405), 1.6, -0.1], [at.cband[0] - 0.13, at.cband[1], -0.12]], 0.004);
+  c([[X(2.5), prof(2.5).top - 0.013, 0], roof(2.55, -0.04, 0.03), roof(2.9, -0.08), [X(3.18), 1.79, -0.1], [X(3.2), at.cband[1] + 0.112, -0.1]], 0.004);
+  c([[X(3.3), prof(3.3).bot + 0.013, 0], keel(3.32, -0.01, 0.025), [X(3.36), 1.2, -0.02], [X(3.41), 1.45, -0.05], [X(3.405), 1.6, -0.1], [at.cband[0] - 0.13, at.cband[1], -0.12]], 0.004);
   // GPS: the forward patch to the starboard EGI, the aft patch along the roof to the port EGI
-  c([roof(3.0, 0, 0.03), [X(2.85), 1.76, 0.12], [at.egi[0][0] - 0.08, at.egi[0][1] + 0.08, 0.2]]);
-  c([roof(5.05, -0.02, 0.03), roof(4.4, -0.04), roof(3.4, -0.04), roof(3.0, -0.08), [X(2.8), 1.74, -0.17], [at.egi[1][0] - 0.08, at.egi[1][1] + 0.08, -0.2]]);
+  c([[X(3.0), prof(3.0).top - 0.012, 0], roof(2.96, 0.01, 0.03), [X(2.85), 1.76, 0.12], [at.egi[0][0] - 0.08, at.egi[0][1] + 0.08, 0.2]]);
+  c([[X(5.05), prof(5.05).top - 0.012, 0], roof(4.98, -0.02, 0.03), roof(4.4, -0.04), roof(3.4, -0.04), roof(3.0, -0.08), [X(2.8), 1.74, -0.17], [at.egi[1][0] - 0.08, at.egi[1][1] + 0.08, -0.2]]);
   // IFF: upper blade forward along the roof; lower blade along the lower side and up into the bay
   c([roof(6.6, 0.02, 0.03), roof(6.0, 0.03), roof(5.0, 0.03), roof(3.6, 0.03), roof(2.9, 0.03), [X(2.68), 1.68, 0.03], [at.iff[0] - 0.02, at.iff[1] + 0.06, 0.03]]);
   // the lower blade's cable stays in the keel channel under the aft cell's floor, rising only between the gear wells

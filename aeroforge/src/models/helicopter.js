@@ -109,7 +109,7 @@ export function buildHelicopter() {
       ['Cabin', '11 troops or 4 litters'], ['Cargo hook', '4,082 kg (9,000 lb)'], ['Cruise', '151 kt (280 km/h) at 16,800 lb, 4,000 ft / 95 °F, 100 % MCP'],
     ],
     heroStats: [['16.36', 'm', 'Rotor diameter'], ['2 × 1,994', 'shp', 'T700-701D engines'], ['9,979', 'kg', 'Max take-off']],
-    sources: 'Sikorsky/Lockheed Martin UH-60M brochure; US Army aviation fact sheets; GE Aviation T700-GE-701D datasheet; NASA CR-166309 (UH-60A GenHel engineering simulation data); NASA/Army (Yeo) wide-chord-blade reports; SAE 2007-01-3301 (UH-60M rotor ice protection); Sikorsky patents on the canted tail rotor and stabilator; NASA transmission reports (20,900 → 258 rpm); museum placard data; Wikipedia',
+    sources: 'Sikorsky/Lockheed Martin UH-60M brochure; TM 1-1520-237-10 operator\'s manual (UH-60A/L); US Army aviation fact sheets; GE Aviation T700-GE-701D datasheet; NASA CR-166309 (UH-60A GenHel engineering simulation data); NASA/Army (Yeo) wide-chord-blade reports; SAE 2007-01-3301 (UH-60M rotor ice protection); Sikorsky patents on the canted tail rotor and stabilator; NASA TP-2626 transmission tests (20,909 → 258 rpm, 565 kg); NASA TM-85890 (Hilbert UH-60 model: tail rotor 124.62 rad/s); museum placard data; Wikipedia',
     fleetTag: '4,082 kg hook',
     root: A.root,
     air,

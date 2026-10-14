@@ -90,6 +90,24 @@ export function block(x, y, z, w, h, d, ry = 0) {
   return g;
 }
 
+/**
+ * Straight bar from p0 to p1 with a level section: w across it in the horizontal plane, h in the
+ * vertical plane through it (engine/geometry's beam() rolls its section with the bar's heading).
+ */
+export function bar(p0, p1, w, h) {
+  const a = new THREE.Vector3(...p0), b = new THREE.Vector3(...p1);
+  const along = b.clone().sub(a), len = along.length();
+  along.divideScalar(len);
+  const side = new THREE.Vector3(0, 1, 0).cross(along);
+  if (side.lengthSq() < 1e-8) side.set(1, 0, 0);
+  side.normalize();
+  const up = along.clone().cross(side).normalize();
+  const g = new THREE.BoxGeometry(w, h, len);
+  g.applyMatrix4(new THREE.Matrix4().makeBasis(side, up, along));
+  const m = a.add(b).multiplyScalar(0.5);
+  return g.translate(m.x, m.y, m.z);
+}
+
 /** Capsule-ended cylinder (COPV / pressure bottle) along +y centred at (x, y, z). */
 export function bottle(x, y, z, r, len, seg = 20) {
   const g = new THREE.CapsuleGeometry(r, Math.max(0.001, len - 2 * r), 6, seg);

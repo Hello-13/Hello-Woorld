@@ -290,8 +290,8 @@ export const TAIL = {
 /** Lateral lean of the pylon mid-plane at height y. */
 export const pylonLean = (y) => -Math.max(0, y - TAIL.shearY0) * Math.tan(TAIL.cant);
 /**
- * Tail-rotor controls in the pylon (world metres), aft of the rear spar so they stay clear of the
- * pylon drive shaft that climbs just ahead of it: the servo's lower end (No. 1 port) and upper end,
+ * Tail-rotor controls in the pylon (world metres), between the pylon drive shaft and the rear spar
+ * that angles back behind them: the servo's lower end (No. 1 port) and upper end,
  * and the cable quadrant's pivot. Shared by the tail module and the cable and hydraulic runs.
  */
 export const TR_CTL = { servoLo: [-9.56, 2.95, -0.205], servoHi: [-9.74, 3.15, -0.283], quadrant: [-9.46, 2.76, -0.13] };

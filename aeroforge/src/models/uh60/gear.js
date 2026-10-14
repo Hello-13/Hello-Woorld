@@ -208,7 +208,8 @@ export function buildGear({ A, P }) {
   P('Fuel prime/boost pump', {
     system: 'Fuel', material: 'Electric pump in the left cell (location approximate)', mass: 4, explode: [-0.6, -0.3, -1.1],
     desc: 'An electric pump primes the engine fuel lines before a start and feeds the APU, which draws from the left cell; in flight the engines\' own pumps do the work.',
-  }, [mesh(merge([cyl(0.06, 0.06, 0.14, [-2.65, 0.95, -0.45], 'y', 14), pipe([[-2.65, 1.02, -0.45], [-2.6, 1.6, -0.35], [-2.4, 2.22, -0.3], [-2.1, 2.29, -0.32], [-1.98, 2.3, -0.32]], 0.008)]), MAT.casting())]);
+  }, [mesh(merge([cyl(0.06, 0.06, 0.14, [-2.65, 0.95, -0.45], 'y', 14), pipe(   // riser outboard of the aft avionics shelf to the APU fuel shutoff
+      [[-2.65, 1.02, -0.45], [-2.62, 1.45, -0.52], [-2.58, 1.75, -0.54], [-2.5, 2.0, -0.46], [-2.4, 2.2, -0.32], [-2.1, 2.29, -0.32], [-1.98, 2.3, -0.32]], 0.008)]), MAT.casting())]);
   P('APU fuel shutoff valve', {
     system: 'Fuel', material: 'Solenoid shutoff valve on the APU compartment firewall', mass: 1, explode: [-0.9, 1.3, -1.0],
     desc: 'The prime/boost pump\'s shutoff valve doubles as the APU\'s firewall fuel shutoff: it closes the APU feed at the compartment wall, and the APU fire T-handle shuts it.',

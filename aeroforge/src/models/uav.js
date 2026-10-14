@@ -131,15 +131,15 @@ export function buildUAV() {
   const L = (geo, material, o) => mesh(geo, material, o);
 
   // ============================================================== fuselage skins
-  // the skin is cut away under the gear doors (main wells s 4.9–6.5 from the keel strip up the lower side; nose well s 1.92–3.08);
+  // the skin is cut away under the gear doors (main wells s 4.9–6.5 from the keel strip up the lower side; nose well s 1.92–3.11);
   // the doors, 4 mm proud of the skin, overlap the cut-outs' edges
   const opening = (s, y, z) => {
     const { top, bot, hw, yc } = prof(s);
     const u = Math.abs(z) / hw, v = (y - yc) / ((top - bot) / 2);
     const th = Math.atan2(Math.sign(v) * Math.abs(v) ** 1.2, u ** 1.2) + Math.PI / 2;     // section angle from the keel
-    return (s > 4.9 && s < 6.5 && th > 0.1 && th < 1.45) || (s > 1.92 && s < 3.08 && th > 0.1 && th < 0.41);
+    return (s > 4.9 && s < 6.5 && th > 0.1 && th < 1.45) || (s > 1.92 && s < 3.11 && th > 0.1 && th < 0.41);
   };
-  const fl = fuselageLoft(stationsWithBreaks([0.95, 1.92, 2.05, 3.08, 4.0, 4.9, 6.3, 6.5, FIREWALL_S], 0.2), 48);
+  const fl = fuselageLoft(stationsWithBreaks([0.95, 1.92, 2.05, 3.11, 4.0, 4.9, 6.3, 6.5, FIREWALL_S], 0.2), 48);
   const panels = splitTris(fl, (cx, cy, cz) => {
     const s = 5.5 - cx;
     if (opening(s, cy, cz)) return null;
@@ -176,8 +176,8 @@ export function buildUAV() {
   }, L(panels.get('cowl'), m.skin)), 'cowling');
 
   // ============================================================== fuselage structure
-  // nose-gear well s 1.88–3.12 under a raised avionics floor; main-gear wells s 4.86–6.5 behind the fuselage tank
-  const NW = [1.88, 3.12], NFLOOR = 1.49;
+  // nose-gear well s 1.88–3.13 under a raised avionics floor; main-gear wells s 4.86–6.5 behind the fuselage tank
+  const NW = [1.88, 3.13], NFLOOR = 1.49;
   const MW = [4.86, 6.5], MROOF = [1.5, 1.735], MSTEP = 5.3;
   // frames that cross a gear well are open at the bottom: the well walls and keel webs carry the load around the cut-out
   const openArc = { from: -0.45, to: Math.PI + 0.45, n: 30 };
@@ -223,7 +223,7 @@ export function buildUAV() {
   const nwWall = (zc) => box(NW[1] - NW[0], NFLOOR - NWB, 0.01, [X((NW[0] + NW[1]) / 2), (NFLOOR + NWB) / 2, zc]);
   P('Nose gear well', {
     system: 'Structure', material: 'Composite well liner (est.)', mass: 5, explode: [0.6, -0.15, 0],
-    desc: 'A boxed well, 1.24 m long, that the nose leg retracts aft into; its side walls carry the floor and the frames past the cut-out (size estimated).',
+    desc: 'A boxed well, 1.25 m long, that the nose leg retracts aft into; its side walls carry the floor and the frames past the cut-out (size estimated).',
   }, L(merge([nwWall(0.19), nwWall(-0.19), box(0.01, NFLOOR - NWB, 0.38, [X(NW[0]), (NFLOOR + NWB) / 2, 0]), box(0.01, NFLOOR - NWB, 0.38, [X(NW[1]), (NFLOOR + NWB) / 2, 0])]), m.primer));
   // main-gear wells: keel wall, stepped roof (low under the wing box, high behind it), forward and aft walls
   const keelWall = (zc) => {
@@ -369,11 +369,14 @@ export function buildUAV() {
       system: 'Flight controls', material: 'Aluminium hinge brackets on the rear spar (est.)', mass: 2, count: 12, xrayWeight: 0.6, explode: [-0.55, 1.25, 1.9 * side],
       desc: 'Three brackets on the rear spar carry the hinge line of each of the four surfaces on this wing; the surfaces pivot about their leading edges, and each bracket takes part of the surface’s air load into the spar (bracket count and spacing estimated).',
     }, L(f(merge(brk)), m.alu));
-    const harnessPts = [[0.45, 0.705], [1.5, 0.705], [3.0, 0.705], [4.5, 0.705], [6.0, 0.705], [7.0, 0.704], [7.8, 0.703], [8.6, 0.703], [9.25, 0.70], [9.6, 0.6], [9.85, 0.4], [9.95, 0.08]].map(([z, cf]) => wpt(z, cf, 0));
+    const harnessPts = [[0.45, 0.705], [1.5, 0.705], [3.0, 0.705], [4.5, 0.705], [6.0, 0.705], [7.0, 0.704], [7.8, 0.703], [8.6, 0.703], [9.25, 0.70], [9.6, 0.6], [9.85, 0.4], [9.95, 0.08], [10.01, 0.045]].map(([z, cf]) => wpt(z, cf, 0));
+    // the radio antenna's coax leaves the bundle in the tip and runs out to the pod's inboard face
+    const podAt = wpt(10.05, 0.45, 0);
+    branch.push(pipe([wpt(9.85, 0.4, 0), wpt(9.97, 0.42, 0), [podAt[0] - 0.05, podAt[1], WING.semi - 0.028]], 0.006, 5, 12));
     P(`Wing wiring (${sn})`, {
       system: 'Electrical', material: 'Shielded harness in conduit (est.)', mass: 4, xrayWeight: 0.5, explode: [0, 1.0, 1.9 * side],
-      desc: 'Power and signal runs along the rear spar, outside the fuel bays, with a branch to each of the four surface servos and on to the wingtip radio antenna and the navigation light.',
-    }, L(f(merge([pipe(harnessPts, 0.008, 5, 110), ...branch])), m.harness));
+      desc: 'Power and signal runs along the rear spar, outside the fuel bays, with a branch to each of the four surface servos, then round the tip to the navigation light, with the coax for the wingtip V/UHF antenna leaving it for the antenna pod.',
+    }, L(f(merge([pipe(harnessPts, 0.008, 5, 120), ...branch])), m.harness));
     const lens = new THREE.SphereGeometry(0.03, 12, 8).scale(1.4, 0.8, 1).translate(...wpt(10.0, 0.04, 0)).translate(0.02, 0, 0.03);
     P(`Navigation light (${sn})`, {
       system: 'Electrical', material: 'LED position light', mass: 0.5, explode: [0, 1.5, 2.1 * side],
@@ -626,7 +629,7 @@ export function buildUAV() {
   const movers = [];                       // () => void, run after the legs and doors have moved
 
   // ---- nose gear: steerable oleo leg, retracts aft into the well under the avionics floor
-  const NG = { s: 2.0, y: 1.12, stow: -(Math.PI / 2 + 0.2) };
+  const NG = { s: 2.0, y: 1.12, stow: -(Math.PI / 2 + 0.2) };     // the tyre's arc reaches s 3.121, just short of the well's aft wall
   const noseLeg = new THREE.Group();
   noseLeg.position.set(X(NG.s), NG.y, 0);
   const ngStrut = [
@@ -685,7 +688,7 @@ export function buildUAV() {
   P('Nose-wheel steering controller', {
     system: 'Landing gear', material: 'Servo driver and steering controller (est.)', mass: 1, explode: [0.45, 0.55, -0.4],
     desc: 'Turns rudder-pedal commands from the ground station into drive for the steering servo and centres the wheel when the commands stop. Its failure in May 2015 left the nose wheel uncontrollable on the runway (USAF investigation; position estimated).',
-  }, L(merge([lru(0.15, 0.06, 0.1, nsc, 0.012), pipe([[nsc[0] + 0.07, nsc[1] - 0.01, nsc[2]], [X(2.12), 1.36, -0.11], [X(2.03), 1.22, -0.112], [X(2.0), 1.125, -0.112]], 0.006, 5, 14)]), m.lru));
+  }, L(merge([lru(0.15, 0.06, 0.1, nsc, 0.012), pipe([[nsc[0] + 0.07, nsc[1] - 0.01, nsc[2]], [X(2.12), 1.36, -0.11], [X(NG.s + 0.03), 1.22, -0.112], [X(NG.s), 1.125, -0.112]], 0.006, 5, 14)]), m.lru));
   // the leg's own harness: from the trunnion end, where the steering controller's lead arrives, to the steering motor and the landing light
   P('Nose leg harness', {
     system: 'Electrical', material: 'Shielded harness clamped to the leg, with a flexible loop at the trunnion (est.)', mass: 0.5, xrayWeight: 0.5, explode: [0.4, -0.65, -0.35],
@@ -814,7 +817,7 @@ export function buildUAV() {
       desc: 'A long door that closes the main-gear well in flight to keep the underside smooth. It wraps from the keel strip round the lower corner, because the leg folds into a slot there and the wheel into a pocket at the aft end, and it hinges along its upper edge, under the lower longeron, so it swings out clear of the leg. It opens before the leg moves and closes after it is up (shape, hinge line and sequencing estimated).',
     });
     doors.push({ h: mainDoor, sign: side, open: 1.6 });
-    doors.push({ h: doorPart(`Nose gear door (${sd})`, 1.92, 3.08, -Math.PI / 2 + 0.02 * side, -Math.PI / 2 + 0.42 * side, 'outer', {
+    doors.push({ h: doorPart(`Nose gear door (${sd})`, 1.92, 3.11, -Math.PI / 2 + 0.02 * side, -Math.PI / 2 + 0.42 * side, 'outer', {
       mass: 1.5, explode: [0, -0.55, 0.35 * side], desc: 'One of a pair of nose-gear doors hinged along the outer edge of the well, linked to open with the leg.',
     }), sign: side, open: 1.45 });
     // door actuator: from a bracket inside the well, below the hinge line, out to a lug on the door's inner face
@@ -985,18 +988,27 @@ export function buildUAV() {
     for (const [q, y, z] of [[2.175, NFLOOR + 0.21, 0.24], [2.64, NFLOOR + 0.17, 0.2], zs > 0 ? [3.26, NFLOOR + 0.25, 0.14] : [3.26, NFLOOR + 0.226, 0.13]]) avh.push(tubeBetween(fusePoint(q, Math.PI / 2 - 0.5 * zs, 0.02), [X(q), y, z * zs], 0.007, 5));
     avh.push(pipe([fusePoint(3.35, Math.PI / 2 - 0.5 * zs, 0.02), [X(3.36), 1.6, 0.33 * zs], [X(3.34), 1.3, 0.25 * zs]], 0.009, 5, 16));
   }
-  avh.push(pipe([[X(1.55), 1.3, -0.25], [X(1.25), 1.15, -0.24], [X(1.1), 1.045, -0.195], [X(1.08), 1.008, -0.18]], 0.009, 5, 16));   // past the ballast to the turret's slip ring
+  avh.push(pipe([[X(1.55), 1.3, -0.25], [X(1.25), 1.15, -0.24], [X(1.1), 1.045, -0.195], [X(1.08), 1.002, -0.18]], 0.009, 5, 16));   // past the ballast to the turret's slip ring
+  // starboard: on aft from the radar drop to the MTS-B electronics unit, and the unit's gimbal and video cable forward to the turret
+  avh.push(pipe([[X(1.55), 1.3, 0.25], [X(1.8), 1.285, 0.262], [X(2.098), 1.27, 0.262]], 0.009, 5, 16));
+  avh.push(pipe([[X(2.098), 1.215, 0.25], [X(1.85), 1.19, 0.235], [X(1.4), 1.115, 0.222], [X(1.15), 1.04, 0.2], [X(1.08), 1.002, 0.18]], 0.008, 5, 30));
+  avh.push(tubeBetween(fusePoint(1.7, Math.PI / 2 + 0.5, 0.02), [X(1.7), NFLOOR + 0.212, -0.2], 0.007, 5));            // SATCOM modem
+  avh.push(tubeBetween(fusePoint(2.92, Math.PI / 2 - 0.5, 0.02), [X(2.92), NFLOOR + 0.092, 0.11], 0.006, 5));          // Iridium transceiver
+  // lower anti-collision beacon: from the starboard battery drop, aft past the battery and down under the forward cell to the light's base
+  avh.push(pipe([[X(3.34), 1.3, 0.25], [X(3.4), 1.22, 0.27], [X(3.45), 1.1, 0.24], [X(3.55), 1.03, 0.12], [X(3.68), 1.012, 0.02], [X(3.7), prof(3.7).bot + 0.004, 0]], 0.006, 5, 30));
   avh.push(pipe([fusePoint(2.41, Math.PI / 2 + 0.5, 0.02), [X(2.41), 1.6, -0.34], [X(2.41), 1.45, -0.33], [X(2.41), 1.31, -0.27], [X(2.41), 1.279, -0.256]], 0.006, 5, 20));   // down behind the flight computers and through the floor to the cooling fan
   avh.push(pipe([[X(1.35), 1.5, -0.3], [X(1.1), 1.43, -0.33], [X(0.95), 1.45, -0.33], [X(0.75), 1.47, -0.3], [X(0.45), 1.47, -0.22], [X(0.28), 1.43, -0.09], [X(0.222), 1.37, -0.01]], 0.006, 5, 40));   // forward over the radar deck to the nose camera
   P('Avionics bay harness', {
     system: 'Electrical', material: 'Shielded copper harness and data buses (est.)', mass: 18, xrayWeight: 0.5, explode: [0.3, 1.25, 0],
-    desc: 'Runs along both sides of the avionics bay roof, dropping to each rack, the batteries, the radar, the turret, the cooling fan and, forward over the radar deck, the pilot’s nose camera. Port and starboard runs are kept apart so one chafed bundle cannot take out both channels (routing estimated).',
+    desc: 'Runs along both sides of the avionics bay roof, dropping to each rack, the SATCOM modem, the Iridium set, the batteries, the radar, the MTS-B electronics unit and its turret, the cooling fan, the lower anti-collision beacon and, forward over the radar deck, the pilot’s nose camera. Port and starboard runs are kept apart so one chafed bundle cannot take out both channels (routing estimated).',
   }, L(merge(avh), m.harness));
   const feeders = [];
   for (const zs of [1, -1]) feeders.push(pipe([...topRun(3.45, 7.2, zs), [X(7.42), 1.74, 0.22 * zs], [X(PDU_S), 1.7, 0.2 * zs]], 0.012, 6, 80));
+  // the upper anti-collision beacon's lead, over the IFF and Iridium coax to the light's base on the spine
+  feeders.push(pipe([fusePoint(5.85, Math.PI / 2 - 0.5, 0.02), fusePoint(5.85, Math.PI / 2 - 0.22, 0.022), [X(5.85), prof(5.85).top - 0.018, 0.02], [X(5.85), prof(5.85).top - 0.004, 0]], 0.006, 5, 16));
   P('Main power feeders', {
     system: 'Electrical', material: 'Heavy-gauge power cables (est.)', mass: 16, count: 2, xrayWeight: 0.5, explode: [0, 1.45, 0],
-    desc: 'Two independent power feeders from the distribution units, over the fuel cells and the gear wells to the avionics bay, one per bus, so a single chafed cable cannot take both buses down (routing estimated).',
+    desc: 'Two independent power feeders from the distribution units, over the fuel cells and the gear wells to the avionics bay, one per bus, so a single chafed cable cannot take both buses down; a lead from the starboard one feeds the upper anti-collision beacon (routing estimated).',
   }, L(merge(feeders), m.harness));
   const sideRun = (s0, s1, th, inset = 0.04) => { const pts = []; for (let q = s0; q <= s1 + 1e-6; q += 0.2) pts.push(fusePoint(q, th, inset)); return pts; };
   const SG = [X(9.68), 1.535, 0.145];                    // starter-generator terminal box
@@ -1010,12 +1022,22 @@ export function buildUAV() {
     pipe([[X(GCU_S) - 0.09, 1.61, -0.2], [X(8.05), 1.66, -0.26], ...sideRun(8.1, 8.7, Math.PI - 0.3), [X(8.75), 1.72, -0.22], ...sideRun(8.9, 9.1, Math.PI - 0.12), [X(9.2), 1.68, -0.305], [X(9.26), 1.6, -0.3], [X(9.29), 1.57, -0.28],
       [X(9.42), 1.56, -0.265], [X(9.52), 1.525, -0.235], [X(9.6), 1.48, -0.225], [X(9.648), 1.466, -0.216]], 0.011, 6, 80),   // to the backup generator's terminal box
     tubeBetween([X(9.36), 1.562, -0.262], [X(9.36), 1.609, -0.26], 0.006, 5),                                                        // up to the ignition exciter
-    pipe([fusePoint(9.25, Math.PI - 0.12, 0.04), [X(9.7), 1.72, -0.29], [X(9.98), ENGINE_Y - 0.05, -0.29]], 0.006, 5, 16),
+    pipe([fusePoint(9.25, Math.PI - 0.12, 0.04), [X(9.7), 1.72, -0.29], [X(9.98), ENGINE_Y - 0.05, -0.292], [X(9.996), ENGINE_Y - 0.05, -0.29]], 0.006, 5, 20),   // oil pressure transmitter
+    pipe([[X(9.996), ENGINE_Y - 0.05, -0.29], [X(10.03), ENGINE_Y - 0.1, -0.282], [X(10.058), ENGINE_Y - 0.13, -0.272]], 0.005, 5, 10),                      // and the oil temperature bulb
     pipe([fusePoint(9.25, Math.PI - 0.12, 0.04), [X(9.55), 1.86, -0.24], [X(9.84), ENGINE_Y + 0.17, -0.17]], 0.006, 5, 16),
+    // the start module and the engine control, each a short drop from its side's run to the unit's outboard face
+    pipe([fusePoint(8.66, Math.PI - 0.3, 0.04), [X(8.66), 1.7, -0.3], [X(8.66), 1.625, -0.284]], 0.006, 5, 10),
+    pipe([fusePoint(8.66, 0.3, 0.04), [X(8.66), 1.72, 0.302], [X(8.66), 1.68, 0.299]], 0.006, 5, 10),
+    // the chip detector on the gearbox sump, from the backup generator's terminal box forward of the generator
+    pipe([[X(9.648), 1.466, -0.216], [X(9.585), 1.47, -0.2], [X(9.58), 1.47, -0.09], [X(9.662), 1.452, -0.066]], 0.005, 5, 16),
+    // the NTS valve and the beta-pressure switch on the gearbox's aft face: up the starboard side between the gearbox and the
+    // cowling, round the face behind the housing, and across under the output shaft to the switch
+    pipe([[X(9.45), 1.585, 0.262], [X(9.52), 1.7, 0.288], [X(9.85), 1.725, 0.29], [X(10.15), 1.72, 0.285], [X(10.232), 1.665, 0.22], [X(10.232), 1.615, 0.178]], 0.006, 5, 30),
+    pipe([[X(10.235), 1.578, 0.15], [X(10.235), 1.56, 0.0], [X(10.235), 1.578, -0.15]], 0.005, 5, 12),
   ];
   P('Engine bay harness', {
     system: 'Electrical', material: 'Fire-resistant harness (est.)', mass: 8, xrayWeight: 0.5, explode: [0, 0.55, -1.0],
-    desc: 'Carries power and signals from the distribution units and the generator control unit to the engine control, the start module and the control servos, then through the firewall to the starter-generator, the backup generator’s terminal box, the igniter exciter, the tachometer-generator and the engine sensors, in fire-resistant sleeving because it runs beside the hot section (routing estimated).',
+    desc: 'Carries power and signals from the distribution units and the generator control unit to the engine control, the start module and the control servos, then through the firewall to the starter-generator, the backup generator’s terminal box, the igniter exciter, the tachometer-generator, the torque pickups, the oil pressure and temperature sensors, the chip detector and, round the gearbox to its aft face, the NTS valve and beta-pressure switch, in fire-resistant sleeving because it runs beside the hot section (routing estimated).',
   }, L(merge(ebh), m.harness));
   const finServo = [X(8.3) - 0.64, 1.28 - 0.14, 0];
   const th = [];
@@ -1033,7 +1055,7 @@ export function buildUAV() {
   const fsh = [
     pipe([[X(7.6), 1.6, 0.282], [X(7.6), 1.54, 0.305], [X(7.63), 1.485, 0.25], [X(7.7), 1.48, 0.21], [X(8.5), 1.48, 0.2], [X(8.85), 1.482, 0.2], [X(8.898), 1.48, 0.2]], 0.007, 5, 40),
     pipe([[X(7.65), 1.481, 0.215], [X(7.58), 1.44, 0.18], [X(7.555), 1.408, 0.17]], 0.006, 5, 10),
-    pipe([[X(7.55), 1.692, -0.17], [X(7.4), 1.74, -0.15], ...[7.2, 6.6, 6.0, 5.6].map((q) => fusePoint(q, Math.PI / 2 + 0.3, 0.065)), [X(5.35), 1.752, -0.07],
+    pipe([[X(7.55), 1.692, -0.17], [X(7.4), 1.74, -0.15], ...[7.2, 7.05, 6.6, 6.0, 5.6].map((q) => fusePoint(q, Math.PI / 2 + 0.3, 0.065)), [X(5.35), 1.752, -0.07],
       [X(5.278), 1.66, -0.022], [X(5.275), 1.4, -0.022], [X(5.2), 1.252, -0.022], [X(5.0), 1.25, -0.022], [X(4.88), 1.245, -0.02]], 0.007, 5, 90),
     pipe([[X(4.88), 1.245, -0.02], [X(4.845), 1.2, -0.04], [X(4.836), 1.16, -0.06]], 0.005, 5, 10),
   ];
@@ -1041,9 +1063,19 @@ export function buildUAV() {
   const hdrWall = fuel.pumpY + 0.065;
   for (const zs of [1, -1]) fsh.push(pipe([[X(4.88), 1.245, -0.02], [X(4.84), 1.21, 0.1 * zs], [X(4.8), 1.18, 0.16 * zs], [X(4.765), hdrWall + 0.005, 0.19 * zs], [X(4.752), hdrWall, 0.19 * zs]], 0.005, 5, 20));
   fsh.push(pipe([[X(4.8), 1.18, -0.16], [X(4.768), fuel.pumpY + 0.09, -0.125], [X(4.752), fuel.pumpY + 0.092, -0.09]], 0.004, 5, 10));
+  // fuel quantity probes (fuel.js places them): the aft cell's from the port run over the cell; the header's from the keel channel
+  // through a fitting high in the cell's aft wall; the forward cell's from the starboard power feeder overhead; and in each wing a
+  // lead from the wing wiring through a sealed fitting in the rear spar to each probe's head
+  fsh.push(pipe([fusePoint(7.05, Math.PI / 2 + 0.3, 0.065), [X(7.05), 1.75, -0.108], [X(7.05), 1.735, -0.1]], 0.005, 5, 10));
+  fsh.push(pipe([[X(5.276), 1.48, -0.022], [X(5.1), 1.48, -0.022], [X(4.9), 1.478, -0.025], [X(4.8), 1.475, -0.07], [X(4.75), 1.476, -0.12], [X(4.5), 1.48, -0.12], [X(4.313), 1.485, -0.12]], 0.005, 5, 30));
+  fsh.push(pipe([fusePoint(3.85, Math.PI / 2 - 0.5, 0.02), [X(3.85), 1.77, 0.17], [X(3.85), 1.736, 0.122]], 0.005, 5, 10));
+  for (const zs of [1, -1]) for (const z of [1.6, 3.4, 6.4]) {
+    const pts = [wpt(z - 0.1, 0.705, 0), wpt(z - 0.06, 0.64, 1, 0.032), wpt(z - 0.02, 0.47, 1, 0.032), wpt(z - 0.011, 0.42, 1, 0.035)];
+    fsh.push(pipe(pts.map((p) => [p[0], p[1], p[2] * zs]), 0.004, 5, 16));
+  }
   P('Fuel system harness', {
     system: 'Electrical', material: 'Shielded harness, kept apart from the fuel lines it runs beside (est.)', mass: 2, xrayWeight: 0.5, explode: [0, 0.3, 1.25],
-    desc: 'Powers the fuel system’s electrical units from the distribution units: aft under the equipment shelf to the forward fuel heater and the electrical shutoff valve at the firewall, and forward over the aft cell and down the keel channel between the gear wells to the six selector solenoids and to sealed fittings in the header cell’s aft wall for both header pumps and the dump valve inside it. A fault on this circuit can starve the engine: in 2025 a chafed wire inside a fuel control fired the shutoff valve shut in flight and the aircraft was lost (USAF investigation; routing estimated).',
+    desc: 'Powers the fuel system’s electrical units from the distribution units: aft under the equipment shelf to the forward fuel heater and the electrical shutoff valve at the firewall, and forward over the aft cell and down the keel channel between the gear wells to the six selector solenoids and to sealed fittings in the header cell’s aft wall for both header pumps and the dump valve inside it. Low-energy leads reach every fuel quantity probe: over the aft cell, through the header’s aft wall, down from the starboard feeder to the forward cell, and in each wing from the wing wiring through the rear spar. A fault on this circuit can starve the engine: in 2025 a chafed wire inside a fuel control fired the shutoff valve shut in flight and the aircraft was lost (USAF investigation; routing estimated).',
   }, L(merge(fsh), m.harness));
   P('Generator control unit', {
     system: 'Electrical', material: 'Voltage regulator and protection unit (est.)', mass: 4, explode: [0, 0.75, -0.75],

@@ -154,3 +154,20 @@ test('about a dozen callouts at most, each anchored on its part', () => {
   assert.ok(lines.length >= 6 && lines.length <= 12, `${lines.length} callouts (the brief keeps them to about 12)`);
   for (const l of lines) assert.match(l, /anchor: /, `callout without an anchor: ${l.trim()}`);
 });
+
+test('propeller blades fit the 110 in disc they are described with', () => {
+  const r = +plantSrc.match(/PROP_R = ([\d.]+)/)[1];
+  const rows = [...plantSrc.match(/const BLADE = \[([\s\S]*?)\n\];/)[1].matchAll(/\[([\d.]+), [\d.]+, [\d.]+, [\d.]+, [\d.]+\]/g)].map((m) => +m[1]);
+  assert.ok(rows.length >= 8, `${rows.length} blade stations`);
+  close(rows[rows.length - 1], r, 1e-9, 'blade tip radius = PROP_R');
+  assert.ok(rows[0] > 0.1 && rows[0] < 0.25, `blade root at r ${rows[0]} m, inside the hub clamps`);
+  const desc = read('../src/models/mq9/propulsion.js').match(/P\('Three-blade propeller', \{[\s\S]*?desc: '([^']+)'/)[1];
+  const lengths = [...desc.matchAll(/([\d.]+) m\b/g)].map((m) => +m[1]).filter((v) => v < 2.5);
+  assert.ok(lengths.every((v) => v <= r + 0.01), `no blade dimension in the desc exceeds the ${r} m radius: ${lengths}`);
+});
+
+test('main legs fold as rigid units about one hinge axis each', () => {
+  const uav = read('../src/models/uav.js');
+  assert.match(uav, /const MG = \{[^}]*hinge: \[[^\]]+\][^}]*stow: [\d.]+/, 'main gear hinge axis and stow angle');
+  assert.ok(!/wheel\.quaternion/.test(uav), 'no wheel is turned separately from its leg');
+});

@@ -284,7 +284,7 @@ export function buildFuselage({ A, P }) {
   };
   skin('Nose & cockpit skin', {
     material: 'Aluminium skins on aluminium frames; Kevlar/graphite nose fairing', mass: 120, explode: [1.6, 0, 0],
-    desc: 'Encloses the two-pilot cockpit and the nose avionics bay. The framing around the windshields carries the wire-strike deflector and the upper cutter.',
+    desc: 'Encloses the two-pilot cockpit and the nose avionics bay. A wire-strike deflector runs down the windshield centre post; behind and above it, the pitot and upper cutters sit on the sliding fairing ahead of the rotor head.',
   }, { x0: 2.2, x1: NOSE_X }, { holes: holesFwd, capTip: true, lined: true });
   const cabinSkin = skin('Cabin skin', {
     material: '2024/7075 aluminium skins, honeycomb floor panels', mass: 210, explode: [0, 0, 0],

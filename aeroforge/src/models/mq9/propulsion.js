@@ -104,7 +104,7 @@ export function buildPropulsion({ P, L, m, role }) {
   const scoop = lru(0.34, 0.075, 0.25, [XS(8.02), 1.895, 0], 0.04);
   P('Engine air inlet & plenum', {
     system: 'Propulsion', material: 'Composite scoop and duct, aluminium plenum (routing approximate)', mass: 8, explode: [0, 1.6, 0],
-    desc: 'A dorsal ram-air scoop at the front of the engine hump feeds a flat duct over the accessory bay and the engine to an annular plenum round the inlet screen, just ahead of the gearbox, where the TPE331 draws its 3.5 kg of air a second. The NTSB checked this “inlet assembly ducting” for debris after the 2006 loss (scoop position from photographs; duct routing estimated).',
+    desc: 'A dorsal ram-air scoop at the front of the engine hump feeds a flat duct over the accessory bay and the engine to a plenum round the inlet screen, just ahead of the gearbox, where the TPE331 draws its 3.5 kg of air a second. Fed from above, the plenum wraps the screen round the top and sides and has a flat floor underneath, where it sits on the accessory drive case. The NTSB checked this “inlet assembly ducting” for debris after the 2006 loss (scoop position from photographs; duct routing and plenum shape estimated).',
   }, [L(merge([scoop, duct(inletPath, 0.24, 0.055), plenumGeo()]), m.skin), L(box(0.004, 0.055, 0.21, [XS(8.02) + 0.171, 1.895, 0]), m.intake)]);
 
   // ---- reduction gearbox and accessory drives
@@ -115,7 +115,7 @@ export function buildPropulsion({ P, L, m, role }) {
   }, L(gb.housing, m.gun)), 'gearbox');
   role(P('Accessory drive case', {
     system: 'Propulsion', material: 'Cast case with splined drive pads', mass: 6, count: 4, explode: [0.2, -0.75, 0],
-    desc: 'The lower, engine-side face of the gearbox carries the accessory drive pads (Honeywell): starter-generator 10,887 rpm (300 lb·in continuous), aircraft accessory 3,959 rpm, tachometer-generator 4,187 rpm, plus the propeller-governor pad at 3,754 rpm.',
+    desc: 'The lower, engine-side face of the gearbox carries the accessory drive pads (Honeywell): starter-generator 10,887 rpm (300 lb·in continuous), aircraft accessory 3,959 rpm, tachometer-generator 4,187 rpm, plus the propeller-governor pad at 3,754 rpm. The case fills the space below the inlet screen, and the air plenum’s flat floor rests on its top face.',
   }, [L(gb.accessory, m.gun), L(padsGeo(), m.darkMetal)]), 'gearbox');
   P('Propeller shaft & flange', {
     system: 'Propulsion', material: 'Steel output shaft and propeller flange', mass: 7, explode: [-1.05, 0.45, 0],
@@ -307,7 +307,7 @@ export function buildPropulsion({ P, L, m, role }) {
   const bl = bladesGeo(3);
   P('Three-blade propeller', {
     system: 'Propulsion', material: 'Aluminium-alloy scimitar blades, matte black with yellow tips', mass: 45, count: 3, explode: [-2.3, -1.0, 0],
-    desc: 'A McCauley 3GFR36C606 propeller with three 110GFA-0 blades: aluminium-alloy scimitar blades 1.46 m (57.5 in) long and 0.23 m (9 in) wide, 2.79 m (110 in) across, full-feathering and reversing (NTSB; overhaul records). The yellow tip stripes mark the tip arc for ground crews. Behind the wing and sensors it never blocks the view.',
+    desc: 'A McCauley 3GFR36C606 propeller with three 110GFA-0 aluminium-alloy scimitar blades, full-feathering and reversing. The blade number gives the disc: 110 in (2.79 m) across, so each tip is 1.40 m (55 in) from the shaft; about 1.2 m of each blade shows outboard of the hub clamps, and it is about 0.23 m (9 in) wide at its widest (NTSB; McCauley designation; blade width from a blade removed at overhaul). The yellow tip stripes mark the tip arc for ground crews. Behind the wing and sensors it never blocks the view.',
     callout: true, anchor: [PROP_X + 0.03, SHAFT_Y - 0.58, -0.98],   // near the blade tips, lower port quadrant of the disc
   }, propSpin);
   propSpin.add(L(bl.black, m.blade), L(bl.yellow, m.bladeTip));

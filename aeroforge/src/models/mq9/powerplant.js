@@ -19,7 +19,7 @@
 // propeller flange to 10.255: 1.085 m in all. Propeller plane s 10.45.
 
 import * as THREE from 'three';
-import { loftRings, orientOutward, airfoilLoop } from '../../engine/geometry.js';
+import { loftRings, orientOutward, orientTubeOutward, airfoilLoop } from '../../engine/geometry.js';
 import { X, fusePoint, merge, cylX, latheX, tubeBetween, pipe, lru, box } from './shape.js';
 
 export const ENGINE_Y = 1.69;          // engine centreline
@@ -187,12 +187,23 @@ export function mainShaftGeo() {
 export function screenGeo() {
   return cylX(XS(STATIONS.inlet1), XS(STATIONS.comp1), 0.145, 0.145, ENGINE_Y, 0, 30, true);
 }
-/** Annular inlet plenum round the screen (the inlet duct feeds it from above). */
-export function plenumGeo() {
+/**
+ * Inlet plenum round the screen. The duct feeds it from above; underneath, the gearbox's accessory drive case fills the space in
+ * front of its lower half, so the plenum's floor is flat there and sits on the case's top face instead of wrapping round below.
+ */
+export const PLENUM_FLOOR = 0.168;            // floor below the engine centreline (the accessory case's top is 0.17 below it)
+export function plenumGeo(n = 40) {
   const x0 = XS(STATIONS.inlet1) + 0.004, x1 = XS(STATIONS.comp1) - 0.004;
-  return merge([
-    latheX([[0.15, x0], [0.215, x0 + 0.01], [0.225, (x0 + x1) / 2], [0.215, x1 - 0.01], [0.15, x1]], 32).translate(0, ENGINE_Y, 0),
-  ]);
+  const prof = [[0.15, x0], [0.205, x0 + 0.01], [0.215, (x0 + x1) / 2], [0.205, x1 - 0.01], [0.15, x1]];
+  const rings = prof.map(([r, x]) => {
+    const ring = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      ring.push([x, ENGINE_Y + Math.max(-PLENUM_FLOOR, r * Math.sin(a)), r * Math.cos(a)]);
+    }
+    return ring;
+  });
+  return orientTubeOutward(loftRings(rings, { uvMode: 'metric' }));
 }
 
 /** Gearbox housing outline at scale k (front view: top 0.389, bottom 0.287, half-width 0.267 about the engine centreline). */
@@ -217,8 +228,9 @@ export function gearboxGeo() {
   const rings = [[GEARBOX.s0, 0.95], [GEARBOX.s0 + 0.012, 1.0], [10.02, 1.0], [10.14, 0.965], [GEARBOX.s1 - 0.012, 0.9], [GEARBOX.s1, 0.86]].map(([s, k]) => housingRing(XS(s), k));
   const housing = orientOutward(loftRings(rings, { capStart: true, capEnd: true, uvMode: 'metric' }));
   const mount = [box(0.06, 0.012, 0.1, [XS(FRONT_MOUNT_S), ENGINE_Y + GEARBOX.top - 0.004, 0]), cylX(XS(FRONT_MOUNT_S) - 0.025, XS(FRONT_MOUNT_S) + 0.025, 0.009, 0.009, ENGINE_Y + GEARBOX.top + 0.004, 0, 10)];
-  // accessory case: a deeper lower section on the engine side of the housing, carrying the drive pads
-  const accessory = [lru(0.07, 0.15, 0.36, [XS(GEARBOX.s0 - 0.03), ENGINE_Y - 0.205, 0], 0.03)];
+  // accessory case: a deeper lower section on the engine side of the housing, carrying the drive pads; its top face, 0.17 m
+  // below the engine centreline, is the inlet plenum's floor, so the two meet at a surface
+  const accessory = [lru(0.07, 0.115, 0.36, [XS(GEARBOX.s0 - 0.03), ENGINE_Y - 0.2275, 0], 0.03)];
   const output = [
     cylX(XS(GEARBOX.s1 + 0.04), XS(GEARBOX.s1 - 0.01), 0.085, 0.1, SHAFT_Y, 0, 24),       // output nose
     cylX(XS(STATIONS.gear1 + 0.01), XS(STATIONS.gear1 - 0.005), 0.115, 0.115, SHAFT_Y, 0, 28),   // propeller flange
@@ -239,9 +251,12 @@ export function padsGeo() {
 }
 
 // ------------------------------------------------------------------------------- propeller
-// McCauley 3GFR36C606 hub with 110GFA-0 blades: three aluminium-alloy scimitar blades, 57.5 in
-// (1.46 m) long and 9 in (0.23 m) wide at the widest, 110 in (2.79 m) across, full-feathering and
-// reversing. Built in the propeller's own frame: origin at the propeller plane on the shaft axis,
+// McCauley 3GFR36C606 hub with 110GFA-0 blades: three aluminium-alloy scimitar blades. In McCauley's
+// blade designation the leading number is the basic diameter in inches and the dash number the cut-off
+// from it, so 110GFA-0 is a full 110 in (2.794 m) disc and each tip is 1.397 m from the shaft axis. The
+// airfoil runs from inside the hub clamp (r 0.16) to the tip, about 1.24 m, and is 0.23 m (9 in) wide at
+// its widest; full-feathering and reversing. (A removed blade has been listed as 57.5 in "tall": a
+// measurement of the loose blade, not of radius, so it is not used here.) Built in the propeller's own frame: origin at the propeller plane on the shaft axis,
 // x along the aircraft axis (aft = −x), blade 0 along +z. Rotation is positive about +x (counter-
 // clockwise seen from ahead, as the 1,591 rpm "ccw from rear" gearbox option).
 const BLADE = [

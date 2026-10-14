@@ -220,6 +220,9 @@ export function mvacKit() {
     pipe([[0.36, 1.52 + dy, 0], [0.5, 1.2 + dy, 0.05], [0.58, MVAC.jointY + 0.4, 0.06], [0.56, MVAC.jointY + 0.08, 0.05]], 0.07, { seg: 14, tubular: 18 }),
     hoop(MVAC.jointR + 0.07, 0.06, MVAC.jointY + 0.02, { seg: 64, tube: 10 }),
   ];
+  // the RP-1 inlet steps in to pass inside the thrust structure's gimbal ring (r 0.57–0.67 m), between
+  // the ring and the LOX inlet, then back out to its prevalve under the aft dome
+  out.line[3] = pipe([[0.49, 1.83 + dy, 0], [0.51, 1.95 + dy, 0.02], [0.5, 2.04 + dy, 0.06], [0.5, 2.18 + dy, 0.06], [0.6, 2.3 + dy, 0.01], [0.61, 2.45 + dy, 0]], 0.055, { seg: 20, tubular: 24 });
   // the chill bleed vents into the interstage rather than through a heat shield
   out.bleed = [
     block(0.26, 2.32 + dy, -0.08, 0.07, 0.07, 0.07),
