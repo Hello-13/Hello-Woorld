@@ -675,11 +675,12 @@ export function buildUAV() {
     desc: 'Catches the retracted leg so it cannot drop in flight and releases it for extension; a spring hook on the actuator’s end-stop holds it down (estimated).',
   }, L(merge([box(0.05, 0.16, 0.04, [X(2.66), NFLOOR - 0.09, -0.04]), box(0.06, 0.02, 0.04, [X(2.66) - 0.02, NFLOOR - 0.17, -0.04])]), m.darkMetal));
 
-  const ndrv = [X(2.88), NFLOOR - 0.04, -0.09];
+  // on the well roof beside the port well wall, outboard of where the nose wheel stows (the tyre stows at z ±0.065)
+  const ndrv = [X(2.88), NFLOOR - 0.04, -0.125];
   P('Nose gear retract driver', {
     system: 'Landing gear', material: 'Motor driver electronics on the well roof (est.)', mass: 1, explode: [0.25, 0.6, -0.35],
-    desc: 'Drives the nose-gear retraction actuator on command from the ground station; like the mains it is all-electric (position estimated).',
-  }, L(merge([lru(0.2, 0.06, 0.12, ndrv, 0.012), pipe([[ndrv[0] + 0.1, ndrv[1], ndrv[2]], [X(2.68), 1.43, -0.02], [ngAnchor.x - 0.02, ngAnchor.y, ngAnchor.z - 0.02]], 0.006, 5, 10)]), m.lru));
+    desc: 'Drives the nose-gear retraction actuator on command from the ground station; like the mains it is all-electric. It sits on the well roof against the port wall, clear of the stowed nose wheel, with its lead forward past the uplock to the actuator (position estimated).',
+  }, L(merge([lru(0.2, 0.06, 0.12, ndrv, 0.012), pipe([[ndrv[0] + 0.1, ndrv[1], ndrv[2]], [X(2.72), 1.45, -0.095], [X(2.62), 1.435, -0.08], [X(2.598), 1.428, -0.02], [ngAnchor.x, 1.426, ngAnchor.z - 0.025]], 0.006, 5, 20)]), m.lru));
   const nsc = [X(2.3), NFLOOR - 0.035, -0.12];
   P('Nose-wheel steering controller', {
     system: 'Landing gear', material: 'Servo driver and steering controller (est.)', mass: 1, explode: [0.45, 0.55, -0.4],
@@ -774,18 +775,28 @@ export function buildUAV() {
   // gear electrics: a branch from each main power feeder down behind the wing box to its retract driver, on to the trunnion where
   // the brake line starts; and a branch from the avionics bay harness under the floor to the nose retract driver and steering controller
   const lgh = [];
+  const DOOR_ACT = [5.7, 1.36, 0.3];              // fixed end of each main-door actuator (starboard; mirrored for port)
   for (const zs of [1, -1]) {
-    lgh.push(pipe([fusePoint(5.278, Math.PI / 2 - 0.5 * zs, 0.031), [X(5.278), 1.72, 0.3 * zs], [X(5.27), 1.6, 0.31 * zs], [X(5.255), 1.52, 0.295 * zs], [X(5.24), 1.496, 0.28 * zs]], 0.008, 5, 24));
-    lgh.push(pipe([[X(5.063), 1.445, 0.215 * zs], [X(4.95), 1.42, 0.2 * zs], [X(4.885), 1.36, 0.2 * zs], [X(4.885), 1.28, 0.195 * zs], [X(4.905), 1.25, 0.18 * zs], [X(4.915), 1.243, 0.17 * zs]], 0.007, 5, 24));
+    const ul = uplockAt[zs > 0 ? 0 : 1];
+    // feeder → down behind the wing box, inboard of the upper longeron → retract driver
+    lgh.push(pipe([fusePoint(5.278, Math.PI / 2 - 0.5 * zs, 0.031), [X(5.278), 1.7, 0.2 * zs], [X(5.27), 1.6, 0.27 * zs], [X(5.255), 1.52, 0.285 * zs], [X(5.24), 1.496, 0.28 * zs]], 0.008, 5, 24));
+    // driver → down the well's forward wall → the inboard end of the trunnion pin, where the brake line starts
+    lgh.push(pipe([[X(5.063), 1.445, 0.215 * zs], [X(4.95), 1.42, 0.2 * zs], [X(4.885), 1.36, 0.2 * zs], [X(4.882), 1.27, 0.215 * zs], [X(4.886), 1.205, 0.229 * zs]], 0.007, 5, 24));
+    // driver → inboard under the roof to the keel web, aft along it with a drop to the door actuator, then down to the uplock's release
+    lgh.push(pipe([[X(5.16), 1.468, 0.19 * zs], [X(5.21), 1.472, 0.11 * zs], [X(5.32), 1.468, 0.056 * zs], [X(5.7), 1.458, 0.056 * zs], [X(5.9), 1.38, 0.056 * zs], [ul[0], ul[1] + 0.02, 0.058 * zs], [ul[0], ul[1] - 0.006, 0.06 * zs]], 0.006, 5, 40));
+    lgh.push(pipe([[X(5.7), 1.458, 0.056 * zs], [X(DOOR_ACT[0]), 1.43, 0.18 * zs], [X(DOOR_ACT[0]), DOOR_ACT[1] + 0.006, (DOOR_ACT[2] - 0.007) * zs]], 0.005, 5, 14));
   }
-  lgh.push(pipe([[X(3.35), 1.45, -0.29], [X(3.24), 1.425, -0.21], [X(3.12), 1.425, -0.13], [X(3.0), 1.44, -0.1], [X(2.983), 1.445, -0.095]], 0.006, 5, 20));
-  lgh.push(pipe([[X(3.12), 1.425, -0.13], [X(3.0), 1.428, -0.168], [X(2.7), 1.43, -0.17], [X(2.5), 1.428, -0.165], [X(2.385), 1.44, -0.13]], 0.006, 5, 30));
+  // nose: from the avionics bay harness through the well's aft wall to the retract driver, and under the driver to the steering controller
+  lgh.push(pipe([[X(3.35), 1.45, -0.29], [X(3.24), 1.425, -0.21], [X(3.12), 1.425, -0.13], [X(3.04), 1.44, -0.127], [X(2.985), 1.45, -0.125]], 0.006, 5, 20));
+  lgh.push(pipe([[X(3.12), 1.425, -0.13], [X(3.02), 1.405, -0.15], [X(2.9), 1.4, -0.155], [X(2.7), 1.405, -0.16], [X(2.5), 1.42, -0.16], [X(2.385), 1.44, -0.13]], 0.006, 5, 30));
+  // and from the driver's lead to the nose uplock's release
+  lgh.push(pipe([[X(2.72), 1.45, -0.095], [X(2.7), 1.452, -0.06], [X(2.688), 1.452, -0.042]], 0.005, 5, 8));
   P('Landing gear harness', {
     system: 'Electrical', material: 'Shielded harness in the gear wells (est.)', mass: 2.5, xrayWeight: 0.5, explode: [0, -0.15, 1.15],
-    desc: 'Feeds the all-electric gear: a branch from each main power feeder runs down behind the wing box to its retract driver and on down the well’s forward wall to the trunnion, where the brake line and weight-on-wheels wiring start; the nose branch leaves the avionics bay harness and runs under the floor to the nose retract driver and the steering controller. A 2014 MQ-9 could not lower its gear after a generator failure ran the batteries down (USAF investigation; routing estimated).',
+    desc: 'Feeds the all-electric gear: a branch from each main power feeder runs down behind the wing box to its retract driver, on down the well’s forward wall to the trunnion, where the brake line and weight-on-wheels wiring start, and aft along the keel web to the door actuator and the uplock’s electric release; the nose branch leaves the avionics bay harness and runs under the floor to the nose retract driver, the nose uplock and the steering controller. A 2014 MQ-9 could not lower its gear after a generator failure ran the batteries down (USAF investigation; routing estimated).',
   }, L(merge(lgh), m.harness));
 
-  // gear doors: conformal skin patches; the nose doors hinge on their outer edges, the main doors on the keel
+  // gear doors: conformal skin patches over the cut-outs; the nose doors hinge on their outer edges, the main doors on their upper edges
   const doors = [];
   const doorPart = (name, s0, s1, th0, th1, hingeOn, { nt = 6, ...info }) => {
     const g = skinPatch(s0, s1, th0, th1, 0.004, 6, nt);
@@ -796,7 +807,6 @@ export function buildUAV() {
     P(name, { system: 'Landing gear', skin: true, material: 'Composite doors (est.)', ...info }, h.pivot);
     return h;
   };
-  const DOOR_ACT = [];                     // the door actuators' fixed ends, for the gear harness
   for (const side of [1, -1]) {
     const sd = SN(side);
     const mainDoor = doorPart(`Main gear door (${sd})`, 4.9, 6.5, -Math.PI / 2 + 0.035 * side, -Math.PI / 2 + 1.45 * side, 'outer', {
@@ -809,13 +819,12 @@ export function buildUAV() {
     }), sign: side, open: 1.45 });
     // door actuator: from a bracket inside the well, below the hinge line, out to a lug on the door's inner face
     const act = makeActuator(0.016, 0.009, 0.12, m.darkMetal);
-    const anchor = new THREE.Vector3(X(5.7), 1.3, 0.25 * side);
-    const lugClosed = new THREE.Vector3(...fusePoint(5.7, -Math.PI / 2 + 1.25 * side, 0.012));
-    DOOR_ACT.push(anchor);
+    const anchor = new THREE.Vector3(X(DOOR_ACT[0]), DOOR_ACT[1], DOOR_ACT[2] * side);
+    const lugClosed = new THREE.Vector3(...fusePoint(DOOR_ACT[0], -Math.PI / 2 + 1.25 * side, 0.012));
     const p0 = mainDoor.pivot.position.clone();
     P(`Main gear door actuator (${sd})`, {
       system: 'Landing gear', material: 'Small linear actuator (est.)', mass: 1, explode: [0, -0.2, 0.45 * side],
-      desc: 'Opens and closes the main-gear door in sequence with the leg (position and type estimated).',
+      desc: 'An electric linear actuator from a bracket inside the well to a lug just below the door’s hinge line: it swings the door out before the leg moves and pulls it shut after (position and type estimated).',
     }, act.meshes);
     movers.push(() => act.set(anchor, lugClosed.clone().sub(p0).applyQuaternion(mainDoor.pivot.quaternion).add(p0)));
   }

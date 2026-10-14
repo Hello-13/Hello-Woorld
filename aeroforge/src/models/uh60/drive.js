@@ -337,12 +337,17 @@ export function buildDrive({ A, P, roofY }) {
       system: 'Propulsion', material: 'Steel swirl vanes, aluminium collector scroll and front frame', mass: 10, explode: [0.8, 1.1, 1.7 * s], xrayWeight: 0.6,
       desc: 'Built into the T700\'s front frame: swirl vanes spin the incoming air so sand and dust are flung outward into a collector scroll, removing roughly 85 % of the sand before it can erode the compressor; only clean air turns inward to the compressor.',
     }, [mesh(merge(ipsG), MAT.darkMetal())]);
-    const blower = [cyl(0.08, 0.08, 0.14, [at(0.1), ENG.y + 0.28, z + 0.1 * s], 'x', 18), cyl(0.05, 0.05, 0.04, [at(0.19), ENG.y + 0.28, z + 0.1 * s], 'x', 14)];
-    const scav = pipe([onCase(0.22, 0.3, Math.PI / 2 - 0.25), [at(0.14), ENG.y + 0.26, z + 0.16 * s], [at(0.08), ENG.y + 0.3, z + 0.17 * s], [at(0.2), ENG.y + 0.29, z + 0.2 * s], [at(0.6), ENG.y + 0.28, z + 0.2 * s], [at(1.0), ENG.y + 0.27, z + 0.2 * s], [at(1.2), ENG.y + 0.22, z + 0.2 * s]], 0.04, 10);
+    // blower drum on a pad on the gearbox's outboard face, just aft of the scroll case (between the
+    // starter-side alternator and the boost pump, inside the cowl): axial inlet from the scroll's
+    // discharge port, tangential outlet into the scavenge duct running aft along the top
+    const bc = [at(0.33), ENG.y + 0.295, z + 0.14 * s];
+    const blower = [cyl(0.06, 0.06, 0.06, bc, 'z', 18), cyl(0.045, 0.045, 0.012, [bc[0], bc[1], bc[2] - 0.033 * s], 'z', 14)];
+    const ipsIn = pipe([onCase(0.16, 0.305, 0.97), [at(0.2), ENG.y + 0.29, z + 0.215 * s], [at(0.28), ENG.y + 0.3, z + 0.215 * s], [bc[0], bc[1], bc[2] + 0.045 * s]], 0.028, 10);
+    const scav = pipe([[bc[0] + 0.03, bc[1] + 0.045, bc[2] + 0.015 * s], [at(0.38), ENG.y + 0.32, z + 0.17 * s], [at(0.5), ENG.y + 0.312, z + 0.195 * s], [at(0.8), ENG.y + 0.29, z + 0.2 * s], [at(1.0), ENG.y + 0.27, z + 0.2 * s], [at(1.2), ENG.y + 0.22, z + 0.2 * s]], 0.03, 10);
     P(`T700 IPS blower & scavenge duct ${R}`, {
-      system: 'Propulsion', material: 'Gear-driven centrifugal blower, scavenge duct', mass: 3, explode: [0.45, 2.0, 1.75 * s],
-      desc: 'A blower on the accessory gearbox sucks the sand and dust out of the separator\'s collector scroll and blows it down a duct along the top of the engine, to be dumped overboard around the exhaust.',
-    }, [mesh(merge(blower), MAT.casting()), mesh(scav, MAT.darkMetal())]);
+      system: 'Propulsion', material: 'Gear-driven centrifugal blower, inlet and scavenge ducts', mass: 3, explode: [0.45, 2.0, 1.75 * s],
+      desc: 'A gear-driven blower on a pad on the outboard face of the accessory gearbox sucks the sand and dust out of the separator\'s collector scroll through a short inlet duct and blows it aft along the top of the engine, to be dumped overboard around the exhaust.',
+    }, [mesh(merge(blower), MAT.casting()), mesh(merge([ipsIn, scav]), MAT.darkMetal())]);
 
     // upturned exhaust (UES): out of the cowling's aft opening, through the cooling grid, then up
     const path = [V3(ENG.rear - 0.02, ENG.y, z), V3(-2.0, ENG.y + 0.01, z), V3(-2.2, ENG.y + 0.1, z + 0.02 * s), V3(-2.31, ENG.y + 0.27, z + 0.04 * s), V3(-2.34, ENG.y + 0.42, z + 0.05 * s)];
