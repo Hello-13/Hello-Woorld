@@ -13,14 +13,14 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { loftRings, orientOutward, airfoilLoop, lathe } from '../../engine/geometry.js';
-import { MAT, DEG, V3, merge, box, cyl, tube, pipe, place, unitRod, aimRod, aimFixed, scissor, canvasTex } from './common.js';
+import { MAT, DEG, V3, merge, box, cyl, tube, pipe, place, unitRod, aimRod, aimFixed, scissor, canvasTex, DEICE } from './common.js';
 
 export const HUB = { x: 0, y: 3.33, tilt: 3 * DEG };
 const E = 0.381;          // hinge offset (elastomeric-bearing focal point), m (NASA TM-85890: 1.25 ft)
 const R = 8.18;           // rotor radius, m
 const CHORD = 0.58;       // wide-chord blade (estimate, see physics/rotor.js)
 const TWIST = -18 * DEG;  // root-to-tip twist, referenced to 0.75 R
-const HORN = { x: 0.5, y: -0.08, z: -0.27 };     // pitch-horn ball end (leading side), hub coordinates
+const HORN = { x: 0.5, y: -0.16, z: -0.27 };     // pitch-horn ball end (leading side, below the damper), hub coordinates
 const LH = -HORN.z;                              // horn arm about the feathering axis
 const PHI_H = Math.atan2(-HORN.z, HORN.x);        // link lead ahead of the blade (~28°)
 const RS = Math.hypot(HORN.x, HORN.z);            // pitch-link radius on the rotating swashplate
@@ -31,7 +31,10 @@ const YS0 = -0.43;                                // rotating swashplate height 
 const SERVO_AZ = [34 * DEG, 0, -34 * DEG];
 const RV = 0.47;          // servo clevis radius on the stationary swashplate
 const RB = 0.56;          // servo lower rod-end radius (on its deck bracket)
-const YB = -1.02;         // servo lower rod-end height in the head frame: on the upper deck, ≈ 2.31 m up
+const DECK_TOP = 2.315;   // top of the transmission deck plate the servo brackets stand on (drive.js)
+const EYE_UP = 0.065;     // deck top → lower rod-end pin: 25 mm bracket plate, 40 mm clevis cheeks
+const DY = 0.045;         // lead-lag damper line above the hub plane, so it clears the pitch-horn arm
+const TOP_COVER = 2.73;   // main-module top cover (drive.js), where the swashplate guide is bolted
 const SCISSOR_AZ = -135 * DEG;                    // stationary (anti-drive) scissors, aft right
 
 /** Head-frame point → frame of the head's parent (the hover pose group). */
@@ -228,8 +231,8 @@ export function buildMainRotor({ A, parent }) {
     box(0.05, 0.27, 0.32, [0.5, 0.01, 0]),                                       // outboard bridge
     box(0.3, 0.035, 0.07, [0.37, 0.135, 0.105]), box(0.3, 0.035, 0.07, [0.37, 0.135, -0.105]),   // top rails
     box(0.32, 0.035, 0.3, [0.37, -0.125, 0]),                                    // bottom plate
-    box(0.08, 0.07, 0.08, [0.26, 0.0, -0.21]),                                   // damper lug (leading side)
-    cyl(0.03, 0.03, 0.1, [0.26, 0, -0.21], 'y', 10),                             // damper attachment bolt
+    box(0.08, 0.07, 0.11, [0.26, DY, -0.225]),                                   // damper lug on the cheek (leading side)
+    cyl(0.03, 0.03, 0.1, [0.26, DY, -0.24], 'y', 10),                            // damper attachment bolt
   ]);
   onArms(hubParts, arm);
   P('Main rotor hub', {
@@ -270,8 +273,8 @@ export function buildMainRotor({ A, parent }) {
     cyl(0.044, 0.044, 0.11, [0.43 - E, 0, 0], 'x', 18),                       // stem through the laminate stack
     cyl(0.066, 0.062, 0.27, [0.61 - E, 0, 0], 'x', 22),                       // spindle body through the bridge
     cyl(0.085, 0.085, 0.05, [0.735 - E, 0, 0], 'x', 22),                      // outboard flange (cuff joint)
-    box(0.08, 0.05, 0.07, [0.77 - E, 0, -0.12]),                              // damper attachment lug, leading side
-    cyl(0.022, 0.022, 0.08, [0.78 - E, 0, -0.15], 'y', 10),
+    box(0.08, 0.05, 0.15, [0.77 - E, DY, -0.135]),                            // damper attachment lug, leading side
+    cyl(0.022, 0.022, 0.08, [0.78 - E, DY, -0.2], 'y', 10),
   ]);
   const spindlePart = P('Blade spindles', {
     material: 'Titanium spindles', mass: 14, count: 4, explode: [0, UPX - 0.15, 0],
@@ -294,10 +297,13 @@ export function buildMainRotor({ A, parent }) {
   }, []);
   for (const c of makeChains(cuffPart)) c.feather.add(mesh(cuffG, MAT.titanium()), mesh(pinG, MAT.steel()));
 
+  // clamp collar round the spindle body, a lug on its leading underside and an arm sloping down and
+  // forward to the ball end, so the arm passes under the lead-lag damper at any pitch the head reaches
   const hornG = merge([
-    tube([0.6 - E, 0, -0.06], [HORN.x - E, HORN.y, HORN.z], 0.03, 12),
+    cyl(0.076, 0.076, 0.04, [0.695 - E, 0, 0], 'x', 20),                     // between the droop/antiflap stops and the cuff flange
+    box(0.04, 0.06, 0.06, [0.695 - E, -0.04, -0.06]),
+    tube([0.695 - E, -0.045, -0.06], [HORN.x - E, HORN.y, HORN.z], 0.03, 12),
     cyl(0.036, 0.036, 0.06, [HORN.x - E, HORN.y, HORN.z], 'y', 12),
-    box(0.1, 0.09, 0.14, [0.6 - E, 0, -0.07]),
   ]);
   const hornPart = P('Pitch horns', {
     material: 'Forged steel horns', mass: 4, count: 4, explode: [0, UPX - 0.35, 0],
@@ -336,8 +342,9 @@ export function buildMainRotor({ A, parent }) {
     g.add(mesh(damperG, MAT.hydraulic()), mesh(indicatorG, MAT.yellow()));
     damperPart.add(g);
     const a = (i * Math.PI) / 2;
-    const hubEnd = V3(0.26, 0, -0.21).applyAxisAngle(V3(0, 1, 0), a);
-    return { i, g, hubEnd, local: V3(0.78 - E, 0, -0.15) };
+    const hubEnd = V3(0.26, DY, -0.24).applyAxisAngle(V3(0, 1, 0), a);
+    // the side reservoir faces the blade's leading side, level, clear of the bifilar arms above
+    return { i, g, hubEnd, local: V3(0.78 - E, DY, -0.2), lead: V3(0, 0, -1).applyAxisAngle(V3(0, 1, 0), a) };
   });
 
   // bifilar vibration absorber
@@ -366,13 +373,15 @@ export function buildMainRotor({ A, parent }) {
   bifPart.add(mesh(merge(bifBase), MAT.steel()));
 
   // ------------------------------------------------------------------ blade de-ice: slip ring, distributor, harness
-  // The slip ring's stator is held still by its lead, which comes up the hollow rotor shaft from
-  // below the main module; its rotor and the distributor above it turn with the hub.
-  const leadW = [V3(-0.1, 2.12, 0.66), V3(-0.1, 2.21, 0.56), V3(-0.08, 2.22, 0.3), airToHead(-0.06, 2.18, 0)];
-  const leadH = [...leadW.slice(0, 3).map((p) => airToHead(p.x, p.y, p.z)), leadW[3], V3(0, -1.15, 0), V3(0, -0.6, 0), V3(0, 0.0, 0), V3(0, 0.335, 0)];
+  // The slip ring's stator is held still by its lead, which leaves the de-ice junction box on the
+  // left roof beam, passes under the roof cross beam to the shaft axis below the main module and
+  // comes up the hollow rotor shaft; its rotor and the distributor above it turn with the hub.
+  const [jx, jy, jz] = DEICE.lead;
+  const leadW = [[jx, jy, jz], [jx + 0.05, 2.06, jz + 0.03], [-0.5, 2.036, -0.3], [-0.3, 2.09, -0.15], [-0.13, 2.15, -0.04]];
+  const leadH = [...leadW.map(([x, y, z]) => airToHead(x, y, z)), airToHead(-0.06, 2.18, 0), V3(0, -1.15, 0), V3(0, -0.6, 0), V3(0, 0.0, 0), V3(0, 0.335, 0)];
   P('Main rotor slip ring', {
     system: 'Electrical', material: 'Slip-ring assembly (brushes on rings), stationary lead in a standpipe through the shaft', mass: 9, explode: [0, UPX + 1.55, 0],
-    desc: 'Carries de-ice power across the turning joint: brushes on the stationary side rub on rings that turn with the hub. Its stationary lead runs up the centre of the hollow rotor shaft from the cabin-roof harness. The controller\'s commands pass through it to the distributor above.',
+    desc: 'Carries de-ice power across the turning joint: brushes on the stationary side rub on rings that turn with the hub. Its stationary lead comes from the de-ice junction box on the cabin roof beam and runs up the centre of the hollow rotor shaft. The controller\'s commands pass through it to the distributor above.',
   }, [mesh(merge([cyl(0.1, 0.1, 0.07, [0, 0.375, 0], 'y', 24), cyl(0.104, 0.104, 0.012, [0, 0.35, 0], 'y', 24), cyl(0.104, 0.104, 0.012, [0, 0.39, 0], 'y', 24)]), MAT.casting()),
     mesh(pipe(leadH, 0.014, 6), MAT.wiring())], head);
   P('De-ice distributor', {
@@ -381,12 +390,14 @@ export function buildMainRotor({ A, parent }) {
   }, [mesh(merge([cyl(0.08, 0.08, 0.04, [0, 0.43, 0], 'y', 22), cyl(0.05, 0.08, 0.02, [0, 0.46, 0], 'y', 20)]), MAT.casting())]);
   const harness = [];
   for (const i of blades) {
-    const pts = [V3(0.07, 0.45, 0), V3(0.14, 0.42, 0.02), V3(0.2, 0.33, 0.03), V3(0.25, 0.2, 0.0), V3(0.36, 0.165, 0), V3(0.52, 0.155, 0), V3(0.57, 0.09, 0)];
+    // down the hub arm, then a slack loop beside the antiflap stop to the spindle
+    const pts = [V3(0.07, 0.45, 0), V3(0.14, 0.42, 0.02), V3(0.2, 0.33, 0.03), V3(0.25, 0.2, 0.0), V3(0.36, 0.165, 0), V3(0.52, 0.155, 0.01), V3(0.555, 0.135, 0.065), V3(0.56, 0.105, 0.068), V3(0.555, 0.09, 0.065)];
     harness.push(pipe(pts, 0.01, 5).rotateY((i * Math.PI) / 2));
     harness.push(box(0.05, 0.03, 0.04, [0.3, 0.19, 0]).rotateY((i * Math.PI) / 2));   // clamp block on the hub top
   }
-  const cuffRun = merge([pipe([V3(0.555 - E, 0.08, 0), V3(0.65 - E, 0.077, 0.0), V3(0.72 - E, 0.1, 0.0), V3(0.86 - E, 0.107, 0), V3(0.99 - E, 0.107, 0)], 0.01, 5),
-    cyl(0.026, 0.026, 0.05, [1.02 - E, 0.107, 0], 'x', 12)]);                   // blade-root connector
+  // along the spindle beside the antiflap stop, then over the cuff to the blade-root connector
+  const cuffRun = merge([pipe([V3(0.555 - E, 0.09, 0.065), V3(0.62 - E, 0.085, 0.07), V3(0.68 - E, 0.085, 0.062), V3(0.72 - E, 0.108, 0.02), V3(0.76 - E, 0.113, 0.0), V3(0.86 - E, 0.113, 0), V3(0.99 - E, 0.113, 0)], 0.01, 5),
+    cyl(0.026, 0.026, 0.05, [1.02 - E, 0.113, 0], 'x', 12)]);                   // blade-root connector
   const harnessPart = P('Main rotor de-ice harness', {
     system: 'Electrical', material: 'Shielded heater-power cables, blade-root connectors', mass: 6, count: 4, explode: [0, UPX + 0.85, 0],
     desc: 'From the distributor on top of the hub a cable runs down each hub arm, along the spindle and the cuff, to a connector at the blade root that feeds that blade\'s heater blanket. A slack loop where hub meets spindle lets the blade flap, lag and feather.',
@@ -436,11 +447,14 @@ export function buildMainRotor({ A, parent }) {
   }, [], head);
   const uni = new THREE.Group();
   uniPart.add(uni);
-  uni.add(mesh(merge([new THREE.SphereGeometry(0.14, 28, 18), cyl(0.127, 0.127, 0.24, [0, 0, 0], 'y', 28, true)]), MAT.steel()));
+  const ballProf = [[0.127, -0.059]];
+  for (let k = 0; k <= 8; k++) { const y = -0.059 + (0.118 * k) / 8; ballProf.push([Math.sqrt(0.14 * 0.14 - y * y), y]); }
+  ballProf.push([0.127, 0.059], [0.127, -0.059]);
+  uni.add(mesh(merge([orientOutward(lathe(ballProf, 28)), cyl(0.127, 0.127, 0.15, [0, 0, 0], 'y', 28, true)]), MAT.steel()));
 
   // pitch control rods (rotating swashplate → horn), aimed every frame. Built along +y: lower rod
   // end at 0, adjustment barrel with jam nuts in the middle, upper rod end at RL0.
-  const RL0 = 0.35;
+  const RL0 = 0.25;
   const rodG = merge([
     ...eye(0, 0.024), cyl(0.0175, 0.0175, RL0 - 0.07, [0, RL0 / 2, 0], 'y', 10),
     cyl(0.0225, 0.0225, 0.08, [0, RL0 / 2, 0], 'y', 6), cyl(0.024, 0.024, 0.014, [0, RL0 / 2 - 0.05, 0], 'y', 6), cyl(0.024, 0.024, 0.014, [0, RL0 / 2 + 0.05, 0], 'y', 6),
@@ -463,11 +477,20 @@ export function buildMainRotor({ A, parent }) {
     return { a, l1, l2, pin, p0: V3(0.19 * Math.cos(a), -0.25, -0.19 * Math.sin(a)), lug: V3(0.275 * Math.cos(a), 0.06, -0.275 * Math.sin(a)) };
   });
 
-  // swashplate guide and stationary scissors (head frame, not spinning)
+  // swashplate guide and stationary scissors (head frame, not spinning): the guide's flange sits on
+  // the main-module top cover (TOP_COVER), its tube reaching up to just below the rotating scissors
+  const yCover = airToHead(-0.04, TOP_COVER, 0).y, yTop = -0.29;
+  const ring = (r0, r1, h) => orientOutward(lathe([[r0, -h / 2], [r1, -h / 2], [r1, h / 2], [r0, h / 2], [r0, -h / 2]], 32));
+  const toHead = new THREE.Matrix4().makeRotationZ(HUB.tilt).multiply(new THREE.Matrix4().makeTranslation(0, -HUB.y, 0));
+  const yc = yCover + 0.03;     // tube foot, above the level flange's high edge
+  const guideG = [cyl(0.12, 0.12, yTop - yc, [0, (yTop + yc) / 2, 0], 'y', 24, true), cyl(0.112, 0.112, yTop - yc, [0, (yTop + yc) / 2, 0], 'y', 24, true),
+    ring(0.112, 0.15, 0.02).translate(0, yc + 0.0, 0),
+    ring(0.112, 0.18, 0.02).translate(headToAir(V3(0, yCover, 0)).x, TOP_COVER + 0.011, 0).applyMatrix4(toHead)];
+  for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2 + Math.PI / 8; guideG.push(cyl(0.011, 0.011, 0.012, [headToAir(V3(0, yCover, 0)).x + 0.163 * Math.cos(a), TOP_COVER + 0.026, 0.163 * Math.sin(a)], 'y', 6).applyMatrix4(toHead)); }
   A.part('Swashplate guide', {
     system: 'Flight controls', material: 'Steel guide tube bolted to the main-module top cover', mass: 8, explode: [0, 0.62, 0],
     desc: 'A fixed tube around the rotor shaft, bolted to the top of the main module. The uniball sleeve slides on it, so the swashplate can only move up and down the shaft axis and tilt — never sideways.',
-  }, [mesh(merge([cyl(0.12, 0.12, 0.47, [0, -0.525, 0], 'y', 24, true), cyl(0.2, 0.2, 0.03, [0, -0.745, 0], 'y', 28), cyl(0.112, 0.112, 0.47, [0, -0.525, 0], 'y', 24, true)]), MAT.steel())], head);
+  }, [mesh(merge(guideG), MAT.steel())], head);
   const ssPart = A.part('Stationary scissors', {
     system: 'Flight controls', material: 'Steel anti-drive links with spherical bearings', mass: 4, explode: [0, 0.7, 0],
     desc: 'A two-link scissor from the stationary swashplate down to a lug on the main module. It stops the plate from being dragged round by the rotating one, yet folds and unfolds so the plate can still tilt in every direction and slide on the guide. The rotating scissors above do the opposite job.',
@@ -493,14 +516,21 @@ export function buildMainRotor({ A, parent }) {
     cyl(0.055, 0.055, 0.03, [0, LB - 0.02, 0], 'y', 16), box(0.05, 0.05, 0.08, [-0.06, 0.07, 0]),   // gland nut; pilot-valve housing
   ]);
   const fixedG = [];
+  // the deck brackets are built level in the airframe and taken into the (3°-tilted) head frame
+  const airToHeadM = new THREE.Matrix4().makeRotationZ(HUB.tilt).multiply(new THREE.Matrix4().makeTranslation(0, -HUB.y, 0));
   const servos = SERVO_AZ.map((a) => {
-    const base = V3(RB * Math.cos(a), YB, -RB * Math.sin(a));
+    // lower rod-end pin EYE_UP above the deck plate, at radius RB in the head frame
+    const ax = RB * Math.cos(a), az = -RB * Math.sin(a);
+    const yb = (DECK_TOP + EYE_UP - HUB.y + ax * Math.sin(HUB.tilt)) / Math.cos(HUB.tilt);
+    const base = V3(ax, yb, az), bw = headToAir(base);
     const tang = V3(-Math.sin(a), 0, -Math.cos(a));
-    // bracket from the main-module case flange out to the servo's lower clevis
-    fixedG.push(tube(V3(0.42 * Math.cos(a), YB + 0.01, -0.42 * Math.sin(a)), base.clone().add(V3(0, -0.01, 0)), 0.025, 8),
-      box(0.14, 0.025, 0.12, [base.x, base.y - 0.035, base.z]).rotateY(0),
-      box(0.05, 0.08, 0.012, [0, 0, 0]).translate(base.x + tang.x * 0.04, base.y, base.z + tang.z * 0.04),
-      box(0.05, 0.08, 0.012, [0, 0, 0]).translate(base.x - tang.x * 0.04, base.y, base.z - tang.z * 0.04));
+    // deck bracket: a plate bolted on the deck with two clevis cheeks on it
+    const plate = box(0.13, 0.025, 0.11, [0, 0, 0]).rotateY(a).translate(bw.x, DECK_TOP + 0.0125, bw.z).applyMatrix4(airToHeadM);
+    const bolts = [];
+    for (const [u, v] of [[0.045, 0.04], [0.045, -0.04], [-0.045, 0.04], [-0.045, -0.04]]) bolts.push(cyl(0.008, 0.008, 0.01, [u, 0, v], 'y', 6).rotateY(a).translate(bw.x, DECK_TOP + 0.03, bw.z).applyMatrix4(airToHeadM));
+    fixedG.push(plate, ...bolts,
+      box(0.05, 0.08, 0.012, [0, 0, 0]).rotateY(a).translate(base.x + tang.x * 0.04, base.y, base.z + tang.z * 0.04),
+      box(0.05, 0.08, 0.012, [0, 0, 0]).rotateY(a).translate(base.x - tang.x * 0.04, base.y, base.z - tang.z * 0.04));
     // input pilot-valve lever: a short bellcrank on the manifold, its free end pointing forward to
     // where the deck rod from the mixing unit connects (clear of the pump modules beside the servos)
     const lv0 = base.clone().addScaledVector(tang, -0.06).add(V3(0, 0.07, 0)), lv1 = lv0.clone().add(V3(0.12, -0.03, 0));
@@ -559,7 +589,7 @@ export function buildMainRotor({ A, parent }) {
     }
     for (const d of dampers) {
       toSpin(bladeChains[d.i], d.local, tmp2);
-      aimFixed(d.g, d.hubEnd, tmp2, DL0, up);
+      aimFixed(d.g, d.hubEnd, tmp2, DL0, d.lead);
     }
     // rotating scissors: plate lug (swashSpin frame) → head frame → spin frame
     qPsi.setFromAxisAngle(up, psi); qNeg.setFromAxisAngle(up, -psi);

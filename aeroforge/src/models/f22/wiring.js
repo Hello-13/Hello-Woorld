@@ -35,9 +35,12 @@ export function buildWiring(ctx) {
     const g = [];
     for (const side of [1, -1]) {
       const z = side;
-      // channel A (right) / B (left): from the VMS boxes down the fuselage side, under each inlet duct
+      // channel A (right) / B (left): from the VMS boxes down the fuselage side, under each inlet duct, then
+      // round its lower outboard corner ahead of the main-gear well, aft beside the duct (clear of the stowed
+      // wheel) and under the boom to the engine bay
       const trunk = [[4.3, -0.22, z * 0.3], [4.6, -0.16, z * 0.6], [5.6, -0.16, z * 0.74], [6.8, -0.3, z * 0.82], [7.3, -0.42, z * 0.915], [8.4, -0.42, z * 0.93],
-        [10.4, -0.4, z * 0.93], [12.6, -0.4, z * 0.95], [13.3, -0.25, z * 1.25], [14.0, -0.24, z * 1.3], [14.6, -0.3, z * 1.3]];
+        [10.4, -0.4, z * 0.93], [11.05, -0.39, z * 1.05], [11.25, -0.37, z * 1.28], [11.38, -0.3, z * 1.42], [11.6, -0.2, z * 1.47], [12.55, -0.17, z * 1.47],
+        [12.76, -0.24, z * 1.47], [13.0, -0.245, z * 1.42], [13.3, -0.24, z * 1.38], [14.0, -0.235, z * 1.38], [14.6, -0.3, z * 1.32]];
       g.push(tube(trunk));
       // to the stabilator actuator and up the boom to the rudder actuator
       g.push(tube([[14.9, -0.29, z * 1.33], [15.6, -0.27, z * 1.38], [16.0, -0.25, z * 1.39], [16.2, -0.24, z * 1.38]]));
@@ -45,8 +48,8 @@ export function buildWiring(ctx) {
       // leading-edge flap power drive unit, round the front of the side bay and outboard of the duct
       g.push(tube([[8.4, -0.42, z * 0.93], [8.4, -0.6, z * 1.3], [8.42, -0.45, z * 1.66], [8.4, -0.2, z * 1.7], [8.36, -0.06, z * 1.68]]));
       // along the rear spar to the flaperon and aileron actuators
-      const rear = [[13.3, -0.25, z * 1.25], [13.36, -0.1, z * 1.7]];
-      for (const zz of [2.0, 2.8, 3.6, 4.4, 4.97]) rear.push([13.38, FR.wingY(zz), z * zz]);
+      const rear = [[13.3, -0.24, z * 1.38], [13.32, -0.25, z * 1.6], [13.32, -0.12, z * 1.8], [13.38, -0.07, z * 1.95]];
+      for (const zz of [2.1, 2.8, 3.6, 4.4, 4.97]) rear.push([13.38, FR.wingY(zz), z * zz]);
       g.push(tube(rear));
       for (const [zz, c] of [[2.3, 0.79], [3.48, 0.79]]) g.push(tube([[13.38, FR.wingY(zz), z * zz], [wingS(zz, c) - 0.08, FR.wingY(zz), z * zz]]));
       // channel C (spine): over the tanks under the upper skin, branching aft to both tails and FADECs
@@ -103,7 +106,7 @@ export function buildWiring(ctx) {
     for (const side of [1, -1]) {
       const z = side;
       // out to the wing: round the front of the side bay, then along the front spar to the tip light
-      const front = [[8.4, -0.44, z * 0.95], [8.4, -0.62, z * 1.3], [8.43, -0.47, z * 1.65], [8.45, -0.2, z * 1.72], [8.55, -0.03, z * 1.86], [8.6, -0.03, z * 1.96]];
+      const front = [[8.4, -0.44, z * 0.95], [8.4, -0.62, z * 1.3], [8.43, -0.47, z * 1.65], [8.4, -0.2, z * 1.76], [8.37, -0.04, z * 1.86], [8.4, -0.03, z * 1.96]];
       for (const zz of [2.4, 3.2, 4.0, 4.8, 5.6, 6.3]) front.push([wingS(zz, 0.12), FR.wingY(zz), z * zz]);
       const tipLe = FR.wingLE(FR.WING.semi), tipC = FR.wingTE(FR.WING.semi) - tipLe;
       front.push([tipLe + 0.12 * tipC, FR.wingY(6.62), z * 6.62], [tipLe + 0.15 * tipC, FR.wingY(6.74), z * 6.74]);

@@ -347,9 +347,12 @@ export function buildPad(A, site, base, bed) {
   }, mesh(merge(cyl), FM.padSteel()));
 
   // second-stage umbilical arm and the vehicle clamp arms
+  // each arm roots on a cross beam between the strongback's front columns and its two beams run
+  // into the cradle ring
   const armAt = (ys, wrap, list) => {
     const y = STACK0 + ys;
-    list.push(beam([-0.9, y, zb], [-0.7, y, -R - 0.25], 0.32, 0.5), beam([0.9, y, zb], [0.7, y, -R - 0.25], 0.32, 0.5));
+    list.push(beam([-1.6, y, zb], [1.6, y, zb], 0.34, 0.56));
+    list.push(beam([-0.9, y, zb], [-0.7, y, -R - 0.12], 0.32, 0.5), beam([0.9, y, zb], [0.7, y, -R - 0.12], 0.32, 0.5));
     const g = new THREE.TorusGeometry(R + 0.18, 0.1, 6, 24, wrap);
     g.rotateX(Math.PI / 2); g.rotateY(Math.PI / 2 + wrap / 2);       // centred on −z, facing the strongback
     g.translate(0, y, 0);

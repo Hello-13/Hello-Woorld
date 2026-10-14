@@ -360,8 +360,8 @@ export function buildWeapons(ctx) {
       const a = (k / 6) * Math.PI * 2;
       g.push(FR.cylX(9.275, gy + Math.cos(a) * 0.06, gz + Math.sin(a) * 0.06, 1.45, 0.019, 0.022, 8));
     }
-    g.push(FR.cylX(8.62, gy, gz, 0.06, 0.1, 0.1, 16));                                 // muzzle clamp
-    g.push(FR.cylX(9.5, gy, gz, 0.06, 0.1, 0.1, 16));                                  // mid-barrel clamp
+    g.push(FR.cylX(8.69, gy, gz, 0.06, 0.09, 0.09, 16));                               // muzzle clamp
+    g.push(FR.cylX(9.72, gy, gz, 0.06, 0.09, 0.09, 16));                               // mid-barrel clamp, aft of the spar lug and frame
     g.push(FR.cylX(10.19, gy, gz, 0.38, 0.11, 0.09, 16));                              // rotor and housing
     g.push(new THREE.BoxGeometry(0.26, 0.14, 0.14).translate(X(10.25), gy - 0.05, gz - 0.1));    // feeder / clearing unit
     // muzzle blast trough up to the gun port in the glove skin
@@ -386,7 +386,7 @@ export function buildWeapons(ctx) {
     // storage container, s 10.75–12.65, under the right wing root
     a.push(FR.boxS(11.7, -0.06, 1.66, 1.9, 0.30, 0.26));
     const ribs = [];
-    for (let s = 10.95; s < 12.6; s += 0.3) ribs.push(FR.boxS(s, -0.06, 1.66, 0.025, 0.315, 0.275));
+    for (let s = 10.95; s < 12.6; s += 0.3) ribs.push(FR.boxS(s, -0.06, 1.66, 0.025, 0.315, 0.27));
     // feed chute (rounds to the gun) and return chute (empty cases back to the container)
     const ch = [rectTube([[10.78, 0.0, 1.7], [10.6, -0.01, 1.74], [10.4, -0.04, 1.75]], 0.12, 0.06, { n: 8 }),
       rectTube([[10.4, -0.13, 1.68], [10.6, -0.15, 1.66], [10.78, -0.15, 1.64]], 0.12, 0.06, { n: 8 })];

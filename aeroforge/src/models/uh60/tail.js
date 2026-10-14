@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { wingPanel, mirrorZ, loftRings, orientOutward, airfoilLoop } from '../../engine/geometry.js';
-import { MAT, DEG, V3, merge, box, cyl, tube, pipe, pchip, unitRod, aimRod, TAIL, pylonLean, strobeMat } from './common.js';
+import { MAT, DEG, V3, merge, box, cyl, tube, pipe, pchip, unitRod, aimRod, TAIL, pylonLean, strobeMat, DEICE } from './common.js';
 
 /** Grid surface: fn(u, v) → Vector3 over u, v ∈ [0, 1]; skip(p) drops a quad. Normals computed. */
 function gridSurface(nu, nv, fn, skip = null) {
@@ -55,6 +55,24 @@ function fairing(keys, roofY, { e = 2.6, nu = 40, nv = 28, skip = null, baseDrop
   }, skip);
 }
 
+/** Keys [[x, half-width, crest]] of the aft deck fairing between the nacelles (crest at −3.6 from roofY). */
+const aftKeys = (roofY) => [[-3.6, 0.17, roofY(-3.6) + 0.18], [-3.0, 0.28, 2.45], [-2.4, 0.35, 2.6], [-1.9, 0.43, 2.645], [-1.65, 0.47, 2.66], [-1.4, 0.47, 2.665], [-0.9, 0.45, 2.67]];
+/**
+ * Point on the aft deck fairing at station x and angle a (0 = right base, π/2 = crest, π = left base),
+ * pushed `off` metres along the outward normal, and that normal: the same surface fairing() lofts.
+ */
+export function aftDeckPoint(roofY, x, a, off = 0) {
+  const keys = aftKeys(roofY), e = 2.6;
+  const at = (xx, aa) => {
+    const hw = pchip(keys.map(([k, w]) => [k, w]), xx), top = pchip(keys.map(([k, , t]) => [k, t]), xx), base = roofY(xx) - 0.03;
+    const c = Math.cos(aa), s = Math.sin(aa);
+    return V3(xx, base + (top - base) * Math.pow(Math.abs(s), 2 / e), hw * Math.sign(c) * Math.pow(Math.abs(c), 2 / e));
+  };
+  const p = at(x, a), tx = at(x + 0.01, a).sub(at(x - 0.01, a)), ta = at(x, a + 0.01).sub(at(x, a - 0.01));
+  const n = tx.cross(ta).normalize();
+  return { p: p.addScaledVector(n, off), n };
+}
+
 /** Tail-rotor blade in its feathering frame (x radial from the hub, LE toward −z). */
 function trBladeGeometry() {
   const loop = airfoilLoop(0.095, 14, 0, 1, 0.01);
@@ -98,7 +116,7 @@ export function buildTail({ A, P, air, roofY }) {
   }, [mesh(merge([trans, well, wellLip]), paint), mesh(well.clone(), MAT.interior())]);
   // between the nacelles its flanks run into the cowls' inboard sides, closing the deck (no open
   // slot between the engines and the fairing, and the fuel lines pass from one to the other inside)
-  const aftF = fairing([[-3.6, 0.17, roofY(-3.6) + 0.18], [-3.0, 0.28, 2.45], [-2.4, 0.35, 2.6], [-1.9, 0.43, 2.645], [-1.65, 0.47, 2.66], [-1.4, 0.47, 2.665], [-0.9, 0.45, 2.67]], roofY, { nu: 36, nv: 28 });
+  const aftF = fairing(aftKeys(roofY), roofY, { nu: 36, nv: 28 });
   const grille = [];
   for (let k = 0; k < 7; k++) grille.push(box(0.025, 0.012, 0.42, [-1.48 + k * 0.05, 2.668, 0]));
   P('Aft deck fairing', {
@@ -230,11 +248,14 @@ export function buildTail({ A, P, air, roofY }) {
   };
   const qInv = trFrame.quaternion.clone().invert();
   const toTr = (p) => V3(...p).sub(hub).applyQuaternion(qInv);
+  // the feed climbs the pylon beside the pylon drive shaft, 0.115 m to starboard of its axis
+  // (closing in near the top, where the pylon thins, passing aft of the tail-rotor servo)
+  const shaftSide = (t, off = 0.115) => [TAIL.igb[0] + (TAIL.tgb[0] - TAIL.igb[0]) * t, TAIL.igb[1] + (TAIL.tgb[1] - TAIL.igb[1]) * t, TAIL.igb[2] + (TAIL.tgb[2] - TAIL.igb[2]) * t + off];
   P('Tail rotor slip ring', {
     system: 'Electrical', material: 'Slip-ring assembly on the tail-rotor shaft, feed cable up the pylon', mass: 3, explode: [-2.9, 1.7, -0.4],
     desc: 'Carries de-ice power onto the turning tail-rotor shaft between the gearbox and the hub. The controller switches the tail-rotor power itself and sends it through here to all four blades at once, so unlike the main rotor the tail rotor needs no distributor. Its cable branches off the tail-cone harness and climbs the pylon.',
   }, [mesh(merge([cyl(0.068, 0.068, 0.06, [0, -0.13, 0], 'y', 20), cyl(0.074, 0.074, 0.01, [0, -0.15, 0], 'y', 20)]), MAT.casting()),
-    mesh(pipe([toTr([-8.6, 2.0, -0.18]), toTr([-8.9, 2.4, pylonLean(2.4) - 0.04]), toTr([-9.45, 3.1, pylonLean(3.1) - 0.05]), toTr([-9.8, 3.4, -0.32]), toTr([-9.88, 3.5, -0.24]), V3(0.05, -0.13, 0.06)], 0.009, 5), MAT.wiring())], trFrame);
+    mesh(pipe([toTr(DEICE.tailEnd), toTr([-8.64, 2.08, -0.05]), ...[[0.2], [0.4], [0.6], [0.75, 0.1], [0.88, 0.07]].map(([t, o]) => toTr(shaftSide(t, o))), toTr([-9.86, 3.42, -0.24]), toTr([-9.9, 3.49, -0.215]), V3(0.05, -0.13, 0.06)], 0.009, 5), MAT.wiring())], trFrame);
   const bladeG = trBladeGeometry();
   trPart('Tail rotor blades', {
     system: 'Rotor system', material: 'Graphite/glass skins over the crossbeam spars, nickel erosion strips', mass: 32, count: 4, explode: [-3.1, 1.1, 0],

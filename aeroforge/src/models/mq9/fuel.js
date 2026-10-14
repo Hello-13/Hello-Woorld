@@ -202,14 +202,16 @@ export function buildFuel({ P, L, m }) {
 export function buildFuelLines({ P, L, m }, fu, prop) {
   const { heaterP, fsovP, pumpY, keelY } = fu;
   const hp = prop.heatP, pump = prop.pumpP;
+  const under = (s, z, d = 0.03) => [X(s), prof(s).bot + d, z];       // in the keel channel under the aft cell's floor
   P('Engine feed line', {
     system: 'Fuel', material: 'Aluminium tube, stainless and fire-sleeved aft of the firewall', mass: 2.5, explode: [0, -0.45, 0.75],
-    desc: 'From the header pumps along the keel between the gear wells, up past the aft cell, through the forward electric heater and the FSOV at the firewall, then to the engine’s fuel heater and high-pressure pump on top of the engine (routing estimated).',
+    desc: 'From the header pumps along the keel between the gear wells and under the aft cell’s floor, up behind the cell to the forward electric heater, through the FSOV at the firewall, then under the engine’s hot end to its own fuel heater and up the port side to the high-pressure pump on top of the engine (routing estimated).',
   }, L(merge([
-    pipe([[X(4.62), pumpY, 0.19], [X(4.75), pumpY + 0.02, 0.09], [X(5.0), keelY - 0.01, -0.025], [X(6.0), keelY - 0.01, -0.025], [X(6.5), prof(6.5).bot + 0.08, 0.06], [X(6.9), 1.28, 0.28], [X(7.3), 1.31, 0.25], [heaterP[0] + 0.1, heaterP[1], heaterP[2]]], 0.011, 6, 60),
+    pipe([[X(4.62), pumpY, 0.19], [X(4.72), pumpY - 0.005, 0.12], [X(4.8), prof(4.8).bot + 0.058, 0.03], [X(5.0), keelY - 0.01, -0.025], [X(6.0), keelY - 0.01, -0.025], [X(6.47), prof(6.47).bot + 0.03, 0.0],
+      under(6.62, 0.035), under(6.95, 0.04), under(7.25, 0.045), [X(7.36), 1.26, 0.12], [X(7.42), 1.32, 0.16], [heaterP[0] + 0.1, heaterP[1], heaterP[2]]], 0.011, 6, 80),
     pipe([[heaterP[0] - 0.1, heaterP[1], heaterP[2]], [X(8.0), 1.38, 0.22], [X(8.5), 1.41, 0.21], [fsovP[0] + 0.035, fsovP[1], fsovP[2]]], 0.011, 6, 30),
-    pipe([[fsovP[0] - 0.035, fsovP[1], fsovP[2]], [X(9.1), 1.44, 0.23], [hp[0] + 0.1, hp[1], hp[2]]], 0.011, 6, 16),
-    pipe([[hp[0] - 0.09, hp[1], hp[2]], [X(9.5), hp[1] + 0.04, 0.24], [X(9.52), 1.72, 0.215], [X(9.58), 1.86, 0.16], [pump[0] + 0.06, pump[1], pump[2] + 0.04]], 0.009, 6, 30),
+    pipe([[fsovP[0] - 0.035, fsovP[1], fsovP[2]], [X(9.05), 1.425, 0.15], [X(9.15), 1.415, 0.0], [X(9.22), 1.43, -0.14], [hp[0] + 0.095, hp[1], hp[2]]], 0.011, 6, 30),
+    pipe([[hp[0] - 0.09, hp[1], hp[2]], [X(9.5), 1.5, -0.235], [X(9.56), 1.68, -0.25], [X(9.62), 1.82, -0.16], [X(9.68), 1.89, -0.06], [pump[0], pump[1] - 0.005, pump[2] - 0.038]], 0.009, 6, 40),
   ]), m.pipe));
   // fuselage-cell vents, sump drains, quantity probes, refuel ports and the dump system
   const top = (s) => fusePoint(s, Math.PI / 2 - 0.62, 0.05);
@@ -221,7 +223,7 @@ export function buildFuelLines({ P, L, m }, fu, prop) {
     desc: 'A vent from the top of each fuselage cell joins a line along the upper starboard side that exits at a flush outlet on the lower side aft of the gear wells, so the bladders never collapse or over-pressurise as fuel is drawn or warms (routing estimated).',
   }, L(merge(vent), m.pipe));
   const drain = (p) => new THREE.CylinderGeometry(0.02, 0.02, 0.01, 10).translate(p[0], p[1], p[2]);
-  const drains = [drain([X(3.5), prof(3.5).bot - 0.002, 0.06]), drain([X(4.5), prof(4.5).bot - 0.002, -0.06]), drain([X(7.2), prof(7.2).bot - 0.002, 0.06])];
+  const drains = [drain([X(3.5), prof(3.5).bot - 0.002, 0.06]), drain([X(4.5), prof(4.5).bot - 0.002, -0.095]), drain([X(7.2), prof(7.2).bot - 0.002, 0.06])];
   for (const zs of [1, -1]) for (const z of [1.2, 4.7]) drains.push(drain(W(z, 0.5, -1, -0.002, zs)));
   P('Fuel sump drains', {
     system: 'Fuel', material: 'Flush poppet drain valves', mass: 0.6, count: 7, explode: [0, -1.0, 0],

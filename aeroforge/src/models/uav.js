@@ -182,12 +182,15 @@ export function buildUAV() {
   // the V-tail spar frames (s 8.78, 9.31) are cut where the dorsal inlet duct and the exhaust pipes pass
   const arcs = (s, list, h) => list.map(([a, b]) => hoop(s, { h, from: a, to: b, n: Math.max(4, Math.round((36 * (b - a)) / (Math.PI * 2))) }));
   const PI = Math.PI, DUCT = 0.3;
-  const aftFrames = [4.25, 5.25, 6.3, 6.95, 7.75, 10.3].map((s) => hoop(s, { h: s > 9 ? 0.035 : 0.045, ...(inWell(s) ? openArc : s > 9 ? { from: -0.35, to: PI + 0.35, n: 30 } : {}) }));
+  // the frame under the aft cell has a keel cut-out for the feed line and the IFF cable; the one at the oil cooler opens round its scoop
+  const keelCut = (a) => ({ from: -PI / 2 + a, to: PI * 1.5 - a, n: 34 });
+  const aftOpen = { 6.95: keelCut(0.16), 7.75: keelCut(0.34) };
+  const aftFrames = [4.25, 5.25, 6.3, 6.95, 7.75, 10.3].map((s) => hoop(s, { h: s > 9 ? 0.035 : 0.045, ...(inWell(s) ? openArc : s > 9 ? { from: -0.35, to: PI + 0.35, n: 30 } : aftOpen[s] ?? {}) }));
   aftFrames.push(...arcs(8.78, [[-PI / 2, PI / 2 - DUCT], [PI / 2 + DUCT, PI * 1.5]], 0.045));
   aftFrames.push(...arcs(9.31, [[-0.35, 0.66], [1.08, PI / 2 - DUCT], [PI / 2 + DUCT, PI - 1.08], [PI - 0.66, PI + 0.35]], 0.04));
   P('Centre & aft fuselage frames', {
     system: 'Structure', material: 'Composite and aluminium ring frames (est.)', mass: 44, count: 8, xrayWeight: 0.4, explode: [-0.3, 0.45, 0],
-    desc: 'Frames at the wing spars, main-gear wells, accessory bay, V-tail spars and engine mounts. The frames at the front and rear spar positions take the wing’s lift into the body; the two V-tail spar frames carry the tail’s root fittings and are cut where the inlet duct and exhaust pipes pass; those over the wells and the engine bay are open below (spacing estimated).',
+    desc: 'Frames at the wing spars, main-gear wells, accessory bay, V-tail spars and engine mounts. The frames at the front and rear spar positions take the wing’s lift into the body; the two V-tail spar frames carry the tail’s root fittings and are cut where the inlet duct and exhaust pipes pass; those over the wells and the engine bay are open below, and the two under the aft cell and at the oil cooler have keel cut-outs for the feed line, the cables and the cooler scoop (spacing estimated).',
   }, L(merge(aftFrames), m.frame));
   const longerons = [0.9, Math.PI - 0.9, -0.5, -Math.PI + 0.5].map((th) => {
     const pts = [];
@@ -353,11 +356,11 @@ export function buildUAV() {
       system: 'Flight controls', material: 'Aluminium hinge brackets on the rear spar (est.)', mass: 2, count: 12, xrayWeight: 0.6, explode: [-0.55, 1.25, 1.9 * side],
       desc: 'Three brackets on the rear spar carry the hinge line of each of the four surfaces on this wing; the surfaces pivot about their leading edges, and each bracket takes part of the surface’s air load into the spar (bracket count and spacing estimated).',
     }, L(f(merge(brk)), m.alu));
-    const harnessPts = [[0.45, 0.705], [3.0, 0.705], [6.0, 0.705], [9.2, 0.705], [9.85, 0.4], [9.95, 0.08]].map(([z, cf]) => wpt(z, cf, 0));
+    const harnessPts = [[0.45, 0.705], [1.5, 0.705], [3.0, 0.705], [4.5, 0.705], [6.0, 0.705], [7.0, 0.704], [7.8, 0.703], [8.6, 0.703], [9.25, 0.70], [9.6, 0.6], [9.85, 0.4], [9.95, 0.08]].map(([z, cf]) => wpt(z, cf, 0));
     P(`Wing wiring (${sn})`, {
       system: 'Electrical', material: 'Shielded harness in conduit (est.)', mass: 4, xrayWeight: 0.5, explode: [0, 1.0, 1.9 * side],
       desc: 'Power and signal runs along the rear spar, outside the fuel bays, with a branch to each of the four surface servos and on to the wingtip radio antenna and the navigation light.',
-    }, L(f(merge([pipe(harnessPts, 0.008, 5, 60), ...branch])), m.harness));
+    }, L(f(merge([pipe(harnessPts, 0.008, 5, 110), ...branch])), m.harness));
     const lens = new THREE.SphereGeometry(0.03, 12, 8).scale(1.4, 0.8, 1).translate(...wpt(10.0, 0.04, 0)).translate(0.02, 0, 0.03);
     P(`Navigation light (${sn})`, {
       system: 'Electrical', material: 'LED position light', mass: 0.5, explode: [0, 1.5, 2.1 * side],
@@ -480,8 +483,9 @@ export function buildUAV() {
       callout: side > 0, anchor: [vtPoint(0.92, 0.85, 1).x, 0, VT_L * 0.92 * side],
     }, rH.pivot, frame);
     surf.rv.push({ h: rH, side });
-    const vs = [sparGeo(0.05, VT_L - 0.05, 0.25, { width: 0.025, steps: 4, root: vtRoot, tip: vtTip, twist: 0 }), sparGeo(0.05, VT_L - 0.08, 0.66, { width: 0.02, steps: 4, root: vtRoot, tip: vtTip, twist: 0 })];
-    for (const zz of [0.05, 0.65, 1.25, 1.85, VT_L - 0.03]) vs.push(ribGeo(zz, 0.02, 0.69, { root: vtRoot, tip: vtTip, twist: 0, th: 0.008 }));
+    // the spars start, and the root rib sits, where the surface leaves the fuselage: clear of the dorsal inlet duct and the exhaust pipes below
+    const vs = [sparGeo(0.09, VT_L - 0.05, 0.25, { width: 0.025, steps: 4, root: vtRoot, tip: vtTip, twist: 0 }), sparGeo(0.15, VT_L - 0.08, 0.66, { width: 0.02, steps: 4, root: vtRoot, tip: vtTip, twist: 0 })];
+    for (const zz of [0.14, 0.65, 1.25, 1.85, VT_L - 0.03]) vs.push(ribGeo(zz, 0.02, 0.69, { root: vtRoot, tip: vtTip, twist: 0, th: 0.008 }));
     const vh = [];
     for (const eta of [0.15, 0.5, 0.85]) {
       const p0 = vtPoint(eta, 0.66, 1), p1 = vtPoint(eta, 0.705, 1);
@@ -493,18 +497,18 @@ export function buildUAV() {
     }, L(f(merge(vh)), m.alu), frame);
     P(`V-tail spar & ribs (${sn})`, {
       system: 'Structure', material: 'Carbon-fibre composite (est.)', mass: 9, explode: [0, 0, 0.55 * side],
-      desc: 'Two spars and five ribs per tail surface; the spars’ roots are pinned through root fittings to the two V-tail spar frames (layout estimated).',
+      desc: 'Two spars and five ribs per tail surface. The root rib sits where the surface leaves the fuselage, and the spars’ roots are pinned through root fittings to the two V-tail spar frames, above the engine’s inlet duct and exhaust pipes (layout estimated).',
     }, L(f(merge(vs)), m.composite), frame);
-    // root fittings: lugs on the upper and lower caps of both spars, pinned into the spar frames below
+    // root fittings: a clevis on the upper and lower cap of each spar root, straddling its spar frame, and the pin through both
     const rf = [];
-    for (const cf of [0.25, 0.66]) {
-      const x = vtPoint(0, cf, 1).x, ht = naca00(cf, vtRoot.t) * vtRoot.chord - 0.018;
-      for (const yy of [ht, -ht]) rf.push(box(0.075, 0.022, 0.1, [x, yy, 0.0]));
-      rf.push(new THREE.CylinderGeometry(0.011, 0.011, 2 * ht + 0.05, 10).translate(x, 0, -0.025), box(0.05, 2 * ht - 0.01, 0.03, [x, 0, -0.035]));
+    for (const [cf, zf, fs] of [[0.25, 0.07, 8.78], [0.66, 0.13, 9.31]]) {
+      const x = X(fs) - frame.position.x, ht = naca00(cf, vtRoot.t) * vtRoot.chord - 0.02;
+      for (const yy of [ht, -ht]) for (const dx of [-0.021, 0.021]) rf.push(box(0.012, 0.022, 0.05, [x + dx, yy, zf]));
+      rf.push(new THREE.CylinderGeometry(0.011, 0.011, 2 * ht + 0.03, 10).translate(x, 0, zf));
     }
     P(`V-tail root fittings (${sn})`, {
       system: 'Structure', material: 'Machined aluminium or titanium lugs and steel pins (est.)', mass: 1.6, count: 4, explode: [0, -0.15, 0.4 * side],
-      desc: 'Four lugs, on the upper and lower caps of the front and rear spars, pin each tail surface to the two V-tail spar frames over the accessory bay and the engine. They carry the tail’s bending and twisting into the fuselage (layout estimated).',
+      desc: 'Clevis fittings on the upper and lower caps of the front and rear spar roots straddle the two V-tail spar frames over the accessory bay and the engine, with a pin through each. They carry the tail’s bending and twisting into the fuselage, and sit outboard of the inlet duct and above the exhaust pipes that pass between the tail roots (layout estimated).',
     }, L(f(merge(rf)), m.titanium), frame);
   }
   const fin = new THREE.Group();
@@ -665,7 +669,15 @@ export function buildUAV() {
   P('Nose-wheel steering controller', {
     system: 'Landing gear', material: 'Servo driver and steering controller (est.)', mass: 1, explode: [0.45, 0.55, -0.4],
     desc: 'Turns rudder-pedal commands from the ground station into drive for the steering servo and centres the wheel when the commands stop. Its failure in May 2015 left the nose wheel uncontrollable on the runway (USAF investigation; position estimated).',
-  }, L(merge([lru(0.15, 0.06, 0.1, nsc, 0.012), pipe([[nsc[0] - 0.075, nsc[1], nsc[2]], [X(2.12), 1.36, -0.1], [X(2.03), 1.22, -0.07], [X(2.0), 1.12, -0.06]], 0.006, 5, 14)]), m.lru));
+  }, L(merge([lru(0.15, 0.06, 0.1, nsc, 0.012), pipe([[nsc[0] + 0.07, nsc[1] - 0.01, nsc[2]], [X(2.12), 1.36, -0.11], [X(2.03), 1.22, -0.112], [X(2.0), 1.125, -0.112]], 0.006, 5, 14)]), m.lru));
+  // the leg's own harness: from the trunnion end, where the steering controller's lead arrives, to the steering motor and the landing light
+  P('Nose leg harness', {
+    system: 'Electrical', material: 'Shielded harness clamped to the leg, with a flexible loop at the trunnion (est.)', mass: 0.5, xrayWeight: 0.5, explode: [0.4, -0.65, -0.35],
+    desc: 'Rides on the nose leg: power and commands for the steering motor, power for the landing and taxi light, and the steering-position signal back to the controller. It leaves the airframe at the end of the trunnion, on the pivot axis, so retracting the leg twists the loop there instead of stretching it (routing estimated).',
+  }, L(merge([
+    pipe([[0, 0, -0.112], [0.03, -0.04, -0.095], [0.06, -0.1, -0.065], [0.058, -0.2, -0.048], [0.062, -0.27, -0.03], [0.068, -0.297, -0.012]], 0.005, 5, 24),
+    pipe([[0.03, -0.04, -0.095], [-0.03, -0.055, -0.085], [-0.075, -0.065, -0.04], [-0.07, -0.073, 0.02]], 0.005, 5, 14),
+  ]), m.harness), noseLeg);
 
   // ---- main gear: trailing-arm legs, retracting aft into the wells
   // offsets from the trunnion with the leg down (x forward, starboard side; mirrored for port)
@@ -736,6 +748,19 @@ export function buildUAV() {
     }, L(merge([lru(0.2, 0.06, 0.12, drv, 0.012), pipe([[drv[0] + 0.1, drv[1], drv[2]], [X(4.95), 1.44, 0.29 * side], [anchor.x - 0.02, anchor.y - 0.01, anchor.z]], 0.006, 5, 10)]), m.lru));
     mainLegs.push({ piv, wheel, q, qw: q.clone().invert() });
   }
+  // gear electrics: a branch from each main power feeder down behind the wing box to its retract driver, on to the trunnion where
+  // the brake line starts; and a branch from the avionics bay harness under the floor to the nose retract driver and steering controller
+  const lgh = [];
+  for (const zs of [1, -1]) {
+    lgh.push(pipe([fusePoint(5.278, Math.PI / 2 - 0.5 * zs, 0.02), [X(5.278), 1.72, 0.3 * zs], [X(5.27), 1.6, 0.31 * zs], [X(5.255), 1.52, 0.295 * zs], [X(5.24), 1.488, 0.28 * zs]], 0.008, 5, 24));
+    lgh.push(pipe([[X(5.07), 1.445, 0.215 * zs], [X(4.95), 1.42, 0.2 * zs], [X(4.885), 1.36, 0.2 * zs], [X(4.885), 1.28, 0.195 * zs], [X(4.905), 1.25, 0.18 * zs], [X(4.915), 1.243, 0.17 * zs]], 0.007, 5, 24));
+  }
+  lgh.push(pipe([[X(3.35), 1.45, -0.29], [X(3.24), 1.425, -0.21], [X(3.12), 1.425, -0.13], [X(3.0), 1.44, -0.1], [X(2.983), 1.445, -0.095]], 0.006, 5, 20));
+  lgh.push(pipe([[X(3.12), 1.425, -0.13], [X(3.0), 1.428, -0.168], [X(2.7), 1.43, -0.17], [X(2.5), 1.428, -0.165], [X(2.385), 1.44, -0.13]], 0.006, 5, 30));
+  P('Landing gear harness', {
+    system: 'Electrical', material: 'Shielded harness in the gear wells (est.)', mass: 2.5, xrayWeight: 0.5, explode: [0, -0.15, 1.15],
+    desc: 'Feeds the all-electric gear: a branch from each main power feeder runs down behind the wing box to its retract driver and on down the well’s forward wall to the trunnion, where the brake line and weight-on-wheels wiring start; the nose branch leaves the avionics bay harness and runs under the floor to the nose retract driver and the steering controller. A 2014 MQ-9 could not lower its gear after a generator failure ran the batteries down (USAF investigation; routing estimated).',
+  }, L(merge(lgh), m.harness));
 
   // gear doors: conformal skin patches; the nose doors hinge on their outer edges, the main doors on the keel
   const doors = [];
@@ -830,7 +855,7 @@ export function buildUAV() {
   }, L(merge([tubeBetween(oatBase, [oatBase[0] - 0.02, oatBase[1] - 0.06, oatBase[2] + 0.03], 0.009, 8), cylX(oatBase[0] - 0.05, oatBase[0] + 0.01, 0.012, 0.012, oatBase[1] - 0.06, oatBase[2] + 0.03, 8)]), m.pipe));
 
   // ============================================================== communications
-  const MODEM = [X(1.7), NFLOOR + 0.107, -0.17], ADC = [X(1.7), NFLOOR + 0.067, 0.18], IFFP = [X(2.64), NFLOOR + 0.067, 0], CBAND = [X(3.26), NFLOOR + 0.117, -0.16];
+  const MODEM = [X(1.7), NFLOOR + 0.107, -0.17], ADC = [X(1.7), NFLOOR + 0.067, 0.18], IFFP = [X(2.64), NFLOOR + 0.067, 0], CBAND = [X(3.26), NFLOOR + 0.117, -0.13];
   const dishG = new THREE.Group();
   dishG.position.set(X(1.15), 1.58, 0);
   const dishAz = new THREE.Group();
@@ -874,11 +899,11 @@ export function buildUAV() {
   P('C-band datalink transceiver', {
     system: 'Communications', material: 'Line-of-sight datalink radio', mass: 10, explode: [0.3, 1.0, -0.55],
     desc: 'The line-of-sight C-band link used by the launch-and-recovery crew at the airfield: short delay for hand-flown take-offs and landings, but only to the radio horizon.',
-  }, L(lru(0.26, 0.22, 0.28, CBAND), m.lru));
+  }, L(lru(0.26, 0.22, 0.22, CBAND), m.lru));
   P('ARC-210 V/UHF radios', {
     system: 'Communications', material: 'Two software-defined VHF/UHF radios', mass: 11, count: 2, explode: [0.3, 1.05, 0.55],
     desc: 'Two ARC-210 radios relay voice between the crew and air-traffic control or troops on the ground, through the wingtip antennas (Block 5 fit).',
-  }, L(merge([lru(0.26, 0.12, 0.25, [X(3.26), NFLOOR + 0.067, 0.15]), lru(0.26, 0.12, 0.25, [X(3.26), NFLOOR + 0.192, 0.15])]), m.lruOlive));
+  }, L(merge([lru(0.26, 0.12, 0.16, [X(3.26), NFLOOR + 0.067, 0.14]), lru(0.26, 0.12, 0.16, [X(3.26), NFLOOR + 0.192, 0.14])]), m.lruOlive));
   const cband = [bladeAntenna(0.2, 0.24).translate(X(2.5), prof(2.5).top - 0.01, 0), bladeAntenna(0.18, 0.22).rotateX(Math.PI).translate(X(3.3), prof(3.3).bot + 0.01, 0)];
   P('C-band LOS antennas', {
     system: 'Communications', material: 'Blade antennas (positions approximate)', mass: 2, count: 2, explode: [0.4, 0.5, 0],
@@ -897,9 +922,9 @@ export function buildUAV() {
   // pitot, static, OAT and AoA lines to the air data computer; antenna cables; Iridium; ELT (mq9/sensors.js)
   buildAirData({ P, L, m }, ADC);
   buildLinks({ P, L, m }, { modem: MODEM, cband: CBAND, egi: [[X(2.64), NFLOOR + 0.087, 0.2], [X(2.64), NFLOOR + 0.087, -0.2]], iff: IFFP, floor: NFLOOR });
-  const ball = [box(0.36, 0.008, 0.33, [X(1.14), 1.034, 0])];
-  for (let k = 0; k < 3; k++) ball.push(box(0.3, 0.0115, 0.28, [X(1.14), 1.044 + k * 0.012, 0]));
-  for (const dx of [-0.13, 0.13]) for (const dz of [-0.11, 0.11]) ball.push(new THREE.CylinderGeometry(0.009, 0.009, 0.05, 6).translate(X(1.14) + dx, 1.06, dz));
+  const ball = [box(0.27, 0.008, 0.33, [X(1.105), 1.034, 0])];          // s 0.97–1.24, ending just ahead of the radar electronics
+  for (let k = 0; k < 3; k++) ball.push(box(0.23, 0.0115, 0.28, [X(1.105), 1.044 + k * 0.012, 0]));
+  for (const dx of [-0.1, 0.1]) for (const dz of [-0.11, 0.11]) ball.push(new THREE.CylinderGeometry(0.009, 0.009, 0.05, 6).translate(X(1.105) + dx, 1.06, dz));
   P('Nose ballast', {
     system: 'Structure', material: 'Lead plates bolted to the forward-bay floor (mass and size estimated)', mass: 36, count: 3, explode: [0.55, -0.85, 0],
     desc: 'Lead plates on the floor of the forward bay, under the SATCOM pedestal. With the 175 kg engine and the propeller at the tail, ballast in the nose keeps the centre of gravity ahead of the main wheels, and plates come and go as sensor fits change. The NTSB found “ballast from the forward fuselage bay” beyond the 2006 wreckage.',
@@ -923,13 +948,15 @@ export function buildUAV() {
   for (const zs of [1, -1]) {
     avh.push(pipe(topRun(1.3, 3.45, zs), 0.012, 6, 60));
     avh.push(pipe([fusePoint(1.3, Math.PI / 2 - 0.5 * zs, 0.02), [X(1.35), 1.55, 0.3 * zs], [X(1.55), 1.3, 0.25 * zs]], 0.009, 5, 16));
-    for (const [q, y, z] of [[2.175, NFLOOR + 0.21, 0.24], [2.64, NFLOOR + 0.17, 0.2], [3.26, NFLOOR + 0.25, 0.16]]) avh.push(tubeBetween(fusePoint(q, Math.PI / 2 - 0.5 * zs, 0.02), [X(q), y, z * zs], 0.007, 5));
+    for (const [q, y, z] of [[2.175, NFLOOR + 0.21, 0.24], [2.64, NFLOOR + 0.17, 0.2], zs > 0 ? [3.26, NFLOOR + 0.25, 0.14] : [3.26, NFLOOR + 0.226, 0.13]]) avh.push(tubeBetween(fusePoint(q, Math.PI / 2 - 0.5 * zs, 0.02), [X(q), y, z * zs], 0.007, 5));
     avh.push(pipe([fusePoint(3.35, Math.PI / 2 - 0.5 * zs, 0.02), [X(3.36), 1.6, 0.33 * zs], [X(3.34), 1.3, 0.25 * zs]], 0.009, 5, 16));
   }
   avh.push(pipe([[X(1.55), 1.3, -0.25], [X(1.25), 1.15, -0.24], [X(1.1), 1.045, -0.195], [X(1.08), 1.008, -0.18]], 0.009, 5, 16));   // past the ballast to the turret's slip ring
+  avh.push(pipe([fusePoint(2.36, Math.PI / 2 + 0.5, 0.02), [X(2.36), 1.6, -0.34], [X(2.36), 1.45, -0.33], [X(2.355), 1.31, -0.27], [X(2.35), 1.279, -0.256]], 0.006, 5, 20));   // down past the floor to the cooling fan
+  avh.push(pipe([[X(1.35), 1.5, -0.3], [X(1.1), 1.43, -0.33], [X(0.95), 1.45, -0.33], [X(0.75), 1.47, -0.3], [X(0.45), 1.47, -0.22], [X(0.28), 1.43, -0.09], [X(0.222), 1.37, -0.01]], 0.006, 5, 40));   // forward over the radar deck to the nose camera
   P('Avionics bay harness', {
     system: 'Electrical', material: 'Shielded copper harness and data buses (est.)', mass: 18, xrayWeight: 0.5, explode: [0.3, 1.25, 0],
-    desc: 'Runs along both sides of the avionics bay roof, dropping to each rack, the batteries, the radar and the turret. Port and starboard runs are kept apart so one chafed bundle cannot take out both channels (routing estimated).',
+    desc: 'Runs along both sides of the avionics bay roof, dropping to each rack, the batteries, the radar, the turret, the cooling fan and, forward over the radar deck, the pilot’s nose camera. Port and starboard runs are kept apart so one chafed bundle cannot take out both channels (routing estimated).',
   }, L(merge(avh), m.harness));
   const feeders = [];
   for (const zs of [1, -1]) feeders.push(pipe([...topRun(3.45, 7.2, zs), [X(7.42), 1.74, 0.22 * zs], [X(PDU_S), 1.7, 0.2 * zs]], 0.012, 6, 80));
@@ -941,29 +968,47 @@ export function buildUAV() {
   const SG = [X(9.68), 1.535, 0.145];                    // starter-generator terminal box
   const ebh = [
     // starboard: PDU → DEEC → through the firewall → starter-generator, torque pickup and servos
-    pipe([[X(PDU_S) - 0.11, 1.62, 0.2], ...sideRun(7.9, 8.7, 0.3), [X(8.75), 1.74, 0.23], ...sideRun(8.9, 9.3, 0.15), [X(9.5), 1.5, 0.26], [X(9.62), 1.54, 0.2], SG], 0.012, 6, 80),
+    pipe([[X(PDU_S) - 0.11, 1.62, 0.2], ...sideRun(7.9, 8.7, 0.3), [X(8.75), 1.74, 0.23], ...sideRun(8.9, 9.3, 0.15), [X(9.45), 1.585, 0.262], [X(9.58), 1.565, 0.215], [X(9.64), 1.545, 0.18], SG], 0.012, 6, 80),
+    pipe([[X(9.67), 1.522, 0.125], [X(9.655), 1.5, 0.06], [X(9.672), 1.46, 0.03], [X(9.688), 1.44, 0.03]], 0.005, 5, 12),           // to the tachometer-generator
     pipe([fusePoint(8.5, 0.3, 0.04), [X(8.62), 1.8, 0.2], [X(8.74), 1.82, 0.0]], 0.007, 5, 12),
     pipe([fusePoint(9.3, 0.15, 0.04), [X(9.7), 1.84, 0.25], [X(9.84), ENGINE_Y + 0.17, 0.17]], 0.006, 5, 16),
     // port: GCU → ESM → through the firewall → exciter, backup generator, oil sensors and the other pickup
-    pipe([[X(GCU_S) - 0.09, 1.61, -0.2], [X(8.05), 1.66, -0.26], ...sideRun(8.1, 8.7, Math.PI - 0.3), [X(8.75), 1.72, -0.22], ...sideRun(8.9, 9.25, Math.PI - 0.12), [X(9.36), ENGINE_Y - 0.03, -0.29], [X(9.55), 1.5, -0.27], [X(9.72), 1.47, -0.15]], 0.011, 6, 80),
+    pipe([[X(GCU_S) - 0.09, 1.61, -0.2], [X(8.05), 1.66, -0.26], ...sideRun(8.1, 8.7, Math.PI - 0.3), [X(8.75), 1.72, -0.22], ...sideRun(8.9, 9.1, Math.PI - 0.12), [X(9.2), 1.68, -0.305], [X(9.26), 1.6, -0.3], [X(9.29), 1.57, -0.28],
+      [X(9.42), 1.56, -0.265], [X(9.52), 1.525, -0.235], [X(9.6), 1.48, -0.225], [X(9.648), 1.466, -0.216]], 0.011, 6, 80),   // to the backup generator's terminal box
+    tubeBetween([X(9.36), 1.562, -0.27], [X(9.36), 1.609, -0.285], 0.006, 5),                                                        // up to the ignition exciter
     pipe([fusePoint(9.25, Math.PI - 0.12, 0.04), [X(9.7), 1.72, -0.29], [X(9.98), ENGINE_Y - 0.05, -0.29]], 0.006, 5, 16),
     pipe([fusePoint(9.25, Math.PI - 0.12, 0.04), [X(9.55), 1.86, -0.24], [X(9.84), ENGINE_Y + 0.17, -0.17]], 0.006, 5, 16),
   ];
   P('Engine bay harness', {
     system: 'Electrical', material: 'Fire-resistant harness (est.)', mass: 8, xrayWeight: 0.5, explode: [0, 0.55, -1.0],
-    desc: 'Carries power and signals from the distribution units and the generator control unit to the engine control, the start module and the control servos, then through the firewall to the starter-generator, backup generator, igniter exciter and engine sensors, in fire-resistant sleeving because it runs beside the hot section (routing estimated).',
+    desc: 'Carries power and signals from the distribution units and the generator control unit to the engine control, the start module and the control servos, then through the firewall to the starter-generator, the backup generator’s terminal box, the igniter exciter, the tachometer-generator and the engine sensors, in fire-resistant sleeving because it runs beside the hot section (routing estimated).',
   }, L(merge(ebh), m.harness));
   const finServo = [X(8.3) - 0.64, 1.28 - 0.14, 0];
   const th = [];
   for (const [k, zs] of [[0, 1], [1, -1]]) {
     const sv = rvServoAt[k];
-    th.push(pipe([fusePoint(8.3, Math.PI / 2 - 0.75 * zs, 0.04), fusePoint(8.7, Math.PI / 2 - 0.6 * zs, 0.035), [X(8.95), 1.98, 0.13 * zs], [sv.x + 0.08, sv.y - 0.04, sv.z - 0.02 * zs], [sv.x, sv.y, sv.z]], 0.008, 5, 24));
+    th.push(pipe([fusePoint(8.3, Math.PI / 2 - 0.75 * zs, 0.04), fusePoint(8.62, Math.PI / 2 - 0.66 * zs, 0.065), [X(8.78), 1.922, 0.205 * zs], [X(8.95), 1.975, 0.16 * zs], [sv.x + 0.08, sv.y - 0.04, sv.z - 0.02 * zs], [sv.x, sv.y, sv.z]], 0.008, 5, 30));
   }
   th.push(pipe([fusePoint(8.3, Math.PI + 0.3, 0.04), fusePoint(8.6, -Math.PI + 0.9, 0.04), [X(8.8), prof(8.8).bot + 0.05, -0.03], [finServo[0] + 0.05, prof(8.9).bot + 0.01, 0], finServo], 0.007, 5, 24));
   P('Tail harness', {
     system: 'Electrical', material: 'Shielded harness (est.)', mass: 3, xrayWeight: 0.5, explode: [-0.6, 0.6, 0],
     desc: 'Power and command signals for the two ruddervator servos in the tail roots and the ventral rudder servo in the fin (routing estimated).',
   }, L(merge(th), m.harness));
+  // fuel system electrics: from the starboard distribution unit aft under the shelf to the forward fuel heater and the FSOV; from the port
+  // one forward over the aft cell and down the keel channel between the gear wells to the selector solenoids, both header pumps and the dump valve
+  const fsh = [
+    pipe([[X(7.6), 1.6, 0.282], [X(7.6), 1.54, 0.305], [X(7.63), 1.485, 0.25], [X(7.7), 1.48, 0.21], [X(8.5), 1.48, 0.2], [X(8.85), 1.482, 0.2], [X(8.898), 1.48, 0.2]], 0.007, 5, 40),
+    pipe([[X(7.65), 1.481, 0.215], [X(7.58), 1.44, 0.18], [X(7.555), 1.408, 0.17]], 0.006, 5, 10),
+    pipe([[X(7.55), 1.685, -0.17], [X(7.4), 1.74, -0.15], ...[7.2, 6.6, 6.0, 5.6].map((q) => fusePoint(q, Math.PI / 2 + 0.3, 0.065)), [X(5.35), 1.752, -0.07],
+      [X(5.278), 1.66, -0.022], [X(5.275), 1.4, -0.022], [X(5.2), 1.252, -0.022], [X(5.0), 1.25, -0.022], [X(4.88), 1.245, -0.02]], 0.007, 5, 90),
+    pipe([[X(4.88), 1.245, -0.02], [X(4.845), 1.2, -0.04], [X(4.836), 1.16, -0.06]], 0.005, 5, 10),
+  ];
+  for (const zs of [1, -1]) fsh.push(pipe([[X(4.88), 1.245, -0.02], [X(4.84), 1.21, 0.1 * zs], [X(4.82), 1.2, 0.15 * zs], [X(4.75), 1.17, 0.19 * zs], [X(4.64), 1.145, 0.19 * zs], [X(4.627), 1.14, 0.19 * zs]], 0.005, 5, 20));
+  fsh.push(pipe([[X(4.72), 1.164, -0.19], [X(4.69), 1.152, -0.12], [X(4.665), 1.142, -0.07]], 0.004, 5, 10));
+  P('Fuel system harness', {
+    system: 'Electrical', material: 'Shielded harness, kept apart from the fuel lines it runs beside (est.)', mass: 2, xrayWeight: 0.5, explode: [0, 0.3, 1.25],
+    desc: 'Powers the fuel system’s electrical units from the distribution units: aft under the equipment shelf to the forward fuel heater and the electrical shutoff valve at the firewall, and forward over the aft cell and down the keel channel between the gear wells to the six selector solenoids, both header pumps and the dump valve. A fault on this circuit can starve the engine: in 2025 a chafed wire inside a fuel control fired the shutoff valve shut in flight and the aircraft was lost (USAF investigation; routing estimated).',
+  }, L(merge(fsh), m.harness));
   P('Generator control unit', {
     system: 'Electrical', material: 'Voltage regulator and protection unit (est.)', mass: 4, explode: [0, 0.75, -0.75],
     desc: 'Regulates the starter-generator’s output and trips it off line if it misbehaves, so the distribution units can shed load and keep the flight-critical bus alive on the backup generator and batteries. In a 2015 loss the generator’s current fell from 156 A to zero before the batteries ran down (USAF investigation; position estimated).',
@@ -1003,7 +1048,7 @@ export function buildUAV() {
   }, L(merge([
     pipe([[X(2.25), 1.22, -0.255], [X(2.0), 1.27, -0.25], [X(1.92), 1.25, -0.19], [X(1.885), 1.2, -0.1]], 0.033, 8, 24),   // into the aft face of the radar electronics
     pipe([[X(2.15), 1.25, -0.27], [X(2.05), 1.36, -0.28], [X(2.0), 1.47, -0.25]], 0.025, 8, 12),
-    pipe([[X(2.45), 1.22, -0.255], [X(2.6), 1.3, -0.27], [X(2.75), 1.45, -0.28], [X(2.85), 1.56, -0.28], [X(3.08), 1.6, -0.25]], 0.028, 8, 24),
+    pipe([[X(2.45), 1.22, -0.255], [X(2.6), 1.28, -0.27], [X(2.8), 1.36, -0.28], [X(2.88), 1.47, -0.285], [X(2.93), 1.56, -0.28], [X(3.08), 1.6, -0.25]], 0.028, 8, 24),
   ]), m.alu));
   const louvre = [skinPatch(2.9, 3.12, 0.3, 0.5, 0.003, 2, 3)];
   for (let k = 0; k < 4; k++) { const p = fusePoint(2.93 + k * 0.055, 0.4, -0.006); louvre.push(box(0.012, 0.012, 0.13, [p[0], p[1], p[2]], [0.35, 0, 0])); }

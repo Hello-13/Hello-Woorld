@@ -92,11 +92,21 @@ function engineGeometry() {
   // pneumatic helium bottles and the leg-deployment lines to the base of each piston
   const pb = [22.5, 202.5].map((a) => new THREE.SphereGeometry(0.12, 16, 10).translate(...at(1.58, a, 2.7)));
   const legHe = [];
+  // the run round the bay dips under the side boosters' LOX fill & drain valve (at 352° on A, 172°
+  // on B); the geometry is shared, so the centre core's lines dip there too
+  const heY = (a) => {
+    const d = Math.min(...[352, 172].map((c) => Math.abs(((a - c + 540) % 360) - 180)));
+    return 2.95 - 0.22 * (1 - smooth((d - 5) / 8));
+  };
+  const heArc = (a0, a1) => {
+    const n = Math.max(2, Math.ceil(Math.abs(a1 - a0) / 3));
+    return Array.from({ length: n + 1 }, (_, i) => { const a = a0 + ((a1 - a0) * i) / n; return at(1.45, a, heY(a)); });
+  };
   for (const [b, legs] of [[22.5, [45, 315]], [202.5, [135, 225]]]) {
     for (const la of legs) {
       const dlt = ((la - b + 540) % 360) - 180, side = Math.sign(dlt);
       const a1 = b + dlt - side * 6;
-      legHe.push(pipe([at(1.58, b, 2.82), at(1.45, b + side * 4, 2.95), ...arc(1.45, 2.95, b + side * 8, a1, 5).slice(1), at(R - 0.01, a1, 2.95), at(R + 0.05, b + dlt - side * 3, 3.1), pistonB(la)], 0.0115, { seg: 4, tubular: 28, tension: 0.1 }));
+      legHe.push(pipe([at(1.58, b, 2.82), at(1.45, b + side * 4, 2.95), ...heArc(b + side * 8, a1), at(R - 0.01, a1, 2.95), at(R + 0.05, b + dlt - side * 3, 3.1), pistonB(la)], 0.0115, { seg: 4, tubular: 56, tension: 0.1 }));
     }
   }
   const ec = OUTER.map((a) => unit(1.64, a + 8, 1.8, 0.16, 0.2, 0.12));
@@ -277,7 +287,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     desc: 'A ring manifold under the bottles ties all three COPVs into one pressurisation system; it is filled from the ground through the T-0 plate during the count. On CRS-7 (2015) a strut holding one of these bottles in a second-stage LOX tank failed and the vehicle was lost. Routing estimated.',
     explode: [0, 1.2, 3.2],
   }, mesh(merge(man0), FM.steelLine()));
-  const hxAz = 315;
+  const hxAz = 330;                     // between the RP-1 feed lines of the 292.5° and 337.5° engines
   const [hxx, hxz] = polar(1.2, hxAz);
   const hx = P('helium heat exchanger', {
     system: 'Fuel', material: 'Stainless-steel coil heat exchanger', mass: 35,
@@ -286,7 +296,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   }, [mesh(block(hxx, 2.78, hxz, 0.4, 0.24, 0.28, radialYaw(hxAz)), FM.inconel()), mesh(hoop(0.11, 0.03, 2.78, { x: hxx, z: hxz, seg: 16, tube: 6 }), FM.steelLine())]);
   hx.userData.part.temp = 330;
   // helium lines: bottle → down the inside wall → heat exchanger → back up to the LOX and RP-1 ullage
-  const [cx, cz] = polar(1.05, 270), [px, pz] = polar(1.7, 300), [qx, qz] = polar(1.7, 310);
+  const [cx, cz] = polar(1.05, 270), [px, pz] = polar(1.7, hxAz - 8), [qx, qz] = polar(1.7, hxAz + 8);
   const press = [
     pipe([[cx, 36.4, cz], [px * 0.9, 35.5, pz * 0.9], [px, 30, pz], [px, Y.commonDome + 0.3, pz], [px, Y.commonDome - 0.4, pz], [px, Y.engSectionTop + 0.2, pz], [hxx * 1.12, 2.92, hxz * 1.12]], 0.035, { seg: 6, tubular: 80 }),
     pipe([[hxx * 1.12, 2.9, hxz * 1.05], [qx, Y.engSectionTop + 0.3, qz], [qx, Y.commonDome - 0.5, qz], [qx, Y.commonDome + 0.4, qz], [qx, Y.loxTop - 0.2, qz], [qx * 0.7, Y.loxTop + 0.5, qz * 0.7]], 0.03, { seg: 6, tubular: 80 }),
@@ -362,7 +372,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   // fill, drain and vent valves: ground lines enter at the T-0 plate; the vents sit at the tank tops
   const lfd = P('LOX fill & drain valve', {
     system: 'Fuel', material: 'Stainless valve body and line into the LOX manifold', mass: 22,
-    desc: 'LOX loads from the T-0 plate through this valve into the feed manifold and up the transfer tube. On Falcon Heavy first-stage LOX loading starts about 45 minutes before liftoff (NASA's countdown for Psyche, 2023; 35 minutes on Falcon 9). Because the densified LOX keeps boiling off, it is topped up until the last minutes. Line routing simplified.',
+    desc: 'LOX loads from the T-0 plate through this valve into the feed manifold and up the transfer tube. On Falcon Heavy first-stage LOX loading starts about 45 minutes before liftoff (NASA\'s countdown for Psyche, 2023; 35 minutes on Falcon 9). Because the densified LOX keeps boiling off, it is topped up until the last minutes. Line routing simplified.',
     explode: [0, -0.8, 4.8],
   }, mesh(merge([
     pipe([at(R - 0.05, t0Az - 8, T0_Y - 0.05), at(1.45, t0Az - 8, 2.95), at(0.98, t0Az - 4, 2.64)], 0.06, { seg: 8, tubular: 10 }),
@@ -842,9 +852,11 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     callout: !centre && attachSide > 0, anchor: at(R + 0.16, rwA, 30.0), explode: [0, 0, 1.6],
   }, mesh(merge(rw), FM.racewayBlack()));
   const wh = [
-    hoop(1.6, 0.025, fwdY - 0.22, { seg: 64, tube: 4 }), hoop(1.66, 0.025, 2.9, { seg: 64, tube: 4 }),
+    hoop(1.6, 0.025, fwdY - 0.22, { seg: 64, tube: 4 }),
+    // engine-bay ring: it ducks inboard of the eight Octaweb corner posts
+    pipe(Array.from({ length: 64 }, (_, i) => { const a = i * 5.625, d = Math.abs(((a + 22.5) % 45) - 22.5); return at(1.55 + 0.11 * smooth(d / 15), a, 2.9); }), 0.025, { seg: 4, tubular: 128, closed: true }),
     pipe([at(R + 0.06, rwA, Y.s1Top - 0.25), at(R - 0.05, rwA, Y.s1Top - 0.4), at(1.62, rwA, fwdY - 0.1), at(1.6, rwA - 4, fwdY - 0.22)], 0.03, { seg: 6, tubular: 10 }),
-    pipe([at(R + 0.06, rwA, rwBottom + 0.1), at(R - 0.02, rwA, 2.6), at(1.7, rwA + 6, 2.75), at(1.66, rwA + 12, 2.9)], 0.03, { seg: 6, tubular: 10 }),   // past the Octaweb post
+    pipe([at(R + 0.06, rwA, rwBottom + 0.1), at(R - 0.02, rwA + 4, 2.6), at(1.7, rwA + 8, 2.75), at(1.66, rwA + 12, 2.9)], 0.03, { seg: 6, tubular: 10 }),   // round the Octaweb corner post
   ];
   for (const a of OUTER) wh.push(pipe([at(1.66, a + 8, 2.9), at(1.64, a + 8, 1.9)], 0.015, { seg: 4, tubular: 4 }));
   // the centre engine's controller: in over the LOX manifold beside the TEA-TEB relight line, then
@@ -889,7 +901,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   const avBr = [];
   for (const [r, azs, y, w, h, d] of avBoxes) for (const a of azs) avBr.push(...wallBracket(r, a, y, w, h, d, R - 0.015));
   P('forward-skirt avionics brackets', {
-    system: 'Structure', count: 13, material: 'Machined aluminium brackets and wall doublers', mass: 13 * 1.5,
+    system: 'Structure', count: 13, xrayWeight: 0.6, material: 'Machined aluminium brackets and wall doublers', mass: 13 * 1.5,
     desc: 'Each avionics, power and telemetry box in the forward skirt is bolted to a bracket that stands it off the skirt wall, clear of the forward dome, with the harness ring below. Bracket design not published; layout estimated.',
     explode: [0, 3.4, 2.4],
   }, mesh(merge(avBr), FM.aluDark()));
@@ -905,18 +917,22 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     desc: 'Pick up GPS signals for the navigation unit; the stage must know where it is to the metre to steer onto a landing pad or drone ship. Positions estimated.',
     explode: [0, 1.4, 1.8],
   }, mesh(merge(antAz.map((a) => unit(R + 0.02, a, antY + 0.4, 0.12, 0.12, 0.03))), FM.raceway()));
+  // two cameras on the skin at the same azimuth (positions estimated from webcast views)
   const camAz = 100;
-  const cam = [];
-  for (const y of [Y.s1Top + 0.45, Y.engSectionTop - 0.18]) {
-    cam.push(unit(R + 0.06, camAz, y, 0.12, 0.1, 0.1));
+  const camera = (y) => {
     const [lx, lz] = polar(R + 0.09, camAz);
-    cam.push(new THREE.CylinderGeometry(0.025, 0.03, 0.04, 10).translate(lx, y - 0.07, lz));
-  }
-  P('onboard cameras', {
-    system: 'Sensors', count: 2, material: 'Ruggedised video cameras in small housings', mass: 2 * 1.5,
-    desc: 'One camera looks down the stage from the forward end and one from the top of the engine section looks at the legs and plume: the onboard views of every launch webcast, sent down by the S-band transmitters. Positions estimated from webcast views.',
+    return [mesh(unit(R + 0.06, camAz, y, 0.12, 0.1, 0.1), FM.black()), mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.04, 10).translate(lx, y - 0.07, lz), FM.lens())];
+  };
+  P('forward camera', {
+    system: 'Sensors', material: 'Ruggedised video camera in a small housing', mass: 1.5,
+    desc: 'Looks down the side of the stage from its forward end: the view of the stage falling away, the grid fins deploying and the boost-back plume in launch webcasts, sent down by the S-band transmitters. Position estimated from webcast views.',
     explode: [0, 1.8, 2.2],
-  }, [mesh(merge(cam.filter((_, i) => i % 2 === 0)), FM.black()), mesh(merge(cam.filter((_, i) => i % 2 === 1)), FM.lens())]);
+  }, camera(Y.s1Top + 0.45));
+  P('engine-section camera', {
+    system: 'Sensors', material: 'Ruggedised video camera in a small housing', mass: 1.5,
+    desc: 'At the top of the engine section, looking aft at the landing legs and the plume: the view of the legs swinging down and of the landing burn in webcasts. Position estimated from webcast views.',
+    explode: [0, -1.2, 2.2],
+  }, camera(Y.engSectionTop - 0.18));
 
   // ------------------------------------------------------------------ booster attach hardware
   // forward: the top of the centre core's LOX tank (its forward skirt) to each side booster;

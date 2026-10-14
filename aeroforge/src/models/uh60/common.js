@@ -296,7 +296,7 @@ export const pylonLean = (y) => -Math.max(0, y - TAIL.shearY0) * Math.tan(TAIL.c
  * leaves it, and the aft end of the tail-cone harness where the tail-rotor slip-ring feed branches off.
  */
 export const DEICE = {
-  jb: [-0.72, 2.11, -0.395],          // junction box centre (0.2 × 0.1 × 0.1 m)
-  lead: [-0.62, 2.11, -0.39],         // slip-ring lead outlet, forward face of the junction box
+  jb: [-0.72, 2.11, -0.382],          // junction box centre (0.2 × 0.1 × 0.1 m)
+  lead: [-0.62, 2.11, -0.382],        // slip-ring lead outlet, forward face of the junction box
   tailEnd: [-8.6, 1.912, -0.107],     // tail-cone harness end, 4 cm inside the skin at x −8.6
 };

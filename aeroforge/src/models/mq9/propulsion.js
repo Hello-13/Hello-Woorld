@@ -134,20 +134,28 @@ export function buildPropulsion({ P, L, m, role }) {
   role(P('Backup generator', {
     system: 'Electrical', material: 'Brushless permanent-magnet alternator', mass: 9, explode: [-0.45, -0.75, -0.75],
     desc: 'A second, independent source on the aircraft-accessory pad. Block 1 aircraft first had none: after a generator failure only the battery remained, so the Electrical Safety Improvement Program added a direct-drive brushless permanent-magnet alternator for the flight-critical avionics. The GA-ASI Block 5 sheet gives 4 kW of backup power.',
-  }, L(merge([cylX(starterX0, starterX0 + 0.2, 0.06, 0.06, PADS.accessory.y, PADS.accessory.z, 18)]), m.darkMetal)), 'generator');
+  }, L(merge([cylX(starterX0, starterX0 + 0.2, 0.06, 0.06, PADS.accessory.y, PADS.accessory.z, 18), box(0.06, 0.04, 0.03, [XS(9.68), PADS.accessory.y + 0.01, PADS.accessory.z - 0.07])]), m.darkMetal)), 'generator');
   const fanEnd = [starterX0 + 0.27, PADS.starter.y, PADS.starter.z];
-  const coolIn = fusePoint(9.98, -0.3, 0.03);
+  const coolIn = fusePoint(9.49, -0.7, 0.03), scoopAt = fusePoint(9.49, -0.7, 0.006);
+  // outlet louvre on the lower starboard cowling beside the generator's drive end, ahead of the gearbox face
+  const louvre = [];
+  for (let k = 0; k < 3; k++) {
+    const a = new THREE.Vector3(...fusePoint(9.76 + k * 0.03, -0.62, -0.004)), b = new THREE.Vector3(...fusePoint(9.76 + k * 0.03, -0.86, -0.004));
+    louvre.push(tubeBetween(a.toArray(), b.toArray(), 0.005, 5));
+  }
+  louvre.push(tubeBetween(fusePoint(9.745, -0.6, -0.002), fusePoint(9.745, -0.88, -0.002), 0.004, 4), tubeBetween(fusePoint(9.835, -0.6, -0.002), fusePoint(9.835, -0.88, -0.002), 0.004, 4));
   P('Starter-generator cooling duct', {
-    system: 'Electrical', material: 'Flexible ducting from a flush cowling inlet', mass: 0.6, explode: [-0.2, -0.9, 1.0],
-    desc: 'Ram air from a small inlet on the lower starboard cowling runs forward to the fan end of the starter-generator and blows through its windings, then vents into the engine bay. A blocked duct overheats the generator: debris was found in it after the 2006 loss (routing estimated).',
-  }, [L(pipe([coolIn, [XS(9.88), 1.5, 0.222], [XS(9.62), 1.525, 0.218], [fanEnd[0] + 0.03, fanEnd[1] - 0.01, fanEnd[2] + 0.05], fanEnd], 0.024, 8, 24), m.harness), L(lru(0.07, 0.028, 0.06, [coolIn[0], coolIn[1] - 0.006, coolIn[2] - 0.006]), m.intake)]);
+    system: 'Electrical', material: 'Flexible ducting from a flush cowling inlet, louvred outlet', mass: 0.6, explode: [-0.2, -0.9, 1.0],
+    desc: 'Ram air from a small inlet on the lower starboard cowling, just ahead of the generator, is ducted into its fan end and blows through the windings; the warm air leaves the cowling through a louvred outlet beside the drive end, ahead of the gearbox. A blocked duct overheats the generator: debris was found in it after the 2006 loss (routing estimated).',
+  }, [L(pipe([coolIn, [XS(9.495), 1.458, 0.205], [XS(9.505), 1.455, 0.165], fanEnd], 0.024, 8, 16), m.harness), L(lru(0.07, 0.028, 0.06, scoopAt), m.intake), L(merge(louvre), m.darkMetal)]);
 
   // ---- propeller control
-  const govP = [XS(10.1), 1.965, 0.215];
+  const govP = [XS(9.815), ENGINE_Y - 0.095, 0.245], govArm = [XS(9.79), govP[1] + 0.06, govP[2] + 0.02];
   P('Propeller governor', {
     system: 'Propulsion', material: 'Woodward flyweight governor and oil pump', mass: 3, explode: [-0.75, 0.85, 0.3],
-    desc: 'A Woodward unit on the governor pad (3,754 rpm): flyweights sense propeller speed and meter gearbox oil to the pitch-change piston, coarsening the blades when the engine speeds up. The speed-lever servo sets it through a cable. If propeller speed falls below 1,488 rpm an automatic air restart begins (NTSB; position on the gearbox estimated).',
-  }, L(merge([cylX(govP[0] - 0.06, govP[0] + 0.06, 0.032, 0.032, govP[1], govP[2], 14), box(0.03, 0.04, 0.03, [govP[0] + 0.02, govP[1] + 0.03, govP[2] - 0.01])]), m.gun));
+    desc: 'A Woodward unit on the governor pad (3,754 rpm): flyweights sense propeller speed and meter gearbox oil to the pitch-change piston, coarsening the blades when the engine speeds up. The speed-lever servo sets it through a cable to the arm on its side. If propeller speed falls below 1,488 rpm an automatic air restart begins (NTSB; its pad here, on the engine-side face of the gearbox, is estimated).',
+  }, L(merge([cylX(XS(GEARBOX.s0) + 0.002, XS(9.755), 0.03, 0.03, govP[1], govP[2], 14), cylX(XS(GEARBOX.s0) + 0.014, XS(GEARBOX.s0) - 0.002, 0.038, 0.038, govP[1], govP[2], 14),
+    box(0.012, 0.045, 0.012, [govArm[0], govArm[1] - 0.022, govArm[2]]), box(0.03, 0.01, 0.012, [govArm[0] - 0.01, govArm[1], govArm[2]])]), m.gun));
   P('NTS & beta-pressure switch', {
     system: 'Propulsion', material: 'Negative-torque-sensing valve and pressure switch with oil lines', mass: 0.8, count: 2, explode: [-0.9, 0.2, 0.55],
     desc: 'Two small units on the gearbox (Honeywell basic engine). The negative-torque-sensing (NTS) system notices when a windmilling propeller starts to drive the engine and moves the blades toward feather to cut the drag; the beta-pressure switch reports that the blades are in the ground (beta) range.',
@@ -160,11 +168,11 @@ export function buildPropulsion({ P, L, m, role }) {
     system: 'Propulsion', material: 'Hydromechanical fuel control with underspeed governor', mass: 5, explode: [-0.2, 1.3, 0.5],
     desc: 'On top of the engine over the compressor (Honeywell drawing), the hydromechanical fuel control meters fuel for the power lever’s setting. In the beta range its underspeed governor holds rpm with fuel flow. After the 2006 crash investigators found the power lever at 90°, the propeller pitch control at 89° and the underspeed governor at 32°. In 2025 a chafed wire inside an FCU fired the electrical shutoff valve and an MQ-9 was lost.',
   }, L(merge([lru(0.2, 0.06, 0.13, [fcuP[0], fcuP[1], 0], 0.02), box(0.03, 0.03, 0.03, [fcuP[0] + 0.06, fcuP[1] + 0.035, 0.05]), cylX(fcuP[0] - 0.05, fcuP[0] - 0.02, 0.012, 0.012, fcuP[1] + 0.038, -0.04, 8)]), m.darkMetal)), 'compressor');
-  const pumpP = [XS(9.72), ENGINE_Y + 0.235, 0.04];
+  const pumpP = [XS(9.7025), ENGINE_Y + 0.23, 0.04], PUMP_H = 0.0475;
   role(P('Engine-driven fuel pump', {
     system: 'Propulsion', material: 'Gear-type high-pressure pump on a drive from the gearbox', mass: 3, explode: [-0.45, 1.25, 0.3],
     desc: 'Raises the boost-pump pressure to the several hundred psi the nozzles need to atomise the fuel, and hands it to the fuel control. The NTSB found its drive shaft still connected after the 2006 crash.',
-  }, L(merge([cylX(pumpP[0] - 0.06, pumpP[0] + 0.06, 0.045, 0.045, pumpP[1], pumpP[2], 16), cylX(pumpP[0] - 0.09, pumpP[0] - 0.06, 0.02, 0.02, pumpP[1], pumpP[2], 10)]), m.darkMetal)), 'compressor');
+  }, L(merge([cylX(pumpP[0] - PUMP_H, pumpP[0] + PUMP_H, 0.04, 0.04, pumpP[1], pumpP[2], 16), cylX(pumpP[0] - PUMP_H - 0.028, pumpP[0] - PUMP_H, 0.018, 0.018, pumpP[1], pumpP[2], 10)]), m.darkMetal)), 'compressor');
   const msovP = [XS(9.44), ENGINE_Y + 0.27, -0.05];
   P('Mechanical fuel shutoff valve (MSOV)', {
     system: 'Propulsion', material: 'Lever-operated shutoff valve at the fuel-control outlet', mass: 0.5, explode: [0.35, 1.45, -0.35],
@@ -180,14 +188,14 @@ export function buildPropulsion({ P, L, m, role }) {
     system: 'Propulsion', material: 'Small accumulator and valve on the main manifold', mass: 0.4, explode: [0.6, -0.8, 0.2],
     desc: 'At shutdown it blows the fuel left in the manifolds and nozzles into the combustor so it cannot cook into carbon in the hot nozzle tips (Honeywell basic engine).',
   }, L(merge([cylX(xMan - 0.04, xMan + 0.04, 0.024, 0.024, ENGINE_Y - 0.27, 0.07, 12), tubeBetween([xMan, ENGINE_Y - 0.25, 0.07], [xMan, ENGINE_Y - 0.236, 0.02], 0.005, 5)]), m.alu));
-  const heatP = [XS(9.36), ENGINE_Y - 0.19, -0.245];
+  const heatP = [XS(9.36), ENGINE_Y - 0.22, -0.2];
   P('Engine fuel heater', {
     system: 'Propulsion', material: 'Oil-to-fuel heat exchanger (fuel anti-ice)', mass: 1.5, explode: [0.3, -0.5, -0.8],
     desc: 'The TPE331-10’s own fuel anti-ice heating: warm engine oil heats the fuel before the high-pressure pump so that water in it cannot freeze into filter-blocking ice crystals at altitude (Honeywell basic engine; position estimated).',
   }, L(merge([cylX(heatP[0] - 0.09, heatP[0] + 0.09, 0.038, 0.038, heatP[1], heatP[2], 14), cylX(heatP[0] + 0.03, heatP[0] + 0.05, 0.044, 0.044, heatP[1], heatP[2], 14)]), m.alu));
 
   // ---- lubrication
-  const tankP = [XS(9.36), ENGINE_Y - 0.17, 0.26];
+  const tankP = [XS(9.32), ENGINE_Y - 0.21, 0.2];
   role(P('Oil tank', {
     system: 'Propulsion', material: 'Aluminium tank with filler and sight gauge', mass: 4, explode: [0, -0.55, 0.95],
     desc: 'Holds the engine and gearbox oil (a few litres; size and position estimated). The same oil cools the bearings, lubricates the gears, heats the fuel and works the propeller’s pitch-change piston.',
@@ -212,14 +220,16 @@ export function buildPropulsion({ P, L, m, role }) {
     system: 'Propulsion', material: 'Thermostatic bypass valve', mass: 0.6, explode: [0.3, -0.55, -0.6],
     desc: 'At the cooler inlet: cold oil bypasses the matrix and hot oil is sent through it, so the oil warms quickly and then holds its temperature. A 2009 MQ-9 was lost when an improperly assembled temperature control valve caused a severe oil-flow imbalance and engine failure (USAF investigation).',
   }, L(merge([cylX(tcvP[0] - 0.04, tcvP[0] + 0.04, 0.026, 0.026, tcvP[1], tcvP[2], 12), box(0.03, 0.03, 0.03, [tcvP[0], tcvP[1] + 0.03, tcvP[2]])]), m.alu)), 'oil');
-  const oilLines = [];
-  for (const [dz, dy] of [[0, 0], [0.04, 0.02]]) {
-    oilLines.push(pipe([[filtX + 0.06, PADS.tach.y - 0.02, -0.11 + dz], [XS(9.6), 1.44 + dy, -0.2 + dz], [XS(9.2), 1.43 + dy, -0.21 + dz], [XS(FIREWALL_S), 1.42 + dy, -0.2 + dz], [XS(8.4), 1.39 + dy, -0.16 + dz], [tcvP[0] - 0.05, tcvP[1] + dy * 0.5, tcvP[2] + dz]], 0.008, 6, 48));
-  }
-  oilLines.push(pipe([[tankP[0] - 0.08, tankP[1] - 0.03, tankP[2] - 0.02], [XS(9.6), ENGINE_Y - 0.25, 0.14], [filtX + 0.05, PADS.tach.y, 0.0]], 0.007, 6, 16));
+  // supply from the filter to the temperature control valve, return from the cooler matrix to the sump: both run under the
+  // generators and the engine, close to the keel; a third line joins the tank to the pump in the accessory case
+  const oilLines = [
+    pipe([[filtX + 0.07, PADS.tach.y - 0.025, -0.07], [XS(9.66), 1.385, -0.075], [XS(9.5), 1.37, -0.085], [XS(9.2), 1.365, -0.09], [XS(FIREWALL_S), 1.37, -0.1], [XS(8.4), 1.385, -0.14], [XS(7.95), 1.35, -0.15], [XS(7.76), tcvP[1], -0.14], [tcvP[0], tcvP[1], tcvP[2] - 0.022]], 0.008, 6, 60),
+    pipe([[XS(7.91), 1.34, -0.05], [XS(8.0), 1.37, -0.06], [XS(8.4), 1.378, -0.09], [XS(FIREWALL_S), 1.362, -0.055], [XS(9.2), 1.358, -0.045], [XS(9.5), 1.362, -0.04], [XS(9.76), 1.372, -0.03], [XS(9.84), 1.405, -0.02]], 0.008, 6, 60),
+    pipe([[tankP[0] - 0.1, tankP[1] - 0.025, tankP[2] - 0.01], [XS(9.5), 1.40, 0.13], [XS(9.6), 1.372, 0.06], [XS(9.76), 1.366, 0.03], [XS(9.835), 1.385, 0.025], [XS(9.85), 1.405, 0.025]], 0.007, 6, 24),
+  ];
   role(P('Engine oil lines', {
     system: 'Propulsion', material: 'Stainless tube and fire-sleeved hose', mass: 2, count: 3, explode: [0, -0.3, -0.75],
-    desc: 'Supply and return lines between the gearbox sump and the ventral oil cooler, through the firewall in fire-resistant fittings, and a line from the oil tank to the pump (routing estimated).',
+    desc: 'Supply and return lines between the gearbox sump and the ventral oil cooler, low along the keel under the generators and the engine and through the firewall in fire-resistant fittings, and a line from the oil tank to the pump in the accessory case (routing estimated).',
   }, L(merge(oilLines), m.pipe)), 'oil');
 
   // ---- ignition and engine sensors
@@ -265,7 +275,7 @@ export function buildPropulsion({ P, L, m, role }) {
   const cables = [
     pipe([cabStart(0), [XS(8.95), 1.9, -0.1], [XS(9.3), 1.94, -0.08], [fcuP[0] + 0.08, fcuP[1] + 0.03, -0.06]], 0.003, 4, 24),       // power lever → FCU
     pipe([cabStart(1), [XS(8.95), 1.88, 0.0], [XS(9.3), 1.94, -0.04], [msovP[0], msovP[1] + 0.05, msovP[2] - 0.02]], 0.003, 4, 24),       // condition lever → MSOV
-    pipe([cabStart(2), [XS(8.95), 1.86, 0.12], [XS(9.2), 1.58, 0.28], [XS(9.6), 1.58, 0.285], [XS(9.95), 1.8, 0.26], [govP[0] + 0.06, govP[1] + 0.03, govP[2] - 0.01]], 0.003, 4, 40),  // speed lever → governor
+    pipe([cabStart(2), [XS(8.95), 1.86, 0.12], [XS(9.2), 1.58, 0.28], [XS(9.55), 1.605, 0.29], [XS(9.72), 1.64, 0.28], [govArm[0], govArm[1] + 0.003, govArm[2] + 0.002]], 0.003, 4, 40),  // speed lever → governor arm
   ];
   P('Engine control cables', {
     system: 'Propulsion', material: 'Push-pull control cables in conduit', mass: 0.8, count: 3, explode: [0.1, 1.55, 0.2],
@@ -319,5 +329,5 @@ export function buildPropulsion({ P, L, m, role }) {
     desc: 'A large polished spinner, about 0.6 m across, fairs the hub and the pitch-change dome into the end of the cowling so that the flow into the propeller roots stays smooth.',
   }, L(spinnerGeo().translate(PROP_X, SHAFT_Y, 0), m.spinner));
 
-  return { propSpin, hubSpin, domeSpin, fanEnd, fcuP, pumpP, heatP, govP };
+  return { propSpin, hubSpin, domeSpin, fanEnd, fcuP, pumpP, pumpH: PUMP_H, heatP, govP };
 }

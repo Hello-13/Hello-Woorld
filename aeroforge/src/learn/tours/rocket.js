@@ -60,7 +60,7 @@ export default [
     body: 'Each stage flies itself. Three flight computers vote on every decision, fed by an inertial unit and GPS, and two independent flight-safety computers would end the flight on their own if it left its corridor. Cables cannot cross the propellant, so they run up the outside of the tanks in the raceway — black on Block 5 — and branch off in harness rings at both ends, one lead to each engine controller. S-band transmitters send telemetry and camera views down, even after separation.',
     key: 'Triple redundancy: if each computer fails with probability p, two-out-of-three voting fails with ≈ 3p² — for p = 10⁻³ that is 3 × 10⁻⁶.',
     focus: [`${SBA} flight computers`, `${SBA} IMU & GPS navigation unit`, `${SBA} autonomous flight-safety system`, `${SBA} batteries & power distribution`, `${SBA} S-band transmitters`,
-      `${SBA} raceway`, `${SBA} wiring harnesses`, `${SBA} engine controllers`, `${SBA} S-band telemetry antennas`, `${SBA} GPS antennas`, `${SBA} onboard cameras`],
+      `${SBA} raceway`, `${SBA} wiring harnesses`, `${SBA} engine controllers`, `${SBA} S-band telemetry antennas`, `${SBA} GPS antennas`, `${SBA} forward camera`, `${SBA} engine-section camera`, `${SBA} forward-skirt avionics brackets`],
     mode: 'systems', view: { dir: [1.3, 0.2, 0.9], fill: 1.0, lift: 0.08 },
   },
   {

@@ -45,7 +45,7 @@ export function buildHelicopter() {
   const drive = buildDrive({ A, P, roofY: fus.roofY });
   const tail = buildTail({ A, P, air, roofY: fus.roofY });
   const gear = buildGear({ A, P });
-  const cab = buildCabin({ A, P, surfPoint: fus.surfPoint, surfNormal, servoInputs: rotor.servoInputs, servoBases: rotor.servoBases });
+  const cab = buildCabin({ A, P, surfPoint: fus.surfPoint, surfNormal, roofY: fus.roofY, servoInputs: rotor.servoInputs, servoBases: rotor.servoBases });
 
   // thermal roles for the Thermal view
   const byName = (n) => A.parts.find((p) => p.name === n);

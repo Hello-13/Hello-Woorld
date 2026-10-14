@@ -181,7 +181,7 @@ export function buildSystems(ctx) {
     // transfer lines: wings and F-2 → feed tank
     const g = [];
     for (const side of [1, -1]) {
-      g.push(FR.pipe([[11.3, -0.05, side * 2.2], [11.32, -0.1, side * 1.85], [11.36, -0.3, side * 1.6], [11.45, -0.42, side * 1.2], [12.0, -0.43, side * 0.72], [12.6, -0.3, side * 0.3]], 0.03, 6));
+      g.push(FR.pipe([[11.3, -0.05, side * 2.2], [11.32, -0.1, side * 1.85], [11.35, -0.36, side * 1.6], [11.42, -0.41, side * 1.3], [11.5, -0.41, side * 1.15], [12.0, -0.43, side * 0.72], [12.6, -0.3, side * 0.3]], 0.03, 6));
       g.push(FR.pipe([[8.4, 0.1, side * 0.3], [10.5, -0.1, side * 0.25], [11.5, -0.12, side * 0.32], [12.6, -0.25, side * 0.22]], 0.025, 6));
     }
     g.push(FR.pipe([[7.5, -0.4, 0.12], [8.2, -0.25, 0.2], [8.6, -0.1, 0.25]], 0.025, 6));
@@ -245,15 +245,16 @@ export function buildSystems(ctx) {
       explode: [0.1, 2.35, 0],
       desc: 'Distributes fuel from the receptacle (or the ground pressure-refuelling point) to every tank; float-operated shut-off valves close each tank as it fills.',
     }, mesh(merge(m), F.pipe()));
-    // single-point pressure-refuelling adapter in the right main-gear well, piped up into F-3
+    // single-point pressure-refuelling adapter on the aft wall of the right main-gear well (behind the stowed
+    // wheel); its line runs behind the well and under the S-duct into the bottom of F-3
     const ga = [];
-    ga.push(new THREE.CylinderGeometry(0.05, 0.055, 0.1, 16).rotateX(Math.PI / 2 - 0.4).translate(X(12.7), -0.62, 1.415));
-    ga.push(new THREE.BoxGeometry(0.14, 0.12, 0.04).translate(X(12.7), -0.62, 1.445));
-    ga.push(FR.pipe([[12.7, -0.6, 1.44], [12.68, -0.45, 1.47], [12.45, -0.2, 1.45], [12.4, 0.15, 1.38], [12.44, 0.42, 1.12]], 0.022, 6, 14));
+    ga.push(new THREE.CylinderGeometry(0.05, 0.055, 0.1, 16).rotateZ(Math.PI / 2 - 0.5).translate(X(12.875), -0.64, 1.3));
+    ga.push(new THREE.BoxGeometry(0.03, 0.14, 0.14).translate(X(12.93), -0.62, 1.3));
+    ga.push(FR.pipe([[12.93, -0.62, 1.3], [12.98, -0.58, 1.18], [13.0, -0.54, 0.8], [13.0, -0.49, 0.36], [13.0, -0.34, 0.2]], 0.022, 6, 14));
     P('Ground refuelling adapter', {
       system: 'Fuel', material: 'Single-point pressure-refuelling coupling with shut-off valve', mass: 5,
       explode: [0.3, -1.25, 1.5],
-      desc: 'A ground crew refuels every tank through this one coupling in a gear well, under pressure from a truck or hydrant, with the same level-control valves that stop each tank filling (position approximate).',
+      desc: 'A ground crew refuels every tank through this one coupling on the aft wall of the right main-gear well, under pressure from a truck or hydrant, with the same level-control valves that stop each tank filling (position approximate).',
     }, mesh(merge(ga), F.yellow()));
   }
   {
@@ -333,7 +334,7 @@ export function buildSystems(ctx) {
     g.push(FR.pipe([[14.2, -0.42, z * 1.38], [13.6, -0.5, z * 1.0], [13.2, -0.6, z * 0.6]], 0.016, 5));
     g.push(FR.pipe([[14.2, -0.42, z * 1.38], [15.5, -0.35, z * 1.4], [16.2, -0.26, z * 1.38]], 0.016, 5));
     g.push(FR.pipe([[14.6, -0.35, z * 1.4], [14.6, 0.15, z * 1.42], [14.9, 0.3, z * 1.42], [15.9, 0.36, z * 1.44]], 0.014, 5));
-    g.push(FR.pipe([[13.2, -0.55, z * 1.0], [13.4, -0.15, z * 1.6], [13.6, -0.1, z * 2.6], [13.9, -0.15, z * 4.2]], 0.014, 5));
+    g.push(FR.pipe([[13.2, -0.55, z * 1.0], [13.45, -0.2, z * 1.55], [13.58, -0.13, z * 1.85], [13.65, -0.1, z * 2.6], [13.9, -0.15, z * 4.2]], 0.014, 5));
     // forward along the bay edge to the leading-edge flap drive, bay doors and nose
     g.push(FR.pipe([[13.2, -0.6, z * 0.6], [12.6, -0.7, z * 0.84], [10.5, -0.74, z * 0.84], [8.5, -0.7, z * 0.84], [8.0, -0.5, z * 1.2], [8.6, -0.1, z * 1.75]], 0.016, 5, 40));
     // crossfeed: each system also reaches the other side's stabilator and rudder actuators
@@ -394,54 +395,64 @@ export function buildSystems(ctx) {
   }
   // auxiliary power generation system (AlliedSignal, now Honeywell; ≈ 120 kg in all): the G250 APU in the
   // left wing root between two wing spars, its inlet and exhaust behind flush doors, and the stored-energy
-  // system whose air bottles start it
+  // system whose air bottles start it, just ahead of it in the same wing root
   {
-    const ax = 11.97, ay = -0.06, az = -1.72;
+    const ax = 11.97, ay = -0.06, az = -1.70;
     const g = [FR.cylX(ax - 0.12, ay, az, 0.42, 0.13, 0.15, 20), FR.cylX(ax + 0.2, ay, az, 0.22, 0.15, 0.12, 20)];   // compressor / combustor / turbine
     g.push(FR.boxS(ax - 0.28, ay - 0.02, az + 0.06, 0.12, 0.2, 0.18));                                                   // gearbox and starter-generator pad
-    g.push(FR.cylX(ax - 0.33, ay + 0.1, az + 0.09, 0.14, 0.05, 0.05, 12));
+    g.push(FR.cylX(ax - 0.33, ay + 0.1, az + 0.09, 0.14, 0.05, 0.05, 12));                                             // air-turbine starter
     P('Auxiliary power unit (APU)', {
       system: 'Electrical', material: 'Honeywell (AlliedSignal) G250 gas turbine, 335 kW (450 hp)', mass: 70,
       explode: [0.2, 0.9, -1.3],
       desc: 'A 335 kW (450 hp) gas turbine in the left wing root that gives the F-22 autonomous ground starts and can restart the engines at subsonic speed up to 41,000 ft; the whole power system weighs about 120 kg. The F-22 uses an APU plus a stored-energy system, not an F-35-style integrated power package (envelope ≈ 0.7 × 0.3 m, estimate).',
     }, mesh(merge(g), F.boxLight()));
-    // inlet from a flush door in the trunk wall under the chine; exhaust up to a door in the upper skin
-    const wIn = (f) => { const [zz, y] = FR.wallB(11.55, f); return [11.55, y, -zz]; };
-    const d = [rectTube([[11.5, wIn(0.2)[1], -1.77], [11.62, -0.12, -1.74], [11.72, ay - 0.04, -1.7]], 0.1, 0.14, { n: 6 })];
-    d.push(FR.pipe([[12.32, ay, az], [12.42, ay + 0.06, az], [12.5, FR.topAt(12.5, 1.72) - 0.04, az]], 0.065, 12, 8));
+    // inlet: a flush door in the trunk wall just below the wing root, aft of the side bay, with a short duct
+    // up and inboard into the compressor plenum; exhaust: a titanium duct up to a door in the upper skin
+    const fIn = [0.31, 0.42], sIn = [11.7, 11.8, 11.9];
+    const wallPt = (sv, f, inset = 0) => {
+      const [zz, y] = FR.wallB(sv, f);
+      const n = new THREE.Vector2(FR.bD(sv), -(FR.bW(sv) - FR.bWb(sv))).normalize();    // outward wall normal in (z, y)
+      return [sv, y - n.y * inset, -(zz - n.x * inset)];
+    };
+    const fm = (fIn[0] + fIn[1]) / 2;
+    const d = [rectTube([wallPt(11.8, fm, 0.004), wallPt(11.8, fm, 0.07), [11.81, -0.24, az - 0.01], [11.81, ay - 0.115, az]], 0.085, 0.17, { n: 8, up: [1, 0, 0] })];
+    d.push(FR.pipe([[12.32, ay, az], [12.42, ay + 0.06, az + 0.01], [12.5, FR.topAt(12.5, 1.655) - 0.04, -1.655]], 0.065, 12, 8));
     P('APU inlet & exhaust ducts', {
       system: 'Electrical', material: 'Titanium exhaust duct, composite inlet duct', mass: 8,
       explode: [0.2, 1.3, -1.75],
-      desc: 'A 450 hp turbine needs its own air: an inlet duct from a flush door in the side of the fuselage just below the chine, and a short titanium exhaust duct up through the upper skin (positions approximate).',
+      desc: 'A 450 hp turbine needs its own air: a short inlet duct from a flush door in the side of the fuselage just below the left wing root, and a titanium exhaust duct up through the upper skin of the wing root, where crews see its door open on the ground (positions approximate).',
     }, mesh(merge(d), F.tiDull()));
-    const dIn = slab(toothedGrid((sv, u) => { const [zz, y] = FR.wallB(sv, lerp(0.1, 0.32, u)); return [X(sv), y, -(zz + 0.003)]; }, [11.42, 11.52, 11.62], { width: 0.2 }), () => [0, 0.01, 0.02], V(0, -0.3, -1));
-    const dEx = slab(toothedGrid((sv, u) => { const zz = -lerp(1.6, 1.84, u); return [X(sv), FR.topAt(sv, Math.abs(zz)) + 0.003, zz]; }, [12.4, 12.5, 12.6], { width: 0.24 }), () => [0, -0.015, 0], V(0, 1, 0));
+    const dIn = slab(toothedGrid((sv, u) => { const [zz, y] = FR.wallB(sv, lerp(fIn[0], fIn[1], u)); return [X(sv), y, -(zz + 0.003)]; }, sIn, { width: 0.12 }), () => [0, 0.008, 0.02], V(0, -0.4, -1));
+    const dEx = slab(toothedGrid((sv, u) => { const zz = -lerp(1.57, 1.74, u); return [X(sv), FR.topAt(sv, Math.abs(zz)) + 0.003, zz]; }, [12.4, 12.5, 12.6], { width: 0.17 }), () => [0, -0.015, 0], V(0, 1, 0));
     P('APU inlet & exhaust doors', {
       system: 'Skin & fairings', skin: true, material: 'Composite flush doors, saw-tooth edges', mass: 3, count: 2,
       explode: [0.2, 1.75, -2.05],
-      desc: 'Flush doors keep both APU openings closed, and stealthy, except while the APU runs (positions approximate).',
+      desc: 'Flush doors keep both APU openings closed, and stealthy, except while the APU runs: the inlet door in the fuselage side below the left wing root, the exhaust door in the upper skin of the wing root (positions approximate).',
     }, mesh(merge([dIn, dEx]), F.door()));
-    // stored-energy system: two high-pressure air bottles aft of the APU, valve and lines to its starter
+    // stored-energy system: two high-pressure air bottles stacked inside the wing-root envelope ahead of the
+    // APU, a start / control valve behind them and a line to the APU's air-turbine starter
     const b = [];
-    for (const [y, z] of [[-0.32, -1.6], [-0.1, -1.55]]) b.push(new THREE.CapsuleGeometry(0.095, 0.31, 4, 14).rotateZ(Math.PI / 2).translate(X(12.65), y, z));
-    b.push(FR.boxS(12.36, -0.2, -1.6, 0.08, 0.1, 0.1));                                                                    // start / control valve
-    const l = [FR.pipe([[12.42, -0.32, -1.6], [12.37, -0.25, -1.6]], 0.015, 6, 3), FR.pipe([[12.42, -0.1, -1.55], [12.37, -0.16, -1.6]], 0.015, 6, 3)];
-    l.push(FR.pipe([[12.32, -0.2, -1.6], [12.25, -0.17, -1.62], [12.2, -0.15, -1.64]], 0.015, 6, 4));
+    const bs = 10.96, bz = -1.645, by = [-0.15, 0.02];
+    for (const y of by) b.push(new THREE.CapsuleGeometry(0.075, 0.37, 4, 14).rotateZ(Math.PI / 2).translate(X(bs), y, bz));
+    b.push(FR.boxS(11.26, -0.06, -1.58, 0.06, 0.08, 0.08));                                                               // start / control valve
+    const l = [FR.pipe([[11.2, by[0], bz], [11.235, -0.12, -1.62], [11.255, -0.085, -1.595]], 0.014, 6, 4), FR.pipe([[11.2, by[1], bz], [11.235, -0.01, -1.62], [11.255, -0.035, -1.595]], 0.014, 6, 4)];
+    l.push(FR.pipe([[11.29, -0.05, -1.58], [11.42, -0.01, -1.59], [11.5, 0.03, -1.605], [11.58, ay + 0.1, az + 0.09]], 0.016, 6, 8));
     P('Stored-energy system (SES)', {
-      system: 'Electrical', material: 'High-pressure air bottles, start / control valve and lines to the APU', mass: 30,
-      explode: [-0.3, -0.6, -1.95],
-      desc: 'Stored high-pressure air starts the APU, which must be running before either engine can be started. In flight the 75 kW stored-energy system has to come on line within 5 s at any altitude, airspeed and attitude to keep the flight controls, hydraulics and computers alive if both engines fail.',
+      system: 'Electrical', material: 'High-pressure air bottles, start / control valve and line to the APU starter', mass: 30,
+      explode: [0.6, -0.4, -2.0],
+      desc: 'Two high-pressure air bottles just ahead of the APU in the left wing root. Their air spins the APU\'s starter, and the APU must be running before either engine can be started. In flight the 75 kW stored-energy system has to come on line within 5 s at any altitude, airspeed and attitude to keep the flight controls, hydraulics and computers alive if both engines fail (bottle positions approximate).',
     }, [mesh(merge(b), F.orange()), mesh(merge(l), F.pipe())]);
-    const c = [FR.boxS(13.08, -0.25, -1.62, 0.25, 0.18, 0.18), FR.cylX(13.25, -0.25, -1.62, 0.1, 0.06, 0.06, 12)];
-    c.push(FR.pipe([[12.95, -0.25, -1.62], [12.88, -0.3, -1.6], [12.83, -0.32, -1.6]], 0.012, 6, 4));
+    const c = [FR.boxS(10.35, -0.1, bz, 0.22, 0.14, 0.12), FR.cylX(10.5, -0.1, bz, 0.08, 0.05, 0.05, 12)];
+    c.push(FR.pipe([[10.54, -0.1, bz], [10.62, -0.12, bz], [10.69, by[0] + 0.02, bz]], 0.012, 6, 4));
     P('SES air re-charge compressor', {
       system: 'Electrical', material: 'Electrically driven high-pressure air compressor', mass: 12,
-      explode: [-0.5, -0.9, -1.7],
-      desc: 'Refills the stored-energy air bottles on board, part of the plan to make the F-22 independent of ground carts for starting and servicing.',
+      explode: [0.9, -0.7, -1.75],
+      desc: 'Just ahead of the bottles, it refills the stored-energy air bottles on board, part of the plan to make the F-22 independent of ground carts for starting and servicing.',
     }, mesh(merge(c), F.boxLight()));
-    // start path from the APU to both AMADs (drawn as ducting; the actual drive arrangement is not published)
-    const sp = [FR.pipe([[12.3, ay - 0.08, az + 0.1], [12.6, -0.45, -1.55], [13.2, -0.62, -1.4], [13.52, -0.5, -1.38]], 0.035, 8, 16)];
-    sp.push(FR.pipe([[13.2, -0.66, -1.4], [13.3, -0.74, -0.8], [13.3, -0.75, 0.0], [13.3, -0.74, 0.8], [13.4, -0.6, 1.38], [13.52, -0.5, 1.38]], 0.035, 8, 24));
+    // start path from the APU to both AMADs (drawn as ducting; the actual drive arrangement is not published):
+    // aft above the stowed left wheel and outboard of the boom, then down under the generators
+    const sp = [FR.pipe([[12.2, ay - 0.12, az], [12.42, -0.235, -1.735], [12.85, -0.245, -1.735], [13.08, -0.42, -1.665], [13.28, -0.62, -1.52], [13.45, -0.64, -1.4], [13.66, -0.55, -1.38]], 0.035, 8, 24)];
+    sp.push(FR.pipe([[13.27, -0.64, -1.5], [13.32, -0.72, -0.8], [13.32, -0.73, 0.0], [13.32, -0.72, 0.8], [13.42, -0.66, 1.3], [13.5, -0.64, 1.38], [13.66, -0.55, 1.38]], 0.035, 8, 24));
     P('APU start path to AMADs', {
       system: 'Electrical', material: 'Start ducting (arrangement not published; route approximate)', mass: 10,
       explode: [-0.2, -1.45, 0],

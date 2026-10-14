@@ -12,6 +12,7 @@ import { mesh } from '../../engine/assembly.js';
 import { lathe, loftRings, orientOutward } from '../../engine/geometry.js';
 import { MAT, DEG, V3, merge, box, cyl, tube, pipe, place, TAIL } from './common.js';
 import { GEARS, SPEEDS, ratio } from './gears.js';
+import { aftDeckPoint } from './tail.js';
 
 const ENG = { y: 2.58, z: 0.76, front: -0.5, rear: -1.67 };   // inlet face and exhaust flange: 1.17 m
 const rpm = (x) => Math.round(x).toLocaleString('en-US');
@@ -89,12 +90,19 @@ export function buildDrive({ A, P, roofY }) {
   // The main module (the M's improved-durability gearbox): a magnesium housing around the
   // combining spiral-bevel stage and the planetary stage, with its own lubrication system.
   const cx = -0.04;   // shaft axis at transmission height (the shaft leans 3° forward)
+  // Each input module's output: the 80-tooth input gear (centred on the engine-shaft line, where the
+  // input pinion's axis crosses it), the freewheel in its hub and the 17-tooth combining pinion all
+  // sit on one shaft, which slopes down and inboard to cross the main bevel gear's axis — the apex of
+  // the combining bevel set.
+  const inAxis = (s) => { const G = V3(0.16, 2.52, 0.5 * s); return { G, d: V3(cx, 2.45, 0).sub(G).normalize() }; };
+  const onAxis = (g, s, k) => { const { G, d } = inAxis(s); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), d)); const c = G.clone().addScaledVector(d, k); return g.translate(c.x, c.y, c.z); };
   const caseG = [
-    place(lathe([[0.001, 0], [0.38, 0], [0.44, 0.1], [0.44, 0.24], [0.4, 0.34], [0.29, 0.42], [0.18, 0.48], [0.16, 0.52], [0.001, 0.52]], 36), [cx, 2.24, 0]),
+    place(lathe([[0.001, 0], [0.38, 0], [0.44, 0.1], [0.44, 0.24], [0.4, 0.34], [0.29, 0.42], [0.22, 0.46], [0.2, 0.49], [0.001, 0.49]], 36), [cx, 2.24, 0]),   // flat top cover at 2.73 carries the swashplate guide
     box(0.82, 0.12, 0.74, [cx, 2.25, 0]),                           // sump
     cyl(0.11, 0.11, 0.3, [cx - 0.5, 2.45, 0], 'x', 20),            // tail take-off housing
   ];
-  for (let k = 0; k < 12; k++) {                                     // case ribs
+  for (let k = 0; k < 12; k++) {                                     // case ribs (none under the input and transfer modules)
+    if ([2, 3, 4, 8, 9, 10].includes(k)) continue;
     const a = (k / 12) * Math.PI * 2;
     caseG.push(box(0.03, 0.26, 0.06, [cx + 0.44 * Math.cos(a), 2.4, 0.44 * Math.sin(a)], [0, -a, 0]));
   }
@@ -115,7 +123,8 @@ export function buildDrive({ A, P, roofY }) {
     const a = (k / 48) * Math.PI * 2;
     bevel.push(box(0.03, 0.025, 0.016, [cx + 0.29 * Math.cos(a), 2.428, 0.29 * Math.sin(a)], [0, -a, 0]));
   }
-  for (const sd of [1, -1]) bevel.push(place(new THREE.CylinderGeometry(0.055, 0.09, 0.14, 18), [cx + 0.06, 2.45, 0.36 * sd], [Math.PI / 2 * sd, 0, 0]));
+  // combining pinions on the input-module output shafts, narrow end toward the apex
+  for (const sd of [1, -1]) bevel.push(onAxis(new THREE.CylinderGeometry(0.055, 0.09, 0.14, 18), sd, 0.18));
   bevel.push(place(new THREE.CylinderGeometry(0.045, 0.07, 0.1, 16), [cx - 0.33, 2.47, 0], [0, 0, Math.PI / 2]));   // tail take-off pinion
   P('Main bevel gear & combining pinions', {
     system: 'Drive system', material: 'Carburised steel spiral-bevel gears', mass: 105, explode: [1.05, 0.4, 0], xrayWeight: 0.45,
@@ -144,8 +153,8 @@ export function buildDrive({ A, P, roofY }) {
   P('Main transmission oil filter', {
     system: 'Drive system', material: 'Two-stage filter with impending-bypass button', mass: 3, explode: [0.1, 0.35, -1.0],
     desc: 'A two-stage oil filter on the left side of the main module. When its first stage clogs, a red button pops out so the crew sees it on the walk-round; a thermal lockout stops it popping when the oil is cold and thick. Strainers in the sump catch the rest.',
-  }, [mesh(merge([cyl(0.05, 0.05, 0.16, [cx - 0.12, 2.33, -0.5], 'y', 16), cyl(0.06, 0.06, 0.03, [cx - 0.12, 2.425, -0.5], 'y', 16), box(0.08, 0.06, 0.09, [cx - 0.12, 2.38, -0.44])]), MAT.casting()),
-    mesh(cyl(0.012, 0.012, 0.02, [cx - 0.12, 2.45, -0.5], 'y', 8), MAT.red())]);
+  }, [mesh(merge([cyl(0.05, 0.05, 0.16, [cx - 0.125, 2.33, -0.5], 'y', 16), cyl(0.055, 0.055, 0.03, [cx - 0.125, 2.425, -0.5], 'y', 16), box(0.08, 0.06, 0.09, [cx - 0.125, 2.38, -0.44])]), MAT.casting()),
+    mesh(cyl(0.012, 0.012, 0.02, [cx - 0.125, 2.45, -0.5], 'y', 8), MAT.red())]);
   const cl = [];
   for (const z of [0.12, -0.12]) cl.push(pipe([[cx - 0.4, 2.3, z * 1.6], [cx - 0.62, 2.32, z * 1.5], [-0.98, 2.36, z * 1.4], [-1.12, 2.38, z * 1.25]], 0.0125, 6));
   P('Oil cooler lines & thermostatic valve', {
@@ -169,7 +178,7 @@ export function buildDrive({ A, P, roofY }) {
     const s = side, R = s > 0 ? '(right)' : '(left)';
     const g = [
       cyl(0.13, 0.13, 0.3, [0.16, 2.52, 0.5 * s], 'x', 22),
-      tube([0.1, 2.5, 0.46 * s], [cx + 0.1, 2.45, 0.28 * s], 0.11, 18),
+      onAxis(cyl(0.11, 0.11, 0.12, [0, 0, 0], 'y', 18), s, 0.06), onAxis(cyl(0.13, 0.13, 0.015, [0, 0, 0], 'y', 22), s, 0.115),   // output housing and its flange on the main-module case
       cyl(0.085, 0.11, 0.08, [-0.03, 2.52, 0.5 * s], 'x', 18),
       cyl(0.13, 0.13, 0.025, [-0.065, 2.52, 0.5 * s], 'x', 22),                // flange that carries the engine's forward support
     ];
@@ -181,9 +190,11 @@ export function buildDrive({ A, P, roofY }) {
       system: 'Drive system', material: 'Carburised steel spiral-bevel pinion and gear', mass: 8, explode: [0.35, 1.0, 1.35 * s],
       desc: `A ${GEARS.inputPinion}-tooth spiral-bevel pinion on the engine shaft (${rpm(SPEEDS.input)} rpm) drives an ${GEARS.inputGear}-tooth gear about 0.25 m across at ${rpm(SPEEDS.inputGear)} rpm. That gear's shaft drives the accessory module forward and the combining pinion inboard.`,
     }, [mesh(merge([place(new THREE.CylinderGeometry(0.03, 0.045, 0.08, 16), [0.02, 2.52, 0.56 * s], [0, 0, -Math.PI / 2]), cyl(0.02, 0.02, 0.1, [-0.04, 2.52, 0.56 * s], 'x', 10),
-      gearWheel(0.125, 0.035, 48, [0.16, 2.52, 0.5 * s], 'z', 28), cyl(0.03, 0.03, 0.12, [0.16, 2.52, 0.44 * s], 'z', 12)]), MAT.steel())]);
-    const fw = [cyl(0.075, 0.075, 0.1, [0.09, 2.485, 0.4 * s], 'z', 24, true), cyl(0.048, 0.048, 0.1, [0.09, 2.485, 0.4 * s], 'z', 16)];
-    for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; fw.push(cyl(0.011, 0.011, 0.085, [0.09 + 0.061 * Math.cos(a), 2.485 + 0.061 * Math.sin(a), 0.4 * s], 'z', 6)); }
+      onAxis(gearWheel(0.125, 0.035, 48, [0, 0, 0], 'y', 28), s, 0), onAxis(cyl(0.03, 0.03, 0.17, [0, 0, 0], 'y', 12), s, 0.055)]), MAT.steel())]);   // gear and its output shaft to the combining pinion
+    // ramp-roller clutch in the input gear's hub: outer race, inner cam, twelve rollers
+    const fw = [cyl(0.075, 0.075, 0.1, [0, 0, 0], 'y', 24, true), cyl(0.048, 0.048, 0.1, [0, 0, 0], 'y', 16)];
+    for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; fw.push(cyl(0.011, 0.011, 0.085, [0.061 * Math.cos(a), 0, 0.061 * Math.sin(a)], 'y', 6)); }
+    fw.forEach((g) => onAxis(g, s, 0.03));
     P(`Freewheel unit ${R}`, {
       system: 'Drive system', material: 'Steel ramp-roller overrunning clutch', mass: 5, explode: [0.0, 1.0, 1.6 * s],
       desc: 'A ramp-roller overrunning clutch built into the input gear: rollers wedge between ramps on the inner cam and the outer race to drive, and roll free whenever the rotor turns faster than the engine. It is heavier than a sprag clutch but cannot fail by sprag "rollover". It lets a failed engine drop out — or both, in autorotation — while the rotor keeps driving this side\'s accessory module.',
@@ -364,12 +375,14 @@ export function buildDrive({ A, P, roofY }) {
   const fw = [];
   for (const s of [1, -1]) {
     fw.push(box(1.15, 0.24, 0.02, [-1.03, 2.49, 0.43 * s]));          // inboard wall of the engine bay, inside the cowl
-    for (const x of [ENG.front - 0.1, ENG.rear + 0.2]) fw.push(tube([x, 2.29, 0.5 * s], [x, ENG.y - 0.2, ENG.z * s], 0.02), tube([x, 2.29, 0.98 * s], [x, ENG.y - 0.2, ENG.z * s], 0.02));
+    // rear mount links only: the front of the engine is carried by the input module
+    for (const x of [ENG.rear + 0.2]) fw.push(tube([x, 2.29, 0.5 * s], [x, ENG.y - 0.2, ENG.z * s], 0.02), tube([x, 2.29, 0.98 * s], [x, ENG.y - 0.2, ENG.z * s], 0.02));
   }
   // transmission deck plate (primed aluminium), kept inside the transmission fairing's footprint;
   // the main module stands on four pads (the primary servos stand on the deck ahead of the front pair)
   const deck = [box(1.36, 0.03, 0.7, [-0.05, 2.3, 0])];
-  for (const [x, z] of [[0.26, 0.37], [0.26, -0.37], [-0.42, 0.37], [-0.42, -0.37]]) deck.push(box(0.12, 0.1, 0.1, [x, 2.34, z]));
+  for (const [x, z] of [[-0.42, 0.37], [-0.42, -0.37]]) deck.push(box(0.12, 0.1, 0.1, [x, 2.34, z]));
+  for (const z of [0.32, -0.32]) deck.push(box(0.1, 0.06, 0.07, [0.22, 2.32, z]));   // forward pads, under the case bowl
   P('Upper deck, firewalls & mounts', {
     system: 'Structure', material: 'Titanium firewalls, steel engine mount links, primed aluminium deck with transmission mounting pads', mass: 95, explode: [0, 0.12, 0], xrayWeight: 0.5,
     desc: 'The deck above the cabin roof carries the transmission on four pads and each engine on tubular links; titanium firewalls separate the engines from the gearbox and from each other.',
@@ -455,7 +468,7 @@ export function buildDrive({ A, P, roofY }) {
     pnFeed[s] = pts;
   }
   pn.push(pipe([[-1.72, 2.44, -0.25], [-2.0, 2.4, -0.3], [-2.2, 2.39, -0.33], [-2.22, 2.39, -0.37]], 0.022, 6));               // external pneumatic port
-  pn.push(pipe([[-1.6, 2.49, 0.24], [-1.62, 2.42, 0.29]], 0.024, 6));                                                         // heater branch
+  pn.push(pipe([[-1.6, 2.49, 0.24], [-1.615, 2.477, 0.258], [-1.62, 2.46, 0.27]], 0.024, 6));                                // heater branch into the mixing valve
   const valves = [cyl(0.04, 0.04, 0.08, [-1.95, 2.42, -0.18], 'x', 14), cyl(0.035, 0.035, 0.07, [-2.17, 2.39, -0.33], 'x', 12)];
   for (const s of [1, -1]) valves.push(cyl(0.035, 0.035, 0.07, [-1.15, ENG.y + 0.1, (ENG.z - 0.2) * s], 'y', 12), box(0.09, 0.08, 0.08, [-1.0, 2.46, 0.41 * s]), box(0.04, 0.05, 0.04, [-1.0, 2.52, 0.41 * s]));
   P('Pneumatic start ducts', {
@@ -480,17 +493,41 @@ export function buildDrive({ A, P, roofY }) {
     desc: 'Main and reserve bottles above the upper deck behind the right engine compartment. Each has dual outlets, so together they give two shots into either engine bay or the APU compartment; each carries a pressure gauge checked on the preflight walk-round.',
   }, [mesh(merge([new THREE.SphereGeometry(0.085, 16, 12).translate(-2.05, 2.42, 0.24), new THREE.SphereGeometry(0.085, 16, 12).translate(-1.85, 2.42, 0.24)]), MAT.red()),
     mesh(merge([cyl(0.02, 0.02, 0.02, [-2.05, 2.515, 0.24], 'y', 10), cyl(0.02, 0.02, 0.02, [-1.85, 2.515, 0.24], 'y', 10)]), MAT.lens())]);
+  // Discharge lines, routed clear of the tail drive shaft, the fuel feeds and the heater: each bottle
+  // has an outlet to each engine bay and one to the APU compartment. The right-bay pair runs forward
+  // over the heater mixing valve and through the right firewall; the left-bay pair drops under the
+  // tail drive shaft and climbs to the left firewall; the APU pair crosses over the shaft aft of the
+  // compartment's fire detector. A thermal-relief line from both bottles runs aft to the red
+  // indicator disc on the exposed right flank of the aft deck fairing.
   const dl = [];
-  for (const x of [-2.05, -1.85]) {
-    dl.push(pipe([[x, 2.37, 0.29], [x + 0.2, 2.36, 0.36], [-1.2, 2.42, 0.42], [-1.0, 2.44, 0.46]], 0.01, 5));
-    dl.push(pipe([[x, 2.37, 0.19], [x + 0.15, 2.36, 0.05], [x + 0.25, 2.37, -0.2], [-1.4, 2.43, -0.38], [-1.0, 2.44, -0.46]], 0.01, 5));
-    dl.push(pipe([[x, 2.37, 0.18], [-2.2, 2.38, 0.06], [-2.3, 2.44, -0.0], [-2.32, 2.46, -0.04]], 0.009, 5));
+  for (const sd of [1, -1]) {
+    const nz = (z) => z * sd, fwd = [[-1.72, 2.53, 0.36], [-1.57, 2.535, 0.385], [-1.5, 2.535, 0.43], [-1.44, 2.53, 0.47], [-1.38, 2.52, 0.48]].map(([x, y, z]) => [x, y, nz(z)]);
+    if (sd > 0) {
+      dl.push(pipe([[-2.05, 2.48, 0.3], [-1.95, 2.5, 0.31], [-1.85, 2.51, 0.33], [-1.78, 2.52, 0.345], ...fwd], 0.01, 5));
+      dl.push(pipe([[-1.85, 2.48, 0.3], [-1.84, 2.505, 0.325], [-1.8, 2.515, 0.34]], 0.01, 5));
+    } else {
+      // under the shaft, then up between the pneumatic manifold and the left fuel feed
+      const under = [[-2.05, 2.4, 0.158], [-1.95, 2.375, 0.135], [-1.85, 2.35, 0.115], [-1.76, 2.325, 0.07], [-1.71, 2.315, 0.0], [-1.69, 2.32, -0.12], [-1.66, 2.33, -0.24], [-1.63, 2.36, -0.32], [-1.61, 2.44, -0.335], [-1.58, 2.52, -0.36], [-1.53, 2.535, -0.39], ...fwd.slice(2)];
+      dl.push(pipe(under, 0.01, 5), pipe([[-1.85, 2.38, 0.165], [-1.85, 2.36, 0.13], [-1.83, 2.345, 0.11]], 0.01, 5));
+    }
   }
-  dl.push(pipe([[-2.0, 2.44, 0.3], [-2.0, 2.44, 0.4], [-1.98, 2.42, 0.44]], 0.008, 5));
+  dl.push(pipe([[-2.12, 2.45, 0.22], [-2.25, 2.46, 0.14], [-2.36, 2.465, 0.03], [-2.38, 2.462, -0.035]], 0.009, 5),          // APU compartment
+    pipe([[-1.85, 2.44, 0.157], [-1.95, 2.452, 0.14], [-2.05, 2.455, 0.14], [-2.15, 2.458, 0.145], [-2.25, 2.46, 0.14]], 0.009, 5));
+  const nzl = [];
+  for (const sd of [1, -1]) nzl.push(cyl(0.016, 0.016, 0.04, [-1.37, 2.52, 0.495 * sd], 'z', 8));
+  nzl.push(cyl(0.016, 0.016, 0.03, [-2.38, 2.45, -0.045], 'y', 8));
+  // thermal relief: both bottles' safety ports → indicator disc flush in the fairing skin
+  const ind = aftDeckPoint(roofY, -2.72, 0.5);
+  const indIn = ind.p.clone().addScaledVector(ind.n, -0.03);
+  dl.push(pipe([[-1.85, 2.37, 0.3], [-1.95, 2.36, 0.305], [-2.05, 2.355, 0.302], [-2.2, 2.35, 0.3], [-2.45, 2.36, 0.29], [-2.62, 2.37, 0.282], indIn], 0.008, 5));
+  const disc = cyl(0.03, 0.03, 0.008, [0, 0, 0], 'y', 16).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), ind.n));
+  const discAt = ind.p.clone().addScaledVector(ind.n, 0.002);
+  disc.translate(discAt.x, discAt.y, discAt.z);
+  const rim = tube(indIn, ind.p.clone().addScaledVector(ind.n, -0.002), 0.022, 12);
   P('Fire extinguisher discharge lines', {
-    system: 'Propulsion', material: 'Stainless-steel discharge tubing, thermal discharge indicator', mass: 3, explode: [-0.4, 1.7, 0.85],
-    desc: 'Tubing from both bottles to nozzles in each engine bay and the APU compartment. A thermal-discharge safety port vents a bottle that overheats and ruptures a red indicator disc on the right side of the fuselage, so the crew can see from outside that a bottle has emptied.',
-  }, [mesh(merge(dl), MAT.hydraulic()), mesh(cyl(0.03, 0.03, 0.01, [-1.98, 2.42, 0.445], 'z', 14), MAT.red())]);
+    system: 'Propulsion', material: 'Stainless-steel discharge tubing and nozzles, thermal discharge indicator', mass: 3, explode: [-0.4, 1.7, 0.85],
+    desc: 'Tubing from both bottles to nozzles in each engine bay and the APU compartment. A thermal-discharge safety port vents a bottle that overheats and ruptures a red indicator disc in the right side of the aft deck fairing, so the crew can see on the walk-round that a bottle has emptied. (Disc position approximate.)',
+  }, [mesh(merge([...dl, rim]), MAT.hydraulic()), mesh(merge(nzl), MAT.steel()), mesh(disc, MAT.red())]);
 
   return { engines, ENG };
 }

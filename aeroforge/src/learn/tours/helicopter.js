@@ -44,10 +44,12 @@ export default [
   },
   {
     title: 'Keeping ice off the blades',
-    body: 'Ice on a rotor blade destroys lift and, if it sheds unevenly, the rotor\'s balance. A heater blanket under each blade\'s leading edge melts the ice\'s bond so it flies off cleanly. Power crosses into the turning rotor through a slip ring fed up the hollow shaft, and a distributor on the hub switches the blades\' heater zones in turn so the generators are not overloaded; the tail rotor\'s four blades are heated all at once through their own slip ring. The controller times it all from the ice detector\'s icing rate and the outside air temperature.',
+    body: 'Ice on a rotor blade destroys lift and, if it sheds unevenly, the rotor\'s balance. A heater blanket under each blade\'s leading edge melts the ice\'s bond so it flies off cleanly. Follow the power: from the controller and junction box on the cabin-roof beam a lead runs under the roof, into the bottom of the gearbox and up the hollow rotor shaft to the slip ring on top of the hub, where brushes pass it into the turning rotor. The distributor above switches the blades\' heater zones in turn, so the generators are not overloaded, and a cable runs down each hub arm and along the cuff to its blade. The tail rotor\'s four blades are heated all at once through their own slip ring, fed from the tail-cone harness. The controller times it all from the ice detector\'s icing rate and the outside air temperature.',
     key: 'Colder air → longer heater-on time; heavier icing → shorter off time. Blades are heated in cycles, never all at once.',
-    focus: ['Main rotor blade heater blankets', 'Main rotor de-ice harness', 'De-ice distributor', 'Main rotor slip ring', 'Tail rotor slip ring', 'Blade de-ice controller & junction box', 'Ice detector', 'OAT sensor'],
-    mode: 'xray', view: { dir: [0.9, 0.85, 0.9], fill: 1.05 },
+    // framed on the head and the roof below it, so the slip ring, distributor, harness and the lead
+    // from the junction box read at a useful size; the blankets run out along the ghosted blades
+    focus: ['Main rotor slip ring', 'De-ice distributor', 'Main rotor de-ice harness', 'Main rotor hub', 'Blade de-ice controller & junction box', 'Main rotor shaft'],
+    mode: 'xray', view: { dir: [0.85, 0.55, -0.95], fill: 1.0 },
   },
   {
     title: 'Torque, and why the tail rotor is canted',

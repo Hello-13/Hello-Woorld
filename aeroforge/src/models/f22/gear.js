@@ -234,7 +234,7 @@ export function buildGear(ctx) {
     const axle = V(X(11.38), FR.GROUND + Rm, side * 1.62);
     const vd = axle.clone().sub(T);
     const L = vd.length();
-    const vs = V(X(12.33) - T.x, -0.5 - T.y, side * 1.25 - T.z).normalize().multiplyScalar(L);
+    const vs = V(X(12.33) - T.x, -0.59 - T.y, side * 1.25 - T.z).normalize().multiplyScalar(L);   // stowed axle, low enough that the flat wheel clears the duct floor
     const q = new THREE.Quaternion().setFromUnitVectors(vd.clone().normalize(), vs.clone().normalize());
     const dir = vd.clone().normalize();
     const at = (k) => dir.clone().multiplyScalar(L * k);
@@ -282,11 +282,15 @@ export function buildGear(ctx) {
     pC.add(twist);
     // brake line down the leg to the brake (rides on the wheel group so it follows the twist)
     twist.add(mesh(rodV(at(0.05).add(V(-0.08, 0, -side * 0.06)), at(0.9).add(V(-0.1, 0, -side * 0.08)), 0.012, 6), F.hyd()));
-    let best = 0, bestY = -1;
-    for (let k = 0; k < 72; k++) {
-      const phi = (k / 72) * Math.PI * 2;
+    // stowed wheel as flat as the splayed leg allows; of the two flattest twists, take the one that puts
+    // the raised rim forward, where the duct floor above the well is highest
+    let best = 0, bestKey = -Infinity;
+    for (let k = 0; k < 720; k++) {
+      const phi = (k / 720) * Math.PI * 2;
       const a = V(0, 0, 1).applyAxisAngle(dir, phi).applyQuaternion(q);
-      if (Math.abs(a.y) > bestY) { bestY = Math.abs(a.y); best = phi; }
+      const up = V(0, 1, 0).addScaledVector(a, -a.y).normalize();       // toward the raised rim
+      const key = Math.round(Math.abs(a.y) * 2000) + up.x * 0.5;
+      if (key > bestKey) { bestKey = key; best = phi; }
     }
     if (best > Math.PI) best -= Math.PI * 2;
     P(`Main wheel & carbon brake (${R})`, {

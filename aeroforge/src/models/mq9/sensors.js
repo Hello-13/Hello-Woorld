@@ -151,7 +151,8 @@ export function buildLinks({ P, L, m }, at) {
   c([roof(5.05, -0.02, 0.03), roof(4.4, -0.04), roof(3.4, -0.04), roof(3.0, -0.08), [X(2.8), 1.74, -0.17], [at.egi[1][0] - 0.08, at.egi[1][1] + 0.08, -0.2]]);
   // IFF: upper blade forward along the roof; lower blade along the lower side and up into the bay
   c([roof(6.6, 0.02, 0.03), roof(6.0, 0.03), roof(5.0, 0.03), roof(3.6, 0.03), roof(2.9, 0.03), [X(2.68), 1.68, 0.03], [at.iff[0] - 0.02, at.iff[1] + 0.06, 0.03]]);
-  c([keel(6.9, 0, 0.02), [X(6.62), 1.25, 0.0], [X(6.3), 1.3, 0.0], [X(5.0), 1.3, 0.0], [X(4.88), 1.29, 0.04], fusePoint(4.79, -0.6, 0.035), fusePoint(4.4, -0.6, 0.035),
+  // the lower blade's cable stays in the keel channel under the aft cell's floor, rising only between the gear wells
+  c([keel(6.9, 0, 0.02), keel(6.8, -0.03, 0.022), keel(6.62, -0.035, 0.022), keel(6.5, -0.03, 0.025), [X(6.38), 1.225, -0.012], [X(6.25), 1.29, 0.0], [X(6.0), 1.3, 0.0], [X(5.0), 1.3, 0.0], [X(4.88), 1.29, 0.04], fusePoint(4.79, -0.6, 0.035), fusePoint(4.4, -0.6, 0.035),
     fusePoint(3.6, -0.6, 0.035), fusePoint(3.1, -0.5, 0.035), [X(2.92), 1.42, 0.3], [X(2.84), 1.5, 0.2], [X(2.8), 1.54, 0.08], [at.iff[0] - 0.13, at.iff[1], 0.04]]);
   P('Antenna coax runs', {
     system: 'Communications', material: 'Low-loss coaxial cable, 6–8 mm (routing estimated)', mass: 2.5, count: 6, xrayWeight: 0.5, explode: [0.2, 0.9, 0.35],

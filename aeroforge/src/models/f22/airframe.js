@@ -392,8 +392,9 @@ export function buildAirframe(ctx) {
     const sob = FR.wingSection(zSOB);
     for (const f of [...TI_F, ...RTM_F]) {
       const x = sob.le[0] - f * sob.chord, hh = naca(f, sob.t) * sob.chord * 0.9;
-      fits.push(new THREE.BoxGeometry(0.16, hh * 1.7, 0.1).translate(x, sob.le[1], zSOB - 0.05));
-      for (const dy of [-hh * 0.55, hh * 0.55]) fits.push(new THREE.CylinderGeometry(0.03, 0.03, 0.14, 10).rotateX(Math.PI / 2).translate(x, sob.le[1] + dy, zSOB - 0.07));
+      // short in z, so the lugs stay in the side wall clear of the gun, its ammunition container and the APU ducts
+      fits.push(new THREE.BoxGeometry(0.16, hh * 1.7, 0.06).translate(x, sob.le[1], zSOB - 0.03));
+      for (const dy of [-hh * 0.55, hh * 0.55]) fits.push(new THREE.CylinderGeometry(0.03, 0.03, 0.08, 10).rotateX(Math.PI / 2).translate(x, sob.le[1] + dy, zSOB - 0.03));
     }
     const sideG = (g) => (side > 0 ? g : mirror(g));
     P(`Wing titanium spars (${R})`, {

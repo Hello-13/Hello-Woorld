@@ -245,9 +245,9 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   const ctlAz = 80;
   P('MVac engine controller', {
     system: 'Avionics', material: 'Engine computer (three voting processors)', mass: 4,
-    desc: 'Like each first-stage Merlin, the Merlin Vacuum has its own controller of three computers that check each other, running its start, throttle, relight and shutdown sequences. Mounted under the thrust cone beside the powerhead (position estimated).',
+    desc: 'Like each first-stage Merlin, the Merlin Vacuum has its own controller of three computers that check each other, running its start, throttle, relight and shutdown sequences. It hangs on a bracket from the underside of the thrust cone beside the powerhead (position estimated).',
     explode: [0.6, -0.6, 1.4],
-  }, mesh(unit(0.86, ctlAz, gimbalY + 0.02, 0.16, 0.2, 0.12), FM.avionics()));
+  }, [mesh(unit(0.86, ctlAz, gimbalY + 0.1, 0.16, 0.2, 0.12), FM.avionics()), mesh(unit(0.86, ctlAz, gimbalY + 0.22, 0.08, 0.06, 0.04), FM.aluDark())]);
   const tt = [sideBottle(1.6, 180, 47.76, 0.1, 0.45), pipe([at(1.5, 180, 47.76), at(0.9, 182, 47.5), [-0.36, ex + 2.05 + dy, 0.12]], 0.015, { seg: 6, tubular: 12 })];
   V('Second stage TEA-TEB ignition tank', {
     material: 'Stainless pressure vessel', mass: 12,
@@ -351,6 +351,19 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
     desc: 'Batteries power the stage through ascent, coasts and the deorbit burn; there are no solar arrays on the second stage, which limits how long it can coast.',
     explode: [0, -0.8, -1.2],
   }, mesh(merge([40, 220].map((a) => unit(1.6, a, 47.74, 0.34, 0.22, 0.2))), FM.battery()));
+  // the forward-skirt boxes stand off the wall on brackets: [azimuths, w, h, d], all at r 1.62
+  const s2Br = [];
+  for (const [azs, w, h, d] of [[[30, 90, 150, 210, 270, 330], 0.4, 0.24, 0.28], [[0, 180], 0.26, 0.16, 0.16], [[120], 0.2, 0.15, 0.1]]) {
+    for (const a of azs) {
+      const ro = 1.62 + d / 2, wall = R - 0.015;
+      s2Br.push(unit((ro + wall - 0.03) / 2 + 0.005, a, avY, Math.min(0.12, w * 0.4), h * 0.55, wall - 0.03 - ro + 0.01), unit(wall - 0.015, a, avY, Math.min(0.3, w * 0.8), h + 0.06, 0.03));
+    }
+  }
+  P('Second stage avionics brackets', {
+    system: 'Structure', count: 9, xrayWeight: 0.6, material: 'Machined aluminium brackets and wall doublers', mass: 9 * 1.2,
+    desc: 'Bolt the flight computers, IMU, flight-termination, S-band and C-band boxes to the forward-skirt wall above the LOX dome, with the harness ring below them. Bracket design not published; layout estimated.',
+    explode: [0, 1.9, 1.4],
+  }, mesh(merge(s2Br), FM.aluDark()));
   const rwAz = 290;
   const rw = [unit(R + 0.06, rwAz, (Y.interTop + 0.3 + Y.fairingBase) / 2, 0.22, Y.fairingBase - Y.interTop - 0.3, 0.12)];
   P('Second stage raceway', {
@@ -368,13 +381,16 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
     desc: 'Feed the navigation unit with GPS fixes for orbit insertion and, on missions that need it, the deorbit burn.',
     explode: [0, 0.6, 2.0],
   }, mesh(merge([150, 330].map((a) => unit(R + 0.02, a, 55.9, 0.14, 0.14, 0.03))), FM.raceway()));
-  const camG = [unit(1.66, 60, 47.88, 0.12, 0.08, 0.1), unit(R + 0.06, 60, 57.45, 0.12, 0.08, 0.1)];
-  const camL = [new THREE.CylinderGeometry(0.025, 0.03, 0.04, 10).translate(...at(1.66, 60, 47.82)), new THREE.CylinderGeometry(0.03, 0.025, 0.04, 10).translate(...at(R + 0.07, 60, 57.51))];
-  P('Second stage cameras', {
-    system: 'Sensors', count: 2, material: 'Video cameras in small housings', mass: 2 * 1.5,
-    desc: 'One looks down from the aft skirt at the Merlin Vacuum\'s glowing nozzle; one on the forward skirt watches the fairing go and the payload separate. Positions estimated from webcast views.',
-    explode: [0, -0.4, 2.6],
-  }, [mesh(merge(camG), FM.black()), mesh(merge(camL), FM.lens())]);
+  P('Second stage engine camera', {
+    system: 'Sensors', material: 'Video camera in a small housing', mass: 1.5,
+    desc: 'Looks down from the aft skirt at the Merlin Vacuum: the glowing niobium nozzle extension of every webcast. Position estimated from webcast views.',
+    explode: [0, -0.6, 2.6],
+  }, [mesh(unit(1.66, 60, 47.88, 0.12, 0.08, 0.1), FM.black()), mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.04, 10).translate(...at(1.66, 60, 47.82)), FM.lens())]);
+  P('Second stage payload camera', {
+    system: 'Sensors', material: 'Video camera in a small housing', mass: 1.5,
+    desc: 'On the outside of the forward skirt, looking up: it watches the fairing halves fall away and, later, the payload separate. Position estimated from webcast views.',
+    explode: [0, 0.6, 2.6],
+  }, [mesh(unit(R + 0.06, 60, 57.45, 0.12, 0.08, 0.1), FM.black()), mesh(new THREE.CylinderGeometry(0.03, 0.025, 0.04, 10).translate(...at(R + 0.07, 60, 57.51)), FM.lens())]);
 
   // ------------------------------------------------------------------ T-0 quick disconnect and harnesses
   const qd = [unit(R + 0.01, qdAz, qdY, 0.9, 0.7, 0.04)];
@@ -394,17 +410,19 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   }, [mesh(merge(qd), FM.aluDark()), mesh(merge(qdCover), FM.raceway()), mesh(merge(qdLines), FM.steelLine())]);
   const s2h = [
     pipe([at(R + 0.03, qdAz + 6, qdY + 0.05), at(R + 0.05, qdAz + 12, qdY + 0.07), at(R + 0.05, rwAz - 4, qdY + 0.07), at(R + 0.05, rwAz, qdY + 0.1)], 0.028, { seg: 6, tubular: 10 }),   // QD → raceway
-    pipe([at(R + 0.05, rwAz, Y.interTop + 0.35), at(R - 0.03, rwAz, Y.interTop + 0.25), at(1.76, rwAz - 3, 47.8)], 0.028, { seg: 6, tubular: 6 }),
-    hoop(1.76, 0.014, 47.8, { seg: 64, tube: 4 }),
-    pipe([at(1.76, ctlAz, 47.8), at(1.2, ctlAz, 47.5), at(0.94, ctlAz, gimbalY + 0.02)], 0.014, { seg: 4, tubular: 8 }),         // → MVac controller
+    pipe([at(R + 0.05, rwAz, Y.interTop + 0.35), at(R - 0.03, rwAz, Y.interTop + 0.25), at(1.78, rwAz - 3, 47.8)], 0.028, { seg: 6, tubular: 6 }),
+    hoop(1.78, 0.014, 47.8, { seg: 64, tube: 4 }),              // outboard of the N₂ and MEK bottles
+    pipe([at(1.78, ctlAz, 47.8), at(1.2, ctlAz, 47.5), at(0.93, ctlAz, gimbalY + 0.1)], 0.014, { seg: 4, tubular: 8 }),         // → MVac controller
     pipe([at(R + 0.05, rwAz, Y.fairingBase - 0.05), at(R - 0.03, rwAz, Y.fairingBase + 0.05), at(1.72, rwAz - 3, 57.12)], 0.028, { seg: 6, tubular: 6 }),
     hoop(1.72, 0.014, 57.12, { seg: 64, tube: 4 }),
   ];
-  for (const a of [40, 220, 180, 135, 315, 60]) s2h.push(pipe([at(1.76, a, 47.8), at(1.72, a, 47.84)], 0.01, { seg: 4, tubular: 3 }));   // batteries, TEA-TEB, N₂ valves, camera
-  for (const a of [0, 30, 90, 120, 150, 180, 210, 270, 330]) s2h.push(pipe([at(1.72, a, 57.12), at(1.72, a, 57.24)], 0.01, { seg: 4, tubular: 3 }));
+  for (const a of [40, 220, 180, 135, 315, 60]) s2h.push(pipe([at(1.78, a, 47.8), at(1.72, a, 47.84)], 0.01, { seg: 4, tubular: 3 }));   // batteries, TEA-TEB, N₂ valves, camera
+  for (const a of [30, 90, 150, 210, 270, 330]) s2h.push(pipe([at(1.72, a, 57.12), at(1.72, a, 57.24)], 0.01, { seg: 4, tubular: 3 }));
+  for (const [a, yb] of [[0, avY - 0.08], [180, avY - 0.08], [120, avY - 0.075]]) s2h.push(pipe([at(1.72, a, 57.12), at(1.68, a, 57.2), at(1.62, a, yb + 0.01)], 0.01, { seg: 4, tubular: 5 }));   // S-band, C-band
   for (const a of [rwAz - 4, rwAz + 4]) {
     // payload harnesses: forward skirt → up the attach fitting and adapter to the separation plane
-    s2h.push(pipe([at(1.72, a, 57.12), at(1.76, a, 57.62), at(1.27, a, 57.89), at(0.84, a, Y.pafTop - 0.02), at(0.86, a, Y.pafTop + 0.4), at(0.72, a, Y.pafTop + 0.47)], 0.014, { seg: 4, tubular: 16 }));
+    s2h.push(pipe([at(1.72, a, 57.12), at(1.76, a, 57.62), at(1.27, a, 57.87), at(1.07, a, 58.04), at(0.87, a, Y.pafTop - 0.07), at(0.87, a, Y.pafTop + 0.2), at(0.76, a, Y.pafTop + 0.27), at(0.755, a, Y.pafTop + 0.37)], 0.014, { seg: 4, tubular: 16 }));
+    s2h.push(unit(0.755, a, Y.pafTop + 0.4, 0.07, 0.06, 0.04));          // separation connector at the clamp-band plane
   }
   P('Second stage wiring & payload harnesses', {
     system: 'Electrical', material: 'Shielded cable bundles, Ø 25–30 mm', mass: 60,
@@ -432,7 +450,7 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
     explode: [0, 2.6, 0],
   }, mesh(merge(adapter), FM.aluDark()));
   const clamp = [hoop(0.845, 0.04, adTop - 0.03, { seg: 64, tube: 8 })];
-  for (let i = 0; i < 8; i++) { const [x, z] = polar(0.74, i * 45); clamp.push(post(x, z, adTop - 0.25, adTop - 0.02, 0.03, 8)); }
+  for (let i = 0; i < 8; i++) { const [x, z] = polar(0.775, i * 45); clamp.push(post(x, z, adTop - 0.25, adTop, 0.03, 8)); }   // springs on the adapter wall, bearing on the spacecraft ring
   P('Payload clamp band & separation springs', {
     system: 'Separation', material: 'Clamp band, separation springs, separation connectors', mass: 40,
     desc: 'A clamp band holds the spacecraft ring to the adapter; when its bolts are cut, the band springs open and separation springs push the payload away at well under 1 m/s while the harness connectors pull apart.',
@@ -443,7 +461,7 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   // octagonal bus (flats face ±x / ±z) with a top deck, launch-adapter ring and thruster clusters
   const busSide = lathe([[1.19, py0 + 0.1], [1.19, py0 + 5.0]], 8, Math.PI / 8);
   const deck = [lathe([[0.001, py0 + 0.1], [1.19, py0 + 0.1]], 8, Math.PI / 8), lathe([[1.19, py0 + 5.0], [0.001, py0 + 5.0]], 8, Math.PI / 8)];
-  const busKit = [post(0, 0, py0 - 0.02, py0 + 0.12, 0.8, 32), post(0, 0, py0 + 5.0, py0 + 5.25, 0.45, 20), post(0, 0, py0 + 5.25, py0 + 5.6, 0.18, 16, 0.3)];
+  const busKit = [post(0, 0, py0 - 0.05, py0 + 0.12, 0.83, 32), post(0, 0, py0 + 5.0, py0 + 5.25, 0.45, 20), post(0, 0, py0 + 5.25, py0 + 5.6, 0.18, 16, 0.3)];
   for (const a of [45, 135, 225, 315]) for (const y of [py0 + 0.4, py0 + 4.7]) busKit.push(unit(1.12, a, y, 0.18, 0.14, 0.14));
   const pl = P('Payload: communications satellite', {
     system: 'Payload', xrayWeight: 0.6, material: 'Spacecraft bus under gold and silver multi-layer insulation', mass: 6400,
@@ -451,7 +469,7 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
     callout: true, anchor: [-1.15, py0 + 0.9, 0.6], explode: [0, 4.4, 0],
   }, [mesh(busSide, SKIN.mli()), mesh(merge(deck), SKIN.mli()), mesh(merge(busKit), M.titanium())]);
   pl.userData.part.temp = 293;
-  const busIn = [post(0, 0, py0 - 0.4, py0 + 0.1, 0.18, 16, 0.08), post(0, 0, py0 + 0.6, py0 + 4.4, 0.62, 24)];
+  const busIn = [post(0, 0, py0 - 0.4, py0 + 0.1, 0.18, 16, 0.08), post(0, 0, py0 + 0.12, py0 + 4.98, 0.62, 24)];   // engine; central thrust tube deck to deck
   for (const y of [py0 + 1.3, py0 + 3.7]) busIn.push(new THREE.SphereGeometry(0.42, 18, 12).translate(0.62, y, 0), new THREE.SphereGeometry(0.42, 18, 12).translate(-0.62, y, 0));
   P('Payload apogee engine & propellant tanks', {
     system: 'Propulsion', xrayWeight: 0.6, material: 'Bipropellant apogee engine, titanium tanks', mass: 2900,
@@ -463,18 +481,21 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
     desc: 'Folded against the bus for launch and released after separation.',
     explode: [0, 4.4, 0.9],
   }, mesh(merge([1, -1].map((s) => block(0, py0 + 2.6, s * 1.24, 2.0, 4.6, 0.26))), M.solar()));
-  const refl = [];
+  const refl = [], reflHw = [];
   for (const s of [1, -1]) {
     const g = lathe([[0.001, 0], [0.6, 0.06], [1.1, 0.22], [1.25, 0.32]], 40);
     g.rotateZ((s * Math.PI) / 2);
     g.translate(s * (1.19 + 0.36), py0 + 2.8, 0);
     refl.push(g);
+    // hinged deployment arm from the bus face to the dish's lower rim, and two launch hold-downs
+    reflHw.push(rod([s * 1.08, py0 + 1.3, 0], [s * 1.27, py0 + 1.58, 0], 0.045, 10));
+    for (const dz of [-0.4, 0.4]) reflHw.push(rod([s * 1.08, py0 + 3.3, dz], [s * 1.47, py0 + 3.3, dz], 0.035, 8));
   }
   P('Payload antenna reflectors (stowed)', {
-    system: 'Communications', count: 2, xrayWeight: 0.6, material: 'Carbon-fibre reflectors', mass: 2 * 70,
-    desc: 'Deployable communications reflectors folded against the sides of the bus for launch.',
+    system: 'Communications', count: 2, xrayWeight: 0.6, material: 'Carbon-fibre reflectors on deployment arms, launch hold-downs', mass: 2 * 70,
+    desc: 'Deployable communications reflectors folded against the sides of the bus for launch, each on a hinged deployment arm and held by two hold-downs that are released once the satellite is in orbit.',
     explode: [0, 4.4, 0],
-  }, mesh(merge(refl), M.offWhite()));
+  }, [mesh(merge(refl), M.offWhite()), mesh(merge(reflHw), FM.aluDark())]);
 
   // ------------------------------------------------------------------ fairing
   const prof = FAIR;
@@ -494,21 +515,27 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
       desc: 'Line the inside of the cylinder and lower ogive to soak up the roar of liftoff and transonic flight, which would otherwise shake the payload harder than the launch loads themselves.',
       explode: [side * 3.2, 2.2, 0],
     }, mesh(lathe(innerProf, 48, phi, Math.PI), FM.blanket()), grp);
-    // vertical-seam latches every ≈ 1.6 m on both seams
+    // vertical-seam latches every ≈ 1.5 m on both seams, from just above the boat-tail flare; each
+    // leans with the wall so it stays inside the skin on the ogive
+    const latchYs = [];
+    for (let y = Y.fairingBase + 1.5; y < 66; y += 1.5) latchYs.push(y);
     const lat = [];
-    for (let y = Y.fairingBase + 0.6; y < 66; y += 1.6) for (const zs of [-1, 1]) {
-      const zz = (fairR(y) - 0.06) * zs;
-      lat.push(block(xs + side * 0.03, y, zz, 0.07, 0.25, 0.1));
+    for (const y of latchYs) for (const zs of [-1, 1]) {
+      const s = (fairR(y + 0.05) - fairR(y - 0.05)) / 0.1;
+      const g = new THREE.BoxGeometry(0.07, 0.25, 0.1);
+      g.rotateX(zs * Math.atan(s));
+      g.translate(xs + side * 0.03, y, (fairR(y) - 0.065) * zs);
+      lat.push(g);
     }
     P(`Fairing half ${label} seam latches`, {
       system: 'Separation', count: lat.length, material: 'Mechanical latches along the vertical seam', mass: 20,
-      desc: 'Mechanical latches fasten the two halves along the vertical seam. A high-pressure helium circuit releases them all at once about 3½–4 minutes into flight, once aerodynamic heating on the payload has fallen low enough. Spacing estimated.',
+      desc: 'Mechanical latches fasten the two halves along the vertical seam, above the boat-tail flare where the base ring takes over. A high-pressure helium circuit releases them all at once about 3½–4 minutes into flight, once aerodynamic heating on the payload has fallen low enough. Spacing estimated.',
       explode: [side * 4.6, 2.2, 0],
     }, mesh(merge(lat), FM.aluDark()), grp);
-    const py = side > 0 ? 59.4 : 62.8;                   // A carries the lower pair, B the upper (estimate)
+    const py = side > 0 ? 59.4 : 62.15;                  // A carries the lower pair, B the upper, between latches (estimate)
     const push = [];
     for (const zs of [-1, 1]) {
-      const zz = (fairR(py) - 0.12) * zs;
+      const zz = (fairR(py) - 0.15) * zs;
       const g = new THREE.CylinderGeometry(0.06, 0.06, 0.36, 14); g.rotateZ(Math.PI / 2); g.translate(side * 0.2, py, zz);
       const g2 = new THREE.CylinderGeometry(0.035, 0.035, 0.2, 10); g2.rotateZ(Math.PI / 2); g2.translate(side * 0.01, py, zz);
       push.push(g, g2, block(side * 0.38, py, zz, 0.04, 0.22, 0.2));
@@ -523,13 +550,13 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
     const he = [bottle(...at(fairR(by) - 0.22, bA, by), 0.15, 0.6, 14)];
     const seamPts = (zs) => {
       const pts = [];
-      for (let y = Y.fairingBase + 0.6; y < 66; y += 1.6) pts.push([xs + side * 0.1, y, (fairR(y) - 0.1) * zs]);
+      for (const y of latchYs) pts.push([xs + side * 0.1, y, (fairR(y) - 0.06) * zs]);
       return pts;
     };
     for (const zs of [-1, 1]) {
       const a1 = side > 0 ? zs * 84 : 180 - zs * 84;
-      he.push(pipe([at(fairR(by) - 0.22, bA + zs * 4, by + 0.3), ...arc(fairR(by + 0.3) - 0.12, by + 0.3, bA + zs * 10, a1, 8), [xs + side * 0.1, by + 0.3, (fairR(by + 0.3) - 0.1) * zs], ...seamPts(zs).filter(([, y]) => y > by + 0.4)], 0.008, { seg: 4, tubular: 70, tension: 0.05 }));
-      he.push(pipe([[xs + side * 0.1, Y.fairingBase + 0.6, (fairR(Y.fairingBase + 0.6) - 0.1) * zs], [xs + side * 0.1, by + 0.3, (fairR(by + 0.3) - 0.1) * zs]], 0.008, { seg: 4, tubular: 6 }));
+      he.push(pipe([at(fairR(by) - 0.22, bA + zs * 4, by + 0.3), ...arc(fairR(by + 0.3) - 0.12, by + 0.3, bA + zs * 10, a1, 8), [xs + side * 0.1, by + 0.3, (fairR(by + 0.3) - 0.06) * zs], ...seamPts(zs).filter(([, y]) => y > by + 0.4)], 0.008, { seg: 4, tubular: 70, tension: 0.05 }));
+      he.push(pipe([[xs + side * 0.1, latchYs[0], (fairR(latchYs[0]) - 0.06) * zs], [xs + side * 0.1, by + 0.3, (fairR(by + 0.3) - 0.06) * zs]], 0.008, { seg: 4, tubular: 6 }));
     }
     P(`Fairing half ${label} helium bottle & lines`, {
       system: 'Separation', material: 'Composite helium bottle, stainless lines along the seams', mass: 10,
@@ -551,11 +578,11 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
     }
     const tA = az(-26.6), tY = 65.4;
     tank.push(new THREE.SphereGeometry(0.22, 16, 10).translate(...at(fairR(tY) - 0.3, tA, tY)), hoop(0.225, 0.012, tY, { seg: 24, tube: 4, x: at(fairR(tY) - 0.3, tA, tY)[0], z: at(fairR(tY) - 0.3, tA, tY)[2] }),
-      wallBox(tA, tY, 0.3, 0.08, 0.08, 0.0));
+      wallBox(tA, tY, 0.3, 0.08, 0.08, 0.01));
     for (const ta of [24, -24]) tank.push(pipe([at(fairR(tY - 0.2) - 0.3, tA, tY - 0.15), at(fairR(tY - 0.6) - 0.08, az(ta * 0.5 - 13), tY - 0.6), at(fairR(thrY + 0.07) - 0.1, az(ta), thrY + 0.07)], 0.006, { seg: 4, tubular: 14 }));
     const aA = az(26.6), aY = 65.6;
-    av.push(wallBox(aA, aY, 0.3, 0.5, 0.25, 0.07), wallBox(aA, aY, 0.36, 0.56, 0.05, 0.0));
-    av.push(unit(fairR(aY + 0.45) + 0.005, aA, aY + 0.45, 0.12, 0.12, 0.02));       // GPS patch through the skin
+    av.push(wallBox(aA, aY, 0.3, 0.5, 0.25, 0.08), wallBox(aA, aY, 0.36, 0.56, 0.05, 0.03));
+    av.push(wallBox(aA, aY + 0.45, 0.12, 0.12, 0.02, -0.012));                      // GPS patch through the skin, flush with its slope
     P(`Fairing half ${label} recovery thrusters`, {
       system: 'Recovery', count: 2, material: 'Nitrogen cold-gas thruster clusters, nozzles through the skin', mass: 12,
       desc: 'Nitrogen thrusters orient the falling half for re-entry, nose-first and stable, before the parachutes open. SES-10 (March 2017) brought back the first fairing half under control with thrusters and a steerable parachute. Positions estimated.',
@@ -575,7 +602,8 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
       system: 'Recovery', material: 'Packed steerable parafoil and drogue in a wall-mounted pack', mass: 45,
       desc: 'A drogue and then a steerable parafoil bring the half down gently to the sea for pick-up. Pack size and position estimated.',
       explode: [side * 5.2, 3.6, 0],
-    }, mesh(merge([wallBox(az(0), 66.6, 1.0, 0.85, 0.45, 0.05), wallBox(az(0), 66.6, 1.1, 0.06, 0.12, 0.0)]), FM.parafoil()), grp);
+    }, mesh(merge([wallBox(az(0), 66.6, 0.8, 0.8, 0.45, 0.07), wallBox(az(0), 66.6, 0.81, 0.06, 0.51, 0.05),                 // pack and its strap
+      wallBox(az(0), 66.31, 0.14, 0.06, 0.1, 0.005), wallBox(az(0), 66.89, 0.14, 0.06, 0.1, 0.005)]), FM.parafoil()), grp);   // wall mounts
     if (side > 0) {
       // standard access door (one, Ø 610 mm; its azimuth is set per mission)
       const dA = 40, dY = 61.2;

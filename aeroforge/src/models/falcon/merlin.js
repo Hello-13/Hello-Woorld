@@ -151,9 +151,17 @@ export function merlinKit({ detail = false, level = detail ? 'full' : 'mid' } = 
   ];
   // engine chill: a bleed valve on the LOX pump inlet dumps LOX through the pump overboard,
   // through the heat shield, until the hardware is cold enough for start
-  const bleed = [
+  // (an outer engine's line drops past the pump on its leading side and pulls in toward the engine
+  // before the heat shield, inboard of the Octaweb's lower ring and the hold-down fittings)
+  // (an outer engine's valve sits higher and its line hops over the Octaweb strut to the corner
+  // beside it, then drops past the pump's leading side and pulls in toward the engine before the heat
+  // shield, inboard of the Octaweb's lower ring and the hold-down fittings)
+  const bleed = full ? [
     block(px - 0.1, 2.32, -0.08, 0.07, 0.07, 0.07),
-    pipe([[px - 0.1, 2.3, -0.12], [px + 0.02, 2.15, -0.28], [px + 0.1, 1.85, -0.3], [px + 0.1, 1.2, -0.27]], 0.0125, { seg: lseg, tubular: full ? 14 : 8 }),
+    pipe([[px - 0.1, 2.3, -0.12], [px + 0.02, 2.15, -0.28], [px + 0.1, 1.85, -0.3], [px + 0.1, 1.2, -0.27]], 0.0125, { seg: lseg, tubular: 14 }),
+  ] : [
+    block(px - 0.1, 2.38, -0.08, 0.07, 0.07, 0.07),
+    pipe([[px - 0.1, 2.37, -0.12], [px - 0.06, 2.4, -0.2], [px, 2.32, -0.3], [px + 0.04, 2.12, -0.3], [px + 0.14, 1.85, -0.16], [px + 0.19, 1.55, -0.1], [px + 0.2, 1.2, -0.08]], 0.0125, { seg: lseg, tubular: 16 }),
   ];
   return { pump, line, gg, duct, act, valve, ign, tvc, bleed };
 }

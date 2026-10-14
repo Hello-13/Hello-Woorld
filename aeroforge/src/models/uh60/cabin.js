@@ -9,7 +9,8 @@
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
-import { MAT, V3, merge, box, cyl, tube, pipe, place } from './common.js';
+import { MAT, V3, merge, box, cyl, tube, pipe, place, DEICE } from './common.js';
+import { aftDeckPoint } from './tail.js';
 
 /** A blade antenna standing on point p with its root along the surface normal n. */
 function bladeAntenna(p, n, h = 0.22, c = 0.26) {
@@ -42,7 +43,7 @@ function slingSeat(x, z, facing = 1, ceiling = 1.98, floor = 0.62) {
   return { frame, fabric };
 }
 
-export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], servoBases = [] }) {
+export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [], servoBases = [] }) {
   const handles = {};
   const fl = 0.66;   // cockpit floor
   const sideA = (a, s) => (s > 0 ? a : Math.PI - a);          // mirror a section angle to the left side
@@ -96,7 +97,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], serv
   P('Overhead console', {
     system: 'Crew systems', material: 'Circuit-breaker and switch panels', mass: 9, explode: [0.8, 1.2, 0],
     desc: 'Engine control levers, the ENG FUEL SYS selector levers, fuel, electrical, de-ice and lighting switches and circuit breakers, within reach of both pilots overhead.',
-  }, [mesh(merge([box(0.55, 0.08, 0.5, [2.95, 2.12, 0]), box(0.12, 0.05, 0.28, [3.12, 2.06, 0])]), MAT.black())]);
+  }, [mesh(merge([box(0.55, 0.08, 0.5, [2.95, 2.17, 0]), box(0.12, 0.05, 0.28, [3.12, 2.11, 0]), box(0.08, 0.02, 0.46, [2.75, 2.215, 0])]), MAT.black())]);   // hung from the canopy-bow frame
 
   // cyclic, collective, pedals (animated)
   const cyclics = [], collectives = [], pedals = [];
@@ -106,10 +107,15 @@ export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], serv
     system: 'Flight controls', material: 'Aluminium sticks with multi-function grips', mass: 6, count: 2, explode: [0.6, 0.5, 0],
     desc: 'Moving the stick tilts the swashplate and hence the rotor disc: forward to accelerate, sideways to roll. Its grip carries the stick-trim and trim-release switches, go-around, cargo-hook release, radio/ICS switches and the stabilator slew-up switch; it reaches the swashplate through the mixing unit and primary servos — there is no direct cable to any one blade.',
   }, []);
+  const cycBase = [];
   for (const z of [0.53, -0.53]) {
     const g = new THREE.Group(); g.position.set(3.2, 0.68, z); g.add(mesh(cycG, MAT.black()), mesh(cycSw, MAT.darkMetal()));
     cycPart.add(g); cyclics.push(g);
+    // gimbal housing bolted on the floor, its boot, and the stick's lower arm through the floor to the
+    // under-floor linkage
+    cycBase.push(box(0.14, 0.012, 0.14, [3.2, 0.686, z]), cyl(0.07, 0.042, 0.07, [3.2, 0.727, z], 'y', 14, true), cyl(0.022, 0.022, 0.09, [3.2, 0.63, z], 'y', 8));
   }
+  cycPart.add(mesh(merge(cycBase), MAT.black()));
   const colHead = [place(new THREE.BoxGeometry(0.15, 0.06, 0.06), [0.5, 0.08, 0], [0, 0, 0.1]), cyl(0.012, 0.012, 0.025, [0.47, 0.12, 0], 'y', 6), cyl(0.012, 0.012, 0.025, [0.53, 0.125, 0], 'y', 6), box(0.03, 0.02, 0.02, [0.56, 0.1, 0.03])];
   const colG = merge([tube([0, 0, 0], [0.48, 0.07, 0], 0.018, 8), ...colHead]);
   // the copilot's collective telescopes aft for seat access: a sleeve over the forward tube
@@ -302,8 +308,10 @@ export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], serv
     desc: 'Carry the boosted inputs into the mixing unit and its mixed outputs aft along the deck to the input pilot-valve levers of the three primary servos, forward of the main gearbox.',
   }, [mesh(merge(deckRods), MAT.structure())]);
   const cab = [], cabPts = [];
+  // from the mixing unit down through the roof, under the two roof cross beams and the main-module
+  // sump in the cabin ceiling, aft through the transition section and along the tail cone
   for (const dz of [0.05, 0.1]) {
-    const pts = [[1.2, 2.4, dz], [-0.8, 2.33, dz + 0.1], [-3.6, 2.12, dz]];
+    const pts = [[1.2, 2.4, dz], [0.95, 2.28, dz + 0.1], [0.75, 2.12, dz + 0.12], [0.5, 2.055, dz + 0.12], [0.0, 2.1, dz + 0.12], [-0.5, 2.055, dz + 0.12], [-1.0, 2.1, dz + 0.12], [-1.6, 2.13, dz + 0.1], [-2.4, 2.15, dz + 0.05], [-3.6, 2.12, dz]];
     for (let x = -4.4; x >= -8.2; x -= 0.95) pts.push([x, 1.98 - (x + 4.4) * -0.015, dz]);
     pts.push([-8.9, 2.2, -0.02], [-9.2, 2.6, -0.11], [-9.33, 2.86, -0.22]);
     cab.push(pipe(pts, 0.006, 4));
@@ -318,7 +326,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], serv
   const crank = (p, ax = 'z') => [cyl(0.03, 0.03, 0.04, p, ax, 10), box(0.1, 0.02, 0.025, [p[0] + 0.03, p[1] + 0.02, p[2]])];
   for (const p of [[2.62, 0.6, 0.32], [2.62, 0.6, -0.32], [2.4, 0.62, -0.7], [2.35, 0.68, -0.88], [2.3, 2.05, -0.92], [2.2, 2.3, -0.6]]) bc.push(...crank(p));
   bc.push(box(0.04, 0.03, 0.4, [1.0, 2.4, -0.1]), cyl(0.02, 0.02, 0.06, [1.0, 2.38, -0.1], 'y', 8));
-  for (const p of cabPts.slice(1, -2)) bc.push(cyl(0.032, 0.032, 0.025, [p[0], p[1] + 0.01, 0.075], 'z', 12), box(0.05, 0.08, 0.06, [p[0], p[1] + 0.06, 0.075]));
+  for (const p of cabPts.slice(cabPts.findIndex((q) => q[0] === -3.6), -2)) bc.push(cyl(0.032, 0.032, 0.025, [p[0], p[1] + 0.01, 0.075], 'z', 12), box(0.05, 0.08, 0.06, [p[0], p[1] + 0.06, 0.075]));
   P('Control bellcranks & cable pulleys', {
     system: 'Flight controls', material: 'Aluminium bellcranks and walking beam, phenolic cable pulleys on brackets', mass: 5, count: 15, explode: [0.0, 1.4, -0.9],
     desc: 'Wherever a control run changes direction there is a bellcrank: under the cockpit floor, at the foot and the top of the control closet, and a walking beam on the deck. Along the tail cone the two tail-rotor cables run over pulleys on brackets about every metre.',
@@ -378,21 +386,37 @@ export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], serv
   }, [mesh(merge([cyl(0.05, 0.05, 0.12, [-1.86, 2.38, -0.18], 'x', 14), box(0.06, 0.07, 0.07, [-1.88, 2.31, -0.18])]), MAT.hydraulic())]);
   P('Hydraulic logic modules', {
     system: 'Hydraulics', material: 'Two electronic logic modules in the left and right relay panels', mass: 2, count: 2, explode: [0.6, 0.4, 0],
-    desc: 'They read the reservoir-level and pressure switches. If a system starts losing fluid they close the shutoff valves on the leaking branch and bring the backup pump on, isolating the leak automatically and telling the pilot on the caution panel. (Relay-panel location approximate.)',
-  }, [mesh(merge([box(0.15, 0.1, 0.08, [2.05, 1.86, 0.86]), box(0.15, 0.1, 0.08, [2.05, 1.86, -0.86])]), MAT.avionics())]);
+    desc: 'They read the reservoir-level and pressure switches. If a system starts losing fluid they close the shutoff valves on the leaking branch and bring the backup pump on, isolating the leak automatically and telling the pilot on the caution panel. Shown on the frame behind the cockpit (relay-panel location approximate).',
+  }, [mesh(merge([box(0.08, 0.1, 0.15, [2.136, 1.98, 0.83]), box(0.08, 0.1, 0.15, [2.136, 1.98, -0.83])]), MAT.avionics()),
+    mesh(merge([box(0.012, 0.12, 0.17, [2.172, 1.98, 0.83]), box(0.012, 0.12, 0.17, [2.172, 1.98, -0.83])]), MAT.casting())]);   // mounting flanges on the frame at x 2.2
   // lines, one part per system so each can be traced in the Systems view
   const sv = servoBases.length ? servoBases.map((p) => [p.x - 0.02, p.y + 0.04, p.z]) : [[0.45, 2.33, -0.3], [0.5, 2.33, 0], [0.45, 2.33, 0.3]];
   const trServo = [-9.38, 2.95, -0.24];
   const tailRun = (dz) => [[-1.0, 2.3, -0.36 + dz * 0.2], [-2.0, 2.28, -0.2 + dz], [-3.0, 2.12, -0.16 + dz], [-5.0, 1.97, -0.14 + dz], [-7.5, 1.86, -0.1 + dz], [-8.6, 2.08, -0.02 + dz * 0.5], [-9.0, 2.5, -0.08 + dz * 0.3], [-9.3, 2.85, -0.2 + dz * 0.2], trServo];
-  const toServos = (from, zr) => sv.map((p) => pipe([from, [0.12, 2.325, zr], [p[0] - 0.08, 2.325, p[2] * 0.85], p], 0.008));
-  const no1 = [pipe([[0.24, 2.31, -0.5], [0.0, 2.31, -0.48], [-0.25, 2.33, -0.45]], 0.01), ...toServos([-0.25, 2.325, -0.4], -0.3), pipe([[-0.36, 2.33, -0.45], ...tailRun(0)], 0.007)];
-  const no2 = [pipe([[0.24, 2.31, 0.5], [0.0, 2.31, 0.48], [-0.25, 2.33, 0.45]], 0.01), ...toServos([-0.25, 2.325, 0.4], 0.3), pipe([[-0.25, 2.35, 0.45], [0.2, 2.33, 0.4], [0.75, 2.35, 0.3], [1.4, 2.36, 0.18], [1.75, 2.4, -0.05], [1.9, 2.42, -0.2]], 0.008)];
+  // transfer module → round the outside of the main-module case → over the servo deck brackets to
+  // each servo's manifold (sv is ordered left, centre, right)
+  const toServos = (s) => {
+    // between the case bowl and the oil filter, outboard of the forward transmission pad, up over
+    // the servo brackets; No. 2 enters each manifold 3 cm above No. 1 (its second-stage port)
+    const run = [[-0.25, 2.325, 0.41 * s], [-0.16, 2.31, 0.42 * s], [-0.04, 2.31, 0.44 * s], [0.1, 2.32, 0.43 * s], [0.22, 2.33, 0.39 * s], [0.3, 2.355, 0.345 * s]];
+    const port = (p) => [p[0], p[1] + (s > 0 ? 0.03 : 0), p[2]];
+    const near = port(sv[s > 0 ? 2 : 0]), mid = port(sv[1]), far = port(sv[s > 0 ? 0 : 2]);
+    const dN = s > 0 ? 0.025 : 0;       // No. 2 crosses over No. 1 in front of the case
+    const toMid = [[0.4, 2.39 + dN, 0.18 * s], [0.43, 2.385 + dN, 0.06 * s]];
+    return [pipe([...run, [0.36, 2.41, near[2] + 0.007 * s], near], 0.008),
+      pipe([...run, ...toMid, [0.46, 2.4 + dN, mid[2]], mid], 0.008),
+      pipe([...run, ...toMid, [0.43, 2.385 + dN, -0.15 * s], [0.37, 2.4 + dN, far[2] + 0.033 * s], far], 0.008)];
+  };
+  // pump module → transfer module, low along the case bowl (inboard of the oil filter)
+  const pumpRun = (s) => pipe([[0.24, 2.31, 0.5 * s], [0.1, 2.285, 0.47 * s], [0.0, 2.278, 0.455 * s], [-0.08, 2.275, 0.44 * s], [-0.16, 2.275, 0.425 * s], [-0.25, 2.29, 0.425 * s], [-0.3, 2.33, 0.45 * s]], 0.01);
+  const no1 = [pumpRun(-1), ...toServos(-1), pipe([[-0.36, 2.33, -0.45], ...tailRun(0)], 0.007)];
+  const no2 = [pumpRun(1), ...toServos(1), pipe([[-0.25, 2.36, 0.45], [-0.04, 2.345, 0.465], [0.1, 2.355, 0.455], [0.18, 2.355, 0.425], [0.26, 2.36, 0.405], [0.4, 2.37, 0.42], [0.55, 2.37, 0.42], [0.85, 2.36, 0.33], [1.4, 2.36, 0.18], [1.75, 2.4, -0.05], [1.9, 2.42, -0.2]], 0.008)];
   const bk = [pipe([[0.86, 2.36, -0.5], [0.88, 2.33, -0.58], [0.92, 2.33, -0.6]], 0.009),
-    pipe([[0.86, 2.33, -0.66], [0.4, 2.32, -0.66], [0.0, 2.32, -0.62], [-0.2, 2.33, -0.52], [-0.3, 2.33, -0.46]], 0.008),
-    pipe([[0.0, 2.32, -0.62], [-0.45, 2.31, -0.3], [-0.55, 2.31, 0.0], [-0.45, 2.31, 0.3], [-0.32, 2.33, 0.44]], 0.008),
-    pipe([[-0.55, 2.31, -0.1], [-1.0, 2.3, -0.2], [-1.3, 2.24, -0.08], [-1.32, 2.12, -0.02], [-1.34, 2.08, 0]], 0.008),
+    pipe([[0.86, 2.33, -0.66], [0.4, 2.32, -0.66], [0.0, 2.32, -0.62], [-0.16, 2.33, -0.585], [-0.26, 2.33, -0.53], [-0.3, 2.33, -0.48]], 0.008),   // outboard of the oil filter
+    pipe([[-0.26, 2.33, -0.53], [-0.42, 2.31, -0.525], [-0.55, 2.272, -0.35], [-0.58, 2.272, 0.0], [-0.55, 2.272, 0.35], [-0.42, 2.3, 0.47], [-0.33, 2.33, 0.46]], 0.008),   // aft of the main module, under the deck plate, to No. 2
+    pipe([[-0.575, 2.272, -0.1], [-0.8, 2.275, -0.17], [-1.0, 2.3, -0.2], [-1.3, 2.24, -0.08], [-1.32, 2.12, -0.02], [-1.34, 2.08, 0]], 0.008),
     pipe([[-1.74, 2.1, 0.0], [-1.8, 2.22, -0.08], [-1.84, 2.3, -0.14], [-1.86, 2.34, -0.17]], 0.008),
-    pipe([[-0.55, 2.31, -0.12], ...tailRun(0.2)], 0.007)];
+    pipe([[-0.575, 2.272, -0.12], [-0.8, 2.275, -0.2], ...tailRun(0.2)], 0.007)];
   P('No. 1 system hydraulic lines', {
     system: 'Hydraulics', material: 'Stainless/titanium tubing and flexible hoses', mass: 6, explode: [0.3, 1.0, -1.3], xrayWeight: 0.6,
     desc: 'From the left pump module through the No. 1 transfer module to the first stages of the three primary servos, and along the left of the tail cone to the tail-rotor servo\'s first stage.',
@@ -417,9 +441,11 @@ export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], serv
   }, [mesh(merge([box(0.2, 0.1, 0.15, [1.72, 2.02, 0.3]), box(0.2, 0.1, 0.15, [1.72, 2.02, -0.3])]), MAT.avionics())]);
   const fd = [], ct = [];
   for (const s of [1, -1]) {
-    fd.push(pipe([[0.78, 2.52, 0.5 * s], [0.84, 2.44, 0.46 * s], [0.9, 2.3, 0.42 * s], [1.0, 2.18, 0.4 * s], [1.4, 2.1, 0.36 * s], [1.62, 2.04, 0.32 * s], [1.85, 1.96, 0.42 * s], [1.98, 1.97, 0.4 * s]], 0.015, 6));
+    // from the underside of the generator, down through the roof inboard of the roof beam, under the
+    // frame at x 1.0, to the control unit and the converter
+    fd.push(pipe([[0.7, 2.44, 0.5 * s], [0.71, 2.35, 0.47 * s], [0.76, 2.25, 0.42 * s], [0.88, 2.13, 0.4 * s], [1.0, 2.1, 0.39 * s], [1.4, 2.08, 0.36 * s], [1.62, 2.04, 0.32 * s], [1.85, 1.96, 0.42 * s], [1.98, 1.97, 0.4 * s]], 0.015, 6));
     fd.push(pipe([[2.0, 1.97, 0.35 * s], [2.0, 2.02, 0.26 * s], [2.0, 2.05, 0.2 * s]], 0.012, 6));
-    ct.push(cyl(0.03, 0.03, 0.03, [0.86, 2.4, 0.45 * s], 'y', 12), box(0.06, 0.04, 0.05, [2.06, 2.0, 0.3 * s]));
+    ct.push(cyl(0.03, 0.03, 0.03, [0.708, 2.37, 0.478 * s], 'y', 12), box(0.06, 0.04, 0.05, [2.06, 2.0, 0.3 * s]));
   }
   P('Generator feeders, current transformers & limiters', {
     system: 'Electrical', material: 'Heavy-gauge feeder cables, current transformers, current limiters', mass: 12, count: 2, explode: [1.0, 0.2, 0],
@@ -455,11 +481,11 @@ export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], serv
     desc: 'Several kilometres of wire run up from the nose bay and aft along both sides of the cabin roof; critical circuits are duplicated and routed apart for survivability.',
   }, [mesh(merge(wires), MAT.wiring())]);
   const tw = [];
-  for (let x = -2.4; x >= -8.6; x -= 0.6) tw.push([x, Math.PI - 1.15]);
+  for (let x = -2.4; x > -8.5; x -= 0.6) tw.push([x, Math.PI - 1.15]);
   P('Tail cone wiring harness', {
     system: 'Electrical', material: 'Shielded wiring bundle', mass: 12, explode: [-2.2, 0.6, -0.5], xrayWeight: 0.6,
     desc: 'Runs aft along the upper left of the tail cone to the tail lights, the tail-rotor de-ice slip ring, the stabilator actuators and the aft sensors.',
-  }, [mesh(pipe(inSkin(tw, 1, 0.04), 0.012), MAT.wiring())]);
+  }, [mesh(pipe([inSkin([[-2.25, 0.95]], -1)[0], ...inSkin(tw, 1, 0.04), V3(...DEICE.tailEnd)], 0.012), MAT.wiring())]);
   // windshield wipers: pivots at the base of each windshield, arms lying on the glass
   const wp = [];
   for (const s of [1, -1]) {
@@ -477,8 +503,15 @@ export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], serv
   // ------------------------------------------------------------------ blade de-ice control and icing sensors
   P('Blade de-ice controller & junction box', {
     system: 'Electrical', material: 'De-ice system controller, junction box with current limiters', mass: 8, count: 2, explode: [-0.4, -0.5, -0.4],
-    desc: 'The controller times the heater cycles: the ice detector\'s icing rate sets how long the heaters stay off between cycles, and the outside air temperature sets how long each stays on. Main-rotor heater power passes through current limiters in the junction box; a test panel and caution lights report faults. (Cabin location approximate.)',
-  }, [mesh(merge([box(0.25, 0.12, 0.15, [-1.0, 2.08, -0.25]), box(0.2, 0.1, 0.12, [-0.7, 2.08, -0.25])]), MAT.avionics())]);
+    desc: 'The controller times the heater cycles: the ice detector\'s icing rate sets how long the heaters stay off between cycles, and the outside air temperature sets how long each stays on. Main-rotor heater power passes through current limiters in the junction box on to the slip ring, and the tail-rotor feed goes out through the cabin and tail-cone harnesses. A test panel and caution lights report faults. (Shown on the left roof beam; cabin location approximate.)',
+  }, [mesh(merge([box(0.25, 0.12, 0.15, [-1.02, 2.11, -0.357]), box(0.2, 0.1, 0.1, DEICE.jb)]), MAT.avionics()),
+    mesh(merge([box(0.62, 0.13, 0.006, [-0.87, 2.11, -0.428]),                                       // mounting plate on the beam's inboard face
+      ...[-1.12, -0.92, -0.8, -0.64].map((x) => cyl(0.008, 0.008, 0.012, [x, 2.16, -0.425], 'z', 6)),
+      cyl(0.022, 0.022, 0.025, [DEICE.lead[0] + 0.01, DEICE.lead[1], DEICE.lead[2]], 'x', 10),       // slip-ring lead connector
+      cyl(0.02, 0.02, 0.02, [-1.02, 2.045, -0.36], 'y', 10)]), MAT.casting()),                        // harness connector
+    // pigtail from the left cabin harness, under the roof beam, to the controller; link to the junction box
+    mesh(merge([pipe([surfPoint(-1.02, Math.PI - 1.08, -0.06), [-1.02, 2.07, -0.63], [-1.02, 2.045, -0.55], [-1.02, 2.04, -0.46], [-1.02, 2.045, -0.4], [-1.02, 2.05, -0.36]], 0.012, 6),
+      pipe([[-0.895, 2.12, -0.36], [-0.86, 2.13, -0.362], [-0.82, 2.12, -0.37]], 0.01, 5)]), MAT.wiring())]);
   P('Ice detector', {
     system: 'Sensors', material: 'Vibrating-probe ice detector on a short strut', mass: 1, explode: [0.4, 0.6, 0.6],
     desc: 'A probe vibrating at its natural frequency: ice building on it adds mass and lowers the frequency, which the detector turns into an icing rate — trace, light, moderate or heavy — on a cockpit meter and for the de-ice controller. On the upper right fuselage (position approximate).',
@@ -490,26 +523,43 @@ export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], serv
 
   // ------------------------------------------------------------------ avionics (nose bay and aft transition avionics compartment)
   const rack = (boxes) => merge(boxes.map(([x, y, z, w, h, d]) => box(w, h, d, [x, y, z])));
+  // nose-bay equipment racks: three trays on tubular posts standing on the bay floor (the lower skin)
+  const bottomAt = (x, z) => { let lo = -Math.PI / 2, hi = 0; for (let k = 0; k < 24; k++) { const m = (lo + hi) / 2; if (surfPoint(x, m).z < Math.abs(z)) lo = m; else hi = m; } return surfPoint(x, lo).y; };
+  const trays = [
+    { x0: 4.1, x1: 4.4, z0: -0.45, z1: 0.07, y: 0.77, posts: [[4.11, 0.06], [4.39, 0.06], [4.39, -0.44]] },        // AFCS computers
+    { x0: 4.4, x1: 4.62, z0: -0.3, z1: 0.3, y: 0.85, posts: [[4.41, 0.29], [4.41, -0.29], [4.61, 0.29], [4.61, -0.29]] },   // GPS/INS units
+    { x0: 4.15, x1: 4.48, z0: -0.46, z1: 0.46, y: 1.13, posts: [[4.16, 0.45], [4.16, -0.45], [4.47, 0.45], [4.47, -0.45]] },  // FMS / display computers
+  ];
+  const rk = [], rkPost = [];
+  for (const t of trays) {
+    rk.push(box(t.x1 - t.x0, 0.015, t.z1 - t.z0, [(t.x0 + t.x1) / 2, t.y, (t.z0 + t.z1) / 2]));
+    rk.push(box(t.x1 - t.x0, 0.03, 0.012, [(t.x0 + t.x1) / 2, t.y + 0.015, t.z0 + 0.006]), box(t.x1 - t.x0, 0.03, 0.012, [(t.x0 + t.x1) / 2, t.y + 0.015, t.z1 - 0.006]));   // tray lips
+    for (const [x, z] of t.posts) rkPost.push(tube([x, bottomAt(x, z) - 0.01, z], [x, t.y, z], 0.012, 8), cyl(0.024, 0.024, 0.01, [x, bottomAt(x, z) + 0.004, z], 'y', 10));
+  }
+  P('Nose avionics racks', {
+    system: 'Avionics', material: 'Aluminium equipment trays with hold-down clamps on tubular posts', mass: 9, explode: [2.0, 0.0, 0],
+    desc: 'The nose bay behind the hinged doors holds the flight-critical computers on three trays, at waist height for a maintainer standing on the ground: the AFCS computers low on the left, the GPS/INS units forward and the flight-management and display computers on top. Each unit slides in and clamps down, so it can be swapped in minutes.',
+  }, [mesh(merge(rk), MAT.structure()), mesh(merge(rkPost), MAT.casting())]);
   P('Flight management & display computers', {
     system: 'Avionics', material: 'Dual flight-management computers and display generators', mass: 22, count: 2, explode: [1.9, 0.5, 0],
     desc: 'Dual computers drive the four displays and run navigation, fuel planning and moving maps — the heart of the M model\'s common avionics architecture.',
-  }, [mesh(rack([[4.32, 1.22, 0.24, 0.3, 0.16, 0.22], [4.32, 1.22, -0.24, 0.3, 0.16, 0.22]]), MAT.avionics())]);
+  }, [mesh(rack([[4.32, 1.2175, 0.24, 0.3, 0.16, 0.22], [4.32, 1.2175, -0.24, 0.3, 0.16, 0.22]]), MAT.avionics())]);
   P('Embedded GPS/INS units', {
     system: 'Avionics', material: 'Two ring-laser-gyro inertial units with embedded GPS receivers', mass: 18, count: 2, explode: [2.1, 0.2, 0],
     desc: 'Two embedded GPS/inertial units give position, attitude and heading for the displays and autopilot; either can do the job alone.',
-  }, [mesh(rack([[4.5, 0.95, 0.18, 0.2, 0.17, 0.2], [4.5, 0.95, -0.18, 0.2, 0.17, 0.2]]), MAT.avionics())]);
+  }, [mesh(rack([[4.5, 0.9425, 0.18, 0.2, 0.17, 0.2], [4.5, 0.9425, -0.18, 0.2, 0.17, 0.2]]), MAT.avionics())]);
   P('Digital AFCS computers', {
     system: 'Avionics', material: 'Dual flight-control computers', mass: 12, count: 2, explode: [1.8, 0.0, 0],
     desc: 'The digital automatic flight control system: stability augmentation, trim, attitude and altitude hold and coupled approaches to a hover, through the SAS and trim actuators. On the M the same two computers also drive the stabilator.',
-  }, [mesh(rack([[4.25, 0.86, -0.3, 0.26, 0.16, 0.2], [4.25, 0.86, -0.06, 0.26, 0.16, 0.2]]), MAT.avionics())]);
+  }, [mesh(rack([[4.25, 0.8575, -0.3, 0.26, 0.16, 0.2], [4.25, 0.8575, -0.06, 0.26, 0.16, 0.2]]), MAT.avionics())]);
   P('Communication radios & IFF', {
     system: 'Communications', material: 'VHF/UHF/FM (SINCGARS) and HF radios, IFF transponder', mass: 40, explode: [-0.9, 0.9, 0],
     desc: 'Radios on a shelf in the aft avionics compartment, behind the stowage compartments: secure VHF-FM for ground troops, VHF/UHF (including satellite) for aviation and HF for long range, plus an IFF transponder.',
-  }, [mesh(rack([[-2.65, 1.72, -0.25, 0.32, 0.18, 0.3], [-2.65, 1.72, 0.12, 0.32, 0.18, 0.3], [-3.0, 1.7, -0.1, 0.3, 0.16, 0.36], [-2.8, 1.58, -0.05, 0.6, 0.02, 0.9]]), MAT.avionics())]);
+  }, [mesh(rack([[-2.65, 1.68, -0.25, 0.32, 0.18, 0.3], [-2.65, 1.68, 0.12, 0.32, 0.18, 0.3], [-3.0, 1.67, -0.1, 0.3, 0.16, 0.36], [-2.8, 1.58, -0.05, 0.6, 0.02, 0.9]]), MAT.avionics())]);
   P('Health monitoring & data recorders', {
     system: 'Avionics', material: 'Integrated vehicle health management unit, crash-survivable memory unit', mass: 12, explode: [-1.2, 1.1, 0.5],
     desc: 'The M\'s integrated vehicle health management system: vibration sensors on the drive train feed a monitoring unit that flags wearing bearings and gears before they fail, and a crash-survivable memory unit keeps flight data and cockpit audio.',
-  }, [mesh(rack([[-3.0, 1.68, 0.38, 0.22, 0.16, 0.2]]), MAT.avionics()), mesh(box(0.18, 0.14, 0.14, [-3.0, 1.84, 0.38]), MAT.red())]);
+  }, [mesh(rack([[-3.0, 1.67, 0.38, 0.22, 0.16, 0.2]]), MAT.avionics()), mesh(box(0.18, 0.14, 0.14, [-3.0, 1.82, 0.38]), MAT.red())]);
 
   // ------------------------------------------------------------------ antennas & sensors
   const antennas = (list) => merge(list.map(([x, a]) => bladeAntenna(surfPoint(x, a, -0.004), surfNormal(x, a), 0.22, 0.26)));
@@ -575,7 +625,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], serv
   P('AVCS controller', {
     system: 'Avionics', material: 'Digital vibration-control computer', mass: 7, explode: [-1.2, 0.3, -0.8],
     desc: 'Reads the accelerometers and a rotor-speed reference and continuously re-tunes the amplitude and phase of each force generator. The bifilar on the hub removes the bulk of the vibration first; the AVCS cancels what still reaches the cabin.',
-  }, [mesh(box(0.22, 0.14, 0.2, [-3.0, 1.68, -0.42]), MAT.avionics())]);
+  }, [mesh(box(0.22, 0.14, 0.2, [-3.0, 1.66, -0.4]), MAT.avionics())]);
 
   // ------------------------------------------------------------------ aircraft survivability equipment
   // Encyclopedic level: the visible sensor fairings and dispensers of the UH-60M's ASE suite.
@@ -615,8 +665,10 @@ export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], serv
     desc: 'Under the right side of the nose, slewed from the collective: it swings forward through 120° and turns a full 360°. An infrared filter turns it into an invisible light for crews on night-vision goggles.',
   }, [mesh(merge([cyl(0.11, 0.11, 0.06, [sl.x, sl.y - 0.02, sl.z], 'y', 20), box(0.08, 0.06, 0.08, [sl.x, sl.y + 0.02, sl.z])]), MAT.black()), mesh(cyl(0.09, 0.09, 0.01, [sl.x, sl.y - 0.055, sl.z], 'y', 20), MAT.lens())]);
   const dl = [];
-  for (const x of [-1.2, 0.0, 1.2]) dl.push(cyl(0.06, 0.06, 0.02, [x, 2.06, 0], 'y', 14));
-  for (const z of [0.4, -0.4]) dl.push(cyl(0.035, 0.035, 0.05, [3.05, 2.06, z], 'y', 10));
+  // cabin domes under the roof frames at x −1.2 and 1.0 and under the aft roof cross beam; cockpit
+  // floods under the canopy-bow frame
+  for (const [x, y] of [[-1.2, 2.158], [-0.5, 2.061], [1.0, 2.17]]) dl.push(cyl(0.06, 0.06, 0.02, [x, y, 0], 'y', 14));
+  for (const z of [0.4, -0.4]) dl.push(cyl(0.035, 0.035, 0.05, [2.75, 2.168, z], 'y', 10));
   P('Cockpit & cabin lighting', {
     system: 'Electrical', material: 'NVG-compatible dome, flood and utility lights', mass: 3, count: 5, explode: [0, 0.4, 0],
     desc: 'Cabin dome lights switch between white and a dim blue-green that does not blind night-vision goggles; cockpit floods and utility lights are NVG-compatible too.',
@@ -626,7 +678,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], serv
   P('Heater mixing valve & overtemperature sensors', {
     system: 'Environmental control', material: 'Bleed-air modulation and mixing valve, mixing chamber, two overtemperature sensors', mass: 6, explode: [-0.3, 1.6, 0.9],
     desc: 'Bleed air from the engines, the APU or a ground cart is mixed here with outside air to the temperature set on the overhead HEATER control. Two sensors, at the valve inlet and in the mixing chamber, shut the bleed off at about 90–96 °C, and an interlock cuts the heater\'s flow when engine anti-ice is on so the engines are not over-bled.',
-  }, [mesh(merge([cyl(0.07, 0.07, 0.16, [-1.62, 2.4, 0.33], 'x', 14), box(0.1, 0.1, 0.12, [-1.62, 2.38, 0.24]), cyl(0.016, 0.016, 0.04, [-1.56, 2.47, 0.33], 'y', 8), cyl(0.016, 0.016, 0.04, [-1.68, 2.47, 0.33], 'y', 8)]), MAT.casting())]);
+  }, [mesh(merge([cyl(0.07, 0.07, 0.16, [-1.62, 2.4, 0.27], 'x', 14), box(0.1, 0.1, 0.12, [-1.62, 2.38, 0.18]), cyl(0.016, 0.016, 0.04, [-1.56, 2.47, 0.27], 'y', 8), cyl(0.016, 0.016, 0.04, [-1.68, 2.47, 0.27], 'y', 8)]), MAT.casting())]);
   P('Ventilation blower', {
     system: 'Environmental control', material: 'Electric centrifugal blower', mass: 7, explode: [0.6, 1.4, 0.6],
     desc: 'With VENT BLOWER on, it forces outside air into the cabin ducts; switched off, the heater gives its maximum output. Ram-air vents beside the consoles cool the cockpit.',
@@ -635,17 +687,22 @@ export function buildCabin({ A, P, surfPoint, surfNormal, servoInputs = [], serv
   for (const s of [1, -1]) ecs.push(pipe([[2.2, 1.97, 0.6 * s], [0.5, 1.97, 0.7 * s], [-1.6, 1.97, 0.7 * s]], 0.04, 8));
   ecs.push(pipe([[1.82, 2.32, 0.3], [2.3, 2.15, 0.4], [2.9, 2.05, 0.45], [3.5, 1.5, 0.75]], 0.035, 8));
   ecs.push(pipe([[1.75, 2.32, 0.28], [1.7, 2.1, 0.45], [1.8, 1.99, 0.62]], 0.035, 8));
-  ecs.push(pipe([[-1.62, 2.32, 0.24], [-1.62, 2.12, 0.0], [-1.6, 2.0, -0.4], [-1.6, 1.97, -0.68]], 0.035, 8), pipe([[-1.62, 2.12, 0.1], [-1.6, 1.98, 0.5], [-1.6, 1.97, 0.68]], 0.035, 8));
+  ecs.push(pipe([[-1.62, 2.34, 0.18], [-1.62, 2.12, 0.0], [-1.6, 2.0, -0.4], [-1.6, 1.97, -0.68]], 0.035, 8), pipe([[-1.62, 2.12, 0.1], [-1.6, 1.98, 0.5], [-1.6, 1.97, 0.68]], 0.035, 8));
   const reg = [];
   for (const s of [1, -1]) for (const x of [1.6, 0.4, -0.8]) reg.push(box(0.12, 0.03, 0.08, [x, 1.93, 0.68 * s]));
   P('Heating & ventilation ducts & registers', {
     system: 'Environmental control', material: 'Composite ducts along the cabin ceiling, adjustable registers', mass: 14, explode: [0.0, 1.15, 0], xrayWeight: 0.5,
     desc: 'Ducts carry the mixed or ventilating air along both sides of the cabin ceiling and forward to the cockpit, with adjustable registers over the seats.',
   }, [mesh(merge(ecs), MAT.casting()), mesh(merge(reg), MAT.black())]);
+  const hi = aftDeckPoint(roofY, -2.3, 0.15), hq = new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), hi.n);
+  const onFair = (g, off) => { const c = hi.p.clone().addScaledVector(hi.n, off); return g.applyQuaternion(hq).translate(c.x, c.y, c.z); };
+  const intakeFace = onFair(box(0.15, 0.008, 0.07, [0, 0, 0]), 0.0);
+  const intakeGrid = merge([0, 1, 2, 3].map((k) => onFair(box(0.008, 0.008, 0.06, [-0.045 + k * 0.03, 0, 0]), 0.006)));
+  const intakeIn = hi.p.clone().addScaledVector(hi.n, -0.03);
   P('Heater air intake port', {
     system: 'Environmental control', material: 'Screened ambient-air intake with short duct to the mixing valve', mass: 1, explode: [-0.3, 1.2, 1.3],
-    desc: 'The heater\'s cold-air source: an intake on the right side of the aft deck fairing feeds outside air to the mixing valve, where bleed air warms it.',
-  }, [mesh(merge([box(0.16, 0.08, 0.02, [-1.62, 2.44, 0.465]), pipe([[-1.62, 2.43, 0.45], [-1.62, 2.42, 0.4]], 0.03, 8)]), MAT.black())]);
+    desc: 'The heater\'s cold-air source: a screened intake low on the right side of the aft deck fairing, behind the engine cowling and under the exhaust, feeds outside air forward under the extinguisher bottles to the mixing valve, where bleed air warms it. (Position approximate.)',
+  }, [mesh(merge([intakeFace, intakeGrid]), MAT.black()), mesh(pipe([intakeIn, [-2.22, 2.29, 0.27], [-2.05, 2.29, 0.24], [-1.85, 2.29, 0.24], [-1.77, 2.33, 0.26], [-1.71, 2.39, 0.27]], 0.025, 8), MAT.casting())]);
 
   return handles;
 }
