@@ -242,15 +242,15 @@ test('weight-on-wheels switches sit on their legs, clear of the tyres', () => {
   for (const key of ['nose', 'main']) {
     const g = L.GEAR[key];
     const c = L.wowCentre(g);
-    const axle = [g.axleS, L.GROUND + g.r, g.axleZ];
+    const axle = [g.axleS, L.GROUND + g.r, g.axleZ], foot = [g.axleS, L.GROUND + g.r, g.legZ];
     // every corner of the switch box is more than a tyre radius + 3 cm from the axle
     for (const dx of [-1, 1]) for (const dy of [-1, 1]) for (const dz of [-1, 1]) {
       const p = [c[0] + (dx * g.wow.box[0]) / 2, c[1] + (dy * g.wow.box[1]) / 2, c[2] + (dz * g.wow.box[2]) / 2];
       const d = Math.hypot(p[0] - axle[0], p[1] - axle[1], p[2] - axle[2]);
       assert.ok(d > g.r + 0.03, `${key} switch corner ${d.toFixed(3)} m from the axle`);
     }
-    // and it is mounted on the leg: within 0.2 m of the trunnion–axle line
-    const t = g.trunnion, u = axle.map((v, i) => v - t[i]), n = Math.hypot(...u);
+    // and it is mounted on the leg: within 0.2 m of the line from the trunnion to the leg's foot
+    const t = g.trunnion, u = foot.map((v, i) => v - t[i]), n = Math.hypot(...u);
     const w = c.map((v, i) => v - t[i]);
     const along = (w[0] * u[0] + w[1] * u[1] + w[2] * u[2]) / n;
     const off = Math.sqrt(Math.max(0, w[0] ** 2 + w[1] ** 2 + w[2] ** 2 - along ** 2));
@@ -264,7 +264,7 @@ test('inlet ducts are an open air path: bay, side bays and gear wells stay outsi
   assert.ok(fan && L.ductSection(7.0) && !L.ductSection(L.FAN_S + 0.05), 'duct spans lip → fan face');
   const cz = fan.reduce((a, p) => a + p[0], 0) / fan.length, cy = fan.reduce((a, p) => a + p[1], 0) / fan.length;
   close(cz, L.ENG_Z, 0.02, 'fan-face centre z'); close(cy, L.ENG_Y, 0.02, 'fan-face centre y');
-  assert.ok(L.ductDepth(10.4, 0.0, 1.17) > 0.3 && L.ductDepth(10.4, 0.0, 1.75) < 0, 'ductDepth is inside / outside where expected');
+  assert.ok(L.ductDepth(10.4, 0.25, 0.48) > 0.25 && L.ductDepth(10.4, 0.0, 1.2) < 0, 'ductDepth is inside / outside where expected');
   // main-bay ceiling (with its aft taper) at least 2 cm under the duct floor
   for (let s = L.MAIN_BAY.s0; s <= L.MAIN_BAY.s1 + 1e-9; s += 0.05) {
     for (let z = 0; z <= L.MAIN_BAY.z; z += 0.01) {
@@ -280,9 +280,62 @@ test('inlet ducts are an open air path: bay, side bays and gear wells stay outsi
     }
   }
   // main-gear well roof 2 cm under the duct floor across the well
-  for (let s = L.MAIN_WELL.s0; s <= L.MAIN_WELL.s1 + 1e-9; s += 0.05) {
-    for (let z = L.MAIN_WELL.z0; z <= L.MAIN_WELL.z1; z += 0.02) { const sp = L.ductSpan(s, z); if (sp) assert.ok(L.mainWellRoof(s) <= sp.lo - 0.019, `well roof under the duct at s ${s.toFixed(2)}`); }
+  for (let s = L.MAIN_WELL.cav0; s <= L.MAIN_WELL.s1 + 1e-9; s += 0.05) {
+    for (let z = L.wellInWall(s); z <= L.wellWallZ(s, -0.3); z += 0.02) { const sp = L.ductSpan(s, z); if (sp) assert.ok(L.mainWellRoof(s, z) <= sp.lo - 0.019, `well roof under the duct at s ${s.toFixed(2)}, z ${z.toFixed(2)}`); }
   }
+});
+
+test('serpentine ducts hide the fan face: no straight line through the inlet reaches it within ±30°', () => {
+  // rays from points on the fan disc, every 5° of yaw and pitch, must leave the duct before reaching the lip
+  const secs = [];
+  for (let s = L.FAN_S - 0.01; ; s -= 0.05) {
+    const p = L.ductSection(s); if (!p) break;
+    const zs = p.map((q) => q[0]), ys = p.map((q) => q[1]);
+    secs.push({ d: L.FAN_S - s, zs, ys, zl: Math.min(...zs), zh: Math.max(...zs), yl: Math.min(...ys), yh: Math.max(...ys) });
+  }
+  assert.ok(secs.length > 100, 'duct sections from the fan face to the lip');
+  const R = L.F119.rInlet, pts = [];
+  for (let y = -R; y <= R; y += 0.06) for (let z = -R; z <= R; z += 0.06) if (Math.hypot(y, z) <= R) pts.push([L.ENG_Z + z, L.ENG_Y + y]);
+  const inside = (sec, z, y) => {
+    if (z < sec.zl || z > sec.zh || y < sec.yl || y > sec.yh) return false;
+    let ins = false; const { zs, ys } = sec;
+    for (let i = 0, j = zs.length - 1; i < zs.length; j = i++) if ((ys[i] > y) !== (ys[j] > y) && z < zs[i] + ((y - ys[i]) * (zs[j] - zs[i])) / (ys[j] - ys[i])) ins = !ins;
+    return ins;
+  };
+  let seen = 0;
+  for (let a = -30; a <= 30; a += 5) for (let b = -30; b <= 30; b += 5) {
+    const dz = Math.tan(a * DEG), dy = Math.tan(b * DEG);
+    for (const [z0, y0] of pts) if (secs.every((sec) => inside(sec, z0 - dz * sec.d, y0 - dy * sec.d))) seen++;
+  }
+  assert.equal(seen, 0, `${seen} fan-face rays escape the inlet`);
+});
+
+test('main gear: stub axle keeps the strut out of the tyre, and the wheel stows flat inside its well', () => {
+  const g = L.GEAR.main, W = L.MAIN_WELL;
+  // the strut (0.1 m outer cylinder) passes the tyre's inner face with room to spare
+  assert.ok(g.stub - g.w / 2 - 0.1 > 0.04, 'strut clear of the tyre');
+  close(g.axleZ, g.legZ + g.stub, 1e-9, 'wheel on its stub axle');
+  // the leg keeps its length: the stowed foot (straight above the flat wheel) is reachable from the trunnion
+  const T = g.trunnion, L0 = Math.hypot(g.axleS - T[0], L.GROUND + g.r - T[1], g.legZ - T[2]);
+  const dS = g.stow[0] - T[0], dY = g.stow[1] + g.stub - T[1];
+  assert.ok(L0 * L0 > dS * dS + dY * dY, 'stowed foot within reach of the leg');
+  const zc = T[2] - Math.sqrt(L0 * L0 - dS * dS - dY * dY);
+  // tyre cross-section points of the stowed wheel (lying flat, pitched nose-down by g.pitch) all in the cavity,
+  // aft of the weapons bay, inside the wheel bay's opening in plan and above the closed door
+  const tube = Math.min(g.w / 2, g.r * 0.32), sc = g.w / 2 / tube, c = Math.cos(g.pitch), sn = Math.sin(g.pitch);
+  const sW = g.stow[0] + g.stub * sn, yW = g.stow[1];
+  let worst = 9;
+  for (let i = 0; i < 48; i++) for (let j = 0; j < 12; j++) {
+    const u = (i / 48) * 2 * Math.PI, w = (j / 12) * 2 * Math.PI, rr = g.r - tube + tube * Math.cos(w);
+    const ds = rr * Math.cos(u), dz = rr * Math.sin(u), dy = tube * Math.sin(w) * sc;   // wheel frame: axle along y
+    const s = sW + ds * c - dy * sn, y = yW + dy * c + ds * sn, z = zc + dz;
+    worst = Math.min(worst, L.mainWellDepth(s, y, z));
+    assert.ok(s > L.MAIN_BAY.s1 + 0.03, 'stowed wheel aft of the weapons bay');
+    assert.ok(z > L.wellInner(s) + 0.01 && z < L.wellOuter(s) - 0.01, 'stowed wheel inside the opening in plan');
+  }
+  assert.ok(worst > 0.01, `stowed tyre ${(worst * 100).toFixed(1)} cm inside the well`);
+  // the wheel bay's opening is wider than the tyre's diameter, as on the jet (the door is about 0.95 m wide)
+  assert.ok(L.wellOuter(12.85) - L.wellInner(12.85) > 2 * g.r + 0.04, 'wheel bay opening wider than the wheel');
 });
 
 test('main-bay door drive clears the missiles, closed and through the open-bay ejection', () => {

@@ -83,13 +83,13 @@ export function buildThermal(ctx) {
   for (const side of [1, -1]) {
     const R = side > 0 ? 'right' : 'left';
     const z = side;
-    const c = [box(8.2, 0.29, z * 1.16, 0.4, 0.16, 0.26)];
-    for (let k = 0; k < 6; k++) c.push(box(8.02 + k * 0.072, 0.29, z * 1.16, 0.008, 0.165, 0.265));              // core plate edges
+    const c = [box(8.2, 0.32, z * 1.16, 0.4, 0.16, 0.26)];
+    for (let k = 0; k < 6; k++) c.push(box(8.02 + k * 0.072, 0.32, z * 1.16, 0.008, 0.165, 0.265));              // core plate edges
     const d = [];
     // cooling air from the diverter slot between the fuselage and the inlet, up over the duct's inboard top
-    d.push(rectTube([[6.6, -0.12, z * slotZ(6.6)], [6.95, -0.06, z * slotZ(6.95)], [7.35, 0.05, z * 0.985], [7.7, 0.17, z * 1.03], [7.99, 0.28, z * 1.1]], 0.035, 0.12, { n: 16 }));
+    d.push(rectTube([[6.6, -0.12, z * slotZ(6.6)], [6.95, -0.06, z * slotZ(6.95)], [7.35, 0.05, z * 0.985], [7.7, 0.19, z * 1.03], [7.99, 0.31, z * 1.1]], 0.035, 0.12, { n: 16 }));
     // exhaust up to the upper grille
-    d.push(rectTube([[8.4, 0.31, z * 1.16], [8.44, 0.45, z * 1.16], [8.48, FR.topAt(8.48, 1.24) - 0.05, z * 1.16]], 0.14, 0.06, { n: 6 }));
+    d.push(rectTube([[8.4, 0.34, z * 1.16], [8.44, 0.47, z * 1.16], [8.48, FR.topAt(8.48, 1.24) - 0.05, z * 1.16]], 0.14, 0.06, { n: 6 }));
     P(`Fuel–ram-air cooler (${R})`, {
       system: 'Fuel', material: 'Aluminium fuel / air heat exchanger with its diverter-air inlet and exhaust ducts', mass: 18,
       explode: [0.4, 1.35, 1.65 * side],
@@ -105,9 +105,9 @@ export function buildThermal(ctx) {
       // cool fuel from the transfer gallery forward and down to the exchanger
       g.push(FR.pipe([[8.6, -0.12, z * 0.26], [8.4, -0.17, z * 0.28], [8.2, -0.5, z * 0.3], [7.7, -0.62, z * 0.35], [7.52, -0.62, z * 0.35]], 0.02, 6, 16));   // over the main bay's forward wall
       // warm fuel out of the exchanger: up to the ram-air cooler …
-      g.push(FR.pipe([[7.18, -0.66, z * 0.42], [7.3, -0.55, z * 0.85], [7.6, -0.2, z * 0.97], [7.85, 0.2, z * 1.06], [8.0, 0.29, z * 1.06]], 0.018, 6, 20));
+      g.push(FR.pipe([[7.18, -0.66, z * 0.42], [7.3, -0.55, z * 0.85], [7.6, -0.2, z * 0.97], [7.85, 0.22, z * 1.06], [8.0, 0.32, z * 1.06]], 0.018, 6, 20));
       // … and from the cooler back into F-1 (recirculation)
-      g.push(FR.pipe([[8.4, 0.25, z * 1.1], [8.38, 0.42, z * 0.95], [8.3, 0.45, z * 0.75]], 0.018, 6, 10));
+      g.push(FR.pipe([[8.4, 0.28, z * 1.1], [8.38, 0.44, z * 0.95], [8.3, 0.46, z * 0.75]], 0.018, 6, 10));
       // bypass straight back to F-1 when the fuel is cool enough
       g.push(FR.pipe([[7.3, -0.55, z * 0.85], [7.4, -0.3, z * 0.8]], 0.016, 6, 4));
     }

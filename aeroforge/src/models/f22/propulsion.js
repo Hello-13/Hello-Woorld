@@ -91,7 +91,7 @@ export function buildPropulsion(ctx) {
     P(`Serpentine inlet duct (${R})`, {
       system: 'Propulsion', material: 'Composite duct with radar-absorbent lining', mass: 160,
       explode: [0, -0.15, 1.0 * side], callout: side > 0, anchor: [X(10.6), 0.38, 1.15 * side],
-      desc: 'The duct curves up and inward for about 7 m from the inlet to the engine. On the real jet the serpentine ducts keep the fan faces — normally the brightest radar reflectors on a jet — out of line of sight from any exterior view, and an absorbent lining soaks up energy that bounces in. The real duct shape is not published, and the model\'s bend is gentler: looking in from a few degrees off the inlet axis, up to about a quarter of the fan face still shows.',
+      desc: 'From the caret inlet the duct climbs and swings inboard over the weapons bay, then turns back down and outboard onto the engine, about 7 m in all. The serpentine ducts keep the fan faces — normally the brightest radar reflectors on a jet — out of line of sight from any exterior view, and an absorbent lining soaks up energy that bounces in. The real duct shape is not published; the model\'s is solved so that no straight line from outside reaches its fan face.',
     }, mesh(FR.gridSurface(aft, { closed: true, uv: 'n' }), F.duct()));
     {
       // bypass (spill) door on the upper aft fuselage over the end of the duct, with the short duct to it
@@ -106,10 +106,10 @@ export function buildPropulsion(ctx) {
         explode: [-0.2, 1.75, 1.2 * side],
         desc: 'When the engine needs less air than the fixed caret inlet captures, this door opens to spill the surplus from the aft end of the duct overboard, keeping the inlet shock system stable instead of letting it buzz. It matters at the Mach 1.5-plus the F-22 cruises at on dry power (position approximate).',
       }, hd.pivot);
-      // a collar seated on the duct's outboard roof (y follows the roof) that rises to the door opening
-      const roof = (sv, zz) => { const sp = FR.ductSpan(sv, zz); return sp ? sp.hi : -1; };
+      // a collar seated on the duct's outboard roof (y follows the roof) that leads outboard to the door opening
+      const roof = (sv, zz) => FR.ductSpan(sv, zz).hi;
       const foot = [], mouth = [];
-      const fs = [12.55, 13.05], fz = [1.14, 1.22], ms = [12.52, 13.08], mz = [1.2, 1.42];
+      const fs = [12.55, 13.05], fz = [0.76, 0.92], ms = [12.52, 13.08], mz = [1.2, 1.42];
       const loop = (sa, za, f) => {
         const out = [];
         for (let k = 0; k < 6; k++) out.push(f(lerp(sa[0], sa[1], k / 6), za[0]));
@@ -118,13 +118,13 @@ export function buildPropulsion(ctx) {
         for (let k = 0; k < 4; k++) out.push(f(sa[0], lerp(za[1], za[0], k / 4)));
         return out;
       };
-      foot.push(...loop(fs, fz, (sv, zz) => [X(sv), roof(sv, zz) + 0.004, side * zz]));
+      foot.push(...loop(fs, fz, (sv, zz) => [X(sv), roof(sv, zz) + 0.008, side * zz]));
       mouth.push(...loop(ms, mz, (sv, zz) => [X(sv), FR.topAt(sv, zz) - 0.022, side * zz]));
       const by = [FR.gridSurface([foot, mouth], { closed: true, uv: 'n' })];
       P(`Inlet bypass duct (${R})`, {
         system: 'Propulsion', material: 'Composite plenum off the top of the S-duct', mass: 10,
         explode: [-0.2, 1.25, 1.35 * side],
-        desc: 'A short plenum taps the top of the serpentine duct just ahead of the fan face and leads up and outboard to the bypass door, so spilled air never reaches the engine (position approximate).',
+        desc: 'A short plenum taps the outboard shoulder of the serpentine duct just ahead of the fan face and leads outboard to the bypass door, so spilled air never reaches the engine (position approximate).',
       }, mesh(merge(by), F.duct()));
     }
 
@@ -420,8 +420,9 @@ export function buildPropulsion(ctx) {
       }, mesh(merge(am), F.boxLight()));
 
       const f = [];
-      f.push(new THREE.BoxGeometry(0.18, 0.14, 0.16).translate(X(13.48), gy - 0.01, zc + side * 0.1));       // main fuel pump
-      f.push(new THREE.BoxGeometry(0.2, 0.12, 0.14).translate(X(13.5), gy - 0.01, zc - side * 0.1));        // fuel metering unit
+      // (on the gearbox's front face, aft of the gap under the fan face where the airframe lines cross)
+      f.push(new THREE.BoxGeometry(0.14, 0.14, 0.16).translate(X(13.53), gy - 0.01, zc + side * 0.1));       // main fuel pump
+      f.push(new THREE.BoxGeometry(0.15, 0.12, 0.14).translate(X(13.525), gy - 0.01, zc - side * 0.1));     // fuel metering unit
       f.push(FR.pipe([[13.5, gy + 0.05, zc - side * 0.1], [13.9, gy + 0.08, zc - side * 0.18], [14.5, -0.64, zc - side * 0.22], [14.75, -0.42, zc - side * 0.12], [14.79, -0.31, zc - side * 0.04]], 0.016, 6));
       P(`Engine fuel pump & metering unit (${R})`, {
         system: 'Propulsion', material: 'Gear-driven high-pressure pump, FADEC-controlled metering unit', mass: 40,

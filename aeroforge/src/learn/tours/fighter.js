@@ -10,7 +10,7 @@ const BOTH = (name) => [`${name} (right)`, `${name} (left)`];
 const EXTERIOR = [
   'Radome', 'Forward fuselage skin', 'Mid-fuselage upper skin', 'Intake trunk & lower fuselage skin', 'Aft fuselage upper skin', 'Aft fuselage lower skin',
   ...BOTH('Wing skin'), ...BOTH('Leading-edge flap'), ...BOTH('Flaperon'), ...BOTH('Aileron'), ...BOTH('Stabilator'), ...BOTH('Vertical tail'), ...BOTH('Rudder'),
-  ...BOTH('Caret inlet cowl'), ...BOTH('Aft boom'), ...BOTH('Main bay door'), ...BOTH('Side bay door'), ...BOTH('Main gear door'), 'Nose gear doors',
+  ...BOTH('Caret inlet cowl'), ...BOTH('Aft boom'), ...BOTH('Main bay door'), ...BOTH('Side bay door'), ...BOTH('Main gear door'), ...BOTH('Main gear strut door'), 'Nose gear doors',
   ...BOTH('Engine-change door'), ...BOTH('Countermeasure bay door'), 'Air-refuelling door', 'Gun-port door', 'Arresting hook door',
   ...BOTH('Inlet bypass door'), ...BOTH('Upper bleed exit grille'), 'APU inlet & exhaust doors', 'Forward avionics bay doors', 'AMAD & FADEC access panels', 'Engine-bay upper access panels',
   ...BOTH('Nozzle external flaps'), ...BOTH('Nozzle divergent (vectoring) flaps'), 'Canopy',
@@ -48,7 +48,7 @@ export default [
   },
   {
     title: 'Caret inlets, S-ducts',
-    body: 'Each fixed caret inlet has two swept lips that make oblique shocks, slowing supersonic air with little loss. Perforated walls bleed off the slow boundary layer, a bypass door spills surplus air, and the duct snakes 7 m up and inward to hide the fan.',
+    body: 'Each fixed caret inlet has two swept lips that make oblique shocks, slowing supersonic air with little loss. Perforated walls bleed off the slow boundary layer, a bypass door spills surplus air, and the 7 m S-duct hides the fan from any outside view.',
     key: 'A single normal shock at Mach 2 wastes 28 % of total pressure; oblique shocks first recover over 90 %.',
     focus: ['Caret inlet cowl (right)', 'Inlet throat & boundary-layer bleed (right)', 'Inlet bleed plenum & exit duct (right)', 'Upper bleed exit grille (right)', 'Serpentine inlet duct (right)',
       'Inlet bypass duct (right)', 'Inlet bypass door (right)', 'F119 variable inlet guide vanes (right)', 'F119 fan (right)'],
@@ -104,12 +104,12 @@ export default [
   },
   {
     title: 'Landing gear',
-    body: 'A steerable nose leg folds aft under the cockpit; two main legs fold up and aft into wells beneath the inlet ducts, their wheels turning flat. Folding braces lock each leg down, uplocks hold it up, and every door edge is serrated.',
+    body: 'A steerable nose leg folds aft under the cockpit; two main legs swing up and aft into wells behind the weapons bay, each wheel turning to lie flat. Folding braces lock each leg down, uplocks hold it up, and the door edges are serrated.',
     key: 'An oleo strut turns sink energy ½ m v² into heat: a 29 t jet landing at 3 m/s brings about 130 kJ.',
     focus: ['Nose gear shock strut', 'Nose-wheel steering unit', 'Nose gear torque links', 'Nose wheel & tyre', 'Nose gear drag brace & downlock', 'Nose gear retraction actuator', 'Nose gear doors',
       'Nose gear door linkage', 'Nose gear weight-on-wheels switch', 'Taxi / landing light', ...BOTH('Main gear weight-on-wheels switch'),
       ...BOTH('Main gear shock strut'), ...BOTH('Main gear torque links'), ...BOTH('Main wheel & carbon brake'), ...BOTH('Main gear folding brace & downlock'),
-      ...BOTH('Main gear retraction actuator'), ...BOTH('Main gear door'), ...BOTH('Main gear door actuator')],
+      ...BOTH('Main gear retraction actuator'), ...BOTH('Main gear door'), ...BOTH('Main gear strut door'), ...BOTH('Main gear door actuator')],
     view: { dir: [1, 0.05, 0.8], fill: 0.8 },
   },
   {

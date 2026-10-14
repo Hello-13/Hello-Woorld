@@ -225,7 +225,8 @@ export function buildFighter() {
       for (const g of anim.gear) {
         qT.copy(qI).slerp(g.q, ku);
         for (const p of g.pivots) p.quaternion.copy(qT);
-        if (g.twist) g.twist.g.quaternion.setFromAxisAngle(g.twist.axis, g.twist.angle * smooth(0.15, 0.85, ret));
+        if (g.twist?.set) g.twist.set(ku);
+        else if (g.twist) g.twist.g.quaternion.setFromAxisAngle(g.twist.axis, g.twist.angle * smooth(0.15, 0.85, ret));
       }
       const doorOpen = smooth(0, 0.15, state.gear) * 1;
       for (const d of anim.gearDoors) d.h.set(d.angle * doorOpen);

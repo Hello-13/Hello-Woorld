@@ -163,7 +163,7 @@ export function buildSystems(ctx) {
     for (const side of [1, -1]) {
       const sec = FR.wingSection(2.05);
       g.push(FR.cylX(FR.SN - (sec.le[0] - 0.6 * sec.chord), sec.le[1] - 0.03, side * 2.05, 0.22, 0.06, 0.06, 14));
-      g.push(FR.cylX(11.6, -0.12, side * 0.32, 0.22, 0.055, 0.055, 14));
+      g.push(FR.cylX(11.6, -0.155, side * 0.32, 0.22, 0.055, 0.055, 14));
     }
     P('Fuel transfer pumps', {
       system: 'Fuel', material: 'Electrically driven centrifugal pumps', mass: 24, count: 4,
@@ -186,9 +186,10 @@ export function buildSystems(ctx) {
     // transfer lines: wings and F-2 → feed tank
     const g = [];
     for (const side of [1, -1]) {
-      // between the duct floor and the main-gear well roof (≈ 9 cm apart here)
-      g.push(FR.pipe([[11.3, -0.05, side * 2.2], [11.32, -0.1, side * 1.85], [11.35, -0.33, side * 1.6], [11.42, -0.36, side * 1.33], [11.5, -0.415, side * 1.15], [12.0, -0.425, side * 0.72], [12.6, -0.3, side * 0.3]], 0.025, 6, 42));
-      g.push(FR.pipe([[8.4, 0.1, side * 0.3], [10.5, -0.1, side * 0.25], [11.5, -0.12, side * 0.32], [12.6, -0.25, side * 0.22]], 0.025, 6));
+      // from each wing root under the gun's ammunition container, along the weapons-bay sill ahead of the gear
+      // well and up over the bay's sloping aft ceiling into the bottom of F-3
+      g.push(FR.pipe([[11.3, -0.05, side * 2.2], [11.32, -0.1, side * 1.85], [11.35, -0.33, side * 1.6], [11.42, -0.4, side * 1.3], [11.5, -0.43, side * 1.02], [11.6, -0.43, side * 0.89], [12.0, -0.42, side * 0.88], [12.2, -0.36, side * 0.76], [12.38, -0.3, side * 0.56], [12.5, -0.29, side * 0.4], [12.6, -0.3, side * 0.28], [12.68, -0.33, side * 0.12]], 0.025, 6, 60));
+      g.push(FR.pipe([[8.4, 0.1, side * 0.3], [10.5, -0.08, side * 0.25], [11.5, -0.155, side * 0.32], [12.2, -0.19, side * 0.27], [12.45, -0.2, side * 0.22], [12.62, -0.29, side * 0.12]], 0.025, 6));
     }
     g.push(FR.pipe([[7.5, -0.4, 0.12], [8.2, -0.25, 0.2], [8.6, -0.1, 0.25]], 0.025, 6));
     P('Fuel transfer lines', {
@@ -203,8 +204,8 @@ export function buildSystems(ctx) {
         system: 'Fuel', material: 'Self-sealing titanium feed line with shut-off valve', mass: 8,
         explode: [-0.9, 0.2, 0.7 * side],
         desc: 'Runs from its boost pump in the feed tank, through a fire shut-off valve at the engine-bay firewall, to the engine-mounted fuel pump on the gearbox.',
-      }, mesh(merge([FR.pipe([[13.1, -0.37, side * 0.19], [13.2, -0.5, side * 0.36], [13.34, -0.66, side * 0.7], [13.46, fy + 0.02, ez + side * 0.1]], 0.024, 6, 12),
-        new THREE.BoxGeometry(0.06, 0.08, 0.08).translate(X(13.3), -0.62, side * 0.62)]), F.pipe()));
+      }, mesh(merge([FR.pipe([[13.1, -0.37, side * 0.19], [13.18, -0.45, side * 0.33], [13.24, -0.48, side * 0.47], [13.31, -0.6, side * 0.63], [13.39, -0.68, side * 0.79], [13.47, fy + 0.02, ez + side * 0.1]], 0.024, 6, 20),
+        new THREE.BoxGeometry(0.06, 0.08, 0.08).translate(X(13.35), -0.645, side * 0.71)]), F.pipe()));
     }
   }
   {
@@ -241,27 +242,30 @@ export function buildSystems(ctx) {
       explode: [0.2, 2.95, 0.4],
       desc: 'Floodlights set into the receptacle well light the slipway so the tanker\'s boom operator can see to plug in at night (count and positions approximate).',
     }, [mesh(merge(lens), F.lens()), mesh(merge(lit), arLamp, { cast: false })]);
-    // refuel manifold: receptacle → F-1 → gallery along the spine → F-2, F-3 and both wings
+    // refuel manifold: receptacle → F-1 → gallery along the spine, in the slot between the two ducts → F-2, F-3
+    // and both wings
     const m = [];
-    m.push(FR.pipe([[8.28, FR.topAt(8.28, 0) - 0.2, 0], [8.4, 0.2, 0.08], [9.0, 0.32, 0.18], [11.0, 0.32, 0.2], [12.6, 0.28, 0.2]], 0.03, 6));
-    // wing branches arch over the inlet duct's roof, then drop outboard of it into the wing tank
-    for (const side of [1, -1]) m.push(FR.pipe([[10.6, 0.32, side * 0.2], [10.75, 0.44, side * 0.65], [10.9, 0.45, side * 1.05], [11.0, 0.38, side * 1.38], [11.12, 0.2, side * 1.64], [11.25, 0.04, side * 1.95], [11.4, 0.0, side * 2.4]], 0.022, 6, 40));
+    m.push(FR.pipe([[8.28, FR.topAt(8.28, 0) - 0.2, 0], [8.4, 0.2, 0.03], [9.0, 0.32, 0], [11.0, 0.32, 0], [12.52, 0.28, 0]], 0.03, 6));
+    // wing branches: a tee down the slot, then outboard under the duct floor (the duct roof runs too close to the
+    // skin to pass over it), below the gun's ammunition container and into each wing tank through the root rib
+    m.push(FR.pipe([[10.55, 0.32, 0], [10.62, 0.1, 0], [10.7, -0.12, 0], [10.74, -0.17, 0]], 0.022, 6, 8));
+    for (const side of [1, -1]) m.push(FR.pipe([[10.74, -0.17, 0], [10.8, -0.17, side * 0.2], [10.86, -0.17, side * 0.5], [10.92, -0.17, side * 0.8], [10.98, -0.29, side * 1.1], [11.03, -0.31, side * 1.45], [11.08, -0.29, side * 1.72], [11.11, -0.23, side * 1.86], [11.14, -0.15, side * 1.95], [11.2, -0.11, side * 2.15], [11.27, -0.1, side * 2.4]], 0.022, 6, 48));
     m.push(FR.pipe([[8.3, FR.topAt(8.3, 0) - 0.22, 0], [8.0, 0.1, -0.1], [7.7, -0.1, -0.15]], 0.022, 6));
     P('Refuelling manifold', {
       system: 'Fuel', material: 'Aluminium manifold with level-control shut-off valves', mass: 22,
       explode: [0.1, 2.35, 0],
       desc: 'Distributes fuel from the receptacle (or the ground pressure-refuelling point) to every tank; float-operated shut-off valves close each tank as it fills.',
     }, mesh(merge(m), F.pipe()));
-    // single-point pressure-refuelling adapter on the aft wall of the right main-gear well (behind the stowed
-    // wheel); its line runs behind the well and under the S-duct into the bottom of F-3
+    // single-point pressure-refuelling adapter on the forward wall of the right main-gear well, facing aft, reached
+    // through the open leg slot; its line runs up outboard of the S-duct and over its shoulder into F-2
     const ga = [];
-    ga.push(new THREE.CylinderGeometry(0.05, 0.055, 0.1, 16).rotateZ(Math.PI / 2 - 0.5).translate(X(12.875), -0.64, 1.3));
-    ga.push(new THREE.BoxGeometry(0.03, 0.14, 0.14).translate(X(12.93), -0.62, 1.3));
-    ga.push(FR.pipe([[12.93, -0.62, 1.3], [12.98, -0.58, 1.18], [13.0, -0.54, 0.8], [13.0, -0.49, 0.36], [13.0, -0.34, 0.2]], 0.022, 6, 14));
+    ga.push(new THREE.CylinderGeometry(0.05, 0.055, 0.1, 16).rotateZ(Math.PI / 2 + 0.35).translate(X(11.69), -0.69, 1.03));
+    ga.push(new THREE.BoxGeometry(0.03, 0.14, 0.14).translate(X(11.655), -0.68, 1.03));
+    ga.push(FR.pipe([[11.655, -0.68, 1.03], [11.6, -0.62, 1.02], [11.58, -0.4, 1.0], [11.55, 0.0, 0.98], [11.53, 0.36, 0.96], [11.51, 0.55, 0.88], [11.5, 0.6, 0.7]], 0.022, 6, 20));
     P('Ground refuelling adapter', {
       system: 'Fuel', material: 'Single-point pressure-refuelling coupling with shut-off valve', mass: 5,
       explode: [0.3, -1.25, 1.5],
-      desc: 'A ground crew refuels every tank through this one coupling on the aft wall of the right main-gear well, under pressure from a truck or hydrant, with the same level-control valves that stop each tank filling (position approximate).',
+      desc: 'A ground crew refuels every tank through this one coupling on the forward wall of the right main-gear well, under pressure from a truck or hydrant, with the same level-control valves that stop each tank filling (position approximate).',
     }, mesh(merge(ga), F.yellow()));
   }
   {
@@ -270,8 +274,9 @@ export function buildSystems(ctx) {
     const probe = (s, z, y0, y1) => g.push(new THREE.CylinderGeometry(0.012, 0.012, y1 - y0, 6).translate(X(s), (y0 + y1) / 2, z));
     probe(7.3, 0.4, -0.42, FR.topAt(7.3, 0.4) - 0.09);
     probe(8.1, -0.45, -0.42, FR.topAt(8.1, 0.45) - 0.09);
-    for (const [s, z] of [[9.0, 0.3], [10.2, -0.3], [11.4, 0.3], [9.6, -1.3], [10.8, 1.3]]) probe(s, z, ductTop(s, Math.abs(z)) + 0.07, FR.topAt(s, Math.abs(z)) - 0.09);
-    probe(12.85, 0.2, -0.35, FR.topAt(12.85, 0.2) - 0.09);
+    // F-2: in the slot between the ducts (and, forward, inboard of them), from just above its floor to the top
+    for (const [s, z] of [[9.0, 0.45], [9.8, -0.25], [11.0, -0.07], [11.8, -0.07]]) probe(s, z, -0.17, FR.topAt(s, Math.abs(z)) - 0.09);
+    probe(12.75, -0.08, -0.35, FR.topAt(12.75, 0.08) - 0.09);
     probe(12.85, -0.6, ductTop(12.85, 0.6) + 0.07, FR.topAt(12.85, 0.6) - 0.09);
     for (const side of [1, -1]) {
       for (const z of [2.4, 3.4, 4.6]) {
@@ -282,7 +287,7 @@ export function buildSystems(ctx) {
       }
     }
     P('Fuel quantity probes', {
-      system: 'Fuel', material: 'Capacitance gauging probes', mass: 8, count: 15,
+      system: 'Fuel', material: 'Capacitance gauging probes', mass: 8, count: 14,
       explode: [0, 2.9, 0.4],
       desc: 'Capacitance probes in every tank measure the fuel height (fuel and air have different permittivity); the fuel-management computer turns them into mass, which the up-front displays show (probe count illustrative).',
     }, mesh(merge(g), F.copper()));
@@ -298,7 +303,10 @@ export function buildSystems(ctx) {
     const l = [];
     l.push(FR.pipe([[7.45, -0.6, 0], [7.6, -0.5, 0.05], [7.7, -0.4, 0.05]], 0.016, 5));
     l.push(FR.pipe([[7.7, -0.4, 0.05], [8.45, 0.05, 0.1], [9.0, 0.42, 0.1], [11.5, 0.42, 0.1], [12.8, 0.36, 0.1]], 0.014, 5));
-    for (const side of [1, -1]) l.push(FR.pipe([[11.0, 0.42, side * 0.1], [11.2, 0.47, side * 0.6], [11.35, 0.48, side * 1.0], [11.45, 0.42, side * 1.3], [11.58, 0.22, side * 1.58], [11.72, 0.02, side * 2.0], [11.9, -0.07, side * 3.0]], 0.012, 5, 40));
+    // wing branches follow the refuelling branches a little further forward: down the slot between the ducts,
+    // outboard under the duct floor and the ammunition container, into the wing tanks
+    l.push(FR.pipe([[10.3, 0.42, 0.1], [10.36, 0.2, 0.09], [10.42, -0.05, 0.08], [10.46, -0.13, 0.08]], 0.012, 5, 8));
+    for (const side of [1, -1]) l.push(FR.pipe([[10.46, -0.13, 0.08], [10.52, -0.14, side * 0.25], [10.6, -0.14, side * 0.5], [10.68, -0.155, side * 0.8], [10.76, -0.26, side * 1.1], [10.84, -0.28, side * 1.45], [10.9, -0.27, side * 1.72], [10.94, -0.21, side * 1.86], [10.98, -0.13, side * 1.95], [11.05, -0.1, side * 2.15], [11.1, -0.09, side * 2.3]], 0.012, 5, 44));
     P('Inert-gas generating system (OBIGGS)', {
       system: 'Fuel', material: 'Hollow-fibre air-separation module, distribution lines', mass: 30,
       explode: [0.6, -1.65, 0],
@@ -322,7 +330,7 @@ export function buildSystems(ctx) {
       system: 'Hydraulics', material: 'Bootstrap (self-pressurising) piston reservoir', mass: 15,
       explode: [0.1, -1.25, 0.55 * side],
       desc: `System ${S} has its own pressurised reservoir, so a leak in one system cannot drain the other. A bootstrap piston keeps the fluid under pressure so the pumps are fed at any altitude or attitude.`,
-    }, mesh(merge([FR.cylX(13.0, -0.62, side * 0.5, 0.42, 0.09, 0.09, 14), FR.cylX(13.25, -0.62, side * 0.5, 0.08, 0.05, 0.05, 10)]), F.hyd()));
+    }, mesh(merge([FR.cylX(13.07, -0.62, side * 0.3, 0.42, 0.09, 0.09, 14), FR.cylX(13.32, -0.62, side * 0.3, 0.08, 0.05, 0.05, 10)]), F.hyd()));
     P(`Hydraulic accumulators (system ${S})`, {
       system: 'Hydraulics', material: 'Nitrogen-charged steel accumulators', mass: 10,
       explode: [0.2, -1.45, 0.3 * side],
@@ -338,17 +346,17 @@ export function buildSystems(ctx) {
     const z = side, S = side > 0 ? 'A' : 'B';
     const g = [];
     // pump → reservoir / manifold, then aft to the stabilator, rudder and nozzle area, outboard to the wing
-    g.push(FR.pipe([[14.2, -0.42, z * 1.38], [13.6, -0.5, z * 1.0], [13.2, -0.6, z * 0.6]], 0.016, 5));
+    g.push(FR.pipe([[14.2, -0.42, z * 1.38], [13.85, -0.6, z * 1.25], [13.6, -0.66, z * 1.15], [13.42, -0.71, z * 1.0], [13.38, -0.72, z * 0.9], [13.3, -0.74, z * 0.6], [13.15, -0.74, z * 0.5], [13.0, -0.74, z * 0.47]], 0.016, 5, 24));
     g.push(FR.pipe([[14.2, -0.42, z * 1.38], [15.5, -0.35, z * 1.4], [16.2, -0.26, z * 1.38]], 0.016, 5));
     g.push(FR.pipe([[14.6, -0.35, z * 1.4], [14.6, 0.15, z * 1.42], [14.9, 0.3, z * 1.42], [15.9, 0.36, z * 1.44]], 0.014, 5));
     // out along the rear spar to the flaperon and aileron actuators (one actuator per surface)
     const fl = FR.teActuator('flaperon'), ai = FR.teActuator('aileron');
-    g.push(FR.pipe([[13.2, -0.55, z * 1.0], [13.45, -0.2, z * 1.55], [13.5, -0.12, z * 1.85], [13.48, FR.wingY(2.3), z * 2.3], [13.48, fl.y, z * (fl.z - 0.12)], [fl.s1 - 0.12, fl.y, z * (fl.z - 0.035)]], 0.014, 5, 30));
+    g.push(FR.pipe([[13.6, -0.66, z * 1.15], [13.63, -0.56, z * 1.52], [13.56, -0.3, z * 1.66], [13.5, -0.12, z * 1.85], [13.48, FR.wingY(2.3), z * 2.3], [13.48, fl.y, z * (fl.z - 0.12)], [fl.s1 - 0.12, fl.y, z * (fl.z - 0.035)]], 0.014, 5, 30));
     g.push(FR.pipe([[13.48, fl.y, z * (fl.z - 0.12)], [13.48, FR.wingY(4.0), z * 4.0], [13.47, FR.wingY(ai.z - 0.25), z * (ai.z - 0.25)], [ai.s1 - 0.03, ai.y, z * (ai.z - 0.03)]], 0.012, 5, 30));
-    // forward along the bay sill (y −0.70) to the bay doors and launchers (crossing over the stowed main wheel's
-    // inboard rim just aft of the bay), then round the front of the side bay, under the inlet duct and up
-    // outboard of it to the leading-edge-flap power drive unit
-    g.push(FR.pipe([[13.2, -0.6, z * 0.6], [12.8, -0.55, z * 0.72], [12.53, -0.445, z * 0.76], [12.45, -0.415, z * 0.845], [12.3, -0.418, z * 0.88], [12.12, -0.435, z * 0.88], [12.0, -0.5, z * 0.88], [11.92, -0.62, z * 0.875], [11.82, -0.7, z * 0.845], [10.5, -0.7, z * 0.84], [8.7, -0.7, z * 0.84], [8.48, -0.66, z * 0.95], [8.465, -0.6, z * 1.3], [8.465, -0.47, z * 1.62], [8.44, -0.22, z * 1.74], [8.42, -0.06, z * 1.76]], 0.016, 5, 80));
+    // forward inboard of the main-gear wheel bay, round the aft outboard corner of the weapons bay (between its aft
+    // wall and the well) and along the bay sill (y −0.70) to the bay doors and launchers, then round the front of
+    // the side bay, under the inlet duct and up outboard of it to the leading-edge-flap power drive unit
+    g.push(FR.pipe([[13.0, -0.74, z * 0.47], [12.6, -0.73, z * 0.47], [12.47, -0.72, z * 0.47], [12.42, -0.715, z * 0.52], [12.405, -0.71, z * 0.66], [12.39, -0.705, z * 0.79], [12.3, -0.7, z * 0.84], [11.82, -0.7, z * 0.845], [10.5, -0.7, z * 0.84], [8.7, -0.7, z * 0.84], [8.48, -0.66, z * 0.95], [8.465, -0.6, z * 1.3], [8.465, -0.47, z * 1.62], [8.44, -0.22, z * 1.74], [8.42, -0.06, z * 1.76]], 0.016, 5, 80));
     // crossfeed: each system also reaches the other side's stabilator and rudder actuators
     g.push(FR.pipe([[16.0, -0.3, z * 1.38], [16.1, -0.55, z * 0.6], [16.15, -0.58, -z * 0.6], [16.25, -0.3, -z * 1.3]], 0.012, 5));
     P(`Hydraulic lines (system ${S})`, {
@@ -360,11 +368,11 @@ export function buildSystems(ctx) {
   {
     const g = [];
     for (const side of [1, -1]) {
-      // main gear: off the bay-sill gallery just ahead of the stowed wheel, to the retraction actuator and down
-      // the strut to the brake; a stub aft to the door jack
-      g.push(FR.pipe([[11.82, -0.7, side * 0.845], [11.6, -0.6, side * 0.9], [11.3, -0.48, side * 1.0], [11.24, -0.47, side * 1.02]], 0.012, 5));
-      g.push(FR.pipe([[11.6, -0.6, side * 0.9], [11.42, -0.5, side * 1.1], [11.3, -0.55, side * 1.28]], 0.01, 5));      // brake line to the strut
-      g.push(FR.pipe([[12.85, -0.53, side * 0.735], [12.86, -0.5, side * 0.86], [12.85, -0.49, side * 0.93]], 0.01, 5));   // door jack
+      // main gear: off the bay-sill gallery beside the well, up its inboard wall and across the roof to the
+      // retraction actuator, a hose across the trunnion to the brake line on the strut, and a stub to the door jack
+      g.push(FR.pipe([[12.3, -0.7, side * 0.845], [12.33, -0.6, side * 0.9], [12.33, -0.36, side * 0.92], [12.32, -0.305, side * 1.0], [12.3, -0.305, side * 1.25], [12.3, -0.345, side * 1.35]], 0.012, 5, 16));
+      g.push(FR.pipe([[11.88, -0.7, side * 0.845], [11.91, -0.67, side * 0.95], [11.93, -0.63, side * 1.04], [11.935, -0.615, side * 1.09]], 0.01, 5));   // brake hose to the trunnion
+      g.push(FR.pipe([[12.6, -0.73, side * 0.47], [12.56, -0.6, side * 0.5], [12.535, -0.52, side * 0.56], [12.53, -0.5, side * 0.6]], 0.01, 5));   // door jack
     }
     // nose gear: from the manifold beside the accumulators up behind the main bay's aft wall, forward above its
     // ceiling, down ahead of its front wall and under the cockpit to the nose-gear actuator and steering unit
@@ -372,7 +380,7 @@ export function buildSystems(ctx) {
     P('Landing-gear & brake hydraulic lines', {
       system: 'Hydraulics', material: 'Titanium and steel tubing, flexible hoses across the gear pivots', mass: 18,
       explode: [0.3, -1.55, 0],
-      desc: 'Utility lines to the gear actuators, door jacks, nose-wheel steering and wheel brakes: the main-gear lines branch off each system\'s bay-sill gallery, the nose-gear line runs from the manifold beside the accumulators forward above the main bay; flexible hoses cross each trunnion (routing approximate).',
+      desc: 'Utility lines to the gear actuators, door jacks, nose-wheel steering and wheel brakes: the main-gear lines branch off each system\'s gallery beside the well, the nose-gear line runs from the manifold beside the accumulators forward above the main bay; flexible hoses cross each trunnion (routing approximate).',
     }, mesh(merge(g), F.hyd()));
   }
 
@@ -408,7 +416,7 @@ export function buildSystems(ctx) {
       system: 'Electrical', material: 'Brushless 270 V DC generator, oil cooled', mass: 40,
       explode: [0.45, -1.05, 1.05 * side],
       desc: 'Driven by the accessory drive, it supplies the 270 V DC primary bus. A high-voltage DC system saves copper weight; development-era figures give about 157 kW of primary and auxiliary electrical power in total.',
-    }, mesh(merge([FR.cylX(13.36, -0.42, side * 1.38, 0.26, 0.1, 0.1, 18), box(13.2, -0.42, side * 1.38, 0.06, 0.16, 0.16)]), F.yellow()));
+    }, mesh(merge([FR.cylX(13.36, -0.42, side * 1.43, 0.22, 0.09, 0.09, 18), box(13.27, -0.42, side * 1.43, 0.05, 0.15, 0.15)]), F.yellow()));
   }
   // auxiliary power generation system (AlliedSignal, now Honeywell; ≈ 120 kg in all): the G250 APU in the
   // left wing root between two wing spars, its inlet and exhaust behind flush doors, and the stored-energy
@@ -467,9 +475,10 @@ export function buildSystems(ctx) {
       desc: 'Just ahead of the bottles, it refills the stored-energy air bottles on board, part of the plan to make the F-22 independent of ground carts for starting and servicing.',
     }, mesh(merge(c), F.boxLight()));
     // start path from the APU to both AMADs (drawn as ducting; the actual drive arrangement is not published):
-    // aft above the stowed left wheel and outboard of the boom, then down under the generators
-    const sp = [FR.pipe([[12.2, ay - 0.12, az], [12.42, -0.235, -1.735], [12.85, -0.245, -1.735], [13.08, -0.42, -1.665], [13.28, -0.62, -1.52], [13.45, -0.64, -1.4], [13.66, -0.55, -1.38]], 0.035, 8, 24)];
-    sp.push(FR.pipe([[13.27, -0.64, -1.5], [13.32, -0.72, -0.8], [13.32, -0.73, 0.0], [13.32, -0.72, 0.8], [13.42, -0.66, 1.3], [13.5, -0.64, 1.38], [13.66, -0.55, 1.38]], 0.035, 8, 24));
+    // aft over the left main-gear well, down outboard of its cut-off aft corner and under the generator to the
+    // left AMAD; from there across under both engines' gearboxes to the right one
+    const sp = [FR.pipe([[12.2, ay - 0.12, az], [12.42, -0.235, -1.735], [12.9, -0.245, -1.735], [13.15, -0.26, -1.72], [13.3, -0.45, -1.6], [13.4, -0.64, -1.42], [13.55, -0.6, -1.39], [13.66, -0.53, -1.38]], 0.035, 8, 30)];
+    sp.push(FR.pipe([[13.7, -0.53, -1.38], [13.72, -0.66, -1.2], [13.75, -0.76, -0.95], [13.75, -0.765, 0.0], [13.75, -0.76, 0.95], [13.72, -0.66, 1.2], [13.7, -0.53, 1.38]], 0.02, 8, 36));
     P('APU start path to AMADs', {
       system: 'Electrical', material: 'Start ducting (arrangement not published; route approximate)', mass: 10,
       explode: [-0.2, -1.45, 0],
@@ -502,7 +511,7 @@ export function buildSystems(ctx) {
       // between the main-bay ceiling and F-2, stepping inboard where the duct turns in toward its engine, then
       // down behind the bay's aft wall and under F-3 to the aft distribution centre
       g.push(FR.pipe([[3.0, -0.2, z * 0.25], [5.0, -0.3, z * 0.36], [6.3, -0.3, z * 0.48], [6.9, -0.47, z * 0.52], [7.5, -0.525, z * 0.55], [8.1, -0.53, z * 0.66], [8.36, -0.51, z * 0.745], [8.43, -0.4, z * 0.745], [8.5, -0.33, z * 0.73], [8.7, -0.25, z * 0.66], [9.0, -0.221, z * 0.62], [11.0, -0.221, z * 0.6], [11.8, -0.221, z * 0.45], [12.34, -0.221, z * 0.35], [12.37, -0.25, z * 0.34], [12.41, -0.37, z * 0.33], [12.45, -0.415, z * 0.31], [12.55, -0.44, z * 0.29], [12.9, -0.47, z * 0.25], [13.6, -0.6, z * 0.12]], 0.018, 6, 80));
-      g.push(FR.pipe([[13.7, -0.6, z * 0.16], [13.45, -0.56, z * 0.9], [13.3, -0.45, z * 1.28]], 0.02, 6));           // generator feeders
+      g.push(FR.pipe([[13.4, -0.36, z * 1.45], [13.5, -0.27, z * 1.52], [14.0, -0.26, z * 1.52], [14.45, -0.3, z * 1.53], [14.6, -0.55, z * 1.46], [14.62, -0.709, z * 1.1], [14.62, -0.709, z * 0.4], [14.62, -0.64, z * 0.16]], 0.012, 6, 24));   // generator feeders, aft round the AMAD and in under the engine
       g.push(FR.pipe([[13.9, -0.6, z * 0.12], [15.5, -0.6, z * 0.12], [16.2, -0.4, z * 0.15]], 0.016, 5));             // aft loads
     }
     P('Main wiring harnesses', {
@@ -519,8 +528,8 @@ export function buildSystems(ctx) {
     const vb = [];
     for (const side of [1, -1]) {
       const ez = FR.ENG_Z * side, ey = FR.ENG_Y;
-      // forward along the bay sill, crossing over the stowed main wheel's inboard rim just aft of the bay
-      g.push(FR.pipe([[14.55, -0.6, side * 0.42], [14.0, -0.62, side * 0.5], [13.3, -0.53, side * 0.6], [12.75, -0.47, side * 0.62], [12.46, -0.425, side * 0.64], [12.37, -0.42, side * 0.805], [12.15, -0.422, side * 0.83], [12.0, -0.47, side * 0.83], [11.9, -0.52, side * 0.83], [8.6, -0.52, side * 0.83], [7.6, -0.485, side * 0.55], [6.6, -0.48, side * 0.3]], 0.03, 8, 80));       // between F-1 and the fuel–PAO exchangers
+      // forward inboard of the main-gear wheel bay, round the weapons bay's aft outboard corner and along its sill
+      g.push(FR.pipe([[14.55, -0.6, side * 0.42], [14.42, -0.61, side * 0.45], [13.95, -0.62, side * 0.51], [13.86, -0.645, side * 0.45], [13.7, -0.66, side * 0.44], [13.45, -0.65, side * 0.45], [13.2, -0.56, side * 0.45], [12.9, -0.54, side * 0.45], [12.55, -0.53, side * 0.45], [12.45, -0.525, side * 0.46], [12.408, -0.52, side * 0.55], [12.405, -0.52, side * 0.69], [12.398, -0.52, side * 0.805], [12.31, -0.52, side * 0.835], [11.9, -0.52, side * 0.83], [8.6, -0.52, side * 0.83], [7.6, -0.485, side * 0.55], [6.6, -0.48, side * 0.3]], 0.03, 8, 90));       // between F-1 and the fuel–PAO exchangers
       // bleed port: from the HP compressor case (r ≈ 0.3) out through the bypass duct to the valve
       const dir = new THREE.Vector2(side * 0.42 - ez, -0.6 - ey).normalize();
       g.push(FR.pipe([[14.5, ey + dir.y * 0.3, ez + dir.x * 0.3], [14.52, ey + dir.y * 0.48, ez + dir.x * 0.48], [14.55, -0.6, side * 0.42]], 0.028, 8, 6));

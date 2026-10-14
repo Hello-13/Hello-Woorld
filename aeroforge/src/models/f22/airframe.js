@@ -72,6 +72,28 @@ export function cavity(st, edge, inward, depth) {
   }));
 }
 
+/** Cavity liner from rows of any equal length (opening edge, round the back, opening edge), ear-clipped end caps. */
+export function cavityRows(grid) {
+  const pos = [], idx = [];
+  const m = grid.length, k = grid[0].length;
+  for (const row of grid) for (const p of row) pos.push(...p);
+  for (let r = 0; r < m - 1; r++) {
+    for (let c = 0; c < k - 1; c++) {
+      const a = r * k + c, b = a + 1, cc = a + k, d = cc + 1;
+      idx.push(a, cc, b, b, cc, d);
+    }
+  }
+  for (const r of [0, m - 1]) {
+    const contour = grid[r].map((p) => new THREE.Vector2(p[2], p[1]));
+    for (const f of THREE.ShapeUtils.triangulateShape(contour, [])) idx.push(r * k + f[0], r * k + f[1], r * k + f[2]);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
 /** Cavity liner from rows of four points per station: opening edge, two back corners, opening edge. */
 export function cavityGrid(grid) {
   const pos = [], idx = [];
@@ -181,7 +203,8 @@ export function buildAirframe(ctx) {
   }, mesh(FR.gridSurface(ringsA.slice(iR), { closed: true, keep: keepA(stF) }), F.skin()));
 
   // ================================================================== fuselage B (s 8.4 → 17.55)
-  const bMust = [FR.SIDE_BAY.s0, FR.SIDE_BAY.s1, FR.MAIN_BAY.s0, FR.MAIN_BAY.s1, FR.MAIN_WELL.s0, FR.MAIN_WELL.s1, 13.2, FR.CM_BAY.s0, FR.CM_BAY.s1, FR.ENGINE_DOOR.s0, FR.ENGINE_DOOR.s1];
+  const W = FR.MAIN_WELL;
+  const bMust = [FR.SIDE_BAY.s0, FR.SIDE_BAY.s1, FR.MAIN_BAY.s0, FR.MAIN_BAY.s1, W.s0, W.sStep, W.sStep + 0.01, W.sNotch, W.sNotch + 0.01, W.s1, 13.2, FR.CM_BAY.s0, FR.CM_BAY.s1, FR.ENGINE_DOOR.s0, FR.ENGINE_DOOR.s1];
   const sB = stations(FR.S_AB, FR.S_B_END, 0.15, bMust);
   ctx.sB = sB;
   const ringsB = sB.map((s) => FR.ringB(s).pts);
@@ -191,7 +214,7 @@ export function buildAirframe(ctx) {
     const q = mirB(j), s0 = st[i], s1 = st[i + 1];
     if (upper !== (q <= 16)) return false;
     if (q >= 32 && inRange(s0, s1, FR.MAIN_BAY)) return false;
-    if (q >= 28 && q <= 30 && inRange(s0, s1, FR.MAIN_WELL)) return false;
+    if (q >= 28 && q <= 30 && inRange(s0, s1, W)) return false;
     if (q >= 21 && q <= 23 && inRange(s0, s1, FR.SIDE_BAY)) return false;
     if (q === 22 && inRange(s0, s1, FR.CM_BAY)) return false;
     if (q >= FR.ENGINE_DOOR.q0 && q < FR.ENGINE_DOOR.q1 && inRange(s0, s1, FR.ENGINE_DOOR)) return false;
@@ -279,18 +302,25 @@ export function buildAirframe(ctx) {
   {
     // each frame stays 3 cm clear of the inlet ducts that pass through it: where a duct comes close to the skin
     // the frame is made shallower
-    const clipDuct = (s) => (o, i) => {
-      if (FR.ductDepth(s, i[1], i[0]) < -0.03) return i;
-      let lo = 0, hi = 1;                                   // fraction of the way from the outer edge to i
-      for (let k = 0; k < 14; k++) { const m = (lo + hi) / 2; if (FR.ductDepth(s, lerp(o[1], i[1], m), lerp(o[0], i[0], m)) < -0.03) lo = m; else hi = m; }
-      return [lerp(o[0], i[0], lo), lerp(o[1], i[1], lo)];
+    // (checked at both faces of the frame, since the duct moves across it); where the duct runs right up to the
+    // skin, as it does just behind the inlet, the frame stops either side of it
+    // (the main-gear wells too: the bulkhead over them stops round the wheel bay)
+    const depAt = (s, th) => (y, z) => Math.max(...[s - th / 2, s, s + th / 2].map((ss) => Math.max(FR.ductDepth(ss, y, z), FR.mainWellDepth(ss, y, z))));
+    const clipDuct = (s, th) => {
+      const dep = depAt(s, th);
+      return (o, i) => {
+        if (dep(i[1], i[0]) < -0.03) return i;
+        let lo = 0, hi = 1;                                 // fraction of the way from the outer edge to i
+        for (let k = 0; k < 14; k++) { const m = (lo + hi) / 2; if (dep(lerp(o[1], i[1], m), lerp(o[0], i[0], m)) < -0.03) lo = m; else hi = m; }
+        return [lerp(o[0], i[0], lo), lerp(o[1], i[1], lo)];
+      };
     };
     const band = (s) => {
       const D = FR.bD(s);
-      const sideBay = s > FR.SIDE_BAY.s0 && s < FR.SIDE_BAY.s1;
+      const sideBay = s > FR.SIDE_BAY.s0 && s < FR.SIDE_BAY.s1, dep = depAt(s, 0.05);
       return frameBand(s, zy(FR.ringB(s).pts), {
-        depth: 0.15, thick: 0.05, clip: clipDuct(s),
-        keep: (p) => !(p[1] < -D + 0.12 && Math.abs(p[0]) < FR.MAIN_BAY.z + 0.05) && !(sideBay && p[1] < -0.38 && p[1] > -0.86 && Math.abs(p[0]) > 1.25),
+        depth: 0.15, thick: 0.05, clip: clipDuct(s, 0.05), avoid: (p) => dep(p[1], p[0]) > -0.028,
+        keep: (p) => !(p[1] < -D + 0.12 && Math.abs(p[0]) < FR.MAIN_BAY.z + 0.05) && !(sideBay && p[1] < -0.38 && p[1] > -0.86 && Math.abs(p[0]) > 1.25) && dep(p[1], p[0]) < -0.015,
       });
     };
     P('Mid-fuselage titanium bulkheads', {
@@ -323,10 +353,15 @@ export function buildAirframe(ctx) {
     g.push(slab([grid[0].map((p) => [p[0], p[1], -0.02]), grid[1].map((p) => [p[0], p[1], -0.02])], () => [0, 0, 0.04]));
     // weapons-bay longerons along the door edges and the bay ceiling
     for (const z of [-0.81, 0.81]) {
-      g.push(FR.pipe([[8.45, -0.84, z], [10, -0.86, z], [12.6, -0.85, z], [13.6, -0.78, z]], 0.035, 6));
-      // ceiling longeron along the break of the bay ceiling, stepping inboard under the duct floor aft
-      const cz = (sv) => Math.abs(z) * 0.75 - (0.6075 - 0.44) * FR.smooth(FR.BAY_AFT.s0, FR.BAY_AFT.s1, sv);
-      g.push(FR.pipe([8.3, 10.4, FR.BAY_AFT.s0, 11.7, FR.BAY_AFT.s1, 12.36].map((sv) => [sv, FR.bayCeilAt(sv, cz(sv)) + 0.035, Math.sign(z) * cz(sv)]), 0.03, 6, 24));
+      // the bay-edge longerons end at the bay's aft wall, where the main-gear well begins; from that wall keel
+      // longerons inboard of the wheel bays carry on into the engine bays
+      g.push(FR.pipe([[8.45, -0.84, z], [10, -0.86, z], [12.0, -0.86, z], [12.33, -0.855, z]], 0.035, 6));
+      g.push(FR.pipe([[12.36, -0.8, z * 0.4], [13.1, -0.79, z * 0.4], [13.6, -0.76, z * 0.4]], 0.035, 6));
+      // ceiling longeron along the break of the bay ceiling, stepping inboard under the duct floor aft; at the
+      // aft wall, where the duct floor comes down to the ceiling, it sits flush in the ceiling corner
+      const cz = (sv) => Math.abs(z) * 0.75 - (0.6075 - 0.4) * FR.smooth(FR.BAY_AFT.s0, FR.BAY_AFT.s1, sv);
+      const dy = (sv) => 0.035 - 0.03 * FR.smooth(12.05, 12.36, sv);
+      g.push(FR.pipe([8.3, 10.4, FR.BAY_AFT.s0, 11.7, FR.BAY_AFT.s1, 12.24, 12.36].map((sv) => [sv, FR.bayCeilAt(sv, cz(sv)) + dy(sv), Math.sign(z) * cz(sv)]), 0.03, 6, 24));
     }
     P('Keel & weapons-bay longerons', {
       system: 'Structure', material: 'Titanium keel web, steel / titanium longerons', mass: 380, explode: [0, -0.45, 0],
@@ -657,14 +692,21 @@ export function buildAirframe(ctx) {
       };
       g.push(cavity(stC, edgeC, () => [0, 0.05, -side * 1], 0.12));
     }
-    // main-gear wells
-    const stW = stations(FR.MAIN_WELL.s0, FR.MAIN_WELL.s1, 0.15);
-    // 0.44 m deep, except toward the aft end, where the roof stays 2 cm under the inlet duct's floor
-    const wellRoof = FR.mainWellRoof;
+    // main-gear wells: a forward cavity over the leg slot (and a little ahead of it) for the trunnion, brace and
+    // actuator, stepping out inboard aft of the weapons bay into the wheel bay, whose roof stays 2 cm under the
+    // inlet duct's floor; the outboard wall runs 3 cm inside the trunk's side skin
+    const stW = stations(W.cav0, W.s1, 0.12, [W.s0, W.sStep, W.sStep + 0.01, W.sNotch, W.sNotch + 0.01]);
     for (const side of [1, -1]) {
-      g.push(cavityGrid(stW.map((s) => {
-        const zo = side * Math.min(FR.MAIN_WELL.z1, FR.bWb(s) - 0.05), zi = side * FR.MAIN_WELL.z0, y = wellRoof(s);
-        return [[X(s), -FR.bD(s), zo], [X(s), y, zo], [X(s), y, zi], [X(s), -FR.bD(s), zi]];
+      g.push(cavityRows(stW.map((s) => {
+        const D = FR.bD(s), yb = -D, yf = -D + 0.025;
+        const open = s >= W.s0 - 1e-6;
+        const zIn = FR.wellInWall(s);
+        const yr = (z) => FR.mainWellRoof(s, z);
+        const zoTop = FR.wellWallZ(s, yr(1.4)), zoBot = FR.wellWallZ(s, yf);
+        const roof = [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1].map((u) => { const z = lerp(zoTop, zIn, u); return [z, yr(z)]; });
+        const zm = lerp(zIn, zoBot, 0.5);
+        const row = [open ? [FR.wellOuter(s), yb] : [zm, yf], [zoBot, yf], ...roof, [zIn, yf], open ? [FR.wellInner(s), yb] : [zm, yf]];
+        return row.map(([z, y]) => [X(s), y, side * z]);
       })));
     }
     // nose-gear well

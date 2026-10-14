@@ -221,26 +221,95 @@ export const CM_BAY = { s0: 11.65, s1: 12.05 };
 /** Lower engine-change doors under each engine bay (bottom-sample quads 28–34, z ≈ 0.2–1.4). */
 export const ENGINE_DOOR = { s0: 13.5, s1: 16.8, q0: 28, q1: 34 };
 export const MAIN_BAY = { s0: 8.45, s1: 12.35, z: 0.78 };
-export const MAIN_WELL = { s0: 11.2, s1: 12.95, z0: 0.86, z1: 1.46 };
-/** Main-gear well roof height at station s: 0.44 m above the belly, held 2 cm under the inlet duct's floor aft. */
-export function mainWellRoof(s) {
-  let y = -bD(s) + 0.44;
-  for (let z = MAIN_WELL.z0; z <= MAIN_WELL.z1 + 1e-6; z += 0.02) { const sp = ductSpan(s, z); if (sp) y = Math.min(y, sp.lo - 0.02); }
-  return y;
+/**
+ * Main-gear well (right side; z mirrors). The belly opening is L-shaped: a slot (s0 → sStep) for the leg, from
+ * zSlot out to the trunk's lower corner, and the wheel bay (sStep → s1) from z0 out to z1, aft of the main weapons
+ * bay (which ends at s 12.35), where the whole belly is free to take the 0.86 m wheel lying flat. Inside, the
+ * forward cavity (from cav0, inboard wall at cavIn) holds the trunnion, brace and actuator.
+ */
+export const MAIN_WELL = { s0: 11.80, sStep: 12.39, sNotch: 12.44, s1: 13.33, zSlot: 1.05, zNotch: 0.86, z0: 0.55, cav0: 11.64, cavIn: 0.95 };
+/**
+ * Inboard edge of the main-gear well opening at station s: the slot, then the wheel bay, which keeps a notch
+ * (zNotch) for its first few centimetres, clear of the saw teeth on the main-bay doors' aft edges.
+ */
+export function wellInner(s) {
+  const W = MAIN_WELL;
+  if (s <= W.sStep) return W.zSlot;
+  if (s < W.sStep + 0.01) return lerp(W.zSlot, W.zNotch, (s - W.sStep) / 0.01);
+  if (s <= W.sNotch) return W.zNotch;
+  if (s < W.sNotch + 0.01) return lerp(W.zNotch, W.z0, (s - W.sNotch) / 0.01);
+  return Math.max(W.z0, wellChamferIn(s));
+}
+/** The wheel bay's aft inboard corner is cut off on a diagonal too, so lines can pass between it and the engine. */
+export const wellChamferIn = (s) => 0.55 + Math.max(0, s - 13.1) * 1.3;
+/**
+ * Outboard edge of the opening, 4–5 cm inside the trunk's lower corner. It is also the belly's second sample
+ * everywhere (the engine-change doors start on it), so it only widens by 1.2 cm along the well.
+ */
+export function wellOuter(s) {
+  const W = MAIN_WELL, wb = bWb(s);
+  const win = smooth(W.s0 - 0.3, W.s0, s) * (1 - smooth(W.s1, 13.5, s));
+  const o = Math.min(1.46, wb - 0.05) + 0.012 * win;
+  if (s <= W.s1) return Math.min(o, wellChamfer(s));
+  return lerp(Math.min(o, wellChamfer(W.s1)), o, smooth(W.s1, 13.5, s));       // and back out to the engine doors
 }
 /**
- * Gear legs, gear down: trunnion [s, y, z], axle station / span, tyre radius and width (m). The
- * weight-on-wheels switch sits on the leg at fraction k from trunnion to axle, `fwd` m ahead of the leg
- * and `dz` m to the side (× side for the mains), clear of the tyre and the torque links.
+ * The wheel bay's aft outboard corner is cut off on a diagonal (well clear of the stowed wheel), leaving room
+ * for the generator on the front of the airframe gearbox.
+ */
+export const wellChamfer = (s) => 1.47 - Math.max(0, s - 13.1) * (0.27 / 0.28);
+/**
+ * Main-gear well roof height at (s, z): high over the slot, where the duct is far inboard, and over the wheel bay
+ * 0.3 m above the belly's mid-line, held 2 cm under the inlet duct's floor where the duct comes down to the engine.
+ */
+export function mainWellRoof(s, z) {
+  if (s < MAIN_WELL.sStep) return -0.28;
+  let y = -0.30;
+  for (let dz = -0.04; dz <= 0.0401; dz += 0.02) { const sp = ductSpan(s, z + dz); if (sp) y = Math.min(y, sp.lo - 0.02); }
+  return y;
+}
+/** Inboard wall of the main-gear well cavity at station s (the forward cavity reaches in past the slot). */
+export function wellInWall(s) {
+  const W = MAIN_WELL;
+  if (s <= W.sStep) return W.cavIn;
+  if (s < W.sStep + 0.01) return lerp(W.cavIn, W.zNotch, (s - W.sStep) / 0.01);
+  if (s <= W.sNotch) return W.zNotch;
+  if (s < W.sNotch + 0.01) return lerp(W.zNotch, W.z0, (s - W.sNotch) / 0.01);
+  return Math.max(W.z0, wellChamferIn(s));
+}
+/**
+ * Outboard wall of the cavity at (s, y): straight up from the opening's edge over the slot (clear of the
+ * countermeasure bay in the trunk wall beside it), parallel to the trunk's side skin over the wheel bay.
+ */
+export function wellWallZ(s, y) {
+  if (s <= MAIN_WELL.sStep) return wellOuter(s);
+  const D = bD(s);
+  const wz = (yy) => { const f = clamp(-yy / D, 0, 1); return lerp(bW(s), bWb(s), f) + 0.025 * Math.sin(Math.PI * f); };
+  const o = Math.min(1.46, bWb(s) - 0.05) + 0.012;
+  return Math.min(wz(y) - (wz(-D) - o), wellChamfer(s));
+}
+/** Signed depth of (s, y, |z|) inside the right main-gear well cavity (> 0 inside; rough outside it). */
+export function mainWellDepth(s, y, z) {
+  const W = MAIN_WELL, az = Math.abs(z), sc = clamp(s, W.cav0, W.s1);
+  const floor = sc < W.s0 ? -bD(sc) + 0.025 : -bD(sc);
+  return Math.min(s - W.cav0, W.s1 - s, az - wellInWall(sc), wellWallZ(sc, y) - az, y - floor, mainWellRoof(sc, az) - y);
+}
+/**
+ * Gear legs, gear down: trunnion [s, y, z], axle station / span, tyre radius and width (m). The main legs carry
+ * their wheels on a stub axle `stub` m outboard of the leg (leg foot at legZ), as photographs of the jet show,
+ * so the strut never passes through the tyre; stowed, the wheel lies flat (axle vertical) with its centre at
+ * `stow` [s, y], turning over between fractions `turn` of the retraction and pitching nose-down by `pitch` rad. The weight-on-wheels switch sits on
+ * the leg at fraction k from trunnion to leg foot, `fwd` m ahead of the leg and `dz` m to the side (× side for
+ * the mains), clear of the tyre and the torque links.
  */
 export const GEAR = {
-  nose: { trunnion: [4.06, -0.3, 0], axleS: 3.97, axleZ: 0, r: 0.27, w: 0.19, wow: { k: 0.72, fwd: 0.11, dz: 0.075, box: [0.06, 0.05, 0.045] } },
-  main: { trunnion: [11.3, -0.55, 1.28], axleS: 11.38, axleZ: 1.62, r: 0.43, w: 0.29, wow: { k: 0.53, fwd: 0.137, dz: -0.03, box: [0.06, 0.05, 0.05] } },
+  nose: { trunnion: [4.06, -0.3, 0], axleS: 3.97, axleZ: 0, legZ: 0, r: 0.27, w: 0.19, wow: { k: 0.72, fwd: 0.11, dz: 0.075, box: [0.06, 0.05, 0.045] } },
+  main: { trunnion: [11.98, -0.60, 1.265], axleS: 11.927, legZ: 1.36, axleZ: 1.66, stub: 0.30, r: 0.43, w: 0.29, stow: [12.851, -0.70], turn: [0.09, 0.80], pitch: 0.05, wow: { k: 0.5, fwd: 0, dz: -0.105, box: [0.05, 0.06, 0.05] } },
 };
 /** Centre [s, y, z] of a gear leg's weight-on-wheels switch box (gear down; right main for 'main'). */
 export function wowCentre(g) {
   const [s0, y0, z0] = g.trunnion;
-  const a = [g.axleS, GROUND + g.r, g.axleZ];
+  const a = [g.axleS, GROUND + g.r, g.legZ];
   return [s0 + (a[0] - s0) * g.wow.k - g.wow.fwd, y0 + (a[1] - y0) * g.wow.k, z0 + (a[2] - z0) * g.wow.k + g.wow.dz];
 }
 /** Wall fractions (chine → lower corner) with exact side-bay edges. */
@@ -254,10 +323,28 @@ export function wallB(s, f) {
   const w = bW(s), wb = bWb(s), D = bD(s);
   return [lerp(w, wb, f) + 0.025 * Math.sin(Math.PI * f), -D * f];
 }
+/**
+ * Belly sample z's at station s, corner → centre line: corner, the well opening's outboard and inboard edges
+ * (with two between), then the main-bay edge and three more. Along the gear well the inboard edge follows the
+ * opening (slot, then wheel bay) and aft of the weapons bay the bay samples tuck in under it; well forward and
+ * from the engine-change doors aft (s ≥ 13.5) the samples are the plain ones.
+ */
 export function bottomSamples(s) {
-  const wb = bWb(s);
-  const o = Math.min(MAIN_WELL.z1, wb - 0.05);
-  return [wb, o, lerp(o, MAIN_WELL.z0, 1 / 3), lerp(o, MAIN_WELL.z0, 2 / 3), MAIN_WELL.z0, MAIN_BAY.z, MAIN_BAY.z * 0.75, MAIN_BAY.z * 0.5, MAIN_BAY.z * 0.25, 0];
+  const W = MAIN_WELL, wb = bWb(s);
+  const o = wellOuter(s);
+  const bay = [MAIN_BAY.z, MAIN_BAY.z * 0.75, MAIN_BAY.z * 0.5, MAIN_BAY.z * 0.25];
+  const tuck = [0.47, 0.35, 0.235, 0.12];
+  let zi = 0.86, b = bay;
+  if (s > W.s0 - 0.3 && s < W.s0) zi = lerp(0.86, W.zSlot, smooth(W.s0 - 0.3, W.s0, s));
+  else if (s >= W.s0 && s <= W.s1) {
+    zi = wellInner(s);
+    const t = clamp((s - W.sNotch) / 0.01, 0, 1);
+    b = bay.map((v, k) => lerp(v, tuck[k], t));
+  } else if (s > W.s1 && s < 13.5) {
+    const t = smooth(W.s1, 13.5, s);
+    zi = lerp(wellInner(W.s1), 0.86, t); b = tuck.map((v, k) => lerp(v, bay[k], t));
+  }
+  return [wb, o, lerp(o, zi, 1 / 3), lerp(o, zi, 2 / 3), zi, ...b, 0];
 }
 /** B's ring at station s; index layout: upper (17), chine dup, wall (10), corner dup, bottom (10). */
 export function ringB(s) {
@@ -345,12 +432,18 @@ export const ENG_Z = 0.74, ENG_Y = -0.02;        // engine centre line
 export const F119 = { rInlet: 0.4826, rCase: 0.6, rAug: 0.575, rMax: 0.635 };
 export const DUCT = [
   // [s, z, y, width, height, roundness 0 (lip shape) … 1 (circle)]
+  // A double S-bend, as the F-22's serpentine ducts keep the fan faces out of line of sight from any exterior
+  // view: from the caret lip the duct climbs and swings inboard over the main weapons bay (its inner walls
+  // about 0.3 m apart at s 10.4–11.4), then turns back outboard and down onto the fan face. Solved so that no
+  // straight line through the lip reaches any part of the fan disc within ±40° of the inlet axis, with a 2 cm
+  // margin on the walls; the section area still grows steadily from the throat (≈ 0.32 m²) to the fan face.
   [7.6, 1.36, -0.30, 0.66, 0.76, 0.12],
-  [8.4, 1.33, -0.13, 0.62, 0.72, 0.25],
-  [9.4, 1.26, -0.04, 0.66, 0.72, 0.38],
-  [10.4, 1.17, 0.01, 0.72, 0.74, 0.52],
-  [11.4, 1.04, 0.04, 0.82, 0.80, 0.70],
-  [12.4, 0.875, 0.05, 0.92, 0.86, 0.88],          // floor held up over the stowed main wheels (roof unchanged)
+  [8.4, 1.322, -0.108, 0.618, 0.703, 0.25],
+  [9.4, 0.933, 0.166, 0.667, 0.72, 0.40],
+  [10.4, 0.477, 0.274, 0.68, 0.731, 0.55],
+  [11.4, 0.50, 0.269, 0.727, 0.708, 0.72],
+  [12.4, 0.557, 0.189, 0.829, 0.832, 0.88],
+  [12.9, 0.682, 0.051, 0.92, 0.876, 0.95],
   [FAN_S, ENG_Z, ENG_Y, 0.98, 0.98, 1.0],
 ];
 
