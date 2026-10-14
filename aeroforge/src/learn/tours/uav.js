@@ -105,7 +105,7 @@ export default [
     title: 'Computers, air data and power',
     body: 'On a floor raised over the nose-gear well sit the computers that fly the aircraft: triple-redundant flight control computers with stall protection and a lost-link profile, GPS/inertial units, an air data computer fed by the pitot, static, temperature and angle-of-attack lines, radios and a separate payload computer. Their power comes from the far end: the starter-generator on the gearbox, regulated and switched in the accessory bay and carried forward on two separate feeders. A backup generator and the batteries keep the flight-critical bus alive if it fails.',
     key: 'P = V · I: 156 A at 28 V is 4.4 kW, and the Lynx radar alone averages 1.4 kW.',
-    mode: 'systems', focus: AVIONICS, view: { dir: [0.55, 0.9, 0.8], fill: 0.8 },
+    mode: 'systems', focus: AVIONICS, view: { dir: [-1, 1.25, 0.3], fill: 0.75 },   // from above and behind: the nose bay at the top, clear of the panels
   },
   {
     title: 'Fuel and time on station',

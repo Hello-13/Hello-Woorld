@@ -105,7 +105,7 @@ export function buildFuel({ P, L, m }) {
     P(`Inboard wing tank (${sn})`, {
       system: 'Fuel', material: 'Sealed bay between the spars (est.)', mass: 10, explode: [0, -0.35, 1.9 * side],
       desc: `The inboard of the two tanks in each wing (NTSB), between the spars from the root to 4.4 m out (${lt(litres.inb)} in this model). Wing fuel sits where the lift is, so it relieves wing bending; a jet pump at its low point empties it into the header tank.`,
-      callout: side > 0, anchor: W(2.6, 0.42, 1, 0, side),
+      callout: side > 0, anchor: W(3.9, 0.42, 1, 0, side),   // upper skin near the outboard end of the tank, clear of the stores labels
     }, L(f(inb), m.fuel));
     P(`Outboard wing tank (${sn})`, {
       system: 'Fuel', material: 'Sealed bay between the spars (est.)', mass: 7, explode: [0, -0.35, 2.6 * side],

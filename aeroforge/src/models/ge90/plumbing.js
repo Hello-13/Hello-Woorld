@@ -271,7 +271,7 @@ export function buildPlumbing(ctx) {
     explode: [-0.3, -0.5, 1.0], temp: 450,
     desc: 'Listed only for the -110B1/-113B/-115B: opened by servo fuel from the HMU, it lets warm compressor air forward through the fan hub frame to keep ice off the booster inlet. GE does not publish its routing; the duct here is drawn through the frame to the splitter.',
   }, m(merge([axialCyl(0.66, -2.15, 1.25, 0.028, 0.07, 14), boxAt(0.695, -2.15, 1.25, [0.03, 0.05, 0.04]), radialCyl(0.56, 0.635, -2.17, 1.25, 0.018, 10),
-    line([[0.66, -2.118, 1.25], [0.665, -2.0, 1.27], [0.78, -1.84, 1.3], [0.86, -1.6, 1.32], [0.87, -1.2, 1.33], [0.875, -0.82, 1.33]], 0.018, 8)]), GM.duct()));
+    line([[0.66, -2.118, 1.25], [0.665, -2.0, 1.27], [0.78, -1.84, 1.3], [0.84, -1.66, 1.318], [0.845, -1.55, 1.325], [0.87, -1.2, 1.33], [0.875, -0.82, 1.33]], 0.018, 8)]), GM.duct()));
   P('Core compartment cooling valve', {
     system: 'Thermal control', material: 'Parker FADEC-commanded butterfly valve and duct (location estimated)', mass: 3,
     explode: [0.4, -0.55, 0.9], temp: 400,
@@ -282,8 +282,8 @@ export function buildPlumbing(ctx) {
     explode: [-0.4, -0.55, -0.5], temp: 500,
     desc: 'An eductor is a jet pump: compressor air blown in at its side drags the forward sump\'s vent air, which enters at its front, out through its back and overboard, keeping the bearing sumps below their seal-air pressure at low power so oil cannot weep out. A hand-operated shutoff valve sits in the compressor-air line.',
   }, m(merge([
-    axialCyl(0.67, -2.15, 2.45, 0.026, 0.08, 12), tangentCyl(0.67, -2.16, 2.49, 0.014, 0.012, 8), radialCyl(0.575, 0.6, -2.7, 2.5, 0.014, 8),
-    line([[0.6, -2.7, 2.5], [0.632, -2.5, 2.5], [0.648, -2.3, 2.5], [0.665, -2.2, 2.497], [0.67, -2.16, 2.492]], 0.012), axialCyl(0.639, -2.45, 2.5, 0.02, 0.05, 10), boxAt(0.667, -2.45, 2.5, [0.04, 0.012, 0.012]),
+    axialCyl(0.67, -2.15, 2.45, 0.026, 0.08, 12), tangentCyl(0.67, -2.16, 2.49, 0.014, 0.012, 8), radialCyl(0.575, 0.6, -2.62, 2.5, 0.014, 8),
+    line([[0.6, -2.62, 2.5], [0.625, -2.52, 2.5], [0.648, -2.3, 2.5], [0.665, -2.2, 2.497], [0.67, -2.16, 2.492]], 0.012), axialCyl(0.639, -2.45, 2.5, 0.02, 0.05, 10), boxAt(0.667, -2.45, 2.5, [0.04, 0.012, 0.012]),
     line([[0.31, -1.72, 2.618], [0.4, -1.86, 2.618], [0.6, -1.9, 2.618], [0.668, -2.05, 2.55], [0.672, -2.09, 2.48], [0.67, -2.112, 2.455]], 0.014),
     line([[0.67, -2.188, 2.45], [0.75, -2.29, 2.42], [0.95, -2.4, 2.4], [1.02, -2.42, 2.4]], 0.016),
   ]), GM.duct()));

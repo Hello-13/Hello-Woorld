@@ -46,7 +46,7 @@ export default [
     title: 'The Merlin 1D cycle',
     body: 'Here the centre engine is broken out. One shaft carries the LOX pump, the RP-1 pump and a turbine, which a small gas generator spins by burning a fuel-rich trickle of both propellants; its exhaust is dumped overboard — an open gas-generator cycle, simpler than staged combustion for a few seconds of Isp. Past the main valves (a servo butterfly valve trims the mixture) the propellants meet at a pintle injector and burn at about 9.7 MPa. The steering actuators run on high-pressure RP-1 from the same pump.',
     key: 'One shaft, two impellers, one turbine. The often-quoted 36,000 rpm and ≈ 10,000 hp are the Merlin 1C pump\'s; no Merlin 1D figure is published. TEA-TEB, which ignites on contact with LOX, lights the engine and allows restarts.',
-    focus: ENGINE, explode: 0.85, view: { dir: [0.85, 0.42, 1.4], fill: 0.95 },
+    focus: ENGINE, explode: 0.85, view: { dir: [0.85, 0.42, 1.4], fill: 1.15 },
   },
   {
     title: 'Octaweb and engine-out',
