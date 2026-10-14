@@ -94,7 +94,7 @@ export function buildWeapons(ctx) {
       for (let k = 0; k < p.length - 1; k++) {
         const a = p[k], b = p[k + 1];
         const len = Math.hypot(a[1] - b[1], a[2] - b[2]);
-        const g = new THREE.BoxGeometry(0.05, len, 0.06);
+        const g = new THREE.BoxGeometry(0.05, len, 0.03);
         g.rotateX(Math.atan2(b[2] - a[2], b[1] - a[1]));             // +y → along the segment a → b
         g.translate(a[0], (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
         ribs.push(g);
@@ -301,9 +301,9 @@ export function buildWeapons(ctx) {
       // trapeze drive: a hydraulic actuator from a roof fitting to a lever on the aft arm
       {
         const aft = arms[1];
-        const Fx = V(X(10.6), -0.40, side * 1.12);
+        const Fx = V(X(10.6), -0.415, side * 1.12);                                   // roof fitting, under the duct floor
         const bar = unitRod(0.03, F.hyd()), rodM = unitRod(0.015, F.chrome(), 8);
-        const fit = mesh(merge([FR.boxS(10.6, -0.385, side * 1.12, 0.08, 0.03, 0.08), FR.cylX(10.75, -0.47, side * 1.22, 0.1, 0.035, 0.035, 10)]), F.tiDull());
+        const fit = mesh(merge([FR.boxS(10.6, -0.4, side * 1.12, 0.08, 0.03, 0.08), FR.cylX(10.75, -0.47, side * 1.22, 0.1, 0.035, 0.035, 10)]), F.tiDull());
         const end = new THREE.Vector3(), lever = new THREE.Vector3();
         P(`LAU-141/A trapeze actuator (${R})`, {
           system: 'Weapons', material: 'Hydraulic linear actuator on the trapeze arm, 4,000 psi', mass: 6,

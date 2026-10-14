@@ -11,13 +11,9 @@ import { F } from './materials.js';
 import * as FR from './frame.js';
 import { merge, slab, bladeRow, latheX, hinge, toothedGrid, rectTube } from './util.js';
 
-const { X, lerp, mono } = FR;
+const { X, lerp } = FR;
 
 const mirrorPts = (ring) => ring.map((p) => [p[0], p[1], -p[2]]).reverse();
-
-const ductColsP = [1, 2, 3, 4, 5].map((c) => FR.DUCT.map((r) => [r[0], r[c]]));
-/** Inlet duct centre and size at station s (right side). */
-function ductAtLocal(s) { const [zc, yc, w, h] = ductColsP.map((k) => mono(k, s)); return { zc, yc, w, h }; }
 
 export function buildPropulsion(ctx) {
   const { P, anim } = ctx;
@@ -61,7 +57,8 @@ export function buildPropulsion(ctx) {
     const bl = [];
     // bleed plenum behind the inboard wall, and the exit duct up to the grille on the upper surface
     bl.push(new THREE.BoxGeometry(0.75, 0.4, 0.09).translate(X(8.0), -0.18, side * 0.945));
-    bl.push(FR.pipe([[8.3, 0.0, side * 0.965], [8.4, 0.25, side * 1.0], [8.47, FR.topAt(8.47, 1.08) - 0.04, side * 1.08]], 0.045, 8, 10));
+    // up the inboard side of the fuel–ram-air cooler, then out under the grille's inboard end
+    bl.push(FR.pipe([[8.3, 0.0, side * 0.945], [8.42, 0.22, side * 0.95], [8.5, FR.topAt(8.5, 1.03) - 0.04, side * 1.03]], 0.045, 8, 10));
     P(`Inlet throat & boundary-layer bleed (${R})`, {
       system: 'Propulsion', material: 'Composite duct, perforated titanium bleed panels', mass: 110,
       explode: [0.55, -0.35, 1.25 * side],
@@ -94,7 +91,7 @@ export function buildPropulsion(ctx) {
     P(`Serpentine inlet duct (${R})`, {
       system: 'Propulsion', material: 'Composite duct with radar-absorbent lining', mass: 160,
       explode: [0, -0.15, 1.0 * side], callout: side > 0, anchor: [X(10.6), 0.38, 1.15 * side],
-      desc: 'The duct curves up and inward for about 7 m from the inlet to the engine, so no line of sight reaches the spinning fan — normally the brightest radar reflector on a jet — and its absorbent lining soaks up energy that bounces in.',
+      desc: 'The duct curves up and inward for about 7 m from the inlet to the engine. On the real jet the serpentine ducts keep the fan faces — normally the brightest radar reflectors on a jet — out of line of sight from any exterior view, and an absorbent lining soaks up energy that bounces in. The real duct shape is not published: in this model a sliver of the fan still shows from some angles ahead.',
     }, mesh(FR.gridSurface(aft, { closed: true, uv: 'n' }), F.duct()));
     {
       // bypass (spill) door on the upper aft fuselage over the end of the duct, with the short duct to it
@@ -109,16 +106,25 @@ export function buildPropulsion(ctx) {
         explode: [-0.2, 1.75, 1.2 * side],
         desc: 'When the engine needs less air than the fixed caret inlet captures, this door opens to spill the surplus from the aft end of the duct overboard, keeping the inlet shock system stable instead of letting it buzz. It matters at the Mach 1.5-plus the F-22 cruises at on dry power (position approximate).',
       }, hd.pivot);
-      const sm = (s0 + s1) / 2;
-      const { zc, yc, w, h } = ductAtLocal(sm);
-      // taps the duct's upper outboard shoulder, outboard of the F-3 saddle tank
-      void w; void zc;
-      const zB = side * 1.24, yB = yc + 0.25 * (h / 0.94);
-      const by = [rectTube([[sm, yB, zB], [sm, (yB + FR.topAt(sm, 1.28)) / 2, side * 1.26], [sm, FR.topAt(sm, 1.3) - 0.03, side * 1.3]], 0.14, 0.6, { n: 6, up: [1, 0, 0] })];
+      // a collar seated on the duct's outboard roof (y follows the roof) that rises to the door opening
+      const roof = (sv, zz) => { const sp = FR.ductSpan(sv, zz); return sp ? sp.hi : -1; };
+      const foot = [], mouth = [];
+      const fs = [12.55, 13.05], fz = [1.14, 1.22], ms = [12.52, 13.08], mz = [1.2, 1.42];
+      const loop = (sa, za, f) => {
+        const out = [];
+        for (let k = 0; k < 6; k++) out.push(f(lerp(sa[0], sa[1], k / 6), za[0]));
+        for (let k = 0; k < 4; k++) out.push(f(sa[1], lerp(za[0], za[1], k / 4)));
+        for (let k = 0; k < 6; k++) out.push(f(lerp(sa[1], sa[0], k / 6), za[1]));
+        for (let k = 0; k < 4; k++) out.push(f(sa[0], lerp(za[1], za[0], k / 4)));
+        return out;
+      };
+      foot.push(...loop(fs, fz, (sv, zz) => [X(sv), roof(sv, zz) + 0.004, side * zz]));
+      mouth.push(...loop(ms, mz, (sv, zz) => [X(sv), FR.topAt(sv, zz) - 0.022, side * zz]));
+      const by = [FR.gridSurface([foot, mouth], { closed: true, uv: 'n' })];
       P(`Inlet bypass duct (${R})`, {
         system: 'Propulsion', material: 'Composite plenum off the top of the S-duct', mass: 10,
         explode: [-0.2, 1.25, 1.35 * side],
-        desc: 'A short plenum taps the top of the serpentine duct just ahead of the fan face and leads up to the bypass door, so spilled air never reaches the engine (position approximate).',
+        desc: 'A short plenum taps the top of the serpentine duct just ahead of the fan face and leads up and outboard to the bypass door, so spilled air never reaches the engine (position approximate).',
       }, mesh(merge(by), F.duct()));
     }
 
@@ -384,11 +390,12 @@ export function buildPropulsion(ctx) {
     }
     // ---------------------------------------------------------------- gearbox, AMAD, engine fuel, lube, ignition, mounts
     {
-      const gy = yc - 0.69;
+      // hung close under the fan case, so it and its drive pads stay above the engine-change door's inner face
+      const gy = yc - 0.65;
       const g = [];
       g.push(new THREE.BoxGeometry(0.5, 0.12, 0.34).translate(X(13.85), gy, zc));
       g.push(FR.cylX(13.85, gy + 0.07, zc, 0.46, 0.05, 0.05, 10));                         // tower-shaft housing
-      for (const [s, dz] of [[13.7, 0.12], [14.0, -0.1]]) g.push(FR.cylX(s, gy - 0.07, zc + side * dz, 0.08, 0.045, 0.045, 12));   // drive pads
+      for (const s of [13.66, 14.02]) g.push(new THREE.CylinderGeometry(0.045, 0.045, 0.06, 12).rotateX(Math.PI / 2).translate(X(s), gy, zc - side * 0.2));   // drive pads on the inboard face
       P(`F119 accessory gearbox (${R})`, {
         system: 'Propulsion', material: 'Aluminium / magnesium gear case, steel gears, mounted under the fan case', mass: 55,
         explode: [0.2, -0.95, 0.55 * side],
@@ -478,9 +485,9 @@ export function buildPropulsion(ctx) {
         const green = [FR.pipe([[14.6, fy - 0.05, fz], [14.3, yc - 0.55, zc + side * 0.42], [13.85, gy + 0.08, zc + side * 0.2]], 0.01, 6, 12)];
         const sens = [];
         // fan-inlet temperature / pressure probes (T2 / P2) through the case at the fan face
-        for (const a of [0.6, 2.4]) sens.push(new THREE.CylinderGeometry(0.008, 0.008, 0.1, 6).translate(0, 0.45, 0).rotateX(a * side).translate(X(13.36), yc, zc));
+        for (const a of [0.6, 2.4]) sens.push(new THREE.CylinderGeometry(0.008, 0.008, 0.1, 6).translate(0, 0.45, 0).rotateX(a * side).translate(X(13.39), yc, zc));
         // N1 / N2 speed pickups on the gearbox
-        for (const dz of [-0.2, 0.2]) sens.push(new THREE.CylinderGeometry(0.014, 0.014, 0.06, 8).rotateX(Math.PI / 2).translate(X(13.75), gy, zc + dz));
+        for (const dz of [-0.2, 0.2]) sens.push(new THREE.CylinderGeometry(0.014, 0.014, 0.06, 8).rotateX(Math.PI / 2).translate(X(13.86), gy, zc + dz));
         // turbine-exhaust thermocouples: a ring of probes and their harness at the LP turbine exit
         sens.push(tor(0.555, 0.008, 15.6, 40));
         for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; sens.push(new THREE.CylinderGeometry(0.006, 0.006, 0.2, 5).translate(0, 0.46, 0).rotateX(a).translate(X(15.6), yc, zc)); }

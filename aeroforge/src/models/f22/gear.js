@@ -236,7 +236,7 @@ export function buildGear(ctx) {
     const axle = V(X(G.axleS), FR.GROUND + Rm, side * G.axleZ);
     const vd = axle.clone().sub(T);
     const L = vd.length();
-    const vs = V(X(12.33) - T.x, -0.585 - T.y, side * 1.225 - T.z).normalize().multiplyScalar(L);   // stowed axle: the wheel clears the closed door and stays inside the trunk side wall
+    const vs = V(X(12.33) - T.x, -0.61 - T.y, side * 1.21 - T.z).normalize().multiplyScalar(L);   // stowed axle: the wheel clears the closed door and the duct floor above it and stays inside the trunk side wall
     const q = new THREE.Quaternion().setFromUnitVectors(vd.clone().normalize(), vs.clone().normalize());
     const dir = vd.clone().normalize();
     const at = (k) => dir.clone().multiplyScalar(L * k);
@@ -342,7 +342,8 @@ export function buildGear(ctx) {
       desc: 'Closes the main-gear well flush with the belly; like the bay doors its edges are serrated to keep radar reflections in a few narrow directions.',
     }, h.pivot);
     anim.gearDoors.push({ h, angle: 1.6 });
-    const Fd = V(X(12.6), -0.5, side * 0.95), Pd = V(X(12.6), -FR.bD(12.6) + 0.03, side * 1.12);
+    // at the aft end of the well, behind the stowed wheel and under the duct floor
+    const Fd = V(X(12.85), -0.49, side * 0.95), Pd = V(X(12.85), -FR.bD(12.85) + 0.03, side * 1.12);
     const dBar = unitRod(0.03, F.hyd(), 10), dRod = unitRod(0.016, F.chrome(), 8);
     const dLen = Fd.distanceTo(Pd) * 0.85;
     const dq = new THREE.Quaternion(), dp = new THREE.Vector3();

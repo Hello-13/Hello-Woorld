@@ -198,6 +198,23 @@ export function ringA(s) {
 
 const B_UP = [0, 0.08, 0.16, 0.24, 0.32, 0.40, 0.48, 0.55, 0.62, 0.69, 0.75, 0.81, 0.86, 0.905, 0.94, 0.97, 1];
 export const SIDE_BAY = { s0: 8.5, s1: 11.6, y0: -0.42, y1: -0.82 };
+/**
+ * Side-bay cavity (right side) at station s as four [z, y] points: the door opening's top and bottom edges on
+ * the trunk wall and the two back-wall corners 0.34 m in. Near the front of the bay the inlet duct's floor dips
+ * low, so there the roof slopes down inboard to stay at least 3 cm under the duct.
+ */
+export function sideBaySection(s) {
+  const wf = wallFractions(s);
+  const a = wallB(s, wf[4]), b = wallB(s, wf[7]);
+  const aIn = [a[0] - 0.99 * 0.34, a[1] + 0.08 * 0.34], bIn = [b[0] - 0.99 * 0.34, b[1] + 0.08 * 0.34];
+  for (let k = 0; k < 60; k++) {
+    let ok = true;
+    for (let u = 0; u <= 1.0001 && ok; u += 0.1) ok = ductDepth(s, lerp(a[1], aIn[1], u), lerp(a[0], aIn[0], u)) < -0.03;
+    if (ok) break;
+    aIn[1] -= 0.005;
+  }
+  return [a, aIn, bIn, b];
+}
 /** Countermeasure (flare) bay behind each side bay: the middle third of the side-bay wall band. */
 export const CM_BAY = { s0: 11.65, s1: 12.05 };
 /** Lower engine-change doors under each engine bay (bottom-sample quads 28–34, z ≈ 0.2–1.4). */
@@ -326,7 +343,7 @@ export const DUCT = [
   [9.4, 1.26, -0.04, 0.66, 0.72, 0.38],
   [10.4, 1.17, 0.01, 0.72, 0.74, 0.52],
   [11.4, 1.04, 0.04, 0.82, 0.80, 0.70],
-  [12.4, 0.875, 0.03, 0.92, 0.90, 0.88],
+  [12.4, 0.875, 0.05, 0.92, 0.86, 0.88],          // floor held up over the stowed main wheels (roof unchanged)
   [FAN_S, ENG_Z, ENG_Y, 0.98, 0.98, 1.0],
 ];
 

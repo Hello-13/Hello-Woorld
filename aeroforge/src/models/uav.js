@@ -787,7 +787,7 @@ export function buildUAV() {
     lgh.push(pipe([[X(5.063), 1.445, 0.215 * zs], [X(4.95), 1.42, 0.2 * zs], [X(4.885), 1.36, 0.2 * zs], [X(4.882), 1.27, 0.215 * zs], [X(4.886), 1.205, 0.229 * zs]], 0.007, 5, 24));
     // driver → inboard under the roof to the keel web, aft along it with a drop to the door actuator, then down to the uplock's release
     lgh.push(pipe([[X(5.16), 1.468, 0.19 * zs], [X(5.21), 1.472, 0.11 * zs], [X(5.32), 1.468, 0.056 * zs], [X(5.7), 1.458, 0.056 * zs], [X(5.9), 1.38, 0.056 * zs], [ul[0], ul[1] + 0.02, 0.058 * zs], [ul[0], ul[1] - 0.006, 0.06 * zs]], 0.006, 5, 40));
-    lgh.push(pipe([[X(5.7), 1.458, 0.056 * zs], [X(DOOR_ACT[0]), 1.43, 0.18 * zs], [X(DOOR_ACT[0]), DOOR_ACT[1] + 0.006, (DOOR_ACT[2] - 0.007) * zs]], 0.005, 5, 14));
+    lgh.push(pipe([[X(5.7), 1.458, 0.056 * zs], [X(DOOR_ACT[0]), 1.43, 0.18 * zs], [X(DOOR_ACT[0]), DOOR_ACT[1] + 0.002, (DOOR_ACT[2] - 0.002) * zs]], 0.005, 5, 14));
   }
   // nose: from the avionics bay harness through the well's aft wall to the retract driver, and under the driver to the steering controller
   lgh.push(pipe([[X(3.35), 1.45, -0.29], [X(3.24), 1.425, -0.21], [X(3.12), 1.425, -0.13], [X(3.04), 1.44, -0.127], [X(2.985), 1.45, -0.125]], 0.006, 5, 20));
@@ -987,7 +987,8 @@ export function buildUAV() {
   for (const zs of [1, -1]) {
     avh.push(pipe(topRun(1.3, 3.45, zs), 0.012, 6, 60));
     avh.push(pipe([fusePoint(1.3, Math.PI / 2 - 0.5 * zs, 0.02), [X(1.35), 1.55, 0.3 * zs], [X(1.55), 1.3, 0.25 * zs]], 0.009, 5, 16));
-    for (const [q, y, z] of [[2.175, NFLOOR + 0.21, 0.24], [2.64, NFLOOR + 0.17, 0.2], zs > 0 ? [3.26, NFLOOR + 0.25, 0.14] : [3.26, NFLOOR + 0.226, 0.13]]) avh.push(tubeBetween(fusePoint(q, Math.PI / 2 - 0.5 * zs, 0.02), [X(q), y, z * zs], 0.007, 5));
+    // drops to each rack: the outer and inner computers, the GPS/INS units, and the radios or the datalink transceiver
+    for (const [q, y, z] of [[2.175, NFLOOR + 0.21, 0.24], [2.175, NFLOOR + 0.21, 0.08], [2.64, NFLOOR + 0.17, 0.2], zs > 0 ? [3.26, NFLOOR + 0.25, 0.14] : [3.26, NFLOOR + 0.226, 0.13]]) avh.push(tubeBetween(fusePoint(q, Math.PI / 2 - 0.5 * zs, 0.02), [X(q), y, z * zs], 0.007, 5));
     avh.push(pipe([fusePoint(3.35, Math.PI / 2 - 0.5 * zs, 0.02), [X(3.36), 1.6, 0.33 * zs], [X(3.34), 1.3, 0.25 * zs]], 0.009, 5, 16));
   }
   avh.push(pipe([[X(1.55), 1.3, -0.25], [X(1.25), 1.15, -0.24], [X(1.1), 1.045, -0.195], [X(1.08), 1.002, -0.18]], 0.009, 5, 16));   // past the ballast to the turret's slip ring
@@ -995,6 +996,7 @@ export function buildUAV() {
   avh.push(pipe([[X(1.55), 1.3, 0.25], [X(1.8), 1.285, 0.262], [X(2.098), 1.27, 0.262]], 0.009, 5, 16));
   avh.push(pipe([[X(2.098), 1.215, 0.25], [X(1.85), 1.19, 0.235], [X(1.4), 1.115, 0.222], [X(1.15), 1.04, 0.2], [X(1.08), 1.002, 0.18]], 0.008, 5, 30));
   avh.push(tubeBetween(fusePoint(1.7, Math.PI / 2 + 0.5, 0.02), [X(1.7), NFLOOR + 0.212, -0.2], 0.007, 5));            // SATCOM modem
+  avh.push(pipe([fusePoint(3.3, Math.PI / 2 - 0.5, 0.02), [X(3.3), 1.64, 0.236], [X(3.3), 1.56, 0.226]], 0.006, 5, 12));   // the lower of the two ARC-210s
   avh.push(tubeBetween(fusePoint(2.92, Math.PI / 2 - 0.5, 0.02), [X(2.92), NFLOOR + 0.092, 0.11], 0.006, 5));          // Iridium transceiver
   // lower anti-collision beacon: from the starboard battery drop, aft past the battery and down under the forward cell to the light's base
   avh.push(pipe([[X(3.34), 1.3, 0.25], [X(3.4), 1.22, 0.27], [X(3.45), 1.1, 0.24], [X(3.55), 1.03, 0.12], [X(3.68), 1.012, 0.02], [X(3.7), prof(3.7).bot + 0.004, 0]], 0.006, 5, 30));

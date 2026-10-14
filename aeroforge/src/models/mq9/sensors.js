@@ -150,9 +150,9 @@ export function buildLinks({ P, L, m }, at) {
   c([[X(3.0), prof(3.0).top - 0.012, 0], roof(2.96, 0.01, 0.03), [X(2.85), 1.76, 0.12], [at.egi[0][0] - 0.08, at.egi[0][1] + 0.08, 0.2]]);
   c([[X(5.05), prof(5.05).top - 0.012, 0], roof(4.98, -0.02, 0.03), roof(4.4, -0.04), roof(3.4, -0.04), roof(3.0, -0.08), [X(2.8), 1.74, -0.17], [at.egi[1][0] - 0.08, at.egi[1][1] + 0.08, -0.2]]);
   // IFF: upper blade forward along the roof; lower blade along the lower side and up into the bay
-  c([roof(6.6, 0.02, 0.03), roof(6.0, 0.03), roof(5.0, 0.03), roof(3.6, 0.03), roof(2.9, 0.03), [X(2.68), 1.68, 0.03], [at.iff[0] - 0.02, at.iff[1] + 0.06, 0.03]]);
+  c([[X(6.6), prof(6.6).top - 0.013, 0], roof(6.55, 0.02, 0.03), roof(6.0, 0.03), roof(5.0, 0.03), roof(3.6, 0.03), roof(2.9, 0.03), [X(2.68), 1.68, 0.03], [at.iff[0] - 0.02, at.iff[1] + 0.06, 0.03]]);
   // the lower blade's cable stays in the keel channel under the aft cell's floor, rising only between the gear wells
-  c([keel(6.9, 0, 0.02), keel(6.8, -0.03, 0.022), keel(6.62, -0.035, 0.022), keel(6.5, -0.03, 0.025), [X(6.38), 1.225, -0.012], [X(6.25), 1.29, 0.0], [X(6.0), 1.3, 0.0], [X(5.0), 1.3, 0.0], [X(4.88), 1.29, 0.04], fusePoint(4.79, -0.6, 0.035), fusePoint(4.4, -0.6, 0.035),
+  c([[X(6.9), prof(6.9).bot + 0.013, 0], keel(6.86, -0.01, 0.022), keel(6.8, -0.03, 0.022), keel(6.62, -0.035, 0.022), keel(6.5, -0.03, 0.025), [X(6.38), 1.225, -0.012], [X(6.25), 1.29, 0.0], [X(6.0), 1.3, 0.0], [X(5.0), 1.3, 0.0], [X(4.88), 1.29, 0.04], fusePoint(4.79, -0.6, 0.035), fusePoint(4.4, -0.6, 0.035),
     fusePoint(3.6, -0.6, 0.035), fusePoint(3.1, -0.5, 0.035), [X(2.92), 1.42, 0.3], [X(2.84), 1.5, 0.2], [X(2.8), 1.54, 0.08], [at.iff[0] - 0.13, at.iff[1], 0.04]]);
   P('Antenna coax runs', {
     system: 'Communications', material: 'Low-loss coaxial cable, 6–8 mm (routing estimated)', mass: 2.5, count: 6, xrayWeight: 0.5, explode: [0.2, 0.9, 0.35],
@@ -165,7 +165,7 @@ export function buildLinks({ P, L, m }, at) {
     system: 'Communications', material: 'Satellite phone-band transceiver, patch antenna and coax (CBP fit)', mass: 2, explode: [0.2, 1.55, 0.45],
     desc: 'A secondary beyond-line-of-sight link through the Iridium satellites, fitted to the Customs and Border Protection Predator B lost in 2006 (NTSB); the USAF fit is not public. Its low data rate could fly the aircraft only through the autopilot hold modes, and when the engine stopped it was among the loads shed to save the battery.',
   }, L(merge([lru(0.2, 0.08, 0.15, irBox, 0.01), lru(0.08, 0.014, 0.08, irPatch, 0.03),
-    pipe([[irPatch[0], irPatch[1] - 0.03, 0.06], roof(5.0, 0.06), roof(3.6, 0.065), roof(3.1, 0.07), [X(3.0), 1.66, 0.07], [irBox[0], irBox[1] + 0.04, 0.07]], 0.0035, 4, 40)]), m.lru));
+    pipe([[irPatch[0], irPatch[1] - 0.006, 0], [irPatch[0] - 0.03, irPatch[1] - 0.024, 0.04], roof(5.3, 0.06), roof(5.0, 0.06), roof(3.6, 0.065), roof(3.1, 0.07), [X(3.0), 1.66, 0.07], [irBox[0], irBox[1] + 0.04, 0.07]], 0.0035, 4, 40)]), m.lru));
 
   const elt = [X(6.15), 1.785, 0.12];
   const eltBlade = new THREE.Shape([new THREE.Vector2(0.05, 0), new THREE.Vector2(-0.05, 0), new THREE.Vector2(-0.02, 0.13), new THREE.Vector2(0.0, 0.13)]);
@@ -173,5 +173,5 @@ export function buildLinks({ P, L, m }, at) {
   P('Emergency locator transmitter', {
     system: 'Communications', material: 'ELT, blade antenna and its cable (positions not public)', mass: 1.5, explode: [0, 1.4, 0.5],
     desc: 'Transmits a distress beacon after a crash so searchers can find the wreck. After the 2006 Predator B crash it was never heard: the antenna cable separated in the impact, although the transmitter itself tested normal (NTSB; positions estimated).',
-  }, [L(merge([lru(0.15, 0.08, 0.08, elt, 0.01), pipe([[elt[0] - 0.075, elt[1] + 0.01, elt[2]], [X(6.28), 1.82, 0.06], [X(6.32), prof(6.32).top - 0.03, 0]], 0.0035, 4, 12)]), m.lruOlive), L(eltG, m.dark)]);
+  }, [L(merge([lru(0.15, 0.08, 0.08, elt, 0.01), pipe([[elt[0] - 0.075, elt[1] + 0.01, elt[2]], [X(6.28), 1.82, 0.06], [X(6.31), prof(6.32).top - 0.03, 0.01], [X(6.32), prof(6.32).top - 0.012, 0]], 0.0035, 4, 14)]), m.lruOlive), L(eltG, m.dark)]);
 }

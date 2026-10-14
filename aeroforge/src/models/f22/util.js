@@ -45,9 +45,11 @@ export function insetPoly(pts, d) {
  * `skinGap + depth`, `thick` deep along x. Optional `keep(zy)` drops vertices (e.g. the part of a
  * frame that would cross the cockpit opening) by splitting the band into open runs.
  */
-export function frameBand(s, outline, { depth = 0.08, thick = 0.03, skinGap = 0.01, keep = null } = {}) {
+export function frameBand(s, outline, { depth = 0.08, thick = 0.03, skinGap = 0.01, keep = null, clip = null } = {}) {
   const o = insetPoly(outline, skinGap);
   const i = insetPoly(outline, skinGap + depth);
+  // clip(outer, inner) may pull an inner-edge point back toward the skin (a frame made shallow round a duct)
+  if (clip) for (let k = 0; k < i.length; k++) i[k] = clip(o[k], i[k]);
   const n = o.length;
   const runs = [];
   let cur = [];

@@ -39,7 +39,7 @@ export function buildWiring(ctx) {
       // round its lower outboard corner ahead of the main-gear well, aft beside the duct (clear of the stowed
       // wheel) and under the boom to the engine bay
       const trunk = [[4.3, -0.22, z * 0.3], [4.6, -0.16, z * 0.6], [5.6, -0.16, z * 0.74], [6.8, -0.3, z * 0.82], [7.3, -0.42, z * 0.915], [8.4, -0.42, z * 0.93],
-        [10.4, -0.4, z * 0.93], [11.05, -0.39, z * 1.05], [11.25, -0.37, z * 1.28], [11.38, -0.3, z * 1.42], [11.6, -0.2, z * 1.47], [12.55, -0.17, z * 1.47],
+        [10.4, -0.4, z * 0.93], [11.05, -0.405, z * 1.05], [11.25, -0.37, z * 1.28], [11.38, -0.31, z * 1.42], [11.6, -0.2, z * 1.47], [12.55, -0.17, z * 1.47],
         [12.76, -0.24, z * 1.47], [13.0, -0.245, z * 1.42], [13.3, -0.24, z * 1.38], [14.0, -0.235, z * 1.38], [14.6, -0.3, z * 1.32]];
       g.push(tube(trunk));
       // to the stabilator actuator and up the boom to the rudder actuator

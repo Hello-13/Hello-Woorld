@@ -25,7 +25,7 @@ export function buildThermal(ctx) {
     const g = [box(6.78, -0.26, 0.42, 0.34, 0.17, 0.26)];
     g.push(FR.cylX(6.7, -0.14, 0.39, 0.16, 0.05, 0.05, 14));                                 // refrigerant compressor
     g.push(box(6.86, -0.14, 0.5, 0.14, 0.07, 0.1));                                          // expansion valve block
-    const l = [FR.pipe([[6.62, -0.31, 0.42], [6.56, -0.41, 0.37], [6.5, -0.51, 0.33]], 0.016, 6, 6),            // evaporator ↔ PAO loop 1 (inboard of the batteries)
+    const l = [FR.pipe([[6.62, -0.31, 0.42], [6.58, -0.43, 0.385], [6.55, -0.533, 0.355]], 0.016, 6, 6),         // evaporator ↔ PAO loop 1 supply line (inboard of the batteries)
       // condenser ↔ fuel: outboard of the main harness and the bleed duct, under the front of F-1
       FR.pipe([[6.94, -0.29, 0.52], [7.0, -0.33, 0.6], [7.04, -0.46, 0.63], [7.1, -0.53, 0.65]], 0.016, 6, 8)];
     P('Vapour-cycle refrigeration pack', {

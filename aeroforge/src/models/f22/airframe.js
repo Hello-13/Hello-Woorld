@@ -65,11 +65,15 @@ function capAft(ring) {
  * `inward(s)` the depth direction. Returns walls, back and end caps.
  */
 export function cavity(st, edge, inward, depth) {
-  const grid = st.map((s) => {
+  return cavityGrid(st.map((s) => {
     const [a, b] = edge(s);
     const d = inward(s).map((v) => v * depth);
     return [a, [a[0] + d[0], a[1] + d[1], a[2] + d[2]], [b[0] + d[0], b[1] + d[1], b[2] + d[2]], b];
-  });
+  }));
+}
+
+/** Cavity liner from rows of four points per station: opening edge, two back corners, opening edge. */
+export function cavityGrid(grid) {
   const pos = [], idx = [];
   const m = grid.length;
   for (const row of grid) for (const p of row) pos.push(...p);
@@ -98,6 +102,49 @@ function sparCaps(secs, f, w, t, scale) {
     geo.push(slab(grid, () => [0, -sgn * t, 0]));
   }
   return merge(geo);
+}
+
+/**
+ * Slide a wing panel's root-station vertices (z = root z) outboard along their own chord lines until each clears
+ * the inlet duct by 2.5 cm. The skin root runs inside the fuselage, and without this its inboard strip would
+ * cross the engine air passage of the caret inlet and S-duct.
+ */
+function trimRootFromDuct(g, root, tip) {
+  const p = g.attributes.position, zr = root.le[2];
+  const q = [0, 0, 0];
+  const atRoot = new Uint8Array(p.count);
+  for (let i = 0; i < p.count; i++) {
+    if (Math.abs(p.getZ(i) - zr) > 1e-6) continue;
+    atRoot[i] = 1;
+    const xc = (root.le[0] - p.getX(i)) / root.chord;
+    let yt = (p.getY(i) - root.le[1]) / (root.chord * root.t);
+    const at = (eta) => {
+      const ch = root.chord + (tip.chord - root.chord) * eta, t = root.t + (tip.t - root.t) * eta;
+      q[0] = root.le[0] + (tip.le[0] - root.le[0]) * eta - xc * ch;
+      q[1] = root.le[1] + (tip.le[1] - root.le[1]) * eta + yt * ch * t;
+      q[2] = root.le[2] + (tip.le[2] - root.le[2]) * eta;
+    };
+    // upper and lower points at one chord station (and the mid-plane between) move together, so the faces
+    // that join them through the wing stay clear of the duct as well
+    const ytv = yt;
+    let eta = 0;
+    for (const f of [1, 0.5, 0, -0.5, -1]) {
+      yt = ytv * f;
+      at(eta);
+      while (eta < 0.07 && FR.ductDepth(FR.SN - q[0], q[1], q[2]) > -0.025) { eta += 0.002; at(eta); }
+    }
+    yt = ytv;
+    at(eta);
+    if (eta > 0) p.setXYZ(i, q[0], q[1], q[2]);
+  }
+  // the root end cap (all three corners on the root station) is dropped: the root lies inside the fuselage, and
+  // once its edge is trimmed a flat cap would span the duct's outer corner
+  const idx = g.index.array, kept = [];
+  for (let k = 0; k < idx.length; k += 3) if (!(atRoot[idx[k]] && atRoot[idx[k + 1]] && atRoot[idx[k + 2]])) kept.push(idx[k], idx[k + 1], idx[k + 2]);
+  g.setIndex(kept);
+  p.needsUpdate = true;
+  g.computeVertexNormals();
+  return g;
 }
 
 export function buildAirframe(ctx) {
@@ -225,11 +272,19 @@ export function buildAirframe(ctx) {
   // mid fuselage (Lockheed Martin Fort Worth; ≈ 30 % titanium, 30 % aluminium, 30 % composite): titanium
   // wing-carry-through bulkheads where the titanium front and mid spars attach, aluminium frames between
   {
+    // each frame stays 3 cm clear of the inlet ducts that pass through it: where a duct comes close to the skin
+    // the frame is made shallower
+    const clipDuct = (s) => (o, i) => {
+      if (FR.ductDepth(s, i[1], i[0]) < -0.03) return i;
+      let lo = 0, hi = 1;                                   // fraction of the way from the outer edge to i
+      for (let k = 0; k < 14; k++) { const m = (lo + hi) / 2; if (FR.ductDepth(s, lerp(o[1], i[1], m), lerp(o[0], i[0], m)) < -0.03) lo = m; else hi = m; }
+      return [lerp(o[0], i[0], lo), lerp(o[1], i[1], lo)];
+    };
     const band = (s) => {
       const D = FR.bD(s);
       const sideBay = s > FR.SIDE_BAY.s0 && s < FR.SIDE_BAY.s1;
       return frameBand(s, zy(FR.ringB(s).pts), {
-        depth: 0.15, thick: 0.05,
+        depth: 0.15, thick: 0.05, clip: clipDuct(s),
         keep: (p) => !(p[1] < -D + 0.12 && Math.abs(p[0]) < FR.MAIN_BAY.z + 0.05) && !(sideBay && p[1] < -0.38 && p[1] > -0.86 && Math.abs(p[0]) > 1.25),
       });
     };
@@ -264,7 +319,9 @@ export function buildAirframe(ctx) {
     // weapons-bay longerons along the door edges and the bay ceiling
     for (const z of [-0.81, 0.81]) {
       g.push(FR.pipe([[8.45, -0.84, z], [10, -0.86, z], [12.6, -0.85, z], [13.6, -0.78, z]], 0.035, 6));
-      g.push(FR.pipe([[8.3, -0.24, z * 0.75], [12.4, -0.26, z * 0.75]], 0.03, 6));
+      // ceiling longeron along the break of the bay ceiling, stepping inboard under the duct floor aft
+      const cz = (sv) => Math.abs(z) * 0.75 - (0.6075 - 0.44) * FR.smooth(FR.BAY_AFT.s0, FR.BAY_AFT.s1, sv);
+      g.push(FR.pipe([8.3, 10.4, FR.BAY_AFT.s0, 11.7, FR.BAY_AFT.s1, 12.36].map((sv) => [sv, FR.bayCeilAt(sv, cz(sv)) + 0.035, Math.sign(z) * cz(sv)]), 0.03, 6, 24));
     }
     P('Keel & weapons-bay longerons', {
       system: 'Structure', material: 'Titanium keel web, steel / titanium longerons', mass: 380, explode: [0, -0.45, 0],
@@ -324,7 +381,7 @@ export function buildAirframe(ctx) {
     const flip = (g) => (side > 0 ? g : mirrorZ(g));
     const mz = (v) => new THREE.Vector3(v.x, v.y, v.z * side);
     const R = side > 0 ? 'right' : 'left';
-    const panel = (o) => flip(wingPanel({ root: wRoot, tip: wTip, n: 22, ...o }));
+    const panel = (o) => flip(o.eta0 ? wingPanel({ root: wRoot, tip: wTip, n: 22, ...o }) : trimRootFromDuct(wingPanel({ root: wRoot, tip: wTip, n: 22, ...o }), wRoot, wTip));
     const skin = [
       panel({ c0: 0.075, c1: 0.85, eta0: 0, eta1: 0.525, stations: 6 }),
       panel({ c0: 0.075, c1: 0.78, eta0: 0.525, eta1: 0.94, stations: 5 }),
@@ -421,7 +478,7 @@ export function buildAirframe(ctx) {
     // wing control actuators: LEF power drive unit, torque tube and rotary actuators; trailing-edge actuators
     {
       const g = [];
-      const lefA = mz(wingPoint(wRoot, wTip, 0.08, 0.1)), lefB = mz(wingPoint(wRoot, wTip, 0.93, 0.1));
+      const lefA = mz(wingPoint(wRoot, wTip, 0.068, 0.1)), lefB = mz(wingPoint(wRoot, wTip, 0.93, 0.1));
       g.push(FR.pipe([[FR.SN - lefA.x, lefA.y, lefA.z], [FR.SN - lefB.x, lefB.y, lefB.z]], 0.014, 6, 4));
       for (const e of [0.12, 0.3, 0.48, 0.66, 0.84]) {
         const p = mz(wingPoint(wRoot, wTip, e, 0.1));
@@ -433,22 +490,22 @@ export function buildAirframe(ctx) {
         g.push(new THREE.CylinderGeometry(r * 1.15, r * 1.15, 0.05, 12).rotateX(Math.PI / 2).translate(p.x, p.y, p.z + 0.06));
         g.push(new THREE.BoxGeometry(0.16, r * 0.6, 0.03).translate(p.x + 0.08, p.y, p.z - 0.06));
       }
-      // power drive unit at the wing root, geared into the inboard end of the torque tube
-      const pdu = mz(wingPoint(wRoot, wTip, 0.04, 0.1));
-      g.push(new THREE.BoxGeometry(0.26, 0.09, 0.18).translate(pdu.x, pdu.y, pdu.z));
+      // power drive unit at the wing root, outboard of the inlet duct, geared into the inboard end of the torque tube
+      const pdu = mz(wingPoint(wRoot, wTip, 0.061, 0.1));
+      g.push(new THREE.BoxGeometry(0.26, 0.09, 0.14).translate(pdu.x, pdu.y, pdu.z));
       P(`Leading-edge flap drive (${R})`, {
         system: 'Flight controls', material: 'Hydraulic power drive unit, titanium torque tube, rotary geared actuators', mass: 55, explode: [0.6, -0.6, 2.6 * side],
         desc: 'A hydraulic power drive unit at the wing root turns a torque tube along the front spar, and geared rotary actuators along it move the full-span leading-edge flap. Curtiss-Wright developed these geared rotary actuators and has supplied them since the start of the programme (actuator count approximate; each is sized to the local wing depth).',
       }, mesh(merge(g), F.hyd()));
       const t = [];
-      for (const [e, c, len] of [[0.16, 0.79, 0.55], [0.38, 0.79, 0.5], [0.66, 0.72, 0.42]]) {
+      for (const { eta: e, c, len } of [FR.TE_ACT.flaperon, FR.TE_ACT.aileron]) {
         const p = mz(wingPoint(wRoot, wTip, e, c));
         t.push(new THREE.CylinderGeometry(0.045, 0.04, len, 10).rotateZ(Math.PI / 2).translate(p.x + len / 2 - 0.05, p.y, p.z));
         t.push(new THREE.BoxGeometry(0.06, 0.07, 0.08).translate(p.x - 0.05, p.y, p.z));
       }
       P(`Flaperon & aileron actuators (${R})`, {
         system: 'Flight controls', material: 'Steel / titanium 4,000 psi linear hydraulic actuators', mass: 45, explode: [-0.5, -0.7, 2.6 * side],
-        desc: 'Linear actuators on the rear spar drive the flaperon (two) and the aileron (one); each is fed by both hydraulic systems and commanded electrically by the vehicle-management computers (fly-by-wire).',
+        desc: 'One linear hydraulic actuator drives each surface, the flaperon and the aileron: the F-22 saves weight with a single actuator on every control surface and relies on flight-control reconfiguration if one fails (Flight International, 1997). Each is commanded electrically by the vehicle-management system (positions approximate).',
       }, mesh(merge(t), F.hyd()));
     }
 
@@ -522,7 +579,7 @@ export function buildAirframe(ctx) {
     act.push(new THREE.BoxGeometry(0.12, 0.3, 0.1).translate(X(16.75), -0.15, side * 1.38));
     P(`Stabilator actuator (${R})`, {
       system: 'Flight controls', material: 'Dual-tandem hydraulic actuator, 4,000 psi', mass: 55, explode: [-1.6, -0.75, 1.25 * side],
-      desc: 'A dual-tandem actuator fed by both hydraulic systems, so one system can fail and the stabilator still moves. It sits in the boom and drives a crank on the spindle.',
+      desc: 'The stabilator\'s single actuator (the F-22 has one on each control surface) sits in the boom and drives a crank on the spindle. If its hydraulic supply fails, a compensator keeps the actuator stiff and the flight controls reconfigure to fly on the remaining surfaces (Flight International, 1997).',
     }, mesh(merge(act), F.hyd()));
   }
 
@@ -583,14 +640,9 @@ export function buildAirframe(ctx) {
   {
     const g = [];
     // side weapons bays (in the trunk walls)
-    const stS = stations(FR.SIDE_BAY.s0, FR.SIDE_BAY.s1, 0.4);
+    const stS = stations(FR.SIDE_BAY.s0, FR.SIDE_BAY.s1, 0.2);
     for (const side of [1, -1]) {
-      const edge = (s) => {
-        const wf = FR.wallFractions(s);
-        const a = FR.wallB(s, wf[4]), b = FR.wallB(s, wf[7]);
-        return [[X(s), a[1], side * a[0]], [X(s), b[1], side * b[0]]];
-      };
-      g.push(cavity(stS, edge, () => [0, 0.08, -side * 0.99], 0.34));
+      g.push(cavityGrid(stS.map((s) => FR.sideBaySection(s).map(([zz, y]) => [X(s), y, side * zz]))));
       // countermeasure bay behind the side bay
       const stC = stations(FR.CM_BAY.s0, FR.CM_BAY.s1, 0.3);
       const edgeC = (s) => {
@@ -601,10 +653,18 @@ export function buildAirframe(ctx) {
       g.push(cavity(stC, edgeC, () => [0, 0.05, -side * 1], 0.12));
     }
     // main-gear wells
-    const stW = stations(FR.MAIN_WELL.s0, FR.MAIN_WELL.s1, 0.4);
+    const stW = stations(FR.MAIN_WELL.s0, FR.MAIN_WELL.s1, 0.15);
+    // 0.44 m deep, except toward the aft end, where the roof stays 2 cm under the inlet duct's floor
+    const wellRoof = (s) => {
+      let y = -FR.bD(s) + 0.44;
+      for (let zz = FR.MAIN_WELL.z0; zz <= FR.MAIN_WELL.z1 + 1e-6; zz += 0.02) { const sp = FR.ductSpan(s, zz); if (sp) y = Math.min(y, sp.lo - 0.02); }
+      return y;
+    };
     for (const side of [1, -1]) {
-      const edge = (s) => [[X(s), -FR.bD(s), side * Math.min(FR.MAIN_WELL.z1, FR.bWb(s) - 0.05)], [X(s), -FR.bD(s), side * FR.MAIN_WELL.z0]];
-      g.push(cavity(stW, edge, () => [0, 1, 0], 0.44));
+      g.push(cavityGrid(stW.map((s) => {
+        const zo = side * Math.min(FR.MAIN_WELL.z1, FR.bWb(s) - 0.05), zi = side * FR.MAIN_WELL.z0, y = wellRoof(s);
+        return [[X(s), -FR.bD(s), zo], [X(s), y, zo], [X(s), y, zi], [X(s), -FR.bD(s), zi]];
+      })));
     }
     // nose-gear well
     // nose-gear well: up to the underside of the cockpit floor, and into the floor hump over the stowed wheel

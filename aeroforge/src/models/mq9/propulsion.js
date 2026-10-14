@@ -237,7 +237,7 @@ export function buildPropulsion({ P, L, m, role }) {
   role(P('Ignition exciter', {
     system: 'Propulsion', material: 'Capacitor-discharge ignition unit', mass: 2, explode: [0.3, 0.2, -1.0],
     desc: 'Charges capacitors from the 24 V supply and fires the two igniter plugs through shielded leads, during starts and whenever continuous ignition is selected.',
-  }, L(merge([lru(0.13, 0.05, 0.05, excP), pipe([excP, [XS(9.29), ENGINE_Y + 0.05, -0.27], [XS(9.27), ENGINE_Y + 0.2, -0.15], [XS(9.27), ENGINE_Y + 0.27, 0]], 0.004, 5, 16), pipe([excP, [XS(9.28), ENGINE_Y, -0.27]], 0.004, 5, 8)]), m.lruOlive)), 'generator');
+  }, L(merge([lru(0.13, 0.05, 0.05, excP), pipe([excP, [XS(9.29), ENGINE_Y + 0.05, -0.27], [XS(9.27), ENGINE_Y + 0.2, -0.15], [XS(9.285), ENGINE_Y + 0.27, -0.01], [XS(9.298), ENGINE_Y + 0.276, 0]], 0.004, 5, 18), pipe([excP, [XS(9.28), ENGINE_Y, -0.27]], 0.004, 5, 8)]), m.lruOlive)), 'generator');
   const egtX = XT0 - 0.022;
   const egt = [new THREE.TorusGeometry(0.2, 0.005, 5, 40).rotateY(Math.PI / 2).translate(egtX, ENGINE_Y, 0)];
   for (let k = 0; k < 8; k++) {
