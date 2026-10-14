@@ -343,7 +343,7 @@ export function buildDrive({ A, P, roofY }) {
     const bc = [at(0.33), ENG.y + 0.295, z + 0.14 * s];
     const blower = [cyl(0.06, 0.06, 0.06, bc, 'z', 18), cyl(0.045, 0.045, 0.012, [bc[0], bc[1], bc[2] - 0.033 * s], 'z', 14)];
     const ipsIn = pipe([onCase(0.16, 0.305, 0.97), [at(0.2), ENG.y + 0.29, z + 0.215 * s], [at(0.28), ENG.y + 0.3, z + 0.215 * s], [bc[0], bc[1], bc[2] + 0.045 * s]], 0.028, 10);
-    const scav = pipe([[bc[0] + 0.03, bc[1] + 0.045, bc[2] + 0.015 * s], [at(0.38), ENG.y + 0.32, z + 0.17 * s], [at(0.5), ENG.y + 0.312, z + 0.195 * s], [at(0.8), ENG.y + 0.29, z + 0.2 * s], [at(1.0), ENG.y + 0.27, z + 0.2 * s], [at(1.2), ENG.y + 0.22, z + 0.2 * s]], 0.03, 10);
+    const scav = pipe([[bc[0] + 0.03, bc[1] + 0.035, bc[2] + 0.012 * s], [at(0.38), ENG.y + 0.32, z + 0.17 * s], [at(0.5), ENG.y + 0.312, z + 0.195 * s], [at(0.8), ENG.y + 0.29, z + 0.2 * s], [at(1.0), ENG.y + 0.27, z + 0.2 * s], [at(1.2), ENG.y + 0.22, z + 0.2 * s]], 0.03, 10);
     P(`T700 IPS blower & scavenge duct ${R}`, {
       system: 'Propulsion', material: 'Gear-driven centrifugal blower, inlet and scavenge ducts', mass: 3, explode: [0.45, 2.0, 1.75 * s],
       desc: 'A gear-driven blower on a pad on the outboard face of the accessory gearbox sucks the sand and dust out of the separator\'s collector scroll through a short inlet duct and blows it aft along the top of the engine, to be dumped overboard around the exhaust.',
