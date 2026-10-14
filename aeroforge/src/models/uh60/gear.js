@@ -58,12 +58,14 @@ export function buildGear({ A, P }) {
       system: 'Landing gear', material: 'Forged high-strength steel beam', mass: 38, explode: [0.4, -1.0, 0.8 * s],
       desc: 'A trailing beam pivoted on the lower fuselage carries the wheel. In a hard landing it swings up, stroking the oleo; in a crash it can fail in a controlled way rather than punch into the cabin.',
     }, [mesh(merge(beam), MAT.steel())]);
-    // two-stage oleo: outer cylinder from the airframe fitting, piston down to the beam
-    const top = V3(2.22, 1.26, 1.19 * s), bot = V3(AXLE.x - 0.02, AXLE.y + 0.07, 1.2 * s);
+    // two-stage oleo, outside the fuselage side: outer cylinder from a fitting on the door-post frames
+    // between the cockpit door and the gunner window, leaning in to the drag beam just inboard of the
+    // tyre (the fuselage side is vertical here, so the strut clears it only by leaning)
+    const top = V3(2.22, 1.26, 1.3 * s), bot = V3(AXLE.x - 0.02, AXLE.y + 0.07, 1.145 * s);
     const holder = new THREE.Group();
-    const cylG = merge([tube(top, top.clone().lerp(bot, 0.55), 0.075, 16), box(0.14, 0.12, 0.12, [top.x, top.y, top.z])]);
+    const cylG = merge([tube(top, top.clone().lerp(bot, 0.35), 0.075, 16), box(0.11, 0.12, 0.16, [2.235, top.y, 1.25 * s])]);
     const pistonGroup = new THREE.Group();
-    const pistonG = tube(top.clone().lerp(bot, 0.45), bot, 0.05, 14);
+    const pistonG = tube(top.clone().lerp(bot, 0.3), bot, 0.05, 14);
     pistonGroup.add(mesh(pistonG, MAT.hydraulic()));
     holder.add(mesh(cylG, MAT.paintDark()), pistonGroup);
     P(`Main gear oleo ${R}`, {
@@ -89,7 +91,7 @@ export function buildGear({ A, P }) {
 
   // tail gear: 28.93 ft (8.82 m) behind the main axles (GenHel wheel base)
   const tw = { x: AXLE.x - 8.82, y: 0.22 };
-  const tTop = V3(-6.12, 1.3, 0), tBot = V3(-6.4, 0.4, 0);
+  const tTop = V3(-6.12, 1.3, 0), tBot = V3(-6.42, 0.52, 0);   // fork crown clear above the tyre
   P('Tail gear shock strut', {
     system: 'Landing gear', material: 'Steel cylinder and chromed piston, oil and nitrogen', mass: 18, explode: [0, -0.5, 0.5],
     desc: 'Its own two-stage oleo, mounted to a fitting in the tail cone. It protects the tail cone and tail rotor in a tail-low landing and strokes in a crash like the main struts.',
@@ -97,7 +99,7 @@ export function buildGear({ A, P }) {
   P('Tail wheel yoke & axle', {
     system: 'Landing gear', material: 'Forged steel fork and axle on a swivel', mass: 10, explode: [0, -0.9, 0],
     desc: 'The fork swivels a full 360° below the strut so the tail follows the main wheels when taxiing or turning on the spot.',
-  }, [mesh(merge([tube(tBot, V3(tw.x, tw.y, 0.1), 0.035, 10), tube(tBot, V3(tw.x, tw.y, -0.1), 0.035, 10), box(0.1, 0.08, 0.26, [tBot.x, tBot.y, 0]), cyl(0.03, 0.03, 0.24, [tw.x, tw.y, 0], 'z', 10)]), MAT.steel())]);
+  }, [mesh(merge([tube(tBot.clone().setZ(0.12), V3(tw.x, tw.y, 0.12), 0.03, 10), tube(tBot.clone().setZ(-0.12), V3(tw.x, tw.y, -0.12), 0.03, 10), box(0.1, 0.08, 0.3, [tBot.x, tBot.y, 0]), cyl(0.03, 0.03, 0.28, [tw.x, tw.y, 0], 'z', 10)]), MAT.steel())]);
   P('Tail wheel & tyre', {
     system: 'Landing gear', material: 'Aluminium wheel, 15 × 6 class tyre (size approximate)', mass: 10, explode: [0, -1.3, 0],
     desc: 'A single castoring tail wheel, about 8.8 m behind the main wheels. It keeps the tail rotor clear of the ground on landing.',
@@ -111,9 +113,9 @@ export function buildGear({ A, P }) {
   const brk = [], mc = [];
   for (const z of [0.53, -0.53]) for (const dz of [0.12, -0.12]) mc.push(cyl(0.018, 0.018, 0.12, [3.62, 0.74, z + dz], 'x', 8));
   for (const s of [1, -1]) {
-    brk.push(pipe([[3.58, 0.72, 0.65 * s], [3.2, 0.64, 0.75 * s], [3.0, 0.62, 0.86 * s], [3.05, 0.53, 0.95 * s], [2.7, 0.42, 1.08 * s], [2.45, 0.38, 1.2 * s], [2.43, 0.37, 1.23 * s]], 0.007, 5));
+    brk.push(pipe([[3.58, 0.72, 0.65 * s], [3.57, 0.66, 0.66 * s], [3.54, 0.618, 0.66 * s], [3.38, 0.618, 0.6 * s], [3.2, 0.618, 0.64 * s], [3.0, 0.618, 0.86 * s], [2.97, 0.595, 0.97 * s], [2.85, 0.56, 1.02 * s], [2.7, 0.525, 1.06 * s], [2.45, 0.48, 1.13 * s], [2.43, 0.405, 1.235 * s]], 0.007, 5));   // down through the floor, under it, out through the belly skin aft of the beam pivot and along the top of the beam
   }
-  brk.push(box(0.08, 0.05, 0.08, [3.25, 0.66, 0.0]));     // parking-brake valve
+  brk.push(box(0.08, 0.05, 0.08, [3.25, 0.613, 0.28]));   // parking-brake valve, under the cockpit floor
   P('Brake master cylinders & lines', {
     system: 'Landing gear', material: 'Pedal master cylinders, parking-brake valve, steel and flexible brake lines', mass: 5, explode: [0.6, -0.6, 0.6],
     desc: 'The toe brakes on each pilot\'s pedals work master cylinders; their lines run under the cockpit floor and down the drag beams to the wheel brakes, with a parking-brake valve to hold the aircraft on the deck.',
@@ -121,12 +123,12 @@ export function buildGear({ A, P }) {
   P('Weight-on-wheels switch', {
     system: 'Landing gear', material: 'Sealed switch on the left main gear', mass: 1, explode: [0.3, -0.3, -0.9],
     desc: 'One switch on the left main gear tells the aircraft whether it is on the ground. In flight it arms the backup hydraulic pump\'s automatic start, disables the leak tests and the generators\' underfrequency protection, and changes other systems\' behaviour. Aircraft with external-stores provisions add a second switch on the right drag beam for underfrequency cutout and stores jettison.',
-  }, [mesh(merge([box(0.05, 0.05, 0.05, [2.22, 1.2, -1.12]), tube([2.22, 1.2, -1.12], [2.24, 1.3, -1.08], 0.005, 4)]), MAT.yellow())]);
+  }, [mesh(merge([box(0.05, 0.05, 0.05, [2.315, 1.15, -1.28]), tube([2.31, 1.17, -1.28], [2.28, 1.27, -1.23], 0.005, 4)]), MAT.yellow())]);
   // jack-and-kneel: jacking pads under the main-gear fittings and the tail cone, kneel fittings at the oleo tops
   const jk = [];
   for (const s of [1, -1]) {
     const z = (halfWidthAt(2.6, 0.6) - 0.12) * s;
-    jk.push(cyl(0.045, 0.045, 0.03, [2.6, 0.545, z], 'y', 14), box(0.12, 0.05, 0.1, [2.6, 0.58, z]), box(0.08, 0.05, 0.07, [2.22, 1.34, 1.19 * s]));
+    jk.push(cyl(0.045, 0.045, 0.03, [2.6, 0.545, z], 'y', 14), box(0.12, 0.05, 0.1, [2.6, 0.58, z]), box(0.08, 0.05, 0.07, [2.235, 1.345, 1.27 * s]));
   }
   const yTail = section(-5.85).yB;
   jk.push(cyl(0.04, 0.04, 0.03, [-5.85, yTail - 0.005, 0], 'y', 14), box(0.1, 0.04, 0.08, [-5.85, yTail + 0.025, 0]));
@@ -139,7 +141,7 @@ export function buildGear({ A, P }) {
   for (const side of [1, -1]) {
     const s = side;
     const z = (a, b) => (s > 0 ? [a, b] : [-b, -a]);
-    const [fz0, fz1] = z(0.05, 0.92), [rz0, rz1] = z(0.05, 0.66);
+    const [fz0, fz1] = z(0.05, 0.92), [rz0, rz1] = z(0.05, 0.56);   // rear outboard corner clear of the transition frame
     const g = cell({ x: -1.84, y0: 0.56, y1: 1.5, z0: fz0, z1: fz1 }, { x: -3.0, y0: 0.84, y1: 1.5, z0: rz0, z1: rz1 });
     const fittings = [cyl(0.06, 0.06, 0.06, [-2.3, 1.52, 0.5 * s], 'y', 14), cyl(0.05, 0.05, 0.05, [-2.6, 0.9, 0.5 * s], 'y', 12)];
     P(side > 0 ? 'Fuel cell (right)' : 'Fuel cell (left)', {
@@ -163,7 +165,7 @@ export function buildGear({ A, P }) {
   }, [mesh(merge(valves), MAT.casting())]);
   // single-point pressure refuel/defuel: receptacle on the left, manifold under the cells to each valve
   const inside = (x, y, d) => -(halfWidthAt(x, y) - d);
-  const man = [pipe([[-2.0, 1.0, inside(-2.0, 1.0, 0.04)], [-2.05, 0.82, inside(-2.05, 0.82, 0.05)], [-2.12, 0.66, inside(-2.12, 0.66, 0.07)], [-2.18, 0.605, -0.6], [-2.2, 0.6, -0.3], [-2.2, 0.6, 0.0], [-2.2, 0.6, 0.45]], 0.025, 8)];
+  const man = [pipe([[-2.0, 1.0, inside(-2.0, 1.0, 0.04)], [-2.04, 0.9, inside(-2.04, 0.9, 0.075)], [-2.07, 0.78, inside(-2.07, 0.78, 0.11)], [-2.12, 0.66, inside(-2.12, 0.66, 0.1)], [-2.18, 0.605, -0.6], [-2.2, 0.6, -0.3], [-2.2, 0.6, 0.0], [-2.2, 0.6, 0.45]], 0.025, 8)];
   for (const s of [1, -1]) man.push(tube([-2.2, 0.6, 0.45 * s], [-2.2, cellBot(-2.2) - 0.01, 0.45 * s], 0.025, 8));
   P('Pressure refuel/defuel manifold', {
     system: 'Fuel', material: 'Aluminium manifold from the single-point receptacle', mass: 4, explode: [-0.3, -1.0, 0],
@@ -257,7 +259,7 @@ export function buildGear({ A, P }) {
   P('Cargo hook crew pendant', {
     system: 'Payload', material: 'Hand-held release switch on a coiled cord, stowed in the aft cabin', mass: 1, explode: [-0.4, 0.5, 0.6],
     desc: 'A hand-held pendant the crew chief can plug in to release the load from the cabin while watching it through the floor hatch; it stows on the aft cabin wall.',
-  }, [mesh(merge([box(0.06, 0.12, 0.05, [-1.73, 1.76, 0.52]), new THREE.TorusGeometry(0.035, 0.006, 6, 16).translate(-1.74, 1.66, 0.52)]), MAT.black())]);
+  }, [mesh(merge([box(0.06, 0.12, 0.05, [-1.73, 1.76, 0.74]), new THREE.TorusGeometry(0.035, 0.006, 6, 16).translate(-1.728, 1.66, 0.74)]), MAT.black())]);   // outboard of the stowage door
 
   return { oleos, setHook, hookPart };
 }

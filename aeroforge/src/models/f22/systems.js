@@ -368,7 +368,7 @@ export function buildSystems(ctx) {
     }
     // nose gear: from the manifold beside the accumulators up behind the main bay's aft wall, forward above its
     // ceiling, down ahead of its front wall and under the cockpit to the nose-gear actuator and steering unit
-    g.push(FR.pipe([[12.5, -0.66, 0.0], [12.42, -0.45, 0.07], [12.38, -0.23, 0.08], [12.2, -0.221, 0.08], [8.6, -0.221, 0.08], [8.44, -0.224, 0.1], [8.41, -0.33, 0.15], [8.4, -0.55, 0.18], [7.0, -0.55, 0.3], [5.8, -0.2, 0.2], [4.6, -0.12, 0.08], [4.36, -0.11, 0.02]], 0.012, 5, 80));
+    g.push(FR.pipe([[12.5, -0.66, 0.0], [12.42, -0.45, 0.07], [12.38, -0.23, 0.08], [12.2, -0.221, 0.08], [8.6, -0.221, 0.08], [8.44, -0.224, 0.1], [8.41, -0.33, 0.16], [8.4, -0.55, 0.17], [7.9, -0.565, 0.155], [7.4, -0.56, 0.125], [7.0, -0.52, 0.15], [5.8, -0.2, 0.2], [4.6, -0.12, 0.08], [4.36, -0.11, 0.02]], 0.012, 5, 80));
     P('Landing-gear & brake hydraulic lines', {
       system: 'Hydraulics', material: 'Titanium and steel tubing, flexible hoses across the gear pivots', mass: 18,
       explode: [0.3, -1.55, 0],
@@ -389,7 +389,7 @@ export function buildSystems(ctx) {
       for (const zz of [0.213, 0.373, 0.551]) g.push(FR.pipe([[11.05, -0.27, z * zz], [11.05, -0.24 - (zz > 0.55 ? 0.01 : 0) - 0.04, z * zz]], 0.006, 5, 2));
       // out under the duct to the side bay: trapeze actuator and door actuator
       g.push(FR.pipe([[10.4, -0.7, z * 0.84], [10.5, -0.45, z * 0.92], [10.58, -0.4, z * 1.1]], 0.008, 5));
-      g.push(FR.pipe([[10.58, -0.4, z * 1.1], [10.32, -0.415, z * 1.3], [10.08, -0.4, z * 1.46], [10.06, -0.395, z * 1.48]], 0.007, 5, 16));
+      g.push(FR.pipe([[10.58, -0.4, z * 1.1], [10.32, -0.415, z * 1.3], [10.1, -0.4, z * 1.46], [10.05, -0.39, z * 1.51]], 0.007, 5, 16));   // into the door actuator's roof fitting
     }
     // gun drive, from system A's gallery up the outboard side of the right duct
     g.push(FR.pipe([[10.2, -0.7, 0.84], [10.3, -0.44, 0.95], [10.4, -0.42, 1.42], [10.48, -0.18, 1.56], [10.5, 0.0, 1.58]], 0.008, 5, 24));
@@ -501,7 +501,7 @@ export function buildSystems(ctx) {
     for (const z of [1, -1]) {
       // between the main-bay ceiling and F-2, stepping inboard where the duct turns in toward its engine, then
       // down behind the bay's aft wall and under F-3 to the aft distribution centre
-      g.push(FR.pipe([[3.0, -0.2, z * 0.25], [5.0, -0.3, z * 0.36], [6.3, -0.3, z * 0.48], [7.5, -0.52, z * 0.55], [8.1, -0.53, z * 0.66], [8.36, -0.51, z * 0.745], [8.43, -0.4, z * 0.745], [8.5, -0.33, z * 0.73], [8.7, -0.25, z * 0.66], [9.0, -0.221, z * 0.62], [11.0, -0.221, z * 0.6], [11.8, -0.221, z * 0.45], [12.34, -0.221, z * 0.35], [12.37, -0.25, z * 0.34], [12.41, -0.36, z * 0.33], [12.45, -0.41, z * 0.31], [12.55, -0.44, z * 0.29], [12.9, -0.47, z * 0.25], [13.6, -0.6, z * 0.12]], 0.018, 6, 80));
+      g.push(FR.pipe([[3.0, -0.2, z * 0.25], [5.0, -0.3, z * 0.36], [6.3, -0.3, z * 0.48], [6.9, -0.47, z * 0.52], [7.5, -0.525, z * 0.55], [8.1, -0.53, z * 0.66], [8.36, -0.51, z * 0.745], [8.43, -0.4, z * 0.745], [8.5, -0.33, z * 0.73], [8.7, -0.25, z * 0.66], [9.0, -0.221, z * 0.62], [11.0, -0.221, z * 0.6], [11.8, -0.221, z * 0.45], [12.34, -0.221, z * 0.35], [12.37, -0.25, z * 0.34], [12.41, -0.37, z * 0.33], [12.45, -0.415, z * 0.31], [12.55, -0.44, z * 0.29], [12.9, -0.47, z * 0.25], [13.6, -0.6, z * 0.12]], 0.018, 6, 80));
       g.push(FR.pipe([[13.7, -0.6, z * 0.16], [13.45, -0.56, z * 0.9], [13.3, -0.45, z * 1.28]], 0.02, 6));           // generator feeders
       g.push(FR.pipe([[13.9, -0.6, z * 0.12], [15.5, -0.6, z * 0.12], [16.2, -0.4, z * 0.15]], 0.016, 5));             // aft loads
     }
@@ -520,7 +520,7 @@ export function buildSystems(ctx) {
     for (const side of [1, -1]) {
       const ez = FR.ENG_Z * side, ey = FR.ENG_Y;
       // forward along the bay sill, crossing over the stowed main wheel's inboard rim just aft of the bay
-      g.push(FR.pipe([[14.55, -0.6, side * 0.42], [14.0, -0.62, side * 0.5], [13.3, -0.53, side * 0.6], [12.75, -0.47, side * 0.62], [12.46, -0.425, side * 0.64], [12.37, -0.42, side * 0.805], [12.15, -0.422, side * 0.83], [12.0, -0.47, side * 0.83], [11.9, -0.52, side * 0.83], [8.6, -0.52, side * 0.83], [7.6, -0.56, side * 0.5], [6.6, -0.48, side * 0.3]], 0.03, 8, 80));
+      g.push(FR.pipe([[14.55, -0.6, side * 0.42], [14.0, -0.62, side * 0.5], [13.3, -0.53, side * 0.6], [12.75, -0.47, side * 0.62], [12.46, -0.425, side * 0.64], [12.37, -0.42, side * 0.805], [12.15, -0.422, side * 0.83], [12.0, -0.47, side * 0.83], [11.9, -0.52, side * 0.83], [8.6, -0.52, side * 0.83], [7.6, -0.485, side * 0.55], [6.6, -0.48, side * 0.3]], 0.03, 8, 80));       // between F-1 and the fuel–PAO exchangers
       // bleed port: from the HP compressor case (r ≈ 0.3) out through the bypass duct to the valve
       const dir = new THREE.Vector2(side * 0.42 - ez, -0.6 - ey).normalize();
       g.push(FR.pipe([[14.5, ey + dir.y * 0.3, ez + dir.x * 0.3], [14.52, ey + dir.y * 0.48, ez + dir.x * 0.48], [14.55, -0.6, side * 0.42]], 0.028, 8, 6));

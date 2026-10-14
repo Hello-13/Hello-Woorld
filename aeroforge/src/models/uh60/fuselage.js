@@ -385,7 +385,16 @@ export function buildFuselage({ A, P }) {
   };
   const ckFrames = [], cabFrames = [], trFrames = [], tcFrames = [];
   for (const x of [2.25, 2.75, 3.38, 3.95]) ckFrames.push(...hoop(x, gapsCab(x)));
-  for (const x of [-1.78, -1.2, -0.44, 0.3, 1.0, 1.44, 1.86, 2.2]) cabFrames.push(...hoop(x, gapsCab(x)));
+  // the frames beside the cabin doorway stop at its heavy door posts (which take their place round the
+  // opening), and the two frames under the main module stop at the roof beams either side of the
+  // transmission well, where the gearbox case and sump hang through the deck
+  const extraGaps = (x) => {
+    const g = [];
+    for (const xp of [O.cabDoor.x0 - 0.03, O.cabDoor.x1 + 0.03]) if (Math.abs(x - xp) < 0.05) g.push([O.cabDoor.a0 - 0.04, O.cabDoor.a1 + 0.04], [Math.PI - O.cabDoor.a1 - 0.04, Math.PI - O.cabDoor.a0 + 0.04]);
+    if (x > -0.5 && x < 0.42) g.push([Math.PI / 2 - 0.23, Math.PI / 2 + 0.23]);
+    return g;
+  };
+  for (const x of [-1.78, -1.2, -0.44, 0.3, 1.0, 1.44, 1.86, 2.2]) cabFrames.push(...hoop(x, [...gapsCab(x), ...extraGaps(x)]));
   for (const a of [0.9, Math.PI - 0.9, -0.76, Math.PI + 0.76, 1.25, Math.PI - 1.25]) cabFrames.push(stringer(-1.78, 2.2, a));
   for (const x of [-2.3, -2.85, -3.38]) trFrames.push(...hoop(x, [], 0.05, 0.026));
   for (const x of [-4.0, -4.7, -5.4, -6.1, -6.8, -7.5, -8.2, -8.9]) tcFrames.push(...hoop(x, [], 0.035, 0.02));

@@ -332,7 +332,10 @@ export function buildGear(ctx) {
 
     // main gear door, hinged at its inboard edge, with its actuator
     const st = ctx.sB.filter((s) => s >= FR.MAIN_WELL.s0 - 1e-6 && s <= FR.MAIN_WELL.s1 + 1e-6);
-    const grid = toothedGrid((s, u) => [X(s), -FR.bD(s) - 0.002, side * Math.min(lerp(FR.MAIN_WELL.z0 + 0.004, FR.MAIN_WELL.z1 - 0.004, u), FR.bWb(s) - 0.054)], st, { width: 0.6 });
+    // from the hinge line at the cut-out's inboard edge to 4 mm past its outboard edge (the skin's own
+    // min(z1, bWb − 0.05)), lapping under the skin so no slot is left along either edge
+    const zOut = (s) => Math.min(FR.MAIN_WELL.z1, FR.bWb(s) - 0.05) + 0.004;
+    const grid = toothedGrid((s, u) => [X(s), -FR.bD(s) - 0.002, side * lerp(FR.MAIN_WELL.z0, zOut(s), u)], st, { width: 0.6 });
     const door = slab(grid, () => [0, 0.03, 0], V(0, -1, 0));
     const hp0 = V(X(FR.MAIN_WELL.s0), -FR.bD(FR.MAIN_WELL.s0), side * FR.MAIN_WELL.z0);
     const h = hinge(mesh(door, F.door()), hp0, V(X(FR.MAIN_WELL.s1), -FR.bD(FR.MAIN_WELL.s1), side * FR.MAIN_WELL.z0), V(X(12), -0.9, side * 1.3), V(0, -1, 0));
@@ -378,7 +381,8 @@ export function buildGear(ctx) {
     const pivots = [];
     const hs = [];
     for (const side of [1, -1]) {
-      const grid = toothedGrid((s, u) => { const zz = side * lerp(0.006, z - 0.004, u); return [X(s), FR.bottomAt(s, zz) - 0.002, zz]; }, st, { width: 0.24 });
+      // each door runs from the centre line, where the pair meet, to its hinge on the cut-out's edge
+      const grid = toothedGrid((s, u) => { const zz = side * lerp(0, z, u); return [X(s), FR.bottomAt(s, zz) - 0.002, zz]; }, st, { width: 0.24 });
       const door = slab(grid, () => [0, 0.03, 0], V(0, -1, 0));
       const h = hinge(mesh(door, F.door()), V(X(s0), FR.bottomAt(s0, z), side * z), V(X(s1), FR.bottomAt(s1, z), side * z), V(X(4.8), -0.7, side * 0.05), V(0, -1, 0));
       pivots.push(h.pivot);

@@ -91,6 +91,7 @@ export function buildWeapons(ctx) {
     const ribs = [];
     for (const s of [9.3, 10.4, 11.4]) {
       const p = prof(s);
+      p[0][1] += 0.006; p[p.length - 1][1] += 0.006;                 // the wall frames stop just inside the belly skin
       for (let k = 0; k < p.length - 1; k++) {
         const a = p[k], b = p[k + 1];
         const len = Math.hypot(a[1] - b[1], a[2] - b[2]);
@@ -104,7 +105,7 @@ export function buildWeapons(ctx) {
       system: 'Weapons', material: 'Aluminium / composite bay liner and ceiling frames, acoustic treatment', mass: 230,
       explode: [0, -0.75, 0],
       desc: 'A 3.9 m bay under the inlet ducts, split along the centre line, that holds six AIM-120 missiles or two 1,000 lb GBU-32 JDAM bombs plus two AIM-120s. Carrying weapons inside keeps the outline clean; external stores would multiply the radar cross-section.',
-    }, [mesh(liner, F.bay()), mesh(merge(ends), F.bay()), mesh(merge(ribs), F.alu())]);
+    }, [mesh(merge([liner, ...ends]), F.bay()), mesh(merge(ribs), F.alu())]);
 
     // centre-line keel web between the two halves of the bay, with the door land along its lower edge
     const stK = ctx.sB.filter((s) => s >= s0 - 1e-6 && s <= s1 + 1e-6);
@@ -132,7 +133,7 @@ export function buildWeapons(ctx) {
         const grid = toothedGrid((s, u) => [X(s), -FR.bD(s) - 0.002, side * lerp(za, zb, u)], st, { width: zb - za });
         return slab(grid, () => [0, thick, 0], V(0, -1, 0));
       };
-      const outerGeo = panel(zFold, z - 0.004), innerGeo = panel(zIn, zFold);
+      const outerGeo = panel(zFold, z), innerGeo = panel(zIn, zFold);             // the outer panel reaches its hinge on the cut-out's edge
       // fold-joint hinge knuckles on the inner faces
       const kn = [];
       for (let s = s0 + 0.35; s < s1 - 0.2; s += 0.62) kn.push(FR.cylX(s, -FR.bD(s) - 0.002 + thick + 0.012, side * zFold, 0.14, 0.016, 0.016, 8));
@@ -361,8 +362,8 @@ export function buildWeapons(ctx) {
       w.push(FR.pipe([[8.6, -0.27, side * 0.55], [8.95, -0.255, side * 0.25], [9.25, -0.25, side * 0.213]], 0.007, 5));
       w.push(FR.pipe([[8.38, -0.56, side * 0.68], [8.8, -0.68, side * 0.74], [9.3, -0.745, side * 0.77], [9.52, -0.76, side * 0.81]], 0.008, 5));
       // out under the duct floor to the side-bay trapeze actuator and the side-bay door actuator
-      w.push(FR.pipe([[8.38, -0.5, side * 0.66], [8.7, -0.5, side * 1.0], [9.4, -0.46, side * 1.18], [10.2, -0.43, side * 1.15], [10.56, -0.405, side * 1.12]], 0.008, 5, 30));
-      w.push(FR.pipe([[10.2, -0.43, side * 1.15], [10.1, -0.415, side * 1.38], [10.05, -0.395, side * 1.47]], 0.007, 5, 10));
+      w.push(FR.pipe([[8.38, -0.5, side * 0.66], [8.55, -0.58, side * 0.83], [8.75, -0.52, side * 1.0], [9.4, -0.46, side * 1.18], [10.2, -0.43, side * 1.15], [10.56, -0.405, side * 1.12]], 0.008, 5, 30));   // under the bleed duct
+      w.push(FR.pipe([[10.2, -0.43, side * 1.15], [10.1, -0.415, side * 1.38], [10.05, -0.39, side * 1.5]], 0.007, 5, 10));
     }
     P('Stores management system', {
       system: 'Weapons', material: 'Stores-management processor and two weapon interface units, shielded wiring', mass: 22, count: 3,

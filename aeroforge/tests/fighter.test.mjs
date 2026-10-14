@@ -257,3 +257,77 @@ test('weight-on-wheels switches sit on their legs, clear of the tyres', () => {
     assert.ok(off < 0.2 && along > 0 && along < n, `${key} switch ${off.toFixed(3)} m off the leg`);
   }
 });
+
+test('inlet ducts are an open air path: bay, side bays and gear wells stay outside them', () => {
+  // the duct runs from the raked lip to the fan face and ends round the F119 inlet
+  const fan = L.ductSection(L.FAN_S);
+  assert.ok(fan && L.ductSection(7.0) && !L.ductSection(L.FAN_S + 0.05), 'duct spans lip → fan face');
+  const cz = fan.reduce((a, p) => a + p[0], 0) / fan.length, cy = fan.reduce((a, p) => a + p[1], 0) / fan.length;
+  close(cz, L.ENG_Z, 0.02, 'fan-face centre z'); close(cy, L.ENG_Y, 0.02, 'fan-face centre y');
+  assert.ok(L.ductDepth(10.4, 0.0, 1.17) > 0.3 && L.ductDepth(10.4, 0.0, 1.75) < 0, 'ductDepth is inside / outside where expected');
+  // main-bay ceiling (with its aft taper) at least 2 cm under the duct floor
+  for (let s = L.MAIN_BAY.s0; s <= L.MAIN_BAY.s1 + 1e-9; s += 0.05) {
+    for (let z = 0; z <= L.MAIN_BAY.z; z += 0.01) {
+      const sp = L.ductSpan(s, z);
+      if (sp) assert.ok(L.bayCeilAt(s, z) < sp.lo - 0.019, `bay ceiling under the duct at s ${s.toFixed(2)}, z ${z.toFixed(2)}`);
+    }
+  }
+  // side-bay roof and back wall 3 cm clear of the duct
+  for (let s = L.SIDE_BAY.s0; s <= L.SIDE_BAY.s1 + 1e-9; s += 0.05) {
+    const [a, aIn, bIn] = L.sideBaySection(s);
+    for (const [p, q] of [[a, aIn], [aIn, bIn]]) {
+      for (let u = 0; u <= 1.0001; u += 0.1) assert.ok(L.ductDepth(s, p[1] + (q[1] - p[1]) * u, p[0] + (q[0] - p[0]) * u) < -0.029, `side bay clear of the duct at s ${s.toFixed(2)}`);
+    }
+  }
+  // main-gear well roof 2 cm under the duct floor across the well
+  for (let s = L.MAIN_WELL.s0; s <= L.MAIN_WELL.s1 + 1e-9; s += 0.05) {
+    for (let z = L.MAIN_WELL.z0; z <= L.MAIN_WELL.z1; z += 0.02) { const sp = L.ductSpan(s, z); if (sp) assert.ok(L.mainWellRoof(s) <= sp.lo - 0.019, `well roof under the duct at s ${s.toFixed(2)}`); }
+  }
+});
+
+test('main-bay door drive clears the missiles, closed and through the open-bay ejection', () => {
+  const D = L.BAY_DRIVE, R = L.AMRAAM.r, T = L.AMRAAM.tip;
+  const segPt = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1]; const u = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy || 1))); return Math.hypot(p[0] - a[0] - u * dx, p[1] - a[1] - u * dy); };
+  const segSeg = (a, b, c, d) => Math.min(segPt(a, c, d), segPt(b, c, d), segPt(c, a, b), segPt(d, a, b));
+  const A = [D.z, D.y];
+  // drive envelope at outer-door angle th (0 closed, 90° open): actuator, crank A→C, link C→D (fitting on the door)
+  const drive = (s, th) => {
+    const H = [L.MAIN_BAY.z, -L.bD(s)], c = Math.cos(th), sn = Math.sin(th);
+    const v = [D.fit[0] * c - D.fit[1] * sn, D.fit[0] * sn + D.fit[1] * c];
+    const C = [A[0] + v[0], A[1] + v[1]], F = [H[0] + v[0], H[1] + v[1]];
+    return { C, F };
+  };
+  for (const s of D.stations) {
+    // closed: the actuator sits above the closed door's inner face and the bay longeron line
+    assert.ok(D.y - D.r > -L.bD(s) + L.MAIN_DOOR.thick + 0.01, `actuator above the closed door at s ${s}`);
+    for (const [open, strokes] of [[0, [0]], [Math.PI / 2, [0, 0.25, 0.5, 0.75, 1]]]) {
+      const { C, F } = drive(s, open);
+      for (const [z, y0, t] of L.AMRAAM_SLOTS) for (const k of strokes) {
+        const y = y0 - k * L.AVEL_STROKE;
+        assert.ok(Math.hypot(z - A[0], y - A[1]) > R + D.r + 0.01, 'missile body clears the actuator');
+        for (let f = 0; f < 4; f++) {
+          const a = t + (f * Math.PI) / 2, r0 = [z + R * Math.cos(a), y + R * Math.sin(a)], r1 = [z + T * Math.cos(a), y + T * Math.sin(a)];
+          assert.ok(segPt(A, r0, r1) > D.r + 0.008, `fin clears the actuator (s ${s}, stroke ${k})`);
+          assert.ok(segSeg(r0, r1, A, C) > 0.012 + 0.008, `fin clears the crank (s ${s}, stroke ${k})`);
+          assert.ok(segSeg(r0, r1, C, F) > 0.008 + 0.008, `fin clears the link (s ${s}, stroke ${k})`);
+        }
+      }
+    }
+  }
+  // the outboard missile's ejected fins stay inboard of the drive
+  for (const [z, , t] of L.AMRAAM_SLOTS) for (let f = 0; f < 4; f++) assert.ok(z + T * Math.cos(t + (f * Math.PI) / 2) < D.z - D.r - 0.01, 'fins inboard of the drive');
+  // fins also clear the tapered aft ceiling, where the tail fins sit
+  for (const [z, y, t] of L.AMRAAM_SLOTS) for (let f = 0; f < 4; f++) { const a = t + (f * Math.PI) / 2; assert.ok(y + T * Math.sin(a) < L.bayCeilAt(12.25, z + T * Math.cos(a)), 'tail fin under the aft ceiling'); }
+});
+
+test('one actuator per trailing-edge surface; the cockpit opening closes inside the canopy', () => {
+  // Flight International (1997): two 4,000 psi systems but only one actuator on each control surface
+  assert.deepEqual(Object.keys(L.TE_ACT), ['flaperon', 'aileron']);
+  for (const [k, [e0, e1]] of [['flaperon', [0.07, 0.52]], ['aileron', [0.53, 0.94]]]) {
+    const a = L.TE_ACT[k];
+    assert.ok(a.eta > e0 && a.eta < e1 && a.c > 0.7 && a.c < 0.9, `${k} actuator on its surface's span and behind the rear spar region`);
+  }
+  // the skin opening at the aft cockpit station ends under the canopy (no slit beside its aft end)
+  const r = L.ringA(L.HOLE_S1).pts;
+  for (let k = 0; k <= 5; k++) assert.ok(Math.abs(r[k][2]) <= L.sillW(L.HOLE_S1) - 0.02, `opening edge point ${k} inside the canopy sill`);
+});

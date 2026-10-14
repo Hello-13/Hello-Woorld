@@ -66,9 +66,11 @@ export function pipe(points, r = 0.02, seg = 6, tubular = null) {
   return new THREE.TubeGeometry(curve, tubular || Math.max(8, points.length * 6), r, seg, false);
 }
 
-/** Merge geometries after making them non-indexed (mixed indexed / non-indexed inputs). */
+/** Merge geometries: indexed if every input is indexed, otherwise all made non-indexed first. */
 export function merge(list, mergeGeometries) {
-  const flat = list.filter(Boolean).map((g) => (g.index ? g.toNonIndexed() : g));
+  const src = list.filter(Boolean);
+  const allIndexed = src.every((g) => g.index);
+  const flat = allIndexed ? src : src.map((g) => (g.index ? g.toNonIndexed() : g));
   for (const g of flat) { if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2)); }
   const keepAttrs = ['position', 'normal', 'uv'];
   for (const g of flat) for (const k of Object.keys(g.attributes)) if (!keepAttrs.includes(k)) g.deleteAttribute(k);

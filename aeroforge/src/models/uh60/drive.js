@@ -98,13 +98,13 @@ export function buildDrive({ A, P, roofY }) {
   const onAxis = (g, s, k) => { const { G, d } = inAxis(s); g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), d)); const c = G.clone().addScaledVector(d, k); return g.translate(c.x, c.y, c.z); };
   const caseG = [
     place(lathe([[0.001, 0], [0.38, 0], [0.44, 0.1], [0.44, 0.24], [0.4, 0.34], [0.29, 0.42], [0.22, 0.46], [0.2, 0.49], [0.001, 0.49]], 36), [cx, 2.24, 0]),   // flat top cover at 2.73 carries the swashplate guide
-    box(0.82, 0.12, 0.74, [cx, 2.25, 0]),                           // sump
+    cyl(0.4, 0.4, 0.12, [cx, 2.25, 0], 'y', 36),                    // sump, hanging into the roof well
     cyl(0.11, 0.11, 0.3, [cx - 0.5, 2.45, 0], 'x', 20),            // tail take-off housing
   ];
   for (let k = 0; k < 12; k++) {                                     // case ribs (none under the input and transfer modules)
     if ([2, 3, 4, 8, 9, 10].includes(k)) continue;
     const a = (k / 12) * Math.PI * 2;
-    caseG.push(box(0.03, 0.26, 0.06, [cx + 0.44 * Math.cos(a), 2.4, 0.44 * Math.sin(a)], [0, -a, 0]));
+    caseG.push(box(0.03, 0.21, 0.06, [cx + 0.44 * Math.cos(a), 2.425, 0.44 * Math.sin(a)], [0, -a, 0]));   // ribs stop above the deck plate
   }
   const overall = ratio(), tailRpm = SPEEDS.tailOutput;
   P('Main module (main transmission)', {
@@ -153,14 +153,14 @@ export function buildDrive({ A, P, roofY }) {
   P('Main transmission oil filter', {
     system: 'Drive system', material: 'Two-stage filter with impending-bypass button', mass: 3, explode: [0.1, 0.35, -1.0],
     desc: 'A two-stage oil filter on the left side of the main module. When its first stage clogs, a red button pops out so the crew sees it on the walk-round; a thermal lockout stops it popping when the oil is cold and thick. Strainers in the sump catch the rest.',
-  }, [mesh(merge([cyl(0.05, 0.05, 0.16, [cx - 0.125, 2.33, -0.5], 'y', 16), cyl(0.055, 0.055, 0.03, [cx - 0.125, 2.425, -0.5], 'y', 16), box(0.08, 0.06, 0.09, [cx - 0.125, 2.38, -0.44])]), MAT.casting()),
-    mesh(cyl(0.012, 0.012, 0.02, [cx - 0.125, 2.45, -0.5], 'y', 8), MAT.red())]);
+  }, [mesh(merge([cyl(0.05, 0.05, 0.12, [cx - 0.125, 2.33, -0.5], 'y', 16), cyl(0.055, 0.055, 0.03, [cx - 0.125, 2.405, -0.5], 'y', 16), box(0.08, 0.06, 0.09, [cx - 0.125, 2.36, -0.44])]), MAT.casting()),
+    mesh(cyl(0.012, 0.012, 0.02, [cx - 0.125, 2.43, -0.5], 'y', 8), MAT.red())]);   // below the engine's forward support
   const cl = [];
-  for (const z of [0.12, -0.12]) cl.push(pipe([[cx - 0.4, 2.3, z * 1.6], [cx - 0.62, 2.32, z * 1.5], [-0.98, 2.36, z * 1.4], [-1.12, 2.38, z * 1.25]], 0.0125, 6));
+  for (const z of [0.12, -0.12]) cl.push(pipe([[cx - 0.4, 2.335, z * 1.6], [cx - 0.62, 2.345, z * 1.5], [-0.98, 2.37, z * 1.4], [-1.12, 2.385, z * 1.25]], 0.0125, 6));   // above the deck plate
   P('Oil cooler lines & thermostatic valve', {
     system: 'Drive system', material: 'Steel pressure and return lines, thermostatic bypass valve', mass: 3, explode: [-0.6, 0.85, 0.5],
     desc: 'The only external oil lines on the main transmission: pressure out to the cooler and return back to the module. A thermostatic valve sends the oil round the cooler instead of through it while the oil is below about 71 °C, so the gearbox warms up quickly.',
-  }, [mesh(merge(cl), MAT.hydraulic()), mesh(merge([box(0.09, 0.08, 0.1, [cx - 0.46, 2.3, 0.19]), cyl(0.025, 0.025, 0.04, [cx - 0.46, 2.355, 0.19], 'y', 10)]), MAT.casting())]);
+  }, [mesh(merge(cl), MAT.hydraulic()), mesh(merge([box(0.09, 0.08, 0.1, [cx - 0.46, 2.36, 0.19]), cyl(0.025, 0.025, 0.04, [cx - 0.46, 2.415, 0.19], 'y', 10)]), MAT.casting())]);
   const chips = [];
   for (const s of [1, -1]) chips.push(cyl(0.02, 0.02, 0.06, [0.16, 2.37, 0.52 * s], 'y', 10), cyl(0.02, 0.02, 0.06, [0.43, 2.52, 0.64 * s], 'z', 10));
   chips.push(cyl(0.022, 0.022, 0.06, [cx + 0.05, 2.17, -0.22], 'y', 10));
@@ -285,25 +285,28 @@ export function buildDrive({ A, P, roofY }) {
     const tgt = [new THREE.TorusGeometry(0.21, 0.007, 6, 40).rotateY(Math.PI / 2).translate(at(0.965), ENG.y, z)];
     for (let k = 0; k < 7; k++) { const a = (k / 7) * Math.PI * 2 + 0.2; tgt.push(tube(onCase(0.965, 0.205, a), onCase(0.965, 0.235, a), 0.006, 6)); }
     tgt.push(pipe([onCase(0.965, 0.215, Math.PI / 2 + 0.4), onCase(0.8, 0.24, Math.PI / 2 + 0.5), onCase(0.62, 0.25, Math.PI / 2 + 0.5)], 0.007, 5));
-    tgt.push(cyl(0.02, 0.02, 0.1, onCase(1.1, 0.22, -Math.PI / 2 + 0.3), 'x', 10), pipe([onCase(1.06, 0.22, -Math.PI / 2 + 0.3), onCase(0.95, 0.235, -Math.PI / 2 + 0.6), onCase(0.66, 0.23, -Math.PI / 2 + 0.7)], 0.006, 5));
+    // torque-sensor lead: inside the V of the rear mount links, under the ignition exciter, to the DECU
+    tgt.push(cyl(0.02, 0.02, 0.1, onCase(1.1, 0.22, -Math.PI / 2 + 0.3), 'x', 10), pipe([onCase(1.06, 0.22, -Math.PI / 2 + 0.3), [at(1.02), ENG.y - 0.26, z + 0.03 * s], [at(0.95), ENG.y - 0.26, z + 0.03 * s], [at(0.8), ENG.y - 0.245, z + 0.04 * s], [at(0.74), ENG.y - 0.24, z + 0.04 * s]], 0.006, 5));
     const tgtP = P(`T700 TGT harness & torque sensor ${R}`, {
       system: 'Propulsion', material: 'Chromel-alumel thermocouple harness, torque and overspeed sensor', mass: 1.5, explode: [-0.55, 1.75, 2.0 * s],
       desc: 'A ring of thermocouples at the power-turbine inlet, wired together so their readings average into one turbine gas temperature (TGT) for the cockpit and the DEC. Low on the exhaust frame, the torque and overspeed sensor reads the power-turbine shaft for the torque gauge and the overspeed trip.',
     }, [mesh(merge(tgt), MAT.copper())]);
     // accessory section: top-mounted gearbox with the air-turbine starter, alternator, oil cooler and filter
-    const ag = [box(0.42, 0.11, 0.22, [at(0.27), ENG.y + 0.27, z]), cyl(0.07, 0.07, 0.17, [at(0.13), ENG.y + 0.3, z - 0.1 * s], 'x', 16), cyl(0.05, 0.05, 0.1, [at(0.44), ENG.y + 0.3, z + 0.08 * s], 'x', 14), box(0.1, 0.1, 0.07, [at(0.5), ENG.y + 0.24, z - 0.12 * s])];
+    // gearbox on top of the compressor case just aft of the front frame, inside the cowl; the starter on
+    // its front face over the frame, the alternator on its aft face
+    const ag = [box(0.21, 0.11, 0.22, [at(0.395), ENG.y + 0.32, z]), cyl(0.06, 0.06, 0.17, [at(0.205), ENG.y + 0.31, z - 0.12 * s], 'x', 16), cyl(0.05, 0.05, 0.1, [at(0.55), ENG.y + 0.31, z + 0.05 * s], 'x', 14), box(0.1, 0.1, 0.07, [at(0.5), ENG.y + 0.24, z - 0.12 * s])];
     const agbP = P(`T700 accessory section ${R}`, {
       system: 'Propulsion', material: 'Aluminium gearbox, air-turbine starter, alternator, oil pump, cooler and filter', mass: 30, explode: [0.3, 1.55, 1.7 * s],
       desc: 'On top of the engine\'s front frame, driven off the gas generator by a radial shaft. It carries the air-turbine starter (spun by bleed air from the APU, the other engine or a ground cart), an alternator that powers the ignition and the DEC, the oil pump, cooler and filter, and the particle separator\'s blower.',
     }, [mesh(merge(ag), MAT.casting())]);
     // hydromechanical unit, engine-driven boost pump and filter, fuel manifold to the injectors
-    const fuelLines = [pipe([[at(0.5), ENG.y + 0.2, z + 0.15 * s], [at(0.7), ENG.y + 0.22, z + 0.22 * s], [at(0.88), ENG.y + 0.16, z + 0.2 * s]], 0.011), pipe([[at(0.35), ENG.y + 0.18, z - 0.14 * s], [at(0.7), ENG.y + 0.2, z - 0.2 * s], [at(0.88), ENG.y + 0.14, z - 0.2 * s]], 0.009)];
+    const fuelLines = [pipe([[at(0.5), ENG.y + 0.2, z + 0.15 * s], [at(0.7), ENG.y + 0.22, z + 0.22 * s], [at(0.88), ENG.y + 0.16, z + 0.2 * s]], 0.011), pipe([[at(0.35), ENG.y + 0.18, z - 0.14 * s], [at(0.5), ENG.y + 0.13, z - 0.2 * s], [at(0.7), ENG.y + 0.12, z - 0.21 * s], [at(0.88), ENG.y + 0.14, z - 0.2 * s]], 0.009)];
     const hmuP = P(`T700 fuel control & pump ${R}`, {
       system: 'Propulsion', material: 'Hydromechanical unit (HMU), engine-driven boost pump, fuel filter, copper/steel lines', mass: 14, explode: [0.6, 1.4, 2.1 * s],
       desc: 'The engine-driven boost pump draws fuel by suction from the cell (a cut line sucks air rather than spraying fuel), the barrier filter cleans it and the HMU meters it to the injectors on the DEC\'s commands, with a hydromechanical backup if the electronics fail.',
-    }, [mesh(merge([box(0.16, 0.13, 0.12, [at(0.5), ENG.y + 0.18, z + 0.13 * s]), cyl(0.045, 0.045, 0.12, [at(0.36), ENG.y + 0.17, z + 0.17 * s], 'y', 12)]), MAT.casting()), mesh(merge(fuelLines), MAT.copper())]);
-    const vlv = [box(0.1, 0.08, 0.08, onCase(0.6, 0.22, Math.PI / 2 + 0.75)), pipe([onCase(0.6, 0.2, Math.PI / 2 + 0.75), onCase(0.55, 0.26, Math.PI / 2 + 1.0), onCase(0.32, 0.28, Math.PI / 2 + 1.1)], 0.012, 6),
-      box(0.08, 0.07, 0.07, [at(0.66), ENG.y + 0.18, z + 0.14 * s])];
+    }, [mesh(merge([box(0.16, 0.13, 0.12, [at(0.5), ENG.y + 0.21, z + 0.17 * s]), cyl(0.045, 0.045, 0.12, [at(0.36), ENG.y + 0.17, z + 0.17 * s], 'y', 12)]), MAT.casting()), mesh(merge(fuelLines), MAT.copper())]);   // HMU on the gearbox's outboard face
+    const vlv = [box(0.1, 0.08, 0.08, onCase(0.6, 0.26, Math.PI / 2 + 0.75)), pipe([onCase(0.6, 0.24, Math.PI / 2 + 0.75), onCase(0.55, 0.27, Math.PI / 2 + 1.0), onCase(0.32, 0.28, Math.PI / 2 + 1.1)], 0.012, 6),
+      box(0.08, 0.07, 0.07, [at(0.66), ENG.y + 0.2, z + 0.155 * s])];   // seated on the compressor case
     const vlvP = P(`T700 bleed & overspeed-drain valves ${R}`, {
       system: 'Propulsion', material: 'Anti-icing and start bleed valve, overspeed and drain valve (ODV)', mass: 2.5, explode: [0.0, 1.8, 2.15 * s],
       desc: 'On the compressor casing, the anti-icing and start bleed valve bleeds air during starts so the compressor does not stall, and sends hot air to the inlet when anti-ice is on. Beside the HMU, the overspeed and drain valve shuts off the fuel to stop a power-turbine overspeed when the DEC trips it, and purges the fuel manifold at shutdown.',
@@ -311,7 +314,7 @@ export function buildDrive({ A, P, roofY }) {
     const decuP = P(`T700 DECU & ignition ${R}`, {
       system: 'Propulsion', material: 'Digital electronic control unit, ignition exciter, shielded leads', mass: 8, explode: [0.1, 0.7, 2.0 * s],
       desc: 'The -701D\'s digital electronic control unit trims the fuel flow to hold rotor speed at 100 %, shares load between the two engines and limits turbine temperature; the ignition exciter beside it fires the two igniters only during the start.',
-    }, [mesh(merge([box(0.26, 0.06, 0.16, [at(0.62), ENG.y - 0.22, z]), box(0.1, 0.06, 0.07, [at(0.85), ENG.y - 0.2, z + 0.14 * s])]), MAT.avionics()), mesh(pipe([[at(0.85), ENG.y - 0.19, z + 0.16 * s], [at(0.88), ENG.y - 0.08, z + 0.22 * s], [at(0.86), ENG.y + 0.05, z + 0.21 * s], onCase(0.84, 0.24, -0.6)], 0.007), MAT.wiring())]);
+    }, [mesh(merge([box(0.26, 0.06, 0.16, [at(0.62), ENG.y - 0.24, z]), box(0.1, 0.06, 0.07, [at(0.85), ENG.y - 0.2, z + 0.14 * s])]), MAT.avionics()), mesh(pipe([[at(0.85), ENG.y - 0.19, z + 0.16 * s], [at(0.88), ENG.y - 0.08, z + 0.22 * s], [at(0.86), ENG.y + 0.05, z + 0.21 * s], onCase(0.84, 0.24, -0.6)], 0.007), MAT.wiring())]);
     for (const [p, r] of [[coldP, 'compressor'], [combP, 'engine'], [ggtP, 'engine'], [ptP, 'engine'], [tgtP, 'engine'], [agbP, 'gearbox'], [hmuP, 'warm'], [vlvP, 'warm'], [decuP, 'avionics']]) p.userData.part.thermalRole = r;
     engines.push(coldP, combP, ggtP, ptP, tgtP, agbP, hmuP, vlvP, decuP);
 
@@ -327,10 +330,10 @@ export function buildDrive({ A, P, roofY }) {
       vanes.push(v);
     }
     const ipsG = [
-      cyl(0.31, 0.31, 0.2, [ENG.front - 0.04, ENG.y, z], 'x', 32, true),
+      cyl(0.26, 0.26, 0.2, [ENG.front - 0.04, ENG.y, z], 'x', 32, true),
       cyl(0.13, 0.16, 0.22, [ENG.front - 0.01, ENG.y, z], 'x', 24),
       place(lathe([[0.13, 0], [0.12, 0.02], [0.06, 0.1], [0.001, 0.12]], 20), [ENG.front + 0.1, ENG.y, z], [0, 0, -Math.PI / 2]),
-      latheX([[0.001, 0], [0.17, 0], [0.22, 0.02], [0.31, 0.1], [0.31, 0.16], [0.001, 0.16]], 32).translate(ENG.front - 0.3, ENG.y, z),   // scroll case and main frame
+      latheX([[0.001, 0], [0.17, 0], [0.2, 0.02], [0.26, 0.1], [0.26, 0.16], [0.001, 0.16]], 32).translate(ENG.front - 0.3, ENG.y, z),   // scroll case and main frame
       ...vanes,
     ];
     P(`Inlet particle separator ${R}`, {
@@ -342,7 +345,7 @@ export function buildDrive({ A, P, roofY }) {
     // discharge port, tangential outlet into the scavenge duct running aft along the top
     const bc = [at(0.33), ENG.y + 0.295, z + 0.14 * s];
     const blower = [cyl(0.06, 0.06, 0.06, bc, 'z', 18), cyl(0.045, 0.045, 0.012, [bc[0], bc[1], bc[2] - 0.033 * s], 'z', 14)];
-    const ipsIn = pipe([onCase(0.16, 0.305, 0.97), [at(0.2), ENG.y + 0.29, z + 0.215 * s], [at(0.28), ENG.y + 0.3, z + 0.215 * s], [bc[0], bc[1], bc[2] + 0.045 * s]], 0.028, 10);
+    const ipsIn = pipe([onCase(0.16, 0.255, 0.97), [at(0.2), ENG.y + 0.29, z + 0.215 * s], [at(0.28), ENG.y + 0.3, z + 0.215 * s], [bc[0], bc[1], bc[2] + 0.045 * s]], 0.028, 10);
     const scav = pipe([[bc[0] + 0.03, bc[1] + 0.035, bc[2] + 0.012 * s], [at(0.38), ENG.y + 0.32, z + 0.17 * s], [at(0.5), ENG.y + 0.312, z + 0.195 * s], [at(0.8), ENG.y + 0.29, z + 0.2 * s], [at(1.0), ENG.y + 0.27, z + 0.2 * s], [at(1.2), ENG.y + 0.22, z + 0.2 * s]], 0.03, 10);
     P(`T700 IPS blower & scavenge duct ${R}`, {
       system: 'Propulsion', material: 'Gear-driven centrifugal blower, inlet and scavenge ducts', mass: 3, explode: [0.45, 2.0, 1.75 * s],
@@ -381,13 +384,23 @@ export function buildDrive({ A, P, roofY }) {
   for (const s of [1, -1]) {
     fw.push(box(1.15, 0.24, 0.02, [-1.03, 2.49, 0.43 * s]));          // inboard wall of the engine bay, inside the cowl
     // rear mount links only: the front of the engine is carried by the input module
-    for (const x of [ENG.rear + 0.2]) fw.push(tube([x, 2.29, 0.5 * s], [x, ENG.y - 0.2, ENG.z * s], 0.02), tube([x, 2.29, 0.98 * s], [x, ENG.y - 0.2, ENG.z * s], 0.02));
+    for (const x of [ENG.rear + 0.15]) fw.push(tube([x, 2.29, 0.5 * s], [x, ENG.y - 0.2, ENG.z * s], 0.02), tube([x, 2.29, 0.98 * s], [x, ENG.y - 0.2, ENG.z * s], 0.02));
   }
-  // transmission deck plate (primed aluminium), kept inside the transmission fairing's footprint;
-  // the main module stands on four pads (the primary servos stand on the deck ahead of the front pair)
-  const deck = [box(1.36, 0.03, 0.7, [-0.05, 2.3, 0])];
-  for (const [x, z] of [[-0.42, 0.37], [-0.42, -0.37]]) deck.push(box(0.12, 0.1, 0.1, [x, 2.34, z]));
-  for (const z of [0.32, -0.32]) deck.push(box(0.1, 0.06, 0.07, [0.22, 2.32, z]));   // forward pads, under the case bowl
+  // transmission deck plate (primed aluminium), kept inside the transmission fairing's footprint and
+  // cut round the main module, whose case bowl and sump hang through it into the roof well between
+  // the roof beams; the main module stands on four pads against its case (the primary servos stand
+  // on the deck ahead of the front pair)
+  const deckPiece = (xa, side) => {
+    const R = 0.445, hz = 0.35, xc = (zz) => cx + side * Math.sqrt(R * R - zz * zz), sh = new THREE.Shape();
+    const arc = [];
+    for (let k = 0; k <= 16; k++) { const zz = -hz + (2 * hz * k) / 16; arc.push([xc(zz), zz]); }
+    if (side < 0) { sh.moveTo(xa, -hz); for (const [u, v] of arc) sh.lineTo(u, v); sh.lineTo(xa, hz); } else { sh.moveTo(xa, hz); for (const [u, v] of arc.reverse()) sh.lineTo(u, v); sh.lineTo(xa, -hz); }
+    sh.closePath();
+    return new THREE.ExtrudeGeometry(sh, { depth: 0.03, bevelEnabled: false, curveSegments: 1 }).rotateX(Math.PI / 2).translate(0, 2.315, 0);
+  };
+  const deck = [deckPiece(-0.73, -1), deckPiece(0.63, 1)];
+  for (const z of [0.345, -0.345]) deck.push(box(0.12, 0.1, 0.09, [-0.42, 2.365, z]));   // aft pads, on the deck against the case
+  for (const z of [0.17, -0.17]) deck.push(box(0.08, 0.06, 0.08, [0.42, 2.345, z]));     // forward pads, between the primary servos
   P('Upper deck, firewalls & mounts', {
     system: 'Structure', material: 'Titanium firewalls, steel engine mount links, primed aluminium deck with transmission mounting pads', mass: 95, explode: [0, 0.12, 0], xrayWeight: 0.5,
     desc: 'The deck above the cabin roof carries the transmission on four pads and each engine on tubular links; titanium firewalls separate the engines from the gearbox and from each other.',
@@ -396,7 +409,7 @@ export function buildDrive({ A, P, roofY }) {
   // ------------------------------------------------------------------ tail take-off: gust lock, rotor brake
   const tto = V3(cx - 0.62, 2.45, 0);           // -0.66: the take-off flange at the back of the main module
   const gl = [gearWheel(0.125, 0.024, 36, [tto.x - 0.05, tto.y, 0], 'x', 24), box(0.12, 0.1, 0.08, [tto.x - 0.04, tto.y + 0.17, 0.06]), box(0.03, 0.06, 0.03, [tto.x - 0.05, tto.y + 0.11, 0.06])];
-  const glCable = pipe([[tto.x - 0.03, tto.y + 0.17, 0.11], [-0.8, 2.35, 0.14], [-1.0, 2.24, 0.14], [-1.4, 2.18, 0.13], [-1.68, 2.05, 0.06], [-1.74, 1.9, 0.0]], 0.006, 4);
+  const glCable = pipe([[tto.x - 0.03, tto.y + 0.17, 0.11], [-0.8, 2.35, 0.14], [-1.0, 2.23, 0.14], [-1.1, 2.16, 0.135], [-1.3, 2.135, 0.13], [-1.45, 2.12, 0.12], [-1.68, 2.05, 0.06], [-1.74, 1.9, 0.0]], 0.006, 4);   // under the roof frame at x −1.2
   P('Main rotor gust lock', {
     system: 'Drive system', material: 'Locking pawl on toothed tail take-off flange, push-pull cable, cabin handle', mass: 4, explode: [-0.35, 1.05, 0.5],
     desc: 'A pawl that drops into teeth on the tail take-off flange to stop a parked rotor turning in the wind. It is strong enough to hold the rotor against one engine at IDLE, so an engine can be run for maintenance with the rotor still; it is set only with the rotor stopped and releases only with both engines shut down, from a handle at the rear of the cabin. (Described in the UH-60A/L manual; shown on the assumption the M keeps it beside its rotor brake.)',
@@ -468,7 +481,7 @@ export function buildDrive({ A, P, roofY }) {
   P('APU electronic sequence unit', {
     system: 'Propulsion', material: 'Electronic sequence unit with BITE indicators', mass: 3, explode: [0.5, 0.5, -0.6],
     desc: 'Runs the APU\'s start sequence and shuts it down for overspeed, underspeed, high exhaust temperature, low oil pressure or loss of its own power. Built-in-test indicators on its face show the maintainer why it stopped. Mounted on the aft cabin wall (location approximate).',
-  }, [mesh(box(0.1, 0.15, 0.15, [-1.71, 1.82, -0.52]), MAT.avionics()), mesh(box(0.012, 0.04, 0.1, [-1.655, 1.86, -0.52]), MAT.screenAmber())]);
+  }, [mesh(box(0.1, 0.15, 0.15, [-1.71, 1.82, -0.76]), MAT.avionics()), mesh(box(0.012, 0.04, 0.1, [-1.655, 1.86, -0.76]), MAT.screenAmber())]);   // outboard of the stowage door
 
   // ------------------------------------------------------------------ pneumatic start system
   // one manifold fed by either engine, the APU or a ground cart: check valves at each source and a
@@ -478,20 +491,20 @@ export function buildDrive({ A, P, roofY }) {
   const pnFeed = {};
   for (const s of [1, -1]) {
     const pts = s < 0
-      ? [[-1.72, 2.44, -0.25], [-1.4, 2.45, -0.3], [-1.05, 2.47, -0.4], [-0.86, 2.62, -0.5], [-0.8, 2.8, -0.6], [-0.74, 2.87, -0.65]]
-      : [[-1.72, 2.44, -0.25], [-1.76, 2.5, 0.0], [-1.6, 2.49, 0.24], [-1.3, 2.46, 0.32], [-1.05, 2.47, 0.4], [-0.86, 2.62, 0.5], [-0.8, 2.8, 0.6], [-0.74, 2.87, 0.65]];
+      ? [[-1.72, 2.44, -0.25], [-1.4, 2.45, -0.3], [-1.05, 2.47, -0.4], [-0.86, 2.62, -0.5], [-0.78, 2.76, -0.58], [-0.72, 2.84, -0.63]]
+      : [[-1.72, 2.44, -0.25], [-1.76, 2.5, 0.0], [-1.6, 2.49, 0.24], [-1.3, 2.46, 0.32], [-1.05, 2.47, 0.4], [-0.86, 2.62, 0.5], [-0.78, 2.76, 0.58], [-0.72, 2.84, 0.63]];
     pn.push(pipe(pts, 0.028, 8));
-    pn.push(pipe([[-1.15, 2.5, 0.42 * s], [-1.17, 2.62, 0.52 * s], [-1.15, ENG.y + 0.17, ENG.z * s - 0.12 * s]], 0.02, 6));       // engine bleed port (cross-bleed / heater source)
+    pn.push(pipe([[-1.15, 2.5, 0.42 * s], [-1.17, 2.6, 0.5 * s], [-1.16, 2.7, 0.53 * s], [-1.12, 2.765, 0.575 * s]], 0.02, 6));       // engine bleed port (cross-bleed / heater source), into the engine's bleed valve
     pnFeed[s] = pts;
   }
-  pn.push(pipe([[-1.72, 2.44, -0.25], [-2.0, 2.4, -0.3], [-2.2, 2.39, -0.33], [-2.22, 2.39, -0.37]], 0.022, 6));               // external pneumatic port
+  pn.push(pipe([[-1.72, 2.44, -0.25], [-1.95, 2.42, -0.3], [-2.08, 2.36, -0.33], [-2.2, 2.33, -0.345], [-2.22, 2.33, -0.37]], 0.022, 6));   // external pneumatic port, over the APU fuel valve and beside the APU
   pn.push(pipe([[-1.6, 2.49, 0.24], [-1.615, 2.477, 0.258], [-1.62, 2.46, 0.27]], 0.024, 6));                                // heater branch into the mixing valve
-  const valves = [tube([-1.88, 2.507, -0.205], [-1.8, 2.481, -0.216], 0.04, 14), cyl(0.035, 0.035, 0.07, [-2.17, 2.39, -0.33], 'x', 12)];   // APU-outlet check valve on the duct ahead of the APU
-  for (const s of [1, -1]) valves.push(cyl(0.035, 0.035, 0.07, [-1.15, ENG.y + 0.1, (ENG.z - 0.2) * s], 'y', 12), box(0.09, 0.08, 0.08, [-1.0, 2.46, 0.41 * s]), box(0.04, 0.05, 0.04, [-1.0, 2.52, 0.41 * s]));
+  const valves = [tube([-1.88, 2.507, -0.205], [-1.8, 2.481, -0.216], 0.04, 14), cyl(0.03, 0.03, 0.07, [-2.15, 2.338, -0.338], 'x', 12)];   // APU-outlet check valve on the duct ahead of the APU
+  for (const s of [1, -1]) valves.push(cyl(0.035, 0.035, 0.07, [-1.165, 2.585, 0.5 * s], 'y', 12), box(0.09, 0.08, 0.08, [-1.0, 2.478, 0.41 * s]), box(0.04, 0.05, 0.04, [-1.0, 2.538, 0.41 * s]));   // check valve on the bleed branch, shutoff above the fuel line
   P('Pneumatic start ducts', {
     system: 'Propulsion', material: 'Stainless-steel bleed-air ducts with V-band joints, external ground connector', mass: 9, explode: [-0.9, 1.0, -0.2], xrayWeight: 0.6,
     desc: 'One pneumatic system, fed by either engine\'s compressor bleed, the APU or a ground cart through a connector on the left side, drives both engines\' air-turbine starters and the cabin heater. Bleed from a running engine can start the other one (a cross-bleed start).',
-  }, [mesh(merge(pn), MAT.steel()), mesh(cyl(0.04, 0.04, 0.02, [-2.22, 2.39, -0.375], 'z', 14), MAT.yellow())]);
+  }, [mesh(merge(pn), MAT.steel()), mesh(cyl(0.04, 0.04, 0.02, [-2.22, 2.33, -0.375], 'z', 14), MAT.yellow())]);
   P('Bleed-air check & shutoff valves', {
     system: 'Propulsion', material: 'Flapper check valves, motor-operated shutoff valves', mass: 4, count: 6, explode: [-0.6, 1.5, -0.2],
     desc: 'A check valve at every source — the APU, each engine\'s bleed port and the ground connector — stops air flowing backwards into a source that is not running, and a shutoff valve at each engine isolates that engine\'s side of the system.',
@@ -499,7 +512,7 @@ export function buildDrive({ A, P, roofY }) {
 
   // ------------------------------------------------------------------ fire protection
   const det = [];
-  for (const s of [1, -1]) det.push(cyl(0.025, 0.025, 0.06, [-0.95, 2.48, 0.455 * s], 'z', 10), cyl(0.025, 0.025, 0.06, [-1.25, 2.27, 0.92 * s], 'y', 10));
+  for (const s of [1, -1]) det.push(cyl(0.025, 0.025, 0.06, [-1.28, 2.48, 0.455 * s], 'z', 10), cyl(0.025, 0.025, 0.06, [-1.25, 2.27, 0.92 * s], 'y', 10));
   det.push(cyl(0.025, 0.025, 0.06, [-2.25, 2.46, -0.02], 'y', 10));
   P('Fire detectors', {
     system: 'Propulsion', material: 'Solid-state infrared flame detectors', mass: 1, count: 5, explode: [-0.4, 0.75, 0.2],

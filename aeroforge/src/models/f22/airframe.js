@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
-import { wingPanel, wingPoint, mirrorZ, naca00 } from '../../engine/geometry.js';
+import { wingPanel, wingPoint, mirrorZ, naca00, mergeGeometries } from '../../engine/geometry.js';
 import { F } from './materials.js';
 import * as FR from './frame.js';
 import { merge, dedupe, frameBand, platePoly, slab, hinge, ribPlate, sparWeb, mirror, toothedGrid } from './util.js';
@@ -127,11 +127,15 @@ function trimRootFromDuct(g, root, tip) {
     // upper and lower points at one chord station (and the mid-plane between) move together, so the faces
     // that join them through the wing stay clear of the duct as well
     const ytv = yt;
+    const clear = (e) => { at(e); return FR.ductDepth(FR.SN - q[0], q[1], q[2]) <= -0.025; };
     let eta = 0;
     for (const f of [1, 0.5, 0, -0.5, -1]) {
       yt = ytv * f;
-      at(eta);
-      while (eta < 0.07 && FR.ductDepth(FR.SN - q[0], q[1], q[2]) > -0.025) { eta += 0.002; at(eta); }
+      if (clear(eta)) continue;
+      let lo = eta, hi = eta;
+      while (hi < 0.07 && !clear(hi)) { lo = hi; hi = Math.min(0.07, hi + 0.008); }
+      for (let k = 0; k < 6; k++) { const m = (lo + hi) / 2; if (clear(m)) hi = m; else lo = m; }
+      eta = hi;
     }
     yt = ytv;
     at(eta);
@@ -215,8 +219,9 @@ export function buildAirframe(ctx) {
     system: 'Skin & fairings', skin: true, material: 'Titanium panels (hot structure near the nozzles)',
     mass: 210, explode: [-0.6, -1.3, 0],
     desc: 'The underside of the engine bays and the aft closure around the nozzles. Titanium is used where exhaust heat would soften aluminium or composites; the two large engine-change doors are cut into it.',
-  }, [mesh(FR.gridSurface(rAft, { closed: true, keep: keepB(stAft, false) }), F.skin()), mesh(capAft(rAft[rAft.length - 1]), F.black()),
-    mesh(FR.gridSurface([[17.45, -0.03, 0.44, 1.12], [17.8, -0.04, 0.4, 0.92], [18.1, -0.05, 0.3, 0.56], [18.32, -0.06, 0.14, 0.24]].map(([s, y, w, h]) => FR.superRing(X(s), 0, y, w, h, 16, 3.2)), { closed: true, uv: 'n' }), F.skin())]);
+  }, [mesh(merge([FR.gridSurface(rAft, { closed: true, keep: keepB(stAft, false) }),
+    FR.gridSurface([[17.45, -0.03, 0.44, 1.12], [17.8, -0.04, 0.4, 0.92], [18.1, -0.05, 0.3, 0.56], [18.32, -0.06, 0.14, 0.24]].map(([s, y, w, h]) => FR.superRing(X(s), 0, y, w, h, 16, 3.2)), { closed: true, uv: 'n' })]), F.skin()),
+    mesh(capAft(rAft[rAft.length - 1]), F.black())]);
 
   // lower engine-change doors: each F119 is lowered out of its bay on a trailer
   for (const side of [1, -1]) {
@@ -396,7 +401,7 @@ export function buildAirframe(ctx) {
       system: 'Skin & fairings', skin: true, material: 'Bismaleimide composite skins, RAM-treated edges', mass: 420,
       explode: [0, 0.35, 2.7 * side], callout: false,
       desc: 'Upper and lower skins of a 42°-swept wing with a −17° trailing edge; 78.04 m² for both wings and a 13.56 m span, with 3.25° of anhedral. The real wing uses NACA 64A-series sections (5.92 % thick at the root, 4.29 % at the tip) with conical camber and twist; the model keeps the thickness but uses symmetric sections.',
-    }, skin.map((g) => mesh(g, F.wing())));
+    }, mesh(mergeGeometries(skin), F.wing()));                     // one mesh; the panels keep their chord / side attributes
     wing.userData.part.thermalRole = 'leadingEdge';
 
     // control surfaces
@@ -491,8 +496,8 @@ export function buildAirframe(ctx) {
         g.push(new THREE.BoxGeometry(0.16, r * 0.6, 0.03).translate(p.x + 0.08, p.y, p.z - 0.06));
       }
       // power drive unit at the wing root, outboard of the inlet duct, geared into the inboard end of the torque tube
-      const pdu = mz(wingPoint(wRoot, wTip, 0.061, 0.1));
-      g.push(new THREE.BoxGeometry(0.26, 0.09, 0.14).translate(pdu.x, pdu.y, pdu.z));
+      const pdu = mz(wingPoint(wRoot, wTip, 0.059, 0.1));                            // z ≈ 1.765: inside the cowl side wall
+      g.push(new THREE.BoxGeometry(0.26, 0.09, 0.13).translate(pdu.x, pdu.y, pdu.z));
       P(`Leading-edge flap drive (${R})`, {
         system: 'Flight controls', material: 'Hydraulic power drive unit, titanium torque tube, rotary geared actuators', mass: 55, explode: [0.6, -0.6, 2.6 * side],
         desc: 'A hydraulic power drive unit at the wing root turns a torque tube along the front spar, and geared rotary actuators along it move the full-span leading-edge flap. Curtiss-Wright developed these geared rotary actuators and has supplied them since the start of the programme (actuator count approximate; each is sized to the local wing depth).',
@@ -548,7 +553,7 @@ export function buildAirframe(ctx) {
     const geo = [flip(wingPanel({ root: sr, tip: sn, stations: 1, n: 20 })), flip(wingPanel({ root: sn, tip: stp, stations: 5, n: 20 }))];
     const p0 = V(X(FR.STAB.pivotS), FR.STAB.y, 0), p1 = V(X(FR.STAB.pivotS), FR.STAB.y, side);
     const testTE = V(X(18.6), FR.STAB.y, side * 2.0);
-    const h = hinge(geo.map((g) => mesh(g, F.wing())), p0, p1, testTE, V(0, -1, 0));
+    const h = hinge(mesh(mergeGeometries(geo), F.wing()), p0, p1, testTE, V(0, -1, 0));
     const stab = P(`Stabilator (${R})`, {
       system: 'Flight controls', material: 'Composite skins on a titanium torque box', mass: 290,
       explode: [-2.3, -0.2, 1.9 * side], callout: false,
@@ -603,7 +608,7 @@ export function buildAirframe(ctx) {
       system: 'Skin & fairings', skin: true, material: 'Composite skins, RAM-treated edges', mass: 230,
       explode: [-0.9, 2.0, 1.1 * side], callout: side > 0, anchor: [-2.0, 0.03, 2.9],
       desc: 'Each fin is canted 28° outward so neither presents a flat, vertical surface to a radar looking from the side. Together the two give about 16.5 m² of vertical tail area.',
-    }, fin.map((g) => mesh(g, F.wing()))));
+    }, mesh(mergeGeometries(fin), F.wing())));
     vt.userData.part.thermalRole = 'leadingEdge';
 
     const rud = wingPanel({ root: vRoot, tip: vTip, c0: 0.72, c1: 1, eta0: 0.06, eta1: 0.66, stations: 3 });
@@ -655,11 +660,7 @@ export function buildAirframe(ctx) {
     // main-gear wells
     const stW = stations(FR.MAIN_WELL.s0, FR.MAIN_WELL.s1, 0.15);
     // 0.44 m deep, except toward the aft end, where the roof stays 2 cm under the inlet duct's floor
-    const wellRoof = (s) => {
-      let y = -FR.bD(s) + 0.44;
-      for (let zz = FR.MAIN_WELL.z0; zz <= FR.MAIN_WELL.z1 + 1e-6; zz += 0.02) { const sp = FR.ductSpan(s, zz); if (sp) y = Math.min(y, sp.lo - 0.02); }
-      return y;
-    };
+    const wellRoof = FR.mainWellRoof;
     for (const side of [1, -1]) {
       g.push(cavityGrid(stW.map((s) => {
         const zo = side * Math.min(FR.MAIN_WELL.z1, FR.bWb(s) - 0.05), zi = side * FR.MAIN_WELL.z0, y = wellRoof(s);

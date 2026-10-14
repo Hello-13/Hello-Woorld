@@ -45,11 +45,12 @@ export function mono(keys, s) {
   const n = keys.length;
   if (s <= keys[0][0]) return keys[0][1];
   if (s >= keys[n - 1][0]) return keys[n - 1][1];
-  let m = slopes.get(keys);
-  if (!m) { m = pchipSlopes(keys); slopes.set(keys, m); }
+  // slopes are cached on the key array itself (a hidden property): this is the hottest call in the build
+  let m = keys.__slopes;
+  if (!m) { m = slopes.get(keys) || pchipSlopes(keys); slopes.set(keys, m); Object.defineProperty(keys, '__slopes', { value: m }); }
   let i = 0;
   while (i < n - 2 && s > keys[i + 1][0]) i++;
-  const [s0, v0] = keys[i], [s1, v1] = keys[i + 1];
+  const k0 = keys[i], k1 = keys[i + 1], s0 = k0[0], v0 = k0[1], s1 = k1[0], v1 = k1[1];
   const h = s1 - s0, t = (s - s0) / h, t2 = t * t, t3 = t2 * t;
   return (2 * t3 - 3 * t2 + 1) * v0 + (t3 - 2 * t2 + t) * h * m[i] + (-2 * t3 + 3 * t2) * v1 + (t3 - t2) * h * m[i + 1];
 }
@@ -207,11 +208,11 @@ export function sideBaySection(s) {
   const wf = wallFractions(s);
   const a = wallB(s, wf[4]), b = wallB(s, wf[7]);
   const aIn = [a[0] - 0.99 * 0.34, a[1] + 0.08 * 0.34], bIn = [b[0] - 0.99 * 0.34, b[1] + 0.08 * 0.34];
-  for (let k = 0; k < 60; k++) {
-    let ok = true;
-    for (let u = 0; u <= 1.0001 && ok; u += 0.1) ok = ductDepth(s, lerp(a[1], aIn[1], u), lerp(a[0], aIn[0], u)) < -0.03;
-    if (ok) break;
-    aIn[1] -= 0.005;
+  const ok = (y) => { for (let u = 0; u <= 1.0001; u += 0.1) if (ductDepth(s, lerp(a[1], y, u), lerp(a[0], aIn[0], u)) >= -0.03) return false; return true; };
+  if (!ok(aIn[1])) {
+    let hi = aIn[1], lo = aIn[1] - 0.3;                 // hi fails, lo (30 cm lower) clears
+    for (let k = 0; k < 10; k++) { const m = (lo + hi) / 2; if (ok(m)) lo = m; else hi = m; }
+    aIn[1] = lo;
   }
   return [a, aIn, bIn, b];
 }
@@ -221,6 +222,12 @@ export const CM_BAY = { s0: 11.65, s1: 12.05 };
 export const ENGINE_DOOR = { s0: 13.5, s1: 16.8, q0: 28, q1: 34 };
 export const MAIN_BAY = { s0: 8.45, s1: 12.35, z: 0.78 };
 export const MAIN_WELL = { s0: 11.2, s1: 12.95, z0: 0.86, z1: 1.46 };
+/** Main-gear well roof height at station s: 0.44 m above the belly, held 2 cm under the inlet duct's floor aft. */
+export function mainWellRoof(s) {
+  let y = -bD(s) + 0.44;
+  for (let z = MAIN_WELL.z0; z <= MAIN_WELL.z1 + 1e-6; z += 0.02) { const sp = ductSpan(s, z); if (sp) y = Math.min(y, sp.lo - 0.02); }
+  return y;
+}
 /**
  * Gear legs, gear down: trunnion [s, y, z], axle station / span, tyre radius and width (m). The
  * weight-on-wheels switch sits on the leg at fraction k from trunnion to axle, `fwd` m ahead of the leg
@@ -388,25 +395,41 @@ export function ductRings() {
   return ductCache;
 }
 
-/** Air-passage cross-section of the (right) duct at station s as [z, y] points, or null outside lip → fan face. */
-export function ductSection(s) {
+// ductSection / ductDepth / ductSpan cut the liner exactly as it is lofted: between two rings the surface
+// is linear, and between the raked lip ring and the first S-duct ring each point runs from its own station.
+// They write into a scratch buffer instead of allocating, since the airframe calls them many thousand times.
+let secZ = null, secY = null, secMeta = null;
+function sectionInto(s) {
   const { inner, rings } = ductRings();
-  const R0 = rings[1], s0 = SN - R0[0][0];
-  const sLip = Math.min(...inner.map((p) => SN - p[0]));
-  if (s < sLip || s > FAN_S) return null;
+  if (!secMeta) {
+    const sts = rings.map((r) => SN - r[0][0]);
+    secMeta = { sts, sLip: Math.min(...inner.map((p) => SN - p[0])), n: inner.length };
+    secZ = new Float64Array(inner.length); secY = new Float64Array(inner.length);
+  }
+  const { sts, sLip, n } = secMeta;
+  if (s < sLip || s > FAN_S) return 0;
+  const R0 = rings[1], s0 = sts[1];
   if (s < s0) {
-    // between the raked lip and the first S-duct ring; ahead of the lip the section is the lip itself
-    return inner.map((p, j) => {
-      const sj = SN - p[0];
-      const t = s > sj ? (s - sj) / (s0 - sj) : 0;
-      return [lerp(p[2], R0[j][2], t), lerp(p[1], R0[j][1], t)];
-    });
+    for (let j = 0; j < n; j++) {
+      const p = inner[j], sj = SN - p[0], t = s > sj ? (s - sj) / (s0 - sj) : 0;
+      secZ[j] = p[2] + (R0[j][2] - p[2]) * t; secY[j] = p[1] + (R0[j][1] - p[1]) * t;
+    }
+    return n;
   }
   let i = 1;
-  while (i < rings.length - 2 && s > SN - rings[i + 1][0][0]) i++;
-  const a = rings[i], b = rings[i + 1], sa = SN - a[0][0], sb = SN - b[0][0];
-  const t = clamp((s - sa) / (sb - sa), 0, 1);
-  return a.map((p, j) => [lerp(p[2], b[j][2], t), lerp(p[1], b[j][1], t)]);
+  while (i < rings.length - 2 && s > sts[i + 1]) i++;
+  const A = rings[i], B = rings[i + 1], t = clamp((s - sts[i]) / (sts[i + 1] - sts[i]), 0, 1);
+  for (let j = 0; j < n; j++) { secZ[j] = A[j][2] + (B[j][2] - A[j][2]) * t; secY[j] = A[j][1] + (B[j][1] - A[j][1]) * t; }
+  return n;
+}
+
+/** Air-passage cross-section of the (right) duct at station s as [z, y] points, or null outside lip → fan face. */
+export function ductSection(s) {
+  const n = sectionInto(s);
+  if (!n) return null;
+  const out = [];
+  for (let j = 0; j < n; j++) out.push([secZ[j], secY[j]]);
+  return out;
 }
 
 /**
@@ -414,31 +437,36 @@ export function ductSection(s) {
  * (either duct; z may be signed). A point is clear of the air path when ductDepth < −(its radius + gap).
  */
 export function ductDepth(s, y, z) {
-  const poly = ductSection(s);
-  if (!poly) return -1;
+  const m = sectionInto(s);
+  if (!m) return -1;
   const az = Math.abs(z);
-  let inside = false, d = Infinity;
-  for (let k = 0, m = poly.length; k < m; k++) {
-    const [z1, y1] = poly[k], [z2, y2] = poly[(k + 1) % m];
+  let inside = false, d2 = Infinity;
+  for (let k = 0; k < m; k++) {
+    const k2 = k + 1 === m ? 0 : k + 1;
+    const z1 = secZ[k], y1 = secY[k], z2 = secZ[k2], y2 = secY[k2];
     if ((y1 > y) !== (y2 > y) && az < z1 + ((y - y1) * (z2 - z1)) / (y2 - y1)) inside = !inside;
     const dz = z2 - z1, dy = y2 - y1, L2 = dz * dz + dy * dy || 1;
     const u = clamp(((az - z1) * dz + (y - y1) * dy) / L2, 0, 1);
-    d = Math.min(d, Math.hypot(az - z1 - u * dz, y - y1 - u * dy));
+    const ez = az - z1 - u * dz, ey = y - y1 - u * dy, e2 = ez * ez + ey * ey;
+    if (e2 < d2) d2 = e2;
   }
+  const d = Math.sqrt(d2);
   return inside ? d : -d;
 }
 
 /** Lowest (floor) and highest (roof) duct-wall heights at station s and lateral position z, or null. */
 export function ductSpan(s, z) {
-  const poly = ductSection(s);
-  if (!poly) return null;
+  const m = sectionInto(s);
+  if (!m) return null;
   const az = Math.abs(z);
   let lo = Infinity, hi = -Infinity;
-  for (let k = 0, m = poly.length; k < m; k++) {
-    const [z1, y1] = poly[k], [z2, y2] = poly[(k + 1) % m];
+  for (let k = 0; k < m; k++) {
+    const k2 = k + 1 === m ? 0 : k + 1;
+    const z1 = secZ[k], y1 = secY[k], z2 = secZ[k2], y2 = secY[k2];
     if ((z1 - az) * (z2 - az) > 0 || z1 === z2) continue;
     const y = y1 + ((az - z1) / (z2 - z1)) * (y2 - y1);
-    lo = Math.min(lo, y); hi = Math.max(hi, y);
+    if (y < lo) lo = y;
+    if (y > hi) hi = y;
   }
   return lo <= hi ? { lo, hi } : null;
 }

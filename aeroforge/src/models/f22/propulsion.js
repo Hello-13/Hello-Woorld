@@ -35,7 +35,7 @@ export function buildPropulsion(ctx) {
       system: 'Skin & fairings', skin: true, material: 'Composite cowl, RAM-lined lips', mass: 140,
       explode: [1.0, -0.55, 1.7 * side], callout: side > 0, anchor: [X(7.03), -0.25, 1.75 * side],
       desc: 'A fixed-geometry caret inlet: the top and outer lips are both swept, so each makes an oblique shock that slows supersonic air with little loss, and their edges line up with the wing and chines. A narrow slot at the inboard wall separates the inlet from the fuselage boundary layer.',
-    }, [mesh(cowl, F.skin()), mesh(lipBand, F.skin())]);
+    }, mesh(merge([cowl, lipBand]), F.skin()));
     c.userData.part.thermalRole = 'leadingEdge';
 
     // ---------------------------------------------------------------- inlet duct, bleed and S-duct
@@ -184,7 +184,7 @@ export function buildPropulsion(ctx) {
         system: 'Propulsion', skin: true, material: 'Burn-resistant titanium (Alloy C) case, axially split for maintenance', mass: 260,
         explode: [0.7, 1.75, 0.95 * side],
         desc: 'The outer case is 48 in (1.22 m) across. Between it and the core cowl runs the bypass duct, which carries cool fan air past the hot core to the augmentor and nozzle. The case splits along its length, so modules can be changed without pulling the whole engine apart (drawn faint in X-ray so the core shows).',
-      }, [mesh(merge(c), F.tiDull()), mesh(core, F.hot()), mesh(merge(st), F.tiDull())]);
+      }, [mesh(merge([...c, ...st]), F.tiDull()), mesh(core, F.hot())]);
       cs.userData.part.thermalRole = 'fan';
       cs.userData.part.xrayWeight = 0.5;
     }
@@ -279,7 +279,7 @@ export function buildPropulsion(ctx) {
         system: 'Propulsion', material: 'Nickel / cobalt alloys, ceramic RAM-coated vanes, perforated cooling liner', mass: 380,
         explode: [-1.3, 0.55, 0.6 * side],
         desc: 'The three-zone afterburner lifts thrust from about 116 kN dry to the 156 kN class. Instead of spray bars and V-gutters, fuel is injected from thick curved vanes coated with radar-absorbent ceramic, which also hold the flame and block any view of the turbine (vane count illustrative); a perforated liner keeps bypass air between flame and casing.',
-      }, [mesh(merge(g), F.hot()), mesh(liner, F.liner()), mesh(outer, F.hot())]);
+      }, [mesh(merge([...g, outer]), F.hot()), mesh(liner, F.liner())]);
       aug.userData.part.thermalRole = 'augmentor';
       aug.userData.part.xrayWeight = 0.45;
       const glow = mesh(new THREE.CircleGeometry(0.5, 32).rotateY(-Math.PI / 2).translate(X(17.2), yc, zc), anim.turbine, { cast: false });

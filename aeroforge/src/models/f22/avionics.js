@@ -78,7 +78,7 @@ export function buildAvionics(ctx) {
   P('Vehicle management system computers', {
     system: 'Flight controls', material: 'Redundant flight-control processors', mass: 25, count: 3,
     explode: [2.2, 1.95, 0.6],
-    desc: 'Fly-by-wire computers turn stick and throttle inputs into surface and nozzle commands many times a second. The airframe is unstable in pitch for agility, so they never stop correcting (channel count illustrative).',
+    desc: 'Fly-by-wire computers turn stick and throttle inputs into surface and nozzle commands many times a second; the airframe is unstable in pitch for agility, so they never stop correcting. The VMS (Lear Astronics) combines flight and propulsion control, and the F-22 was the first fighter with triplex digital flight-control computers and no electrical or mechanical back-up mode (Flight International, 1997; box positions approximate).',
   }, mesh(merge([box(4.3, -0.22, 0.36, 0.3, 0.16, 0.12), box(4.3, -0.22, -0.36, 0.3, 0.16, 0.12), box(4.7, -0.22, -0.36, 0.3, 0.16, 0.12)]), F.boxLight()));
 
   // ================================================================== AN/APG-77 radar

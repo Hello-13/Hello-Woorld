@@ -222,12 +222,20 @@ export function buildTail({ A, P, air, roofY }) {
 
   // ------------------------------------------------------------------ gearboxes and pylon shaft
   const igb = V3(...TAIL.igb), tgb = V3(...TAIL.tgb), hub = V3(...TAIL.hub);
+  // the 42° box's case: round, with a flat mounting face 7 cm below the shaft line that sits on the
+  // tail cone's top skin over its frames and longerons
+  const igbCase = () => {
+    const g = new THREE.SphereGeometry(0.16, 18, 14), p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) if (p.getY(i) < -0.07) p.setY(i, -0.07);
+    g.computeVertexNormals();
+    return g;
+  };
   const n = V3(0, Math.sin(TAIL.cant), Math.cos(TAIL.cant));
   const pyDir = tgb.clone().sub(igb).normalize();
   P('Intermediate gearbox (42°)', {
     system: 'Drive system', material: 'Aluminium case, spiral-bevel gears, oil-lubricated', mass: 28, explode: [-2.6, 0.6, 0],
     desc: 'At the base of the pylon a pair of bevel gears turns the drive up the fin through about 42° and reduces its speed. Self-contained with its own oil, it can run 30 minutes at cruise with all its oil lost.',
-  }, [mesh(merge([new THREE.SphereGeometry(0.16, 18, 14).translate(igb.x, igb.y, igb.z), cyl(0.09, 0.09, 0.22, [igb.x + 0.16, igb.y, 0], 'x', 14), tube(igb, igb.clone().addScaledVector(pyDir, 0.24), 0.09, 14)]), MAT.casting())]);
+  }, [mesh(merge([igbCase().translate(igb.x, igb.y, igb.z), cyl(0.07, 0.07, 0.22, [igb.x + 0.16, igb.y, 0], 'x', 14), tube(igb, igb.clone().addScaledVector(pyDir, 0.24), 0.09, 14)]), MAT.casting())]);
   P('Tail drive shaft section 6', {
     system: 'Drive system', material: 'Dynamically balanced aluminium-alloy tube', mass: 6, explode: [-2.8, 0.6, 0],
     desc: 'The sixth and last section climbs the inside of the pylon from the intermediate to the tail gearbox, with a disc coupling at each end.',
@@ -236,21 +244,29 @@ export function buildTail({ A, P, air, roofY }) {
     system: 'Drive system', material: 'Magnesium case, bevel gears, pitch-change shaft through the output', mass: 38, explode: [-3.0, 0.9, -0.3],
     desc: 'Turns the drive 90° into the tail-rotor shaft and reduces it to 1,190 rpm — 4.6 times main-rotor speed — with the tail rotor\'s pitch-change shaft passing through its hollow output. Its housing is magnesium; it carries the tail rotor, the tail-rotor servo below it works the pitch-change shaft through it, and like the 42° box it can run 30 minutes with no oil.',
   }, [mesh(merge([tube(tgb.clone().addScaledVector(n, -0.08), tgb.clone().addScaledVector(n, 0.2), 0.15, 18), tube(tgb, tgb.clone().addScaledVector(pyDir, -0.24), 0.1, 14)]), MAT.casting())]);
-  // tail-rotor servo aft of the rear spar (the pylon shaft climbs just ahead of the spar): a trunnion
-  // link to the spar at its lower end, and its output rod reaching up to the 90° gearbox from behind
+  // tail-rotor servo, mounted on the 90° gearbox as the operator's manual describes: a trunnion collar
+  // at its upper end on a bracket from the underside of the gearbox's input housing; its output rod
+  // reaches up into the box, and it hangs between the pylon shaft and the rear spar
   const sLo = V3(...TR_CTL.servoLo), sHi = V3(...TR_CTL.servoHi), sRod = V3(-9.98, 3.36, -0.38);
   const sparAt = rearSparAt;   // rear-spar axis (see the spars above), here behind the servo
+  // bracket foot on the input housing's underside, nearest the servo's upper end
+  const svBracket = (() => {
+    const ax = tgb.clone().addScaledVector(pyDir, -0.22), d = sHi.clone().sub(ax);
+    d.addScaledVector(pyDir, -d.dot(pyDir)).normalize();
+    return ax.addScaledVector(d, 0.1);
+  })();
   P('Tail rotor servo', {
-    system: 'Flight controls', material: 'Dual-stage hydraulic actuator on a trunnion link to the pylon rear spar', mass: 9, explode: [-3.0, 0.4, -0.5],
-    desc: 'Driven by cables from the pedals through the quadrant below it, it moves the tail rotor\'s pitch-change shaft through the tail gearbox. Two stages: the first on the No. 1 hydraulic system, the second on the backup pump. The operator\'s manual describes it as mounted on the tail gear box; it is shown just below the box, between the pylon drive shaft and the rear spar, its output rod reaching up into the box (exact position approximate).',
+    system: 'Flight controls', material: 'Dual-stage hydraulic actuator on a trunnion bracket on the tail gearbox', mass: 9, explode: [-3.0, 0.4, -0.5],
+    desc: 'Driven by cables from the pedals through the quadrant below it, it moves the tail rotor\'s pitch-change shaft through the tail gearbox. Two stages: the first on the No. 1 hydraulic system, the second on the backup pump. It is mounted on the tail gear box, as the operator\'s manual describes: a trunnion collar at its upper end bolts to a bracket under the box\'s input housing, so the box reacts its loads, and its output rod reaches up into the box. It hangs between the pylon drive shaft and the rear spar (exact position approximate).',
   }, [mesh(merge([tube(sLo, sHi, 0.04, 12), tube(sHi, sRod, 0.012, 8), cyl(0.045, 0.045, 0.03, [sHi.x, sHi.y, sHi.z], 'y', 12).translate(0, -0.01, 0),
-    tube(sparAt(sLo.y).add(V3(0.018, 0, 0.005)), sLo.clone().add(V3(-0.035, 0, 0)), 0.014, 8), cyl(0.02, 0.02, 0.07, [sLo.x, sLo.y, sLo.z], 'x', 10)]), MAT.hydraulic())]);
+    tube(svBracket, sHi.clone().addScaledVector(sHi.clone().sub(svBracket).normalize(), -0.035), 0.016, 8), cyl(0.026, 0.026, 0.04, [svBracket.x, svBracket.y, svBracket.z], 'y', 10).translate(0, 0.01, 0),
+    cyl(0.02, 0.02, 0.07, [sLo.x, sLo.y, sLo.z], 'x', 10)]), MAT.hydraulic())]);
   // gearbox chip/temperature sensors, sight gauges and filler caps
   const tc = tgb.clone().addScaledVector(n, 0.06), dn = V3(0, -Math.cos(TAIL.cant), Math.sin(TAIL.cant));
   P('Tail gearbox chip/temperature sensors & sight gauges', {
     system: 'Drive system', material: 'Fuzz burn-off chip detectors with bimetal temperature switches, oil sight gauges, filler caps', mass: 1, count: 4, explode: [-2.8, 1.25, 0.6],
     desc: 'The 42° and 90° gearboxes carry identical chip/temperature sensors: a magnetic plug with fuzz burn-off lights CHIP INT XMSN or CHIP TAIL XMSN for a real chip, and a bimetal strip closes at 140 °C to light the oil-temperature caution. A sight gauge on each box shows its oil level on the walk-round.',
-  }, [mesh(merge([cyl(0.022, 0.022, 0.06, [igb.x, igb.y - 0.17, 0], 'y', 10), cyl(0.026, 0.026, 0.02, [igb.x + 0.05, igb.y, 0.155], 'z', 14), cyl(0.03, 0.03, 0.03, [igb.x - 0.02, igb.y + 0.16, 0], 'y', 12),
+  }, [mesh(merge([cyl(0.022, 0.022, 0.05, [igb.x - 0.06, igb.y - 0.03, 0.14], 'z', 10), cyl(0.026, 0.026, 0.02, [igb.x + 0.05, igb.y, 0.155], 'z', 14), cyl(0.03, 0.03, 0.03, [igb.x - 0.02, igb.y + 0.16, 0], 'y', 12),
     tube(tc.clone().addScaledVector(dn, 0.14), tc.clone().addScaledVector(dn, 0.2), 0.022, 10), cyl(0.026, 0.026, 0.02, [tc.x - 0.15, tc.y, tc.z], 'x', 14), tube(tc.clone().addScaledVector(dn, -0.14), tc.clone().addScaledVector(dn, -0.18), 0.03, 12)]), MAT.yellow())]);
   // tail rotor quadrant: where the two control cables meet the tail-rotor servo's input
   const qd = V3(...TR_CTL.quadrant);
@@ -336,7 +352,7 @@ export function buildTail({ A, P, air, roofY }) {
   P('Formation lights', {
     system: 'Electrical', material: 'Low-intensity electroluminescent strips (NVG compatible)', mass: 1, count: 3, explode: [-2.4, 0.8, 0.6],
     desc: 'Dim green strips on the tail cone sides and the pylon let pilots on night-vision goggles hold position in close formation without the glare of the navigation lights.',
-  }, [mesh(merge([box(0.5, 0.05, 0.012, [-6.0, 1.75, 0.395]), box(0.5, 0.05, 0.012, [-6.0, 1.75, -0.395]), box(0.6, 0.06, 0.012, [-9.5, 3.4, pylonLean(3.4) + 0.1])]), MAT.formation(), { cast: false })]);
+  }, [mesh(merge([box(0.5, 0.05, 0.012, [-6.0, 1.75, 0.395]), box(0.5, 0.05, 0.012, [-6.0, 1.75, -0.395]), box(0.5, 0.06, 0.012, [-9.45, 3.4, pylonLean(3.4) + 0.1])]), MAT.formation(), { cast: false })]);
 
   const trSt = { phi: 0, pitch: 12 * DEG };
   const lead = 0.35;

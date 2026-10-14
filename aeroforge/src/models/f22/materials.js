@@ -12,7 +12,20 @@ export const F = {
   // F-22 low-observable coating: medium "haze" grey (FS 36170 class), fairly matte. Clones of the
   // shared skins (same procedural maps) with less clearcoat so broad panels read as grey, not black.
   skin: () => once('f22.skin', () => { const m = SKIN.stealth().clone(); m.color.set(0x5b6269); m.metalness = 0.18; m.clearcoat = 0.16; m.clearcoatRoughness = 0.42; return m; }),
-  wing: () => once('f22.wing', () => { const m = SKIN.stealthWing().clone(); m.color.set(0x555c63); m.metalness = 0.18; m.clearcoat = 0.16; m.clearcoatRoughness = 0.42; return m; }),
+  // the wing reuses the fuselage skin's procedural maps, tiled at the wing's own 2.2 m panel scale, so only one
+  // set of skin textures is painted while the model builds
+  wing: () => once('f22.wing', () => {
+    const m = SKIN.stealth().clone();
+    for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'bumpMap', 'aoMap']) {
+      if (!m[k]) continue;
+      const t = m[k].clone();
+      t.repeat.set(1 / 2.2, 1 / 2.2);
+      t.needsUpdate = true;
+      m[k] = t;
+    }
+    m.normalScale.set(0.5, 0.5); m.color.set(0x555c63); m.metalness = 0.18; m.clearcoat = 0.16; m.clearcoatRoughness = 0.42;
+    return m;
+  }),
   /**
    * One-piece canopy: polycarbonate with a gold-tinted indium-tin-oxide film. Roughness is held
    * above ~0.1 on both lobes so the large curved bubble carries broad, steady highlights.

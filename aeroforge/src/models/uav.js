@@ -101,6 +101,21 @@ const sootStreak = () => decalTexture('mq9.soot', 512, 128, (ctx, w, h) => {
   ctx.beginPath(); ctx.ellipse(w * 0.05, h / 2, w * 0.98, h * 0.42, 0, -Math.PI / 2, Math.PI / 2); ctx.fill();
 });
 
+/**
+ * Main-gear slot, as [station, lower, upper] section angles measured from the keel (radians, starboard; mirrored for port).
+ * Photographs of MQ-9As show a narrow slot that runs from the trunnion at the lower corner aft and inboard along the folded
+ * leg to a wider pocket for the wheel at its aft end; this outline is the strip of skin the folding leg actually crosses in
+ * this model's retraction, with a margin. The skin is cut away inside it and the door covers it.
+ */
+const MAIN_SLOT = [[4.87, 0.62, 1.14], [5.05, 0.57, 1.14], [5.3, 0.41, 0.9], [5.5, 0.31, 0.9], [5.75, 0.22, 0.66], [5.9, 0.12, 0.73], [6.05, 0.1, 0.72],
+  [6.12, 0.1, 0.82], [6.17, 0.1, 1.12], [6.22, 0.1, 1.5], [6.27, 0.1, 1.58], [6.4, 0.1, 1.42], [6.5, 0.1, 1.12]];
+function slotAt(s) {
+  let i = 0;
+  while (i < MAIN_SLOT.length - 2 && s > MAIN_SLOT[i + 1][0]) i++;
+  const a = MAIN_SLOT[i], b = MAIN_SLOT[i + 1], t = Math.min(1, Math.max(0, (s - a[0]) / (b[0] - a[0])));
+  return [a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+
 /** Conformal skin patch (doors, access panels) over stations s0..s1 and section angles th0..th1. */
 function skinPatch(s0, s1, th0, th1, out = 0.004, ns = 6, nt = 6) {
   const rows = [];
@@ -131,15 +146,17 @@ export function buildUAV() {
   const L = (geo, material, o) => mesh(geo, material, o);
 
   // ============================================================== fuselage skins
-  // the skin is cut away under the gear doors (main wells s 4.87–6.5 from the keel strip up the lower side; nose well s 1.92–3.11);
-  // the doors, 4 mm proud of the skin, overlap the cut-outs' edges
+  // the skin is cut away under the gear doors (the main-gear slots, MAIN_SLOT; the nose well s 1.92–3.11); the doors, 4 mm proud of
+  // the skin, overlap the cut-outs' edges. The loft has extra stations along the main slots so their cut edges stay close to the outline.
   const opening = (s, y, z) => {
     const { top, bot, hw, yc } = prof(s);
     const u = Math.abs(z) / hw, v = (y - yc) / ((top - bot) / 2);
     const th = Math.atan2(Math.sign(v) * Math.abs(v) ** 1.2, u ** 1.2) + Math.PI / 2;     // section angle from the keel
-    return (s > 4.87 && s < 6.5 && th > 0.1 && th < 1.45) || (s > 1.92 && s < 3.11 && th > 0.1 && th < 0.41);
+    if (s > 4.87 && s < 6.5) { const [lo, hi] = slotAt(s); if (th > lo && th < hi) return true; }
+    return s > 1.92 && s < 3.11 && th > 0.1 && th < 0.41;
   };
-  const fl = fuselageLoft(stationsWithBreaks([0.95, 1.92, 2.05, 3.11, 4.0, 4.87, 5.06, 6.3, 6.5, FIREWALL_S], 0.2), 48);
+  const slotBreaks = Array.from({ length: 16 }, (_, k) => +(4.87 + k * 0.1).toFixed(2));
+  const fl = fuselageLoft(stationsWithBreaks([0.95, 1.92, 2.05, 3.11, 4.0, ...slotBreaks, 6.3, 6.5, FIREWALL_S], 0.2), 48);
   const panels = splitTris(fl, (cx, cy, cz) => {
     const s = 5.5 - cx;
     if (opening(s, cy, cz)) return null;
@@ -635,9 +652,9 @@ export function buildUAV() {
   const ngStrut = [
     new THREE.CylinderGeometry(0.035, 0.035, 0.2, 14).rotateX(Math.PI / 2),                 // trunnion
     tubeBetween([0, 0.01, 0], [0, -0.52, 0], 0.045, 14),                                       // outer cylinder
-    tubeBetween([0, -0.5, 0], [0.025, -0.74, 0], 0.03, 12),                                    // sliding piston
-    box(0.06, 0.05, 0.17, [0.03, -0.75, 0]),                                                   // fork crown
-    box(0.05, 0.2, 0.022, [0.035, -0.85, 0.08]), box(0.05, 0.2, 0.022, [0.035, -0.85, -0.08]),
+    tubeBetween([0, -0.5, 0], [0.025, -0.8, 0], 0.03, 12),                                     // sliding piston
+    box(0.06, 0.05, 0.15, [0.03, -0.81, 0]),                                                   // fork crown
+    box(0.05, 0.2, 0.018, [0.035, -0.91, 0.062]), box(0.05, 0.2, 0.018, [0.035, -0.91, -0.062]),
     box(0.035, 0.1, 0.03, [0, 0.05, 0.06]),                                                     // actuator horn
   ];
   P('Nose gear oleo strut', {
@@ -648,16 +665,17 @@ export function buildUAV() {
   P('Nose gear torque links', {
     system: 'Landing gear', material: 'Forged aluminium scissor links', mass: 1.5, count: 2, explode: [-0.3, -0.5, 0.3],
     desc: 'A hinged scissor between the outer cylinder and the piston: the piston can slide but not turn, so steering torque reaches the wheel.',
-  }, L(merge([tubeBetween([-0.035, -0.44, 0], [-0.078, -0.585, 0], 0.012, 6), tubeBetween([-0.078, -0.585, 0], [-0.02, -0.72, 0], 0.012, 6), cylX(-0.09, -0.066, 0.012, 0.012, -0.585, 0, 8)]), m.alu), noseLeg);
+  }, L(merge([tubeBetween([-0.035, -0.44, 0], [-0.078, -0.585, 0], 0.012, 6), tubeBetween([-0.078, -0.585, 0], [-0.02, -0.78, 0], 0.012, 6), cylX(-0.09, -0.066, 0.012, 0.012, -0.585, 0, 8)]), m.alu), noseLeg);
   P('Nose gear steering actuator', {
     system: 'Landing gear', material: 'Electric steering motor on a collar (est.)', mass: 2.5, explode: [0.3, -0.5, 0.45],
     desc: 'An electric servo on a collar turns the nose leg. The pilot steers through the rudder pedals and the wheel centres itself; differential braking helps on tight turns. When a nosewheel servo driver failed in May 2015 the wheel could neither centre nor follow the pedals, and the aircraft ran off the runway ($6.7 million damage, USAF investigation).',
   }, L(merge([new THREE.TorusGeometry(0.058, 0.014, 6, 20).rotateX(Math.PI / 2).translate(0, -0.1, 0), lru(0.06, 0.05, 0.12, [-0.07, -0.1, 0.05]), cylX(-0.16, -0.1, 0.022, 0.022, -0.1, 0.09, 10)]), m.lruOlive), noseLeg);
-  const nwheel = [new THREE.TorusGeometry(0.135, 0.065, 12, 28), new THREE.CylinderGeometry(0.1, 0.1, 0.1, 20).rotateX(Math.PI / 2)];
+  // 0.28 m across: scaled against the fuselage depth in side views of USAF MQ-9As (AF 20-409 at Kunsan) and a GA-ASI MQ-9A (N428HK)
+  const nwheel = [new THREE.TorusGeometry(0.095, 0.045, 12, 28), new THREE.CylinderGeometry(0.068, 0.068, 0.08, 20).rotateX(Math.PI / 2)];
   P('Nose wheel & tyre', {
-    system: 'Landing gear', material: 'Aluminium wheel, tubeless tyre', mass: 9, explode: [0.2, -0.3, 0.45],
-    desc: 'A single nose wheel about 0.4 m in diameter (estimate). It takes only a small share of the weight but all of the steering loads.',
-  }, [L(nwheel[0], m.rubber), L(nwheel[1], m.alu)], noseLeg).position.set(0.035, -0.92, 0);
+    system: 'Landing gear', material: 'Aluminium wheel, tubeless tyre', mass: 5, explode: [0.2, -0.3, 0.45],
+    desc: 'A single small nose wheel, about 0.28 m across: scaled from side views of USAF and GA-ASI MQ-9As it measures 0.27–0.30 m, and the size is not published, so take it as ±10 %. It takes only a small share of the weight but all of the steering loads.',
+  }, [L(nwheel[0], m.rubber), L(nwheel[1], m.alu)], noseLeg).position.set(0.035, -0.98, 0);
   const lampG = merge([cylX(0.0, 0.04, 0.035, 0.03, 0, 0, 14), cylX(0.04, 0.045, 0.03, 0.03, 0, 0, 14)]);
   const lampPart = P('Landing & taxi light', {
     system: 'Electrical', material: 'LED lamp on the nose leg', mass: 1, explode: [0.35, -0.1, 0],
@@ -778,7 +796,7 @@ export function buildUAV() {
   // gear electrics: a branch from each main power feeder down behind the wing box to its retract driver, on to the trunnion where
   // the brake line starts; and a branch from the avionics bay harness under the floor to the nose retract driver and steering controller
   const lgh = [];
-  const DOOR_ACT = [5.7, 1.36, 0.3];              // fixed end of each main-door actuator (starboard; mirrored for port)
+  const DOOR_ACT = [5.35, 1.25, 0.062];            // fixed end of each main-door actuator (starboard; mirrored for port)
   for (const zs of [1, -1]) {
     const ul = uplockAt[zs > 0 ? 0 : 1];
     // feeder → down behind the wing box, inboard of the upper longeron → retract driver
@@ -787,7 +805,7 @@ export function buildUAV() {
     lgh.push(pipe([[X(5.063), 1.445, 0.215 * zs], [X(4.95), 1.42, 0.2 * zs], [X(4.885), 1.36, 0.2 * zs], [X(4.882), 1.27, 0.215 * zs], [X(4.886), 1.205, 0.229 * zs]], 0.007, 5, 24));
     // driver → inboard under the roof to the keel web, aft along it with a drop to the door actuator, then down to the uplock's release
     lgh.push(pipe([[X(5.16), 1.468, 0.19 * zs], [X(5.21), 1.472, 0.11 * zs], [X(5.32), 1.468, 0.056 * zs], [X(5.7), 1.458, 0.056 * zs], [X(5.9), 1.38, 0.056 * zs], [ul[0], ul[1] + 0.02, 0.058 * zs], [ul[0], ul[1] - 0.006, 0.06 * zs]], 0.006, 5, 40));
-    lgh.push(pipe([[X(5.7), 1.458, 0.056 * zs], [X(DOOR_ACT[0]), 1.43, 0.18 * zs], [X(DOOR_ACT[0]), DOOR_ACT[1] + 0.002, (DOOR_ACT[2] - 0.002) * zs]], 0.005, 5, 14));
+    lgh.push(pipe([[X(5.34), 1.468, 0.056 * zs], [X(DOOR_ACT[0]), 1.36, 0.056 * zs], [X(DOOR_ACT[0]), DOOR_ACT[1] + 0.012, 0.058 * zs]], 0.005, 5, 14));
   }
   // nose: from the avionics bay harness through the well's aft wall to the retract driver, and under the driver to the steering controller
   lgh.push(pipe([[X(3.35), 1.45, -0.29], [X(3.24), 1.425, -0.21], [X(3.12), 1.425, -0.13], [X(3.04), 1.44, -0.127], [X(2.985), 1.45, -0.125]], 0.006, 5, 20));
@@ -799,12 +817,10 @@ export function buildUAV() {
     desc: 'Feeds the all-electric gear: a branch from each main power feeder runs down behind the wing box to its retract driver, on down the well’s forward wall to the trunnion, where the brake line and weight-on-wheels wiring start, and aft along the keel web to the door actuator and the uplock’s electric release; the nose branch leaves the avionics bay harness and runs under the floor to the nose retract driver, the nose uplock and the steering controller. A 2014 MQ-9 could not lower its gear after a generator failure ran the batteries down (USAF investigation; routing estimated).',
   }, L(merge(lgh), m.harness));
 
-  // gear doors: conformal skin patches over the cut-outs; the nose doors hinge on their outer edges, the main doors on their upper edges
+  // gear doors: conformal skin patches over the cut-outs; the nose doors hinge on their outer edges, the main doors on their inboard edges
   const doors = [];
-  const doorPart = (name, s0, s1, th0, th1, hingeOn, { nt = 6, notch = null, ...info }) => {
-    // notch [s, thA, thB]: the door's forward end leaves a slot between thA and thB up to station s (where a leg passes)
-    const g = notch ? merge([skinPatch(notch[0], s1, th0, th1, 0.004, 6, nt), skinPatch(s0, notch[0], th0, notch[1], 0.004, 2, 4), skinPatch(s0, notch[0], notch[2], th1, 0.004, 2, 2)])
-      : skinPatch(s0, s1, th0, th1, 0.004, 6, nt);
+  const doorPart = (name, s0, s1, th0, th1, hingeOn, { nt = 6, ...info }) => {
+    const g = skinPatch(s0, s1, th0, th1, 0.004, 6, nt);
     const th = hingeOn === 'outer' ? th1 : th0;
     const p0 = new THREE.Vector3(...fusePoint(s0, th)), p1 = new THREE.Vector3(...fusePoint(s1, th));
     const h = hingedMesh(g, m.skinDouble, p0, p1);
@@ -814,22 +830,37 @@ export function buildUAV() {
   };
   for (const side of [1, -1]) {
     const sd = SN(side);
-    const mainDoor = doorPart(`Main gear door (${sd})`, 4.87, 6.5, -Math.PI / 2 + 0.035 * side, -Math.PI / 2 + 1.45 * side, 'outer', {
-      mass: 6, explode: [0, -0.6, 0.55 * side], nt: 12, notch: [5.06, -Math.PI / 2 + 0.66 * side, -Math.PI / 2 + 1.3 * side],
-      desc: 'A long door over the main-gear well. It wraps from the keel strip round the lower corner, because the leg folds into the well there and the wheel into a pocket at the aft end, and it hinges along its upper edge, under the lower longeron, so it swings out clear of the leg. It is shut on the ground and in flight, leaving only a slot at its forward end where the strut leaves the body, as photographs of parked and flying aircraft show; it swings open only while the leg moves (shape, hinge line and sequencing estimated).',
-    });
-    doors.push({ h: mainDoor, sign: side, open: 1.6, main: true });
+    // main door: follows the slot outline (overlapping the cut edges by 0.05 rad), with a shallow blister over the wheel pocket,
+    // hinged along its inboard edge so that it hangs open below the belly
+    const rows = [];
+    for (let i = 0; i <= 26; i++) {
+      const q = 4.87 + (1.63 * i) / 26, [lo, hi] = slotAt(q), t0 = lo - 0.05, t1 = hi + 0.05, row = [];
+      for (let j = 0; j <= 12; j++) {
+        const t = t0 + ((t1 - t0) * j) / 12, bl = q > 6.1 ? 0.028 * Math.sin((Math.PI * (q - 6.1)) / 0.4) * Math.sin((Math.PI * j) / 12) : 0;
+        row.push(fusePoint(q, -Math.PI / 2 + t * side, -(0.004 + bl)));
+      }
+      rows.push(row);
+    }
+    const doorG = loftRings(rows, { closed: false, uvMode: 'metric' });
+    const hinge0 = new THREE.Vector3(...fusePoint(4.87, -Math.PI / 2 + (slotAt(4.87)[0] - 0.05) * side)), hinge1 = new THREE.Vector3(...fusePoint(6.5, -Math.PI / 2 + (slotAt(6.5)[0] - 0.05) * side));
+    const mainDoor = hingedMesh(doorG, m.skinDouble, hinge0, hinge1);
+    mainDoor.mesh.castShadow = true;
+    P(`Main gear door (${sd})`, {
+      system: 'Landing gear', skin: true, material: 'Composite door (est.)', mass: 4, explode: [0, -0.6, 0.55 * side],
+      desc: 'Photographs of USAF and GA-ASI MQ-9As show a long, narrow door over each main-gear slot, hanging open below the belly whenever the gear is down (taxiing, take-off and landing) and shut in flight, with a shallow blister at its aft end over the wheel pocket. The slot it closes runs from the trunnion at the lower corner aft and inboard along the folded leg to the pocket (hinge line, actuator and sequencing estimated).',
+    }, mainDoor.pivot);
+    doors.push({ h: mainDoor, sign: -side, open: +(globalThis.process?.env?.DOOR_OPEN || 1.6) });
     doors.push({ h: doorPart(`Nose gear door (${sd})`, 1.92, 3.11, -Math.PI / 2 + 0.02 * side, -Math.PI / 2 + 0.42 * side, 'outer', {
       mass: 1.5, explode: [0, -0.55, 0.35 * side], desc: 'One of a pair of nose-gear doors hinged along the outer edge of the well, linked to open with the leg.',
     }), sign: side, open: 1.45 });
-    // door actuator: from a bracket inside the well, below the hinge line, out to a lug on the door's inner face
-    const act = makeActuator(0.016, 0.009, 0.12, m.darkMetal);
+    // door actuator: from a bracket on the keel web down to a lug on the door's inner face, just outboard of the hinge
+    const act = makeActuator(0.016, 0.009, 0.1, m.darkMetal);
     const anchor = new THREE.Vector3(X(DOOR_ACT[0]), DOOR_ACT[1], DOOR_ACT[2] * side);
-    const lugClosed = new THREE.Vector3(...fusePoint(DOOR_ACT[0], -Math.PI / 2 + 1.25 * side, -0.003));   // on the door's inner face
+    const lugClosed = new THREE.Vector3(...fusePoint(DOOR_ACT[0], -Math.PI / 2 + (slotAt(DOOR_ACT[0])[0] + 0.11) * side, -0.003));
     const p0 = mainDoor.pivot.position.clone();
     P(`Main gear door actuator (${sd})`, {
       system: 'Landing gear', material: 'Small linear actuator (est.)', mass: 1, explode: [0, -0.2, 0.45 * side],
-      desc: 'An electric linear actuator from a bracket inside the well to a lug just below the door’s hinge line: it swings the door out before the leg moves and pulls it shut after (position and type estimated).',
+      desc: 'An electric linear actuator from a bracket on the keel web to a lug just outboard of the door’s hinge: it lowers the door before the leg moves and pulls it shut once the leg is up (position and type estimated).',
     }, act.meshes);
     movers.push(() => act.set(anchor, lugClosed.clone().sub(p0).applyQuaternion(mainDoor.pivot.quaternion).add(p0)));
   }
@@ -1268,9 +1299,8 @@ export function buildUAV() {
       noseLeg.rotation.z = NG.stow * g;
       // each main leg turns as one rigid unit about its fixed hinge axis: slerp from identity keeps that axis
       for (const ml of mainLegs) ml.piv.quaternion.slerpQuaternions(qI, ml.q, g);
-      // the main doors are shut with the gear down too and open only while the legs travel; the nose doors stay open with the leg down
-      const dm = smooth(0, 0.05, a);
-      for (const dr of doors) dr.h.setAngle(dr.open * (1 - d) * (dr.main ? dm : 1) * dr.sign);
+      // the doors hang open whenever the gear is down and close behind the legs once they are up
+      for (const dr of doors) dr.h.setAngle(dr.open * (1 - d) * dr.sign);
       for (const fn of movers) fn();
       // propeller: shown at a slow, alias-free rate (the real one turns ≈ 1,600 rpm)
       state.propA += dt * (5 + state.throttle * 22);

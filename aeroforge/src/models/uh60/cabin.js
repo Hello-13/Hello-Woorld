@@ -235,9 +235,9 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   {
     const g = [];
     for (const s of [1, -1]) {
-      g.push(tube([3.38, 0.6, 0.82 * s], [3.05, 0.44, 1.0 * s], 0.016, 6));                                   // gear-joint deflector over the drag-beam pivot
+      g.push(pipe([[3.38, 0.56, 0.9 * s], [3.12, 0.62, 0.965 * s], [2.98, 0.6, 1.02 * s]], 0.016, 6));          // gear-joint deflector from the belly over the drag-beam pivot
       g.push(place(new THREE.BoxGeometry(0.03, 0.62, 0.02), [2.36, 0.8, 1.2 * s], [0, 0, -0.07]));            // cutter blade ahead of the oleo
-      g.push(tube([2.33, 1.12, 1.19 * s], [2.6, 1.0, 1.09 * s], 0.014, 6));                                   // deflector from the oleo top to the fuselage
+      g.push(tube([2.3, 1.12, 1.255 * s], [2.6, 1.0, 1.17 * s], 0.014, 6));                                   // deflector from the oleo top to the fuselage
     }
     ws('Main gear wire cutters & deflectors', {
       mass: 3, count: 4, explode: [0.8, -0.9, 0.4],
@@ -249,7 +249,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
     ws('Tail gear wire deflector', {
       mass: 1, explode: [0, -0.8, 0],
       desc: 'A rod raked down and aft from the tail cone to the tail-wheel fork, so a wire caught under the tail slides down over the wheel instead of hooking the strut.',
-    }, [mesh(merge([tube(b, [-6.33, 0.47, 0], 0.016, 6), box(0.1, 0.03, 0.06, [b.x, b.y - 0.015, 0])]), MAT.steel())]);
+    }, [mesh(merge([tube(b, [-6.365, 0.53, 0], 0.016, 6), box(0.1, 0.03, 0.06, [b.x, b.y - 0.015, 0])]), MAT.steel())]);   // ends on the front of the fork crown
   }
 
   // ------------------------------------------------------------------ flight-control runs
@@ -284,10 +284,10 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   P('Trim actuators & pedal damper', {
     system: 'Flight controls', material: 'Electromechanical roll and yaw trim with slip clutches, electrohydromechanical pitch trim, pedal damper', mass: 8, count: 4, explode: [1.4, 2.0, 0.2],
     desc: 'With trim engaged these hold the cyclic and pedals where the pilot leaves them. Roll and yaw trim are electromechanical with slip clutches a pilot can override at 13 lb (roll) and 80 lb (yaw) if one jams; pitch trim is electrohydromechanical. The yaw trim also adds the collective/airspeed-to-yaw coupling, strongest from 0 to 40 kt and gone above 100 kt. A damper smooths the pedals. (Location approximate.)',
-  }, [mesh(merge([box(0.2, 0.1, 0.1, [2.16, 2.35, -0.38]), box(0.2, 0.1, 0.1, [2.2, 2.36, -0.22]), cyl(0.04, 0.04, 0.2, [2.18, 2.37, -0.06], 'x', 12), cyl(0.025, 0.025, 0.16, [2.36, 2.34, -0.14], 'x', 10)]), MAT.casting())]);
+  }, [mesh(merge([box(0.2, 0.1, 0.1, [2.29, 2.36, -0.38]), box(0.2, 0.1, 0.1, [2.2, 2.36, -0.22]), cyl(0.04, 0.04, 0.2, [2.18, 2.37, -0.06], 'x', 12), cyl(0.025, 0.025, 0.16, [2.36, 2.34, -0.14], 'x', 10)]), MAT.casting())]);
   const under = [];
-  for (const z of [0.53, -0.53]) under.push(pipe([[3.2, 0.6, z], [2.9, 0.6, z], [2.6, 0.6, z * 0.6], [2.4, 0.62, -0.7], [2.35, 0.66, -0.9]], 0.012));
-  under.push(pipe([[2.6, 0.78, 0.23], [2.5, 0.64, 0.0], [2.38, 0.64, -0.85]], 0.01), pipe([[3.74, 0.74, 0.53], [3.5, 0.62, 0.2], [2.45, 0.63, -0.82]], 0.01));
+  for (const z of [0.53, -0.53]) under.push(pipe([[3.2, 0.618, z], [2.9, 0.618, z], [2.6, 0.618, z * 0.6], [2.4, 0.618, -0.7], [2.35, 0.618, -0.9]], 0.012));   // between the floor cross-members and the floor
+  under.push(pipe([[2.6, 0.78, 0.23], [2.585, 0.66, 0.2], [2.56, 0.618, 0.15], [2.5, 0.618, 0.0], [2.38, 0.618, -0.85]], 0.01), pipe([[3.74, 0.74, 0.53], [3.71, 0.66, 0.49], [3.67, 0.618, 0.43], [3.5, 0.618, 0.2], [2.45, 0.618, -0.82]], 0.01));
   P('Cockpit control linkages', {
     system: 'Flight controls', material: 'Aluminium push-pull tubes and bellcranks under the cockpit floor', mass: 9, explode: [0.6, -0.4, -0.4],
     desc: 'Interconnect the two pilots\' cyclics, collectives and pedals under the floor, so both sets move together, and gather them at the foot of the control closet.',
@@ -311,7 +311,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   // from the mixing unit down through the roof, under the two roof cross beams and the main-module
   // sump in the cabin ceiling, aft through the transition section and along the tail cone
   for (const dz of [0.05, 0.1]) {
-    const pts = [[1.2, 2.4, dz], [0.95, 2.28, dz + 0.1], [0.75, 2.12, dz + 0.12], [0.5, 2.055, dz + 0.12], [0.0, 2.1, dz + 0.12], [-0.5, 2.055, dz + 0.12], [-1.0, 2.1, dz + 0.12], [-1.6, 2.13, dz + 0.1], [-2.4, 2.15, dz + 0.05], [-3.6, 2.12, dz]];
+    const pts = [[1.135, 2.4, dz], [0.95, 2.28, dz + 0.1], [0.75, 2.12, dz + 0.12], [0.5, 2.055, dz + 0.12], [0.0, 2.1, dz + 0.12], [-0.5, 2.055, dz + 0.12], [-1.0, 2.1, dz + 0.12], [-1.6, 2.13, dz + 0.1], [-2.4, 2.15, dz + 0.05], [-3.6, 2.12, dz]];
     for (let x = -4.4; x >= -8.2; x -= 0.95) pts.push([x, 1.98 - (x + 4.4) * -0.015, dz]);
     // under the 42° gearbox and up the pylon, behind the drive shaft and ahead of the rear spar, to the
     // quadrant's two cable-end fittings
@@ -327,7 +327,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   // bellcranks at the corners of the rod runs, walking beam on the deck, pulleys along the tail cone
   const bc = [];
   const crank = (p, ax = 'z') => [cyl(0.03, 0.03, 0.04, p, ax, 10), box(0.1, 0.02, 0.025, [p[0] + 0.03, p[1] + 0.02, p[2]])];
-  for (const p of [[2.62, 0.6, 0.32], [2.62, 0.6, -0.32], [2.4, 0.62, -0.7], [2.35, 0.68, -0.88], [2.3, 2.05, -0.92], [2.2, 2.3, -0.6]]) bc.push(...crank(p));
+  for (const p of [[2.62, 0.612, 0.32], [2.62, 0.612, -0.32], [2.4, 0.612, -0.7], [2.35, 0.612, -0.88], [2.3, 2.05, -0.92], [2.2, 2.3, -0.6]]) bc.push(...crank(p));
   bc.push(box(0.04, 0.03, 0.4, [1.0, 2.4, -0.1]), cyl(0.02, 0.02, 0.06, [1.0, 2.38, -0.1], 'y', 8));
   // pulleys with short brackets up to the tail-cone top longerons (the drive-shaft hangers sit above the skin)
   for (const p of cabPts.slice(cabPts.findIndex((q) => q[0] === -3.6), -2)) bc.push(cyl(0.032, 0.032, 0.025, [p[0], p[1] + 0.01, 0.075], 'z', 12), box(0.05, 0.045, 0.06, [p[0], p[1] + 0.045, 0.075]));
@@ -344,9 +344,12 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   //          pilot-assist servos
   //   backup: AC-motor pump → utility module → second stage of the tail-rotor servo, the APU
   //          accumulator, and either primary system if its pump fails
-  const pumpModule = (x, y, z, s) => [cyl(0.07, 0.07, 0.2, [x + 0.14, y, z], 'x', 14), box(0.14, 0.12, 0.12, [x, y + 0.01, z]), cyl(0.04, 0.04, 0.06, [x, y + 0.1, z], 'y', 10),
+  // r: pump body radius; low: the slim installation under an accessory module (reservoir cap on the
+  // aft face instead of on top, where the accessory and input modules sit)
+  const pumpModule = (x, y, z, s, r = 0.07, low = false) => [cyl(r, r, 0.2, [x + 0.14, y, z], 'x', 14), box(0.14, low ? 0.1 : 0.12, 0.12, [x, y + 0.01, z]),
+    low ? cyl(0.035, 0.035, 0.03, [x - 0.085, y + 0.01, z], 'x', 10) : cyl(0.04, 0.04, 0.06, [x, y + 0.1, z], 'y', 10),
     cyl(0.022, 0.022, 0.08, [x - 0.04, y + 0.0, z + 0.085 * s], 'y', 10), cyl(0.022, 0.022, 0.08, [x + 0.04, y + 0.0, z + 0.085 * s], 'y', 10)];
-  const pmDetail = (x, y, z, s) => [box(0.06, 0.03, 0.006, [x + 0.14, y + 0.0, z + 0.072 * s]), cyl(0.008, 0.008, 0.015, [x - 0.04, y + 0.045, z + 0.085 * s], 'y', 6), cyl(0.008, 0.008, 0.015, [x + 0.04, y + 0.045, z + 0.085 * s], 'y', 6)];
+  const pmDetail = (x, y, z, s, r = 0.07) => [box(0.06, 0.03, 0.006, [x + 0.14, y + 0.0, z + (r + 0.002) * s]), cyl(0.008, 0.008, 0.015, [x - 0.04, y + 0.045, z + 0.085 * s], 'y', 6), cyl(0.008, 0.008, 0.015, [x + 0.04, y + 0.045, z + 0.085 * s], 'y', 6)];
   for (const s of [-1, 1]) {
     P(s < 0 ? 'No. 1 hydraulic pump module (left)' : 'No. 2 hydraulic pump module (right)', {
       system: 'Hydraulics', material: 'Variable-delivery piston pump with integral reservoir and filters', mass: 12, explode: [1.2, 0.5, 0.6 * s],
@@ -354,7 +357,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
         ? 'Driven by the left accessory module, so it runs whenever the rotor turns — even in autorotation — at 3,000 psi (21 MPa). '
         : 'Driven by the right accessory module, at 3,000 psi. ')
         + 'Pump and reservoir are one module, identical to and interchangeable with the other two; a window on the reservoir reads REFILL, FULL or EXPANSION, and its pressure and return filters each pop a red button at about 70 psi above normal pressure drop.',
-    }, [mesh(merge(pumpModule(0.3, 2.36, 0.5 * s, s)), MAT.hydraulic()), mesh(merge(pmDetail(0.3, 2.36, 0.5 * s, s)), MAT.red())]);
+    }, [mesh(merge(pumpModule(0.3, 2.325, 0.5 * s, s, 0.055, true)), MAT.hydraulic()), mesh(merge(pmDetail(0.3, 2.325, 0.5 * s, s, 0.055)), MAT.red())]);   // under its accessory module
     P(s < 0 ? 'No. 1 transfer module' : 'No. 2 transfer module', {
       system: 'Hydraulics', material: 'Valve block with shutoff valves, pressure switches and filters', mass: 5, explode: [0.2, 0.6, 1.0 * s],
       desc: s < 0
@@ -383,7 +386,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   P('Hydraulic servicing hand pump & selector', {
     system: 'Hydraulics', material: 'Reservoir-fill hand pump and manual selector valve', mass: 3, explode: [0.0, 0.85, 1.25],
     desc: 'On the right side of the upper deck: one hand pump refills all three reservoirs, a selector valve picks which one, and all three reservoir levels can be read from the same spot.',
-  }, [mesh(merge([box(0.14, 0.08, 0.08, [-0.1, 2.35, 0.53]), tube([-0.1, 2.39, 0.53], [0.02, 2.43, 0.53], 0.009, 6), box(0.08, 0.06, 0.06, [0.02, 2.34, 0.6]), cyl(0.012, 0.012, 0.04, [0.02, 2.39, 0.6], 'y', 6)]), MAT.casting())]);
+  }, [mesh(merge([box(0.14, 0.08, 0.08, [-0.1, 2.35, 0.53]), tube([-0.13, 2.385, 0.53], [-0.24, 2.41, 0.53], 0.009, 6), box(0.08, 0.06, 0.06, [0.02, 2.34, 0.6]), cyl(0.012, 0.012, 0.04, [0.02, 2.39, 0.6], 'y', 6)]), MAT.casting())]);
   P('APU hydraulic start motor', {
     system: 'Hydraulics', material: 'Axial-piston hydraulic motor on the APU gearbox', mass: 4, explode: [-1.0, 1.2, -1.1],
     desc: 'Fed from the APU accumulator, it cranks the APU up to self-sustaining speed in a few seconds; the battery supplies the APU\'s start control and ignition.',
@@ -399,7 +402,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   const trPort = (dz) => { const [a, b] = [V3(...TR_CTL.servoLo), V3(...TR_CTL.servoHi)]; return dz ? a.clone().addScaledVector(b.sub(a).normalize(), 0.1) : a; };
   // along the tail cone, under the 42° gearbox, up the pylon behind the drive shaft and ahead of the
   // rear spar, then aft over the cable quadrant to the servo, which hangs between them
-  const tailRun = (dz) => [[-1.0, 2.3, -0.36 + dz * 0.2], [-2.0, 2.28, -0.2 + dz], [-3.0, 2.12 - dz * 0.25, -0.16 + dz], [-5.0, 1.97 - dz * 0.25, -0.14 + dz], [-7.5, 1.86 - dz * 0.2, -0.1 + dz], [-8.3, 1.83, -0.08 + dz * 0.8], [-8.62, 1.95, -0.03 + dz * 0.4], [-9.0, 2.5, -0.08 + dz * 0.3],
+  const tailRun = (dz) => [...(dz ? [[-1.0, 2.3, -0.36 + dz * 0.2], [-2.0, 2.28, -0.2 + dz]] : [[-1.0, 2.3, -0.36], [-1.5, 2.29, -0.33], [-1.85, 2.27, -0.28], [-1.92, 2.18, -0.24], [-2.1, 2.135, -0.2]]), [-3.0, 2.12 - dz * 0.25, -0.16 + dz], [-5.0, 1.97 - dz * 0.25, -0.14 + dz], [-7.5, 1.86 - dz * 0.2, -0.1 + dz], [-8.3, 1.83, -0.08 + dz * 1.2], [-8.62, 1.95, -0.075 + dz * 1.0], [-9.0, 2.5, -0.08 + dz * 0.3],
     dz ? [-9.25, 2.72, -0.04] : [-9.25, 2.72, -0.08], dz ? [-9.4, 2.97, -0.15] : [-9.44, 2.88, -0.13], trPort(dz)];
   // transfer module → round the outside of the main-module case → over the servo deck brackets to
   // each servo's manifold (sv is ordered left, centre, right)
@@ -423,7 +426,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
     pipe([[0.86, 2.33, -0.66], [0.4, 2.32, -0.66], [0.0, 2.32, -0.62], [-0.16, 2.33, -0.585], [-0.26, 2.33, -0.53], [-0.3, 2.33, -0.48]], 0.008),   // outboard of the oil filter
     pipe([[-0.26, 2.33, -0.53], [-0.42, 2.31, -0.525], [-0.55, 2.272, -0.35], [-0.58, 2.272, 0.0], [-0.55, 2.272, 0.35], [-0.42, 2.3, 0.47], [-0.33, 2.33, 0.46]], 0.008),   // aft of the main module, under the deck plate, to No. 2
     pipe([[-0.575, 2.272, -0.1], [-0.8, 2.275, -0.17], [-1.0, 2.3, -0.2], [-1.3, 2.24, -0.08], [-1.32, 2.12, -0.02], [-1.34, 2.08, 0]], 0.008),
-    pipe([[-1.74, 2.1, 0.0], [-1.8, 2.22, -0.08], [-1.84, 2.3, -0.14], [-1.86, 2.34, -0.17]], 0.008),
+    pipe([[-1.74, 2.1, 0.0], [-1.765, 2.148, -0.03], [-1.795, 2.15, -0.06], [-1.83, 2.25, -0.12], [-1.86, 2.34, -0.17]], 0.008),   // between the aft bulkhead's top edge and the aft roof frame
     pipe([[-0.575, 2.272, -0.12], [-0.8, 2.275, -0.2], ...tailRun(0.2)], 0.007)];
   P('No. 1 system hydraulic lines', {
     system: 'Hydraulics', material: 'Stainless/titanium tubing and flexible hoses', mass: 6, explode: [0.3, 1.0, -1.3], xrayWeight: 0.6,
@@ -487,7 +490,9 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   // harnesses kept 6 cm inside the skin, following its curvature
   const inSkin = (pts, side, inset = 0.06) => pts.map(([x, a]) => surfPoint(x, side > 0 ? a : Math.PI - a, -inset));
   const wires = [];
-  for (const s of [1, -1]) wires.push(pipe(inSkin([[3.95, 0.1], [3.5, 0.6], [3.0, 0.98], [2.4, 1.08], [1.0, 1.08], [-0.6, 1.08], [-1.75, 1.05], [-2.25, 0.95]], s), 0.016));
+  for (const s of [1, -1]) wires.push(pipe(inSkin([[3.95, 0.1], [3.9, 0.45], [3.8, 0.68], [3.55, 0.78], [3.0, 0.98], [2.4, 1.08], [1.0, 1.08], [-0.6, 1.08], [-1.75, 1.05], [-2.25, 0.95]], s, 0.11), 0.016));   // 11 cm in: inboard of the frames
+  // rubber grommets where each harness passes through the aft cabin bulkhead
+  for (const s of [1, -1]) { const g = surfPoint(-1.78, s > 0 ? 1.05 : Math.PI - 1.05, -0.11); wires.push(new THREE.TorusGeometry(0.022, 0.007, 6, 14).rotateY(Math.PI / 2).translate(g.x, g.y, g.z)); }
   P('Cabin wiring harnesses', {
     system: 'Electrical', material: 'Shielded wiring bundles in clamped runs', mass: 30, explode: [0, 0.7, 0], xrayWeight: 0.6,
     desc: 'Several kilometres of wire run up from the nose bay and aft along both sides of the cabin roof; critical circuits are duplicated and routed apart for survivability.',
@@ -497,7 +502,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   P('Tail cone wiring harness', {
     system: 'Electrical', material: 'Shielded wiring bundle', mass: 12, explode: [-2.2, 0.6, -0.5], xrayWeight: 0.6,
     desc: 'Runs aft along the upper left of the tail cone to the tail lights, the tail-rotor de-ice slip ring, the stabilator actuators and the aft sensors.',
-  }, [mesh(pipe([inSkin([[-2.25, 0.95]], -1)[0], ...inSkin(tw, 1, 0.04), V3(...DEICE.tailEnd)], 0.012), MAT.wiring())]);
+  }, [mesh(pipe([inSkin([[-2.25, 0.95]], -1, 0.11)[0], ...tw.map(([x, a]) => surfPoint(x, a, x > -3.38 ? -0.095 : -0.075)), V3(...DEICE.tailEnd)], 0.012), MAT.wiring())]);   // inboard of the transition and tail-cone frames
   // windshield wipers: pivots at the base of each windshield, arms lying on the glass
   const wp = [];
   for (const s of [1, -1]) {
@@ -522,7 +527,7 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
       cyl(0.022, 0.022, 0.025, [DEICE.lead[0] + 0.01, DEICE.lead[1], DEICE.lead[2]], 'x', 10),       // slip-ring lead connector
       cyl(0.02, 0.02, 0.02, [-1.02, 2.045, -0.36], 'y', 10)]), MAT.casting()),                        // harness connector
     // pigtail from the left cabin harness, under the roof beam, to the controller; link to the junction box
-    mesh(merge([pipe([surfPoint(-1.02, Math.PI - 1.08, -0.06), [-1.02, 2.07, -0.63], [-1.02, 2.045, -0.55], [-1.02, 2.04, -0.46], [-1.02, 2.045, -0.4], [-1.02, 2.05, -0.36]], 0.012, 6),
+    mesh(merge([pipe([surfPoint(-1.02, Math.PI - 1.08, -0.11), [-1.02, 2.07, -0.6], [-1.02, 2.045, -0.55], [-1.02, 2.04, -0.46], [-1.02, 2.045, -0.4], [-1.02, 2.05, -0.36]], 0.012, 6),
       pipe([[-0.895, 2.12, -0.36], [-0.86, 2.13, -0.362], [-0.82, 2.12, -0.37]], 0.01, 5)]), MAT.wiring())]);
   P('Ice detector', {
     system: 'Sensors', material: 'Vibrating-probe ice detector on a short strut', mass: 1, explode: [0.4, 0.6, 0.6],

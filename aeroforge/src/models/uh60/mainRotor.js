@@ -313,7 +313,9 @@ export function buildMainRotor({ A, parent }) {
 
   // droop stops and antiflap stops (static on the hub, beneath/above each spindle)
   const stops = [];
-  stops.push(new THREE.TorusGeometry(0.31, 0.022, 8, 40).rotateX(Math.PI / 2).translate(0, -0.2, 0));
+  // the droop-stop ring is four arcs, one under each arm, leaving the diagonals free for the
+  // rotating scissors' knees
+  for (let k = 0; k < 4; k++) stops.push(new THREE.TorusGeometry(0.31, 0.022, 8, 10, 0.8).rotateZ(-0.4).rotateX(Math.PI / 2).rotateY((k * Math.PI) / 2).translate(0, -0.2, 0));
   onArms(stops, merge([box(0.1, 0.05, 0.1, [0.61, -0.12, 0]), box(0.08, 0.04, 0.09, [0.61, 0.115, 0]), cyl(0.024, 0.024, 0.12, [0.33, -0.2, 0], 'x', 8), cyl(0.012, 0.012, 0.13, [0.61, -0.12, 0], 'z', 8)]));
   P('Droop stops & flap restrainers', {
     material: 'Steel stops with centrifugal-weight latches, heated hinge pins', mass: 8, count: 4, explode: [0, UPX + 0.4, 0.0],

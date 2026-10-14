@@ -1,7 +1,8 @@
 // F-22A signal and power wiring that ties the units together:
-//   fly-by-wire   triplex-redundant command harnesses from the vehicle-management computers to every
-//                 surface actuator and both FADECs (the F-22's fly-by-wire also commands the vectoring
-//                 nozzles), on three separated routes — right side, left side and spine
+//   fly-by-wire   command harnesses from the triplex vehicle-management computers to the surface actuators
+//                 and both FADECs (which also set the vectoring nozzles). The real routing is not published;
+//                 the model simplifies it to three separated trunks: right side (right wing and tail), left
+//                 side (left wing and tail) and spine (both tails and both FADECs)
 //   data buses    fibre-optic high-speed buses from the two CIPs to the radar, EW, CNI, INS, VMS,
 //                 cockpit displays and the aft apertures
 //   power         wiring out to the wing-tip and fin lights, wing apertures, strobes and tail light
@@ -11,6 +12,7 @@ import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { F } from './materials.js';
 import * as FR from './frame.js';
+import { naca00 } from '../../engine/geometry.js';
 import { merge } from './util.js';
 
 const { X } = FR;
@@ -28,7 +30,7 @@ function finPoint(side, e, f, d = 0) {
 
 export function buildWiring(ctx) {
   const { P } = ctx;
-  const tube = (pts, r = 0.009, seg = 5) => FR.pipe(pts, r, seg, Math.max(8, pts.length * 8));
+  const tube = (pts, r = 0.009, seg = 5) => FR.pipe(pts, r, seg, Math.max(8, pts.length * 5));      // thin hidden runs: 5 segments per control point
 
   // ------------------------------------------------------------------ fly-by-wire (three channels)
   {
@@ -39,19 +41,23 @@ export function buildWiring(ctx) {
       // round its lower outboard corner ahead of the main-gear well, aft beside the duct (clear of the stowed
       // wheel) and under the boom to the engine bay
       const trunk = [[4.3, -0.22, z * 0.3], [4.6, -0.16, z * 0.6], [5.6, -0.16, z * 0.74], [6.8, -0.3, z * 0.82], [7.3, -0.42, z * 0.915], [8.4, -0.42, z * 0.93],
-        [10.4, -0.4, z * 0.93], [11.05, -0.405, z * 1.05], [11.25, -0.37, z * 1.28], [11.38, -0.31, z * 1.42], [11.6, -0.2, z * 1.47], [12.55, -0.17, z * 1.47],
+        [10.4, -0.4, z * 0.93], [11.05, -0.405, z * 1.05], [11.15, -0.4, z * 1.16], [11.25, -0.37, z * 1.28], [11.38, -0.31, z * 1.42], [11.6, -0.2, z * 1.47], [12.55, -0.17, z * 1.47],
         [12.76, -0.24, z * 1.47], [13.0, -0.245, z * 1.42], [13.3, -0.24, z * 1.38], [14.0, -0.235, z * 1.38], [14.6, -0.3, z * 1.32]];
       g.push(tube(trunk));
       // to the stabilator actuator and up the boom to the rudder actuator
       g.push(tube([[14.9, -0.29, z * 1.33], [15.6, -0.27, z * 1.38], [16.0, -0.25, z * 1.39], [16.2, -0.24, z * 1.38]]));
       g.push(tube([[15.0, -0.28, z * 1.34], [15.4, 0.0, z * 1.35], [15.8, 0.3, z * 1.4], [15.95, 0.42, z * 1.46]]));
       // leading-edge flap power drive unit, round the front of the side bay and outboard of the duct
-      g.push(tube([[8.4, -0.42, z * 0.93], [8.4, -0.6, z * 1.3], [8.42, -0.45, z * 1.66], [8.4, -0.2, z * 1.7], [8.36, -0.06, z * 1.68]]));
-      // along the rear spar to the flaperon and aileron actuators
+      g.push(tube([[8.4, -0.42, z * 0.93], [8.4, -0.6, z * 1.3], [8.42, -0.45, z * 1.66], [8.4, -0.2, z * 1.71], [8.36, -0.05, z * 1.73]]));   // ends in the LEF power drive unit
+      // along the rear spar to the flaperon and aileron actuators (one per surface), riding above the flaperon
+      // actuator where it crosses it, ending on the aileron actuator; a stub drops into the flaperon actuator
+      const fl = FR.teActuator('flaperon'), ai = FR.teActuator('aileron');
+      const lift = (zz) => { const sec = FR.wingSection(zz); return Math.min(0.055, naca00((13.38 - FR.wingLE(zz)) / sec.chord, sec.t) * sec.chord * 0.9 - 0.02); };
       const rear = [[13.3, -0.24, z * 1.38], [13.32, -0.25, z * 1.6], [13.32, -0.12, z * 1.8], [13.38, -0.07, z * 1.95]];
-      for (const zz of [2.1, 2.8, 3.6, 4.4, 4.97]) rear.push([13.38, FR.wingY(zz), z * zz]);
+      for (const zz of [2.1, 2.5, fl.z, 3.3, 3.6, 4.4]) rear.push([13.38, FR.wingY(zz) + lift(zz), z * zz]);
+      rear.push([13.38, ai.y, z * ai.z]);
       g.push(tube(rear));
-      for (const [zz, c] of [[2.3, 0.79], [3.48, 0.79]]) g.push(tube([[13.38, FR.wingY(zz), z * zz], [wingS(zz, c) - 0.08, FR.wingY(zz), z * zz]]));
+      g.push(tube([[13.38, fl.y + lift(fl.z), z * fl.z], [13.44, fl.y + 0.03, z * fl.z], [fl.s1 - 0.13, fl.y + 0.01, z * fl.z]]));
       // channel C (spine): over the tanks under the upper skin, branching aft to both tails and FADECs
       const up = (sv, zz) => [sv, FR.topAt(sv, zz) - 0.045, z * zz];
       g.push(tube([up(14.0, 0.3), up(14.4, 0.9), up(15.0, 1.3), up(15.6, 1.36), [15.9, 0.4, z * 1.44]]));
@@ -66,7 +72,7 @@ export function buildWiring(ctx) {
     P('Fly-by-wire harnesses (triplex)', {
       system: 'Flight controls', material: 'Shielded twisted-pair signal harnesses, three physically separated routes', mass: 26, xrayWeight: 0.7,
       explode: [0.0, -0.3, 0],
-      desc: 'The "wire" in fly-by-wire: triplex-redundant command lines from the vehicle-management computers to every leading-edge-flap drive, flaperon, aileron, stabilator and rudder actuator, and to both FADECs, because the F-22\'s flight controls also command the vectoring nozzles. The three channels take separate routes — right side, left side and spine — so one hit cannot cut them all (routing approximate).',
+      desc: 'The "wire" in fly-by-wire: command lines from the vehicle-management system to every leading-edge-flap drive, flaperon, aileron, stabilator and rudder actuator and to both FADECs, which also set the vectoring nozzles. The VMS runs on triplex digital flight-control computers with no electrical or mechanical back-up (Flight International, 1997), so each actuator is commanded over redundant channels. The real harness routing is not published; the model simplifies it to three separated trunks: down the right side to the right wing and tail, down the left side to the left, and along the spine to both tails and FADECs.',
     }, mesh(merge(g), F.fbw()));
   }
 
