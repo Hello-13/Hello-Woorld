@@ -62,7 +62,8 @@ export function buildHelicopter() {
     'Main rotor de-ice harness': 0.5, 'Main rotor blade heater blankets': 0.5, 'Main rotor slip ring': 0.6, 'De-ice distributor': 0.6, 'Main rotor shaft': 0.6,
     'Swashplate guide': 0.5, 'Uniball & sliding sleeve': 0.5, 'Swashplate duplex bearing': 0.5, 'Rotating scissors': 0.7, 'Stationary scissors': 0.7,
     'Generator feeders, current transformers & limiters': 0.6, 'Generator cooling-oil lines': 0.6, 'Oil cooler lines & thermostatic valve': 0.6,
-    'Fire extinguisher discharge lines': 0.6, 'Tail drive shaft disc couplings': 0.6, 'Control bellcranks & cable pulleys': 0.7, 'Cabin door posts': 0.4 };
+    'Fire extinguisher discharge lines': 0.6, 'Tail drive shaft disc couplings': 0.6, 'Control bellcranks & cable pulleys': 0.7, 'Cabin door posts': 0.4,
+    'Nose avionics racks': 0.6 };
   for (const [n, w] of Object.entries(xw)) { const p = byName(n); if (p) p.userData.part.xrayWeight = w; }
 
   // estimated masses scaled together to the published 5,675 kg empty weight (GE's engine figure kept)
