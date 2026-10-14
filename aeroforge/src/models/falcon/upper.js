@@ -261,7 +261,9 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
     block(hxAt[0], hxAt[1], hxAt[2], 0.2, 0.14, 0.3),
     pipe([at(1.0, 330, 53.55), at(1.72, 332, 53.0), at(1.72, 334, Y.s2CommonDome), at(1.72, 336, 48.3), at(1.6, 340, 47.68), at(0.95, 200, 47.42), [hxAt[0] - 0.08, hxAt[1], hxAt[2] + 0.12]], 0.028, { seg: 6, tubular: 70 }),
     pipe([[hxAt[0] + 0.08, hxAt[1], hxAt[2] - 0.12], at(0.95, 160, 47.42), at(1.6, 20, 47.68), at(1.72, 22, 48.3), at(1.72, 24, Y.s2CommonDome - 0.3), at(1.72, 26, Y.s2LoxTop - 0.1), at(1.3, 26, Y.s2LoxTop + 0.4)], 0.025, { seg: 6, tubular: 70 }),
-    pipe([at(1.72, 22, 50.0), at(1.5, 22, Y.s2CommonDome - 0.4)], 0.02, { seg: 6, tubular: 6 }),
+    pipe([at(1.72, 22, 50.0), at(1.5, 22, Y.s2CommonDome - 0.55)], 0.02, { seg: 6, tubular: 6 }),
+    post(...polar(1.5, 22), Y.s2CommonDome - 0.68, Y.s2CommonDome - 0.48, 0.045, 10),       // RP-1 ullage diffuser
+    post(...polar(1.3, 26), Y.s2LoxTop + 0.3, Y.s2LoxTop + 0.5, 0.05, 10),                 // LOX ullage diffuser
   ];
   P('Second stage helium heat exchanger & pressurisation lines', {
     system: 'Fuel', material: 'Heat exchanger on the engine, stainless helium lines', mass: 40,
@@ -285,7 +287,7 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   }, [mesh(unit(1.6, 255, 47.74, 0.32, 0.2, 0.18), FM.battery()), mesh(merge([sideBottle(1.6, 200, 47.76, 0.08, 0.35), pipe([at(1.6, 194, 47.76), at(1.6, 188, 47.7)], 0.01, { seg: 4, tubular: 4 })]), FM.steelLine())]);
 
   // ------------------------------------------------------------------ attitude control, avionics, power
-  const rcs = [], n2 = [], n2l = [];
+  const rcs = [], n2 = [], n2l = [], n2r = [];
   const podY = Y.s2AftSkirt - 0.1;
   for (const a of [90, 270]) {
     rcs.push(unit(R + 0.1, a, podY, 0.46, 0.5, 0.22));
@@ -295,6 +297,7 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
     }
     n2.push(sideBottle(1.62, a + 45, 47.77, 0.12, 0.7));
     n2l.push(pipe([at(1.62, a + 45, 47.89), at(1.74, a + 20, 47.97), at(R - 0.03, a, podY)], 0.018, { seg: 6, tubular: 12 }));
+    n2r.push(unit(1.7, a + 30, 47.95, 0.07, 0.07, 0.07));                                   // regulator
   }
   P('Second stage cold-gas thrusters', {
     system: 'Attitude control', count: 2, material: 'Nitrogen thruster pods', mass: 50,
@@ -308,9 +311,9 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
   }, mesh(merge(n2), FM.copv()));
   P('Second stage nitrogen lines', {
     system: 'Attitude control', count: 2, material: 'Stainless lines and regulators', mass: 8,
-    desc: 'Carry nitrogen from each tank through a regulator to the thruster pod beside it.',
+    desc: 'Carry nitrogen from each tank through a regulator (gold), which drops the bottle pressure to the thrusters\' working pressure, to the pod beside it.',
     explode: [0, -1.0, 1.6],
-  }, mesh(merge(n2l), FM.steelLine()));
+  }, [mesh(merge(n2l), FM.steelLine()), mesh(merge(n2r), FM.gold())]);
   const avY = Y.s2Top - 0.25;
   const S = (name, info, geo, mat = FM.avionics()) => P(name, { system: 'Avionics', ...info }, mesh(merge(geo), mat));
   S('Second stage flight computers', {

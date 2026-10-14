@@ -38,6 +38,9 @@ export const AT = {
 };
 
 const m = (g, mat) => mesh(g, mat);
+// stations of the generators' own oil lines to their air/oil cooler: [supply, return] on each
+// generator, and the cooler's four ports in the same order (VSCF supply first)
+const GEN_OIL = { vscf: [-1.19, -1.22], idg: [-1.255, -1.285], ports: [-1.08, -1.11, -1.14, -1.17] };
 /** A small threaded plug: boss on the surface at r0 and a hex head out to r1. */
 const plug = (r0, r1, y, phi, rad = 0.012) => merge([radialCyl(r0, r1, y, phi, rad, 10), radialCyl(r1, r1 + 0.012, y, phi, rad * 1.5, 6)]);
 
@@ -243,12 +246,13 @@ export function buildAccessories(ctx) {
     system: 'Electrical', material: 'Constant-speed drive and 120 kVA generator (aircraft equipment)', mass: 70,
     explode: [0.35, -0.3, 1.81], temp: 330,
     desc: 'The 777\'s main 115 V, 400 Hz generator for this engine, Boeing equipment driven from an engine pad. Its pad turns at 0.7947 × N2 and is rated 181.3 kW (EASA type certificate); a hydraulic constant-speed drive inside holds the generator at a steady speed while the engine\'s speed varies.',
-  }, m(merge([aft(0.7, 0.135, 0.42), axialCyl(R_AGB, Y_AGB_A - 0.44, 0.7, 0.09, 0.04, 20)]), GM.painted()));
+  }, m(merge([aft(0.7, 0.135, 0.42), axialCyl(R_AGB, Y_AGB_A - 0.44, 0.7, 0.09, 0.04, 20),
+    ...GEN_OIL.idg.map((y) => radialCyl(1.97, 1.992, y, 0.7, 0.013, 10)), boxAt(1.98, -1.335, 0.72, [0.035, 0.05, 0.07])]), GM.painted()));
   P('Backup generator (VSCF/PMG)', {
     system: 'Electrical', material: 'Variable-speed generator with integral permanent-magnet generators (aircraft equipment)', mass: 22,
     explode: [0.33, -0.3, 1.66], temp: 330,
     desc: 'The 777\'s backup generator, Boeing equipment on its own engine pad: its pad turns fastest of all, at 2.4126 × N2 (about 22,500 rpm at 100 %), rated 43 kW. Its permanent-magnet sections also power the flight-control electronics if everything else fails.',
-  }, m(merge([aft(0.5, 0.075, 0.3), axialCyl(R_AGB, Y_AGB_A - 0.32, 0.5, 0.05, 0.04, 16)]), GM.painted()));
+  }, m(merge([aft(0.5, 0.075, 0.3), axialCyl(R_AGB, Y_AGB_A - 0.32, 0.5, 0.05, 0.04, 16), ...GEN_OIL.vscf.map((y) => radialCyl(1.912, 1.935, y, 0.5, 0.013, 10))]), GM.painted()));
   P('Engine-driven hydraulic pump', {
     system: 'Hydraulics', material: 'Variable-displacement piston pump (aircraft equipment)', mass: 25,
     explode: [0.37, -0.3, 1.96], temp: 330,
@@ -313,7 +317,7 @@ export function buildAccessories(ctx) {
     system: 'Sensors', material: 'Ametek float-type level transmitter', mass: 1,
     explode: [0.23, -0.2, 2.03], temp: 340,
     desc: 'Measures the oil level in the tank for the 777\'s EICAS display, so crews and engineers can trend oil consumption and spot a slow leak between flights.',
-  }, m(merge([radialCyl(1.93, 1.975, -1.25, PHI.tank - 0.08, 0.02, 10), boxAt(1.985, -1.25, PHI.tank - 0.08, [0.03, 0.05, 0.05])]), GM.connector()));
+  }, m(merge([radialCyl(1.93, 1.975, -1.33, PHI.tank - 0.08, 0.02, 10), boxAt(1.985, -1.33, PHI.tank - 0.08, [0.03, 0.05, 0.05])]), GM.connector()));
   // main fuel/oil heat exchanger: fuel in and out at the ends, oil in and out at the sides
   const ohe = merge([boxAt(1.84, -0.27, 1.44, [0.13, 0.38, 0.24]), axialCyl(1.84, -0.04, 1.44, 0.04, 0.08, 12), axialCyl(1.84, -0.5, 1.44, 0.04, 0.08, 12), radialCyl(1.705, 1.775, -0.27, 1.44, 0.02, 8),
     tangentCyl(1.84, -0.45, 1.364, 0.018, 0.04, 10), tangentCyl(1.84, -0.1, 1.516, 0.018, 0.04, 10)]);
@@ -323,17 +327,31 @@ export function buildAccessories(ctx) {
     desc: 'Fuel is the engine\'s coolant: hot scavenged oil, entering at one side and leaving at the other, gives its heat to the cold fuel flowing end to end, warming the fuel so ice cannot block its filter and putting the heat back into the cycle. After an engine and airplane fire, the FAA had units P/N 1838M88P11 and -P13 replaced (AD 2017-08-06).',
   }, m(ohe, GM.aluminium()));
   // IDG/VSCF air/oil cooler: fan air in from the fan frame, out through the fan cowl (position and routing estimated)
-  const AOC = 0.062;
+  const AOC = 0.062, AOC_PORT = 0.057;
   P('IDG/VSCF air/oil cooler', {
     system: 'Thermal control', material: 'Triumph Thermal plate-fin air/oil cooler with inlet and exit ducts (aircraft equipment; position estimated)', mass: 14,
     explode: [0.3, -0.35, 1.95], temp: 330,
-    desc: 'On the -110B1/-113B/-115B the 777\'s generators\' oil is cooled by fan air here (the base GE90s used a fuel-cooled unit instead). The IDG it cools is rated 120 kVA, 181.3 kW at its pad (EASA type certificate). Its position and duct routing are estimated.',
-  }, m(merge([boxAt(1.84, -1.05, AOC, [0.18, 0.3, 0.1]), tube([P3(1.7, -1.48, AOC), P3(1.76, -1.38, AOC), P3(1.8, -1.2, AOC)], 0.045, { seg: 10, radial: 10 }), tube([P3(1.93, -1.0, AOC + 0.013), P3(2.0, -0.98, AOC + 0.013), P3(2.075, -0.94, AOC + 0.013)], 0.035, { seg: 8, radial: 10 })]), GM.aluminium()));
+    desc: 'On the -110B1/-113B/-115B the 777\'s generators\' oil is cooled by fan air here (the base GE90s used a fuel-cooled unit instead): each generator\'s oil comes round the fan case to the four ports on its outer face and back. The IDG it cools is rated 120 kVA, 181.3 kW at its pad (EASA type certificate). Its position and duct routing are estimated.',
+  }, m(merge([boxAt(1.84, -1.05, AOC, [0.18, 0.3, 0.1]), tube([P3(1.7, -1.48, AOC), P3(1.76, -1.38, AOC), P3(1.8, -1.2, AOC)], 0.045, { seg: 10, radial: 10 }), tube([P3(1.93, -1.0, AOC + 0.013), P3(2.0, -0.98, AOC + 0.013), P3(2.075, -0.94, AOC + 0.013)], 0.035, { seg: 8, radial: 10 }),
+    ...GEN_OIL.ports.map((y) => radialCyl(1.926, 1.946, y, AOC_PORT, 0.012, 10))]), GM.aluminium()));
+  // each line: up off its generator, round the fan case over the tank's outer face at r 2.0 (clear of
+  // the looms and sense lines along the tank), then forward and down onto its port
+  const genLine = (y, yPort, phi0, r0) => tube([P3(r0, y, phi0), P3((r0 + 2.0) / 2 + 0.003, y, phi0 - 0.012), P3(2.0, y, phi0 - 0.04), ...arc(2.0, y, phi0 - 0.07, 0.15, 0.06),
+    P3(1.997, y + 0.04, 0.115), P3(1.975, (y + yPort) / 2 + 0.03, 0.08), P3(1.952, yPort, AOC_PORT + 0.004), P3(1.94, yPort, AOC_PORT)], 0.0095, { seg: 64, radial: 6 });
+  P('IDG & VSCF cooler oil lines', {
+    system: 'Thermal control', material: 'Stainless supply and return tubes carrying the generators\' own oil (aircraft equipment; routing estimated)', mass: 4, count: 4,
+    explode: [0.32, -0.4, 1.9], temp: 340,
+    desc: 'A supply and a return tube for each generator join it to the air/oil cooler beside the oil tank. The oil in them is the generators\' own, kept apart from the engine\'s; it carries the heat of the IDG\'s constant-speed drive and of the backup generator out to the fan air. Boeing does not publish the routing: the tubes are drawn round the aft face of the gearbox and over the tank.',
+  }, m(merge([
+    ...GEN_OIL.vscf.map((y, i) => genLine(y, GEN_OIL.ports[i], 0.5, 1.93)),
+    ...GEN_OIL.idg.map((y, i) => genLine(y, GEN_OIL.ports[i + 2], 0.7, 1.99)),
+  ]), GM.steel()));
   P('VSCF/lube oil-oil cooler', {
     system: 'Thermal control', material: 'Triumph Thermal oil-to-oil cooler', mass: 5,
     explode: [0.4, -0.35, 1.8], temp: 340,
-    desc: 'Passes the backup generator\'s heat into the engine\'s lube oil, which then dumps it into the fuel in the main heat exchanger. The VSCF pad is the fastest on the gearbox, 2.4126 × N2, about 22,500 rpm at 100 %.',
-  }, m(merge([boxAt(1.965, -1.08, 0.5, [0.07, 0.15, 0.12]), radialCyl(1.92, 1.93, -1.04, 0.5, 0.012, 8), radialCyl(1.92, 1.93, -1.12, 0.5, 0.012, 8)]), GM.aluminium()));
+    desc: 'Passes the backup generator\'s heat into the engine\'s lube oil, which then dumps it into the fuel in the main heat exchanger. The VSCF pad is the fastest on the gearbox, 2.4126 × N2, about 22,500 rpm at 100 %. Engine oil enters at its forward face and leaves at its side on the way back to the tank (the oil return line); the two stubs underneath carry the generator\'s oil.',
+  }, m(merge([boxAt(1.965, -1.08, 0.5, [0.07, 0.15, 0.12]), radialCyl(1.92, 1.93, -1.04, 0.5, 0.012, 8), radialCyl(1.92, 1.93, -1.12, 0.5, 0.012, 8),
+    axialCyl(1.965, -1.0, 0.5, 0.017, 0.014, 10), tangentCyl(1.965, -1.08, 0.4695, 0.017, 0.014, 10)]), GM.aluminium()));
 
   // ------------------------------------------------------------------ debris monitoring system (Eaton)
   P('DMS separator', {
@@ -416,8 +434,8 @@ export function buildAccessories(ctx) {
   P('IDG feeder cables', {
     system: 'Electrical', material: 'Three-phase aluminium feeders in fire-resistant sleeves (aircraft equipment)', mass: 18,
     explode: [0.25, -0.4, 1.75], temp: 330,
-    desc: 'Carry the generator\'s 115 V, 400 Hz output up into the strut and on to the 777\'s power panels: three thick phase cables and a neutral, sized for the 120 kVA rating.',
-  }, C((keep) => cutTube([P3(1.98, Y_AGB_A - 0.2, 0.6), P3(2.02, -1.22, 0.56), P3(2.04, -1.28, 0.5), ...upSide(2.04, -1.3, 0.45)], 0.022, keep, { radial: 8 }), GM.harness()));
+    desc: 'Carry the generator\'s 115 V, 400 Hz output from the terminal block on its aft end up into the strut and on to the 777\'s power panels: three thick phase cables and a neutral, sized for the 120 kVA rating.',
+  }, C((keep) => cutTube([P3(1.995, -1.35, 0.715), P3(2.012, -1.4, 0.68), P3(2.015, -1.42, 0.62), ...upSide(2.015, -1.42, 0.57)], 0.022, keep, { radial: 8 }), GM.harness()));
 
   // ------------------------------------------------------------------ drains
   const drainHdr = [P3(1.735, -0.505, 0.6), ...arc(1.735, -0.505, 0.6, 1.36, 0.1), P3(1.8, -0.6, 1.5)];
@@ -434,12 +452,13 @@ export function buildAccessories(ctx) {
   }, m(mast, GM.painted()));
 
   // ------------------------------------------------------------------ fire detection and extinguishing
-  const fanLoop = [P3(1.96, -0.12, 0.05), ...arc(1.96, -0.12, 0.05, 1.75, 0.1), P3(2.0, -0.75, 1.78), P3(2.04, -1.38, 1.75), ...arc(2.04, -1.38, 1.75, 0.05, 0.1), P3(2.0, -0.75, 0.03), P3(1.96, -0.13, 0.05)];
+  const fanLoop = [P3(1.96, -0.12, 0.05), ...arc(1.96, -0.12, 0.05, 1.75, 0.1), P3(2.0, -0.75, 1.78), P3(2.0, -1.2, 1.775), P3(2.01, -1.33, 1.76), P3(2.04, -1.38, 1.75), ...arc(2.04, -1.38, 1.75, 0.05, 0.1),
+    P3(2.01, -1.33, 0.045), P3(2.0, -1.2, 0.04), P3(2.0, -0.9, 0.035), P3(1.965, -0.72, 0.03), P3(1.965, -0.58, 0.03), P3(1.962, -0.3, 0.04), P3(1.96, -0.13, 0.05)];
   P('Fire detector loops (fan compartment)', {
     system: 'Sensors', material: 'Twin gas-filled or eutectic sensing tubes on clips, with responders', mass: 4, count: 2,
     explode: [0.15, 0.25, 2.3], temp: 300,
     desc: 'Two independent sensing loops run round the accessories. Heat anywhere along a loop raises its gas pressure (or drops its resistance) and the responder signals FIRE or overheat in the cockpit; both loops must agree, so a single fault cannot give a false alarm.',
-  }, m(merge([tube(fanLoop, 0.006, { seg: 160, radial: 5 }), boxAt(1.98, -0.12, 0.02, [0.04, 0.06, 0.06]), boxAt(2.05, -1.32, 1.78, [0.04, 0.06, 0.06])]), GM.connector()));
+  }, m(merge([tube(fanLoop, 0.006, { seg: 180, radial: 5 }), boxAt(1.98, -0.12, 0.02, [0.04, 0.06, 0.06]), boxAt(2.0, -1.22, 1.79, [0.04, 0.06, 0.06])]), GM.connector()));
   P('Fire detector loops (core compartment)', {
     system: 'Sensors', material: 'Twin sensing tubes on clips round the combustor and turbine casings', mass: 4, count: 2,
     explode: [-0.85, -1.05, 0.65], temp: 600,

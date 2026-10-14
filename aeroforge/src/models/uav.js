@@ -563,6 +563,7 @@ export function buildUAV() {
   const fcc = [-0.24, -0.08, 0.08].map((z) => lru(0.42, 0.2, 0.14, [X(2.175), NFLOOR + 0.107, z]));
   P('Flight control computers', {
     system: 'Flight controls', material: 'Redundant flight computers', mass: 12, count: 3, explode: [0.9, 0.9, -0.3],
+    callout: true, anchor: [X(2.175) + 0.12, NFLOOR + 0.207, 0.11],   // top of the starboard computer
     desc: 'Triple-redundant computers (GA-ASI, Block 5) fly the aircraft: a stability augmentation system and hold modes keep attitude, altitude and airspeed, and they mix the ruddervator commands. Stall protection pushes the nose down, to about −15°, as speed nears the stall. If the link is lost they fly an uploaded profile: a climb for 51 s at 105 kt, then preset waypoints (USAF and NTSB investigations).',
   }, L(merge(fcc), m.lru));
   A.root.updateMatrixWorld(true);

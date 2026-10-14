@@ -278,11 +278,15 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   const press = [
     pipe([[cx, 36.4, cz], [px * 0.9, 35.5, pz * 0.9], [px, 30, pz], [px, Y.commonDome + 0.3, pz], [px, Y.commonDome - 0.4, pz], [px, Y.engSectionTop + 0.2, pz], [hxx * 1.12, 2.92, hxz * 1.12]], 0.035, { seg: 6, tubular: 80 }),
     pipe([[hxx * 1.12, 2.9, hxz * 1.05], [qx, Y.engSectionTop + 0.3, qz], [qx, Y.commonDome - 0.5, qz], [qx, Y.commonDome + 0.4, qz], [qx, Y.loxTop - 0.2, qz], [qx * 0.7, Y.loxTop + 0.5, qz * 0.7]], 0.03, { seg: 6, tubular: 80 }),
-    pipe([[hxx, 2.9, hxz], [hxx * 0.92, aftDomeY(1.1) + 0.02, hxz * 0.92]], 0.025, { seg: 6, tubular: 6 }),          // RP-1 ullage feed
+    // RP-1 ullage feed: a branch off the riser into the top of the fuel tank, under the common dome
+    pipe([[qx, Y.commonDome - 1.2, qz], [qx * 0.9, Y.commonDome - 1.0, qz * 0.9], [qx * 0.82, Y.commonDome - 0.95, qz * 0.82]], 0.025, { seg: 6, tubular: 8 }),
+    // diffusers: perforated cans that spread the incoming gas so it does not jet onto the propellant
+    post(qx * 0.82, qz * 0.82, Y.commonDome - 1.1, Y.commonDome - 0.85, 0.055, 10),
+    post(qx * 0.7, qz * 0.7, Y.loxTop + 0.42, Y.loxTop + 0.66, 0.06, 10),
   ];
   P('pressurisation lines', {
-    system: 'Fuel', material: 'Stainless steel helium lines', mass: 110,
-    desc: 'Helium runs from the bottles in the LOX tank down the inside of the wall to the heat exchanger, then back up to the tops of both tanks to hold their ullage pressure as the propellant drains. Routing simplified.',
+    system: 'Fuel', material: 'Stainless steel helium lines, ullage diffusers', mass: 110,
+    desc: 'Helium runs from the bottles in the LOX tank down the inside of the wall to the heat exchanger, then back up to the tops of both tanks — under the forward dome and under the common dome — where diffusers spread it into the ullage to hold the pressure as the propellant drains. Routing simplified.',
     explode: [0, 0.8, 4.0],
   }, mesh(merge(press), FM.steelLine()));
 
@@ -377,7 +381,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     system: 'Fuel', material: 'Stainless vent valve and overboard port', mass: 8,
     desc: 'Relieves the fuel tank\'s ullage just under the common dome, where the helium pressurant collects above the RP-1. Position estimated.',
     explode: [0, 0.2, 2.4],
-  }, mesh(merge([unit(1.68, 200, Y.commonDome - 0.25, 0.2, 0.2, 0.16), rod(at(1.68, 200, Y.commonDome - 0.25), at(R + 0.02, 200, Y.commonDome - 0.25), 0.035, 8)]), FM.steelLine()));
+  }, mesh(merge([unit(1.68, 200, Y.commonDome - 0.55, 0.2, 0.2, 0.16), rod(at(1.68, 200, Y.commonDome - 0.55), at(R + 0.02, 200, Y.commonDome - 0.55), 0.035, 8)]), FM.steelLine()));
   rvv.userData.part.thermalRole = 'rp1';
   const [t0x, t0z] = polar(R + 0.04, t0Az);
   const t0 = [unit(R + 0.04, t0Az, T0_Y, 1.25, 0.7, 0.08)];
@@ -781,7 +785,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
 
   // ------------------------------------------------------------------ attitude control
   const cgY = centre ? 46.6 : Y.s1Top + 1.0;
-  const cg = [], n2 = [], n2l = [];
+  const cg = [], n2 = [], n2l = [], n2r = [];
   const n2Y = 42.05;                     // below the battery packs in the forward skirt
   for (const a of [90, 270]) {
     cg.push(unit(R + 0.12, a, cgY, 0.5, 0.62, 0.26));
@@ -791,6 +795,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     }
     n2.push(new THREE.SphereGeometry(0.33, 18, 12).translate(...at(1.2, a + 10, n2Y)));
     n2l.push(pipe([at(1.2, a + 10, n2Y + 0.3), at(1.62, a + 6, n2Y + 0.7), at(1.74, a + 4, Y.s1Top + 0.2), at(1.75, a + 2, cgY - 0.6), at(R - 0.04, a, cgY)], 0.022, { seg: 6, tubular: 20 }));
+    n2r.push(post(...polar(1.2, a + 10), n2Y + 0.3, n2Y + 0.42, 0.05, 10));          // pressure regulator on the tank outlet
   }
   P('cold-gas thrusters', {
     system: 'Attitude control', count: 2, material: 'Nitrogen thruster pods (four nozzles each)', mass: 2 * 40,
@@ -799,9 +804,9 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   }, mesh(merge(cg), FM.black()));
   P('nitrogen tanks', {
     system: 'Attitude control', count: 2, material: 'Composite-overwrapped N₂ tanks and feed lines', mass: 2 * 40,
-    desc: 'High-pressure nitrogen for the thrusters, in the LOX tank\'s forward skirt, fed through regulators to each pod. Placement estimated.',
+    desc: 'High-pressure nitrogen for the thrusters, in the LOX tank\'s forward skirt; a regulator (gold) on each tank outlet drops it to thruster pressure before the line runs up to its pod. Placement estimated.',
     explode: [0, 2.6, 2.0],
-  }, [mesh(merge(n2), FM.copv()), mesh(merge(n2l), FM.steelLine())]);
+  }, [mesh(merge(n2), FM.copv()), mesh(merge(n2l), FM.steelLine()), mesh(merge(n2r), FM.gold())]);
 
   // ------------------------------------------------------------------ avionics, power, wiring, antennas
   const fwdY = Y.fwdAvionics;
