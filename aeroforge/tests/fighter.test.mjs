@@ -235,3 +235,23 @@ test('saw-tooth door edges run parallel to the 42° wing leading edge', () => {
   assert.ok(Math.min(...grid[0].map((p) => p[0])) < 10 && Math.max(...grid[2].map((p) => p[0])) > 11);
   assert.ok(grid[1].every((p) => p[0] === 10.5));
 });
+
+test('weight-on-wheels switches sit on their legs, clear of the tyres', () => {
+  for (const key of ['nose', 'main']) {
+    const g = L.GEAR[key];
+    const c = L.wowCentre(g);
+    const axle = [g.axleS, L.GROUND + g.r, g.axleZ];
+    // every corner of the switch box is more than a tyre radius + 3 cm from the axle
+    for (const dx of [-1, 1]) for (const dy of [-1, 1]) for (const dz of [-1, 1]) {
+      const p = [c[0] + (dx * g.wow.box[0]) / 2, c[1] + (dy * g.wow.box[1]) / 2, c[2] + (dz * g.wow.box[2]) / 2];
+      const d = Math.hypot(p[0] - axle[0], p[1] - axle[1], p[2] - axle[2]);
+      assert.ok(d > g.r + 0.03, `${key} switch corner ${d.toFixed(3)} m from the axle`);
+    }
+    // and it is mounted on the leg: within 0.2 m of the trunnion–axle line
+    const t = g.trunnion, u = axle.map((v, i) => v - t[i]), n = Math.hypot(...u);
+    const w = c.map((v, i) => v - t[i]);
+    const along = (w[0] * u[0] + w[1] * u[1] + w[2] * u[2]) / n;
+    const off = Math.sqrt(Math.max(0, w[0] ** 2 + w[1] ** 2 + w[2] ** 2 - along ** 2));
+    assert.ok(off < 0.2 && along > 0 && along < n, `${key} switch ${off.toFixed(3)} m off the leg`);
+  }
+});

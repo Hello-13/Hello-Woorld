@@ -203,6 +203,21 @@ export const CM_BAY = { s0: 11.65, s1: 12.05 };
 export const ENGINE_DOOR = { s0: 13.5, s1: 16.8, q0: 28, q1: 34 };
 export const MAIN_BAY = { s0: 8.45, s1: 12.35, z: 0.78 };
 export const MAIN_WELL = { s0: 11.2, s1: 12.95, z0: 0.86, z1: 1.46 };
+/**
+ * Gear legs, gear down: trunnion [s, y, z], axle station / span, tyre radius and width (m). The
+ * weight-on-wheels switch sits on the leg at fraction k from trunnion to axle, `fwd` m ahead of the leg
+ * and `dz` m to the side (× side for the mains), clear of the tyre and the torque links.
+ */
+export const GEAR = {
+  nose: { trunnion: [4.06, -0.3, 0], axleS: 3.97, axleZ: 0, r: 0.27, w: 0.19, wow: { k: 0.72, fwd: 0.11, dz: 0.075, box: [0.06, 0.05, 0.045] } },
+  main: { trunnion: [11.3, -0.55, 1.28], axleS: 11.38, axleZ: 1.62, r: 0.43, w: 0.29, wow: { k: 0.53, fwd: 0.137, dz: -0.03, box: [0.06, 0.05, 0.05] } },
+};
+/** Centre [s, y, z] of a gear leg's weight-on-wheels switch box (gear down; right main for 'main'). */
+export function wowCentre(g) {
+  const [s0, y0, z0] = g.trunnion;
+  const a = [g.axleS, GROUND + g.r, g.axleZ];
+  return [s0 + (a[0] - s0) * g.wow.k - g.wow.fwd, y0 + (a[1] - y0) * g.wow.k, z0 + (a[2] - z0) * g.wow.k + g.wow.dz];
+}
 /** Wall fractions (chine → lower corner) with exact side-bay edges. */
 export function wallFractions(s) {
   const D = bD(s);

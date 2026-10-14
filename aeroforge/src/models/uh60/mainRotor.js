@@ -300,9 +300,9 @@ export function buildMainRotor({ A, parent }) {
   // clamp collar round the spindle body, a lug on its leading underside and an arm sloping down and
   // forward to the ball end, so the arm passes under the lead-lag damper at any pitch the head reaches
   const hornG = merge([
-    cyl(0.076, 0.076, 0.04, [0.695 - E, 0, 0], 'x', 20),                     // between the droop/antiflap stops and the cuff flange
-    box(0.04, 0.06, 0.06, [0.695 - E, -0.04, -0.06]),
-    tube([0.695 - E, -0.045, -0.06], [HORN.x - E, HORN.y, HORN.z], 0.03, 12),
+    cyl(0.076, 0.076, 0.04, [0.7 - E, 0, 0], 'x', 20),                     // between the droop/antiflap stops and the cuff flange
+    box(0.04, 0.06, 0.06, [0.7 - E, -0.04, -0.06]),
+    tube([0.7 - E, -0.045, -0.06], [HORN.x - E, HORN.y, HORN.z], 0.03, 12),
     cyl(0.036, 0.036, 0.06, [HORN.x - E, HORN.y, HORN.z], 'y', 12),
   ]);
   const hornPart = P('Pitch horns', {
@@ -314,7 +314,7 @@ export function buildMainRotor({ A, parent }) {
   // droop stops and antiflap stops (static on the hub, beneath/above each spindle)
   const stops = [];
   stops.push(new THREE.TorusGeometry(0.31, 0.022, 8, 40).rotateX(Math.PI / 2).translate(0, -0.2, 0));
-  onArms(stops, merge([box(0.12, 0.05, 0.1, [0.62, -0.12, 0]), box(0.1, 0.04, 0.09, [0.62, 0.115, 0]), cyl(0.024, 0.024, 0.12, [0.33, -0.2, 0], 'x', 8), cyl(0.012, 0.012, 0.13, [0.62, -0.12, 0], 'z', 8)]));
+  onArms(stops, merge([box(0.1, 0.05, 0.1, [0.61, -0.12, 0]), box(0.08, 0.04, 0.09, [0.61, 0.115, 0]), cyl(0.024, 0.024, 0.12, [0.33, -0.2, 0], 'x', 8), cyl(0.012, 0.012, 0.13, [0.61, -0.12, 0], 'z', 8)]));
   P('Droop stops & flap restrainers', {
     material: 'Steel stops with centrifugal-weight latches, heated hinge pins', mass: 8, count: 4, explode: [0, UPX + 0.4, 0.0],
     desc: 'When the rotor is not turning the blades and spindles rest on hub-mounted droop stops, and upper antiflapping stops hold them down in wind; both engage as the rotor slows at shutdown, and centrifugal weights swing them clear at speed. Heaters in the droop-stop hinge pins run whenever blade de-ice is on so ice cannot jam them.',
@@ -450,7 +450,7 @@ export function buildMainRotor({ A, parent }) {
   const ballProf = [[0.127, -0.059]];
   for (let k = 0; k <= 8; k++) { const y = -0.059 + (0.118 * k) / 8; ballProf.push([Math.sqrt(0.14 * 0.14 - y * y), y]); }
   ballProf.push([0.127, 0.059], [0.127, -0.059]);
-  uni.add(mesh(merge([orientOutward(lathe(ballProf, 28)), cyl(0.127, 0.127, 0.15, [0, 0, 0], 'y', 28, true)]), MAT.steel()));
+  uni.add(mesh(merge([orientOutward(lathe(ballProf, 28)), cyl(0.127, 0.127, 0.12, [0, 0, 0], 'y', 28, true)]), MAT.steel()));
 
   // pitch control rods (rotating swashplate → horn), aimed every frame. Built along +y: lower rod
   // end at 0, adjustment barrel with jam nuts in the middle, upper rod end at RL0.
@@ -525,9 +525,9 @@ export function buildMainRotor({ A, parent }) {
     const base = V3(ax, yb, az), bw = headToAir(base);
     const tang = V3(-Math.sin(a), 0, -Math.cos(a));
     // deck bracket: a plate bolted on the deck with two clevis cheeks on it
-    const plate = box(0.13, 0.025, 0.11, [0, 0, 0]).rotateY(a).translate(bw.x, DECK_TOP + 0.0125, bw.z).applyMatrix4(airToHeadM);
+    const plate = box(0.13, 0.025, 0.11, [0, 0, 0]).rotateY(a).translate(bw.x, DECK_TOP + 0.0135, bw.z).applyMatrix4(airToHeadM);
     const bolts = [];
-    for (const [u, v] of [[0.045, 0.04], [0.045, -0.04], [-0.045, 0.04], [-0.045, -0.04]]) bolts.push(cyl(0.008, 0.008, 0.01, [u, 0, v], 'y', 6).rotateY(a).translate(bw.x, DECK_TOP + 0.03, bw.z).applyMatrix4(airToHeadM));
+    for (const [u, v] of [[0.045, 0.04], [0.045, -0.04], [-0.045, 0.04], [-0.045, -0.04]]) bolts.push(cyl(0.008, 0.008, 0.01, [u, 0, v], 'y', 6).rotateY(a).translate(bw.x, DECK_TOP + 0.031, bw.z).applyMatrix4(airToHeadM));
     fixedG.push(plate, ...bolts,
       box(0.05, 0.08, 0.012, [0, 0, 0]).rotateY(a).translate(base.x + tang.x * 0.04, base.y, base.z + tang.z * 0.04),
       box(0.05, 0.08, 0.012, [0, 0, 0]).rotateY(a).translate(base.x - tang.x * 0.04, base.y, base.z - tang.z * 0.04));

@@ -268,13 +268,15 @@ export function buildCockpit(ctx) {
 
   // ------------------------------------------------------------------ gear handle, canopy and jettison controls
   {
-    const gh = [onPanel(0.28, -0.29, 0.05, 0.08, 0.035, 0.03)];
-    gh.push(new THREE.CylinderGeometry(0.008, 0.008, 0.09, 6).rotateZ(Math.PI / 2 + PANEL_TILT).translate(X(PANEL_S) - 0.09, 0.29, -0.29));
-    gh.push(new THREE.CylinderGeometry(0.022, 0.022, 0.025, 14).rotateZ(Math.PI / 2 + PANEL_TILT).translate(X(PANEL_S) - 0.14, 0.3, -0.29));   // wheel-shaped knob
+    // lower left of the main panel, under the left SMFD (whose bezel ends at panel y 0.2175)
+    const ghY = 0.17, ghZ = -0.27, lean = (ghY - 0.28) * Math.tan(-PANEL_TILT);
+    const gh = [onPanel(ghY, ghZ, 0.05, 0.06, 0.035, 0.03)];
+    gh.push(new THREE.CylinderGeometry(0.008, 0.008, 0.09, 6).rotateZ(Math.PI / 2 + PANEL_TILT).translate(X(PANEL_S) - 0.09 + lean, ghY + 0.01, ghZ));
+    gh.push(new THREE.CylinderGeometry(0.022, 0.022, 0.025, 14).rotateZ(Math.PI / 2 + PANEL_TILT).translate(X(PANEL_S) - 0.14 + lean, ghY + 0.02, ghZ));   // wheel-shaped knob
     P('Landing-gear handle', {
       system: 'Crew systems', material: 'Wheel-shaped knob on a lever, red warning light in the grip', mass: 1,
       explode: [0.7, 1.05, -0.6],
-      desc: 'On the left of the main panel. Its wheel-shaped knob can be told apart by feel; weight-on-wheels interlocks stop it raising the gear while the jet is on the ground, and a light in the grip shows when the gear disagrees with the handle (position approximate).',
+      desc: 'On the left of the main panel, below the left display. Its wheel-shaped knob can be told apart by feel; weight-on-wheels interlocks stop it raising the gear while the jet is on the ground, and a light in the grip shows when the gear disagrees with the handle (position approximate).',
     }, mesh(merge(gh), F.wheel()));
     const cj = [box(5.92, 0.3, -0.4, 0.18, 0.02, 0.1)];
     cj.push(box(4.98, 0.2, -0.42, 0.04, 0.05, 0.02));

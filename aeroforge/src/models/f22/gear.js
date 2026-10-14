@@ -90,9 +90,10 @@ export function buildGear(ctx) {
 
   // ================================================================== nose gear (retracts aft under the cockpit floor)
   {
-    const T = V(X(4.06), -0.3, 0);
-    const Rn = 0.27, Wn = 0.19;
-    const axle = V(X(3.97), FR.GROUND + Rn, 0);
+    const G = FR.GEAR.nose;
+    const T = V(X(G.trunnion[0]), G.trunnion[1], G.trunnion[2]);
+    const Rn = G.r, Wn = G.w;
+    const axle = V(X(G.axleS), FR.GROUND + Rn, G.axleZ);
     const leg = axle.clone().sub(T);
     const L = leg.length();
     const dir = leg.clone().normalize();
@@ -132,13 +133,13 @@ export function buildGear(ctx) {
       }, pL);
       pv.push(pL);
     }
-    // weight-on-wheels switch on the torque-link apex
+    // weight-on-wheels switch on the front of the strut, beside the upper torque link and well clear of the tyre
     {
       const pW = pivotAt(T);
-      const c = at(0.86).add(V(0.12, 0, 0.05));
-      pW.add(mesh(merge([new THREE.BoxGeometry(0.06, 0.05, 0.045).translate(c.x, c.y, c.z), new THREE.CylinderGeometry(0.006, 0.006, 0.3, 5).translate(c.x - 0.02, c.y + 0.16, c.z)]), F.yellow()));
+      const Wo = G.wow, c = at(Wo.k).add(V(Wo.fwd, 0, Wo.dz));
+      pW.add(mesh(merge([new THREE.BoxGeometry(...Wo.box).translate(c.x, c.y, c.z), rodV(c.clone().add(V(-0.02, 0.025, 0)), at(0.35).add(V(0.085, 0, Wo.dz)), 0.006, 5)]), F.yellow()));
       P('Nose gear weight-on-wheels switch', {
-        system: 'Landing gear', material: 'Proximity sensor on the oleo torque links, redundant channels', mass: 1,
+        system: 'Landing gear', material: 'Proximity sensor on the strut by the torque links, redundant channels', mass: 1,
         explode: [1.0, -1.3, 0.45],
         desc: 'Senses when the oleo compresses under load. Weight-on-wheels interlocks stop the gear retracting on the ground; in a 2018 mishap the jet sensed weight off wheels at 135 KCAS after rotating early, and the gear came up before it could fly.',
       }, pW);
@@ -229,9 +230,10 @@ export function buildGear(ctx) {
   // ================================================================== main gears (fold up and aft into wells under the ducts)
   for (const side of [1, -1]) {
     const R = side > 0 ? 'right' : 'left';
-    const T = V(X(11.3), -0.55, side * 1.28);
-    const Rm = 0.43, Wm = 0.29;
-    const axle = V(X(11.38), FR.GROUND + Rm, side * 1.62);
+    const G = FR.GEAR.main;
+    const T = V(X(G.trunnion[0]), G.trunnion[1], side * G.trunnion[2]);
+    const Rm = G.r, Wm = G.w;
+    const axle = V(X(G.axleS), FR.GROUND + Rm, side * G.axleZ);
     const vd = axle.clone().sub(T);
     const L = vd.length();
     const vs = V(X(12.33) - T.x, -0.59 - T.y, side * 1.25 - T.z).normalize().multiplyScalar(L);   // stowed axle, low enough that the wheel clears the duct floor and the closed door
@@ -256,11 +258,12 @@ export function buildGear(ctx) {
     pT.add(mesh(merge([rodV(at(0.66).add(V(0.12, 0, 0)), at(0.8).add(V(0.22, 0, 0)), 0.026), rodV(at(0.8).add(V(0.22, 0, 0)), at(0.92).add(V(0.08, 0, 0)), 0.026),
       new THREE.CylinderGeometry(0.03, 0.03, 0.14, 8).rotateX(Math.PI / 2).translate(...at(0.8).add(V(0.22, 0, 0)).toArray())]), F.steel()));
     {
+      // on the front of the oleo cylinder above the torque links, inboard of the tyre and clear of its rim
       const pW = pivotAt(T);
-      const c = at(0.8).add(V(0.24, 0, side * 0.05));
-      pW.add(mesh(merge([new THREE.BoxGeometry(0.06, 0.05, 0.05).translate(c.x, c.y, c.z), new THREE.CylinderGeometry(0.006, 0.006, 0.36, 5).translate(c.x - 0.03, c.y + 0.2, c.z)]), F.yellow()));
+      const Wo = G.wow, c = at(Wo.k).add(V(Wo.fwd, 0, side * Wo.dz));
+      pW.add(mesh(merge([new THREE.BoxGeometry(...Wo.box).translate(c.x, c.y, c.z), rodV(c.clone().add(V(-0.025, 0.025, 0)), at(0.15).add(V(0.113, 0, side * Wo.dz)), 0.006, 5)]), F.yellow()));
       P(`Main gear weight-on-wheels switch (${R})`, {
-        system: 'Landing gear', material: 'Proximity sensor at the torque links, redundant channels', mass: 1,
+        system: 'Landing gear', material: 'Proximity sensor on the oleo cylinder by the torque links, redundant channels', mass: 1,
         explode: [0.75, -1.5, 0.75 * side],
         desc: 'Tells the flight controls, gear handle interlock and brakes whether the leg is carrying weight. The gear-retraction interlock relies on it, so a false weight-off-wheels signal at low speed can raise the gear too soon.',
       }, pW);

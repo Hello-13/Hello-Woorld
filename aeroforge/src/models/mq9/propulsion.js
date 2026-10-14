@@ -177,7 +177,7 @@ export function buildPropulsion({ P, L, m, role }) {
   P('Mechanical fuel shutoff valve (MSOV)', {
     system: 'Propulsion', material: 'Lever-operated shutoff valve at the fuel-control outlet', mass: 0.5, explode: [0.35, 1.45, -0.35],
     desc: 'The engine’s own fuel shutoff valve. The condition lever has three positions: Run; Stop, which closes this mechanical valve; and Stop & Feather, which also feathers the propeller. The MQ-9A has a second, electrical valve (the FSOV) at the firewall.',
-  }, L(merge([cylX(msovP[0] - 0.03, msovP[0] + 0.03, 0.022, 0.022, msovP[1], msovP[2], 12), box(0.012, 0.05, 0.012, [msovP[0], msovP[1] + 0.03, msovP[2] - 0.02])]), m.lruOlive));
+  }, L(merge([cylX(msovP[0] - 0.03, msovP[0] + 0.03, 0.022, 0.022, msovP[1], msovP[2], 12), box(0.012, 0.032, 0.012, [msovP[0], msovP[1] + 0.02, msovP[2] - 0.02])]), m.lruOlive));
   const xMan = XS(STATIONS.turbine0) - 0.035;
   P('Metered fuel line', {
     system: 'Propulsion', material: 'Stainless tube, fire-sleeved', mass: 0.5, explode: [0.55, 1.6, -0.2],
@@ -223,7 +223,7 @@ export function buildPropulsion({ P, L, m, role }) {
   // supply from the filter to the temperature control valve, return from the cooler matrix to the sump: both run under the
   // generators and the engine, close to the keel; a third line joins the tank to the pump in the accessory case
   const oilLines = [
-    pipe([[filtX + 0.07, PADS.tach.y - 0.025, -0.07], [XS(9.66), 1.385, -0.075], [XS(9.5), 1.37, -0.085], [XS(9.2), 1.365, -0.09], [XS(FIREWALL_S), 1.37, -0.1], [XS(8.4), 1.385, -0.14], [XS(7.95), 1.35, -0.15], [XS(7.76), tcvP[1], -0.14], [tcvP[0], tcvP[1], tcvP[2] - 0.022]], 0.008, 6, 60),
+    pipe([[filtX + 0.07, PADS.tach.y - 0.025, -0.07], [XS(9.66), 1.385, -0.075], [XS(9.5), 1.37, -0.085], [XS(9.2), 1.365, -0.09], [XS(FIREWALL_S), 1.37, -0.1], [XS(8.4), 1.385, -0.14], [XS(7.95), 1.35, -0.15], [XS(7.76), tcvP[1], -0.14], [tcvP[0], tcvP[1], tcvP[2] - 0.026]], 0.008, 6, 60),
     pipe([[XS(7.91), 1.34, -0.05], [XS(8.0), 1.37, -0.06], [XS(8.4), 1.378, -0.09], [XS(FIREWALL_S), 1.362, -0.055], [XS(9.2), 1.358, -0.045], [XS(9.5), 1.362, -0.04], [XS(9.76), 1.372, -0.03], [XS(9.84), 1.405, -0.02]], 0.008, 6, 60),
     pipe([[tankP[0] - 0.1, tankP[1] - 0.025, tankP[2] - 0.01], [XS(9.5), 1.40, 0.13], [XS(9.6), 1.372, 0.06], [XS(9.76), 1.366, 0.03], [XS(9.835), 1.385, 0.025], [XS(9.85), 1.405, 0.025]], 0.007, 6, 24),
   ];
@@ -233,7 +233,7 @@ export function buildPropulsion({ P, L, m, role }) {
   }, L(merge(oilLines), m.pipe)), 'oil');
 
   // ---- ignition and engine sensors
-  const excP = [XS(9.36), ENGINE_Y - 0.06, -0.285];
+  const excP = [XS(9.36), ENGINE_Y - 0.06, -0.26];             // inboard of the V-tail spar frame's side arc
   role(P('Ignition exciter', {
     system: 'Propulsion', material: 'Capacitor-discharge ignition unit', mass: 2, explode: [0.3, 0.2, -1.0],
     desc: 'Charges capacitors from the 24 V supply and fires the two igniter plugs through shielded leads, during starts and whenever continuous ignition is selected.',
@@ -274,8 +274,8 @@ export function buildPropulsion({ P, L, m, role }) {
   const cabStart = (i) => [servoX[i] - 0.035, 1.86, -0.12 + i * 0.12];
   const cables = [
     pipe([cabStart(0), [XS(8.95), 1.9, -0.1], [XS(9.3), 1.94, -0.08], [fcuP[0] + 0.08, fcuP[1] + 0.03, -0.06]], 0.003, 4, 24),       // power lever → FCU
-    pipe([cabStart(1), [XS(8.95), 1.88, 0.0], [XS(9.3), 1.94, -0.04], [msovP[0], msovP[1] + 0.05, msovP[2] - 0.02]], 0.003, 4, 24),       // condition lever → MSOV
-    pipe([cabStart(2), [XS(8.95), 1.86, 0.12], [XS(9.2), 1.58, 0.28], [XS(9.55), 1.605, 0.29], [XS(9.72), 1.64, 0.28], [govArm[0], govArm[1] + 0.003, govArm[2] + 0.002]], 0.003, 4, 40),  // speed lever → governor arm
+    pipe([cabStart(1), [XS(8.95), 1.88, 0.0], [XS(9.3), 1.94, -0.04], [msovP[0], msovP[1] + 0.034, msovP[2] - 0.02]], 0.003, 4, 24),       // condition lever → MSOV lever
+    pipe([cabStart(2), [XS(8.9), 1.83, 0.17], [XS(8.95), 1.7, 0.22], [XS(9.05), 1.6, 0.27], [XS(9.2), 1.58, 0.28], [XS(9.55), 1.605, 0.29], [XS(9.72), 1.64, 0.28], [govArm[0], govArm[1] + 0.003, govArm[2] + 0.002]], 0.003, 4, 48),  // speed lever, low through the firewall clear of the exhaust Y-duct → governor arm
   ];
   P('Engine control cables', {
     system: 'Propulsion', material: 'Push-pull control cables in conduit', mass: 0.8, count: 3, explode: [0.1, 1.55, 0.2],

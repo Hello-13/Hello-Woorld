@@ -150,8 +150,9 @@ export function buildFuel({ P, L, m }) {
   const pumpY = prof(4.45).bot + 0.085;
   P('Header tank pumps', {
     system: 'Fuel', material: 'Two electric fuel pumps on the header cell', mass: 3, count: 2, explode: [0, -1.45, 0.45],
-    desc: 'Two electric pumps on the floor of the header cell. They feed the engine and also send fuel at pressure to the jet-pump manifold that refills the header from the other tanks; either can do the job alone.',
-  }, L(merge([1, -1].map((zs) => merge([cylX(X(4.62), X(4.36), 0.036, 0.036, pumpY, 0.19 * zs, 14), cylX(X(4.36), X(4.31), 0.022, 0.022, pumpY, 0.19 * zs, 10), box(0.05, 0.05, 0.05, [X(4.6), pumpY + 0.045, 0.19 * zs])]))), m.darkMetal));
+    desc: 'Two electric pumps on the floor of the header cell. They feed the engine and also send fuel at pressure to the jet-pump manifold that refills the header from the other tanks; either can do the job alone. Their power leads come in through a sealed fitting in the cell’s aft wall.',
+  }, [L(merge([1, -1].map((zs) => merge([cylX(X(4.62), X(4.36), 0.036, 0.036, pumpY, 0.19 * zs, 14), cylX(X(4.36), X(4.31), 0.022, 0.022, pumpY, 0.19 * zs, 10), box(0.05, 0.05, 0.05, [X(4.6), pumpY + 0.045, 0.19 * zs])]))), m.darkMetal),
+    L(merge([1, -1].map((zs) => pipe([[X(4.62), pumpY + 0.05, 0.19 * zs], [X(4.69), pumpY + 0.06, 0.19 * zs], [X(4.748), pumpY + 0.065, 0.19 * zs]], 0.005, 5, 8))), m.harness)]);
   const selS = 4.8, selY = prof(selS).bot + 0.12;
   const sel = [lru(0.06, 0.06, 0.24, [X(selS), selY, 0], 0.01)];
   for (let k = 0; k < 6; k++) sel.push(cylX(X(selS) - 0.014, X(selS) + 0.014, 0.013, 0.013, selY + 0.05, -0.1 + k * 0.04, 8), tubeBetween([X(selS), selY + 0.03, -0.1 + k * 0.04], [X(selS), selY + 0.065, -0.1 + k * 0.04], 0.009, 8));
@@ -243,10 +244,11 @@ export function buildFuelLines({ P, L, m }, fu, prop) {
     system: 'Fuel', material: 'Flush filler caps', mass: 1.5, count: 6, explode: [0, 1.7, 0],
     desc: 'Flush filler caps over each wing tank and the forward and aft fuselage cells, for gravity refuelling where no pressure-refuelling equipment is available; the header fills from the others (positions estimated).',
   }, L(merge(caps), m.darkMetal));
-  const dv = [X(4.66), fu.pumpY + 0.02, -0.06];
+  const dv = [X(4.66), fu.pumpY + 0.055, -0.06];            // above the port motive-manifold pipe
   const mast = fusePoint(6.42, -Math.PI / 2 - 0.12, -0.002);
   P('Fuel dump valve & outlet', {
     system: 'Fuel', material: 'Motorised dump valve, 20 mm line and a small outlet mast', mass: 1.2, explode: [0, -1.55, -0.45],
     desc: 'A valve on the header pumps’ outlet sends fuel overboard through a line along the keel to an outlet mast under the fuselage. After an engine warning in 2018 a crew dumped fuel before an emergency landing, cutting the weight and the energy the brakes would have to absorb (USAF investigation; outlet position not public, estimated here).',
-  }, L(merge([lru(0.06, 0.05, 0.05, dv), pipe([dv, [X(5.0), fu.keelY - 0.03, -0.012], [X(6.0), fu.keelY - 0.03, -0.012], [X(6.38), mast[1] + 0.03, mast[2]]], 0.01, 6, 30), tubeBetween([X(6.38), mast[1] + 0.03, mast[2]], [X(6.46), mast[1] - 0.09, mast[2]], 0.013, 8)]), m.darkMetal));
+  }, [L(merge([lru(0.06, 0.05, 0.05, dv), pipe([dv, [X(5.0), fu.keelY - 0.03, -0.012], [X(6.0), fu.keelY - 0.03, -0.012], [X(6.38), mast[1] + 0.03, mast[2]]], 0.01, 6, 30), tubeBetween([X(6.38), mast[1] + 0.03, mast[2]], [X(6.46), mast[1] - 0.09, mast[2]], 0.013, 8)]), m.darkMetal),
+    L(pipe([[X(4.66), dv[1] + 0.022, dv[2]], [X(4.71), dv[1] + 0.035, -0.08], [X(4.748), dv[1] + 0.037, -0.09]], 0.004, 5, 8), m.harness)]);
 }
