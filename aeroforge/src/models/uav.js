@@ -824,7 +824,7 @@ export function buildUAV() {
     lgh.push(pipe([[X(5.063), 1.445, 0.215 * zs], [X(4.95), 1.42, 0.2 * zs], [X(4.885), 1.36, 0.2 * zs], [X(4.882), 1.27, 0.215 * zs], [X(4.886), 1.205, 0.229 * zs]], 0.007, 5, 24));
     // driver → inboard under the roof to the keel web, aft along it with a drop to the door actuator, then down to the uplock's release
     lgh.push(pipe([[X(5.16), 1.468, 0.19 * zs], [X(5.21), 1.472, 0.11 * zs], [X(5.32), 1.468, 0.056 * zs], [X(5.7), 1.458, 0.056 * zs], [X(5.9), 1.38, 0.056 * zs], [ul[0], ul[1] + 0.02, 0.058 * zs], [ul[0], ul[1] - 0.006, 0.06 * zs]], 0.006, 5, 40));
-    lgh.push(pipe([[X(5.34), 1.468, 0.056 * zs], [X(DOOR_ACT[0]), 1.36, 0.056 * zs], [X(DOOR_ACT[0]), DOOR_ACT[1] + 0.012, 0.058 * zs]], 0.005, 5, 14));
+    lgh.push(pipe([[X(5.34), 1.468, 0.056 * zs], [X(DOOR_ACT[0]), 1.36, 0.056 * zs], [X(DOOR_ACT[0]), DOOR_ACT[1] + 0.02, 0.058 * zs], [X(DOOR_ACT[0]), DOOR_ACT[1], DOOR_ACT[2] * zs]], 0.005, 5, 16));
     lgh.push(pipe([[X(5.9), 1.38, 0.056 * zs], [X(5.97), 1.41, 0.17 * zs], [X(POCKET_ACT[0]), POCKET_ACT[1] + 0.004, (POCKET_ACT[2] - 0.004) * zs]], 0.005, 5, 14));
   }
   // nose: from the avionics bay harness through the well's aft wall to the retract driver, and under the driver to the steering controller
