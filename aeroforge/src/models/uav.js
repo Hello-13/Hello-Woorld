@@ -107,8 +107,9 @@ const sootStreak = () => decalTexture('mq9.soot', 512, 128, (ctx, w, h) => {
  * leg to a wider pocket for the wheel at its aft end; this outline is the strip of skin the folding leg actually crosses in
  * this model's retraction, with a margin. The skin is cut away inside it and the door covers it.
  */
-const MAIN_SLOT = [[4.87, 0.62, 1.36], [5.05, 0.57, 1.36], [5.2, 0.48, 1.0], [5.3, 0.41, 0.9], [5.5, 0.31, 0.9], [5.75, 0.22, 0.8], [5.9, 0.12, 0.8], [6.05, 0.1, 0.72],
-  [6.12, 0.1, 0.82], [6.17, 0.1, 1.12], [6.22, 0.1, 1.5], [6.27, 0.1, 1.58], [6.4, 0.1, 1.42], [6.5, 0.1, 1.12]];
+const MAIN_SLOT = [[4.87, 0.62, 1.36], [5.05, 0.57, 1.36], [5.2, 0.48, 1.0], [5.3, 0.41, 0.9], [5.5, 0.31, 0.9], [5.75, 0.22, 0.8], [5.865, 0.14, 0.8],
+  [5.875, 0.13, 1.55], [6.05, 0.1, 1.55], [6.5, 0.1, 1.55]];
+const POCKET_S = 5.87;          // where the slot door ends and the wheel-pocket door begins (a loft station)
 function slotAt(s) {
   let i = 0;
   while (i < MAIN_SLOT.length - 2 && s > MAIN_SLOT[i + 1][0]) i++;
@@ -171,15 +172,20 @@ export function buildUAV() {
     if (s < FIREWALL_S) return 'aft';
     return 'cowl';
   });
-  // the starboard cut's outline, station by station (the port one is its mirror): [s, lowest, highest section angle]
-  const doorOutline = (() => {
+  // the starboard cut's outline, station by station, for the slot door (ahead of POCKET_S) and the pocket door (aft of it); the
+  // port ones are mirrors: [s, lowest, highest section angle], smoothed over neighbouring stations to cover the cut's saw-tooth edge
+  const doorOutline = (aft) => {
     const pa = panels.get('cutS').attributes.position, by = new Map();
-    for (let k = 0; k < pa.count; k++) {
-      const q = 5.5 - pa.getX(k), key = q.toFixed(3), th = secAngle(q, pa.getY(k), pa.getZ(k));
-      const e = by.get(key) || [q, 9, -9]; e[1] = Math.min(e[1], th); e[2] = Math.max(e[2], th); by.set(key, e);
+    for (let k = 0; k < pa.count; k += 3) {
+      if ((5.5 - (pa.getX(k) + pa.getX(k + 1) + pa.getX(k + 2)) / 3 > POCKET_S) !== aft) continue;
+      for (let j = k; j < k + 3; j++) {
+        const q = 5.5 - pa.getX(j), key = q.toFixed(3), th = secAngle(q, pa.getY(j), pa.getZ(j));
+        const e = by.get(key) || [q, 9, -9]; e[1] = Math.min(e[1], th); e[2] = Math.max(e[2], th); by.set(key, e);
+      }
     }
-    return [...by.values()].sort((a, b) => a[0] - b[0]);
-  })();
+    const a = [...by.values()].sort((u, w) => u[0] - w[0]);
+    return a.map(([q, lo, hi], k) => [q, Math.min(lo, a[Math.max(0, k - 1)][1], a[Math.min(a.length - 1, k + 1)][1]) - 0.01, Math.max(hi, a[Math.max(0, k - 1)][2], a[Math.min(a.length - 1, k + 1)][2]) + 0.01]);
+  };
   P('SATCOM radome', {
     system: 'Skin & fairings', skin: true, material: 'Dielectric composite shell, painted', mass: 22, explode: [1.3, 2.1, -1.3],
     desc: 'The bulbous upper nose is a radome over the Ku-band satellite dish. It is transparent to the 12–18 GHz link signal, which is why the nose shape is set by a 0.7 m-class dish rather than by aerodynamics.',
@@ -809,7 +815,7 @@ export function buildUAV() {
   // gear electrics: a branch from each main power feeder down behind the wing box to its retract driver, on to the trunnion where
   // the brake line starts; and a branch from the avionics bay harness under the floor to the nose retract driver and steering controller
   const lgh = [];
-  const DOOR_ACT = [5.35, 1.25, 0.062];            // fixed end of each main-door actuator (starboard; mirrored for port)
+  const DOOR_ACT = [5.35, 1.25, 0.062], POCKET_ACT = [6.0, 1.4, 0.3];            // fixed end of each main-door actuator (starboard; mirrored for port)
   for (const zs of [1, -1]) {
     const ul = uplockAt[zs > 0 ? 0 : 1];
     // feeder → down behind the wing box, inboard of the upper longeron → retract driver
@@ -819,6 +825,7 @@ export function buildUAV() {
     // driver → inboard under the roof to the keel web, aft along it with a drop to the door actuator, then down to the uplock's release
     lgh.push(pipe([[X(5.16), 1.468, 0.19 * zs], [X(5.21), 1.472, 0.11 * zs], [X(5.32), 1.468, 0.056 * zs], [X(5.7), 1.458, 0.056 * zs], [X(5.9), 1.38, 0.056 * zs], [ul[0], ul[1] + 0.02, 0.058 * zs], [ul[0], ul[1] - 0.006, 0.06 * zs]], 0.006, 5, 40));
     lgh.push(pipe([[X(5.34), 1.468, 0.056 * zs], [X(DOOR_ACT[0]), 1.36, 0.056 * zs], [X(DOOR_ACT[0]), DOOR_ACT[1] + 0.012, 0.058 * zs]], 0.005, 5, 14));
+    lgh.push(pipe([[X(5.9), 1.38, 0.056 * zs], [X(5.97), 1.41, 0.17 * zs], [X(POCKET_ACT[0]), POCKET_ACT[1] + 0.004, (POCKET_ACT[2] - 0.004) * zs]], 0.005, 5, 14));
   }
   // nose: from the avionics bay harness through the well's aft wall to the retract driver, and under the driver to the steering controller
   lgh.push(pipe([[X(3.35), 1.45, -0.29], [X(3.24), 1.425, -0.21], [X(3.12), 1.425, -0.13], [X(3.04), 1.44, -0.127], [X(2.985), 1.45, -0.125]], 0.006, 5, 20));
@@ -827,7 +834,7 @@ export function buildUAV() {
   lgh.push(pipe([[X(2.72), 1.45, -0.095], [X(2.7), 1.452, -0.06], [X(2.688), 1.452, -0.042]], 0.005, 5, 8));
   P('Landing gear harness', {
     system: 'Electrical', material: 'Shielded harness in the gear wells (est.)', mass: 2.5, xrayWeight: 0.5, explode: [0, -0.15, 1.15],
-    desc: 'Feeds the all-electric gear: a branch from each main power feeder runs down behind the wing box to its retract driver, on down the well’s forward wall to the trunnion, where the brake line and weight-on-wheels wiring start, and aft along the keel web to the door actuator and the uplock’s electric release; the nose branch leaves the avionics bay harness and runs under the floor to the nose retract driver, the nose uplock and the steering controller. A 2014 MQ-9 could not lower its gear after a generator failure ran the batteries down (USAF investigation; routing estimated).',
+    desc: 'Feeds the all-electric gear: a branch from each main power feeder runs down behind the wing box to its retract driver, on down the well’s forward wall to the trunnion, where the brake line and weight-on-wheels wiring start, and aft along the keel web to both door actuators and the uplock’s electric release; the nose branch leaves the avionics bay harness and runs under the floor to the nose retract driver, the nose uplock and the steering controller. A 2014 MQ-9 could not lower its gear after a generator failure ran the batteries down (USAF investigation; routing estimated).',
   }, L(merge(lgh), m.harness));
 
   // gear doors: conformal skin patches over the cut-outs; the nose doors hinge on their outer edges, the main doors on their inboard edges
@@ -843,29 +850,33 @@ export function buildUAV() {
   };
   for (const side of [1, -1]) {
     const sd = SN(side);
-    // main door: shaped from the skin cut away for the slot (its outline at every loft station, smoothed over the neighbouring
-    // stations so that it covers the cut's saw-tooth edge), with a shallow blister over the wheel pocket, hinged along its
-    // inboard edge so that it hangs open below the belly
-    const rows = [];
-    const outline = doorOutline.map(([q, lo, hi], k, a) => [q, Math.min(lo, a[Math.max(0, k - 1)][1], a[Math.min(a.length - 1, k + 1)][1]) - 0.01, Math.max(hi, a[Math.max(0, k - 1)][2], a[Math.min(a.length - 1, k + 1)][2]) + 0.01]);
-    for (const [q, t0, t1] of outline) {
+    // the two doors, each shaped from the skin cut away under it; the pocket door carries a shallow blister over the wheel
+    const doorGeo = (outline, blister) => loftRings(outline.map(([q, t0, t1]) => {
       const row = [];
       for (let j = 0; j <= 14; j++) {
-        const t = t0 + ((t1 - t0) * j) / 14, bl = q > 6.1 ? 0.028 * Math.sin((Math.PI * (q - 6.1)) / 0.4) * Math.sin((Math.PI * j) / 14) : 0;
+        const t = t0 + ((t1 - t0) * j) / 14, bl = blister && q > 6.1 ? 0.028 * Math.sin((Math.PI * (q - 6.1)) / 0.4) * Math.sin((Math.PI * j) / 14) : 0;
         row.push(fusePoint(q, -Math.PI / 2 + t * side, -(0.004 + bl)));
       }
-      rows.push(row);
-    }
-    const doorG = loftRings(rows, { closed: false, uvMode: 'metric' });
-    const [first, last] = [outline[0], outline[outline.length - 1]];
-    const hinge0 = new THREE.Vector3(...fusePoint(first[0], -Math.PI / 2 + first[1] * side)), hinge1 = new THREE.Vector3(...fusePoint(last[0], -Math.PI / 2 + last[1] * side));
-    const mainDoor = hingedMesh(doorG, m.skinDouble, hinge0, hinge1);
+      return row;
+    }), { closed: false, uvMode: 'metric' });
+    // slot door: hinged along its inboard edge, it hangs open below the belly with the gear down, as the photographs show
+    const fwdO = doorOutline(false), [first, last] = [fwdO[0], fwdO[fwdO.length - 1]];
+    const mainDoor = hingedMesh(doorGeo(fwdO, false), m.skinDouble, new THREE.Vector3(...fusePoint(first[0], -Math.PI / 2 + first[1] * side)), new THREE.Vector3(...fusePoint(last[0], -Math.PI / 2 + last[1] * side)));
     mainDoor.mesh.castShadow = true;
     P(`Main gear door (${sd})`, {
-      system: 'Landing gear', skin: true, material: 'Composite door (est.)', mass: 4, explode: [0, -0.6, 0.55 * side],
-      desc: 'Photographs of USAF and GA-ASI MQ-9As show a long, narrow door over each main-gear slot, hanging open below the belly whenever the gear is down (taxiing, take-off and landing) and shut in flight, with a shallow blister at its aft end over the wheel pocket. The slot it closes runs from the trunnion at the lower corner aft and inboard along the folded leg to the pocket (hinge line, actuator and sequencing estimated).',
+      system: 'Landing gear', skin: true, material: 'Composite door (est.)', mass: 3, explode: [0, -0.6, 0.55 * side],
+      desc: 'Photographs of USAF and GA-ASI MQ-9As (USAF 230430-F-UB655-0794, an MQ-9A taking off from a Wyoming highway in 2023; GA-ASI’s N428HK in Poland, USAF 5147992) show a long, narrow door over each main-gear slot hanging open just below the belly whenever the gear is down, and shut in flight, with a shallow blister at its aft end over the wheel. This door covers the slot, which runs from the trunnion at the lower corner aft and inboard along the folded leg, and hinges on its inboard edge as the photographs suggest. Because this model’s retraction path is estimated and swings the wheel in from the side, the blistered aft end is modelled as a separate pocket door (hinge lines, actuators and sequencing estimated).',
     }, mainDoor.pivot);
     doors.push({ h: mainDoor, sign: -side, open: 1.85 });
+    // wheel-pocket door: hinged along its outer edge, just under the lower longeron, so it swings out clear of the incoming wheel
+    const aftO = doorOutline(true), thH = Math.max(...aftO.map((r) => r[2]));
+    const pocketDoor = hingedMesh(doorGeo(aftO.map(([q, t0]) => [q, t0, thH]), true), m.skinDouble, new THREE.Vector3(...fusePoint(aftO[0][0], -Math.PI / 2 + thH * side)), new THREE.Vector3(...fusePoint(aftO[aftO.length - 1][0], -Math.PI / 2 + thH * side)));
+    pocketDoor.mesh.castShadow = true;
+    P(`Main gear pocket door (${sd})`, {
+      system: 'Landing gear', skin: true, material: 'Composite door with a moulded blister (est.)', mass: 2.5, explode: [-0.2, -0.6, 0.75 * side],
+      desc: 'Closes the pocket at the aft end of the well where the main wheel lies folded; its shallow blister, seen in photographs of MQ-9As, clears the tyre. In the photographs it is the aft end of one long door; here it hinges separately on its outer edge so that it swings out of the way of the wheel’s estimated path (shape from photographs, hinge estimated).',
+    }, pocketDoor.pivot);
+    doors.push({ h: pocketDoor, sign: side, open: 1.6 });
     doors.push({ h: doorPart(`Nose gear door (${sd})`, 1.92, 3.125, -Math.PI / 2 + 0.002 * side, -Math.PI / 2 + 0.42 * side, 'outer', {
       mass: 1.5, explode: [0, -0.55, 0.35 * side], desc: 'One of a pair of nose-gear doors hinged along the outer edge of the well, linked to open with the leg.',
     }), sign: side, open: 1.45 });
@@ -879,6 +890,15 @@ export function buildUAV() {
       desc: 'An electric linear actuator from a bracket on the keel web to a lug just outboard of the door’s hinge: it lowers the door before the leg moves and pulls it shut once the leg is up (position and type estimated).',
     }, act.meshes);
     movers.push(() => act.set(anchor, lugClosed.clone().sub(p0).applyQuaternion(mainDoor.pivot.quaternion).add(p0)));
+    // pocket-door actuator: from a bracket inside the well, below the hinge, to a lug on the door's inner face
+    const pAct = makeActuator(0.014, 0.008, 0.08, m.darkMetal);
+    const pAnchor = new THREE.Vector3(X(POCKET_ACT[0]), POCKET_ACT[1], POCKET_ACT[2] * side);
+    const pLug = new THREE.Vector3(...fusePoint(POCKET_ACT[0], -Math.PI / 2 + (thH - 0.2) * side, -0.003)), pp0 = pocketDoor.pivot.position.clone();
+    P(`Main gear pocket door actuator (${sd})`, {
+      system: 'Landing gear', material: 'Small linear actuator (est.)', mass: 0.6, explode: [-0.2, -0.2, 0.6 * side],
+      desc: 'Swings the wheel-pocket door out before the leg moves and shuts it once the wheel is in (position and type estimated).',
+    }, pAct.meshes);
+    movers.push(() => pAct.set(pAnchor, pLug.clone().sub(pp0).applyQuaternion(pocketDoor.pivot.quaternion).add(pp0)));
   }
 
   // ============================================================== sensors
