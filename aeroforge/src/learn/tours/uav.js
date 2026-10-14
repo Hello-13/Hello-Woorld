@@ -61,20 +61,20 @@ export default [
   },
   {
     title: 'A long, thin wing',
-    body: 'Making lift leaves a wake of tip vortices whose drag falls as span grows. The Reaper’s wing has an aspect ratio near 17, closer to a glider’s than a fighter’s, so it reaches a lift-to-drag ratio around 20. In Pressure view the strongest suction (blue) runs along the leading edge from root to tip. Each wing has two flaps and two ailerons, each on its own servo.',
+    body: 'Making lift leaves a wake of tip vortices whose drag falls as span grows. The Reaper’s 20.1 m wing has an aspect ratio near 17 in this model (its area is not published), closer to a glider’s than a fighter’s, and the lab estimates a lift-to-drag ratio around 20. In Pressure view the strongest suction (blue) runs along the leading edge from root to tip. Each wing has two flaps and two ailerons, each on its own servo.',
     key: 'Induced drag C_Di = C_L² / (π e AR): double the aspect ratio, halve the induced drag.',
     mode: 'pressure', focus: WING, view: { dir: [0.25, 1, 0.55], fill: 1.05 },
   },
   {
     title: 'Inside the wing and body',
-    body: 'Two carbon-composite spars, ribs and the skins form a torsion box, pinned at its root to a carry-through box in the fuselage so the wings can come off for shipping. Fuel lives inside the box between the spars, in an inboard and an outboard tank divided by a sealed rib, right where the lift is. Behind the rear spar sit the hinge brackets, a servo for each of the four surfaces and their wiring. The fuselage is graphite skin on Nomex honeycomb over ring frames and four longerons; the V-tail spars pin into two frames over the engine bay.',
+    body: 'Two carbon-composite spars, ribs and the skins form a torsion box, pinned at its root to a carry-through box in the fuselage so the wings can come off for shipping. Fuel lives inside the box between the spars, in an inboard and an outboard tank divided by a sealed rib, right where the lift is. Behind the rear spar sit the hinge brackets, a servo for each of the four surfaces and their wiring. The fuselage is graphite skin on Nomex honeycomb over ring frames and four longerons; the V-tail spars pin into two frames, one over the accessory bay and one over the engine bay.',
     key: 'Fuel in the wing relieves bending: the root moment depends on lift minus the weight carried outboard.',
     mode: 'systems', explode: 0.3, focus: WING_BOX, view: { dir: [0.35, 0.8, 0.75], fill: 0.62 },
   },
   {
     title: 'A turboprop at the back',
-    body: 'A Honeywell TPE331-10GD makes up to 900 shp (671 kW) from an engine only 1.09 m long, mounted right ahead of the propeller. Air from a dorsal scoop enters behind the gearbox, is squeezed 10.55 times by two centrifugal impellers, burns in a reverse-flow annular combustor wrapped around the turbine, and drives three turbine stages on one shaft at 41,730 rpm. In this pusher the hot end faces forward, so a Y-duct turns the exhaust back out of two side stacks. The fuel control sits on top of the engine; servos in the accessory bay work its levers through cables.',
-    key: 'Power required P = D · V / η_prop. At a 7,600 m loiter the Reaper needs only about 150 kW, a third of the ≈ 450 kW the TPE331 still gives up there (671 kW at sea level).',
+    body: 'A Honeywell TPE331-10GD makes up to 900 shp (671 kW) from an engine only 1.09 m long, mounted right ahead of the propeller. Air from a dorsal scoop enters between the gearbox and the compressor, is squeezed 10.55 times by two centrifugal impellers, burns in a reverse-flow annular combustor wrapped around the turbine, and drives three turbine stages on one shaft at 41,730 rpm. In this pusher the hot end faces forward, so a Y-duct turns the exhaust back out of two side stacks. The fuel control sits on top of the engine; servos in the accessory bay work its levers through cables. A tube truss hangs the engine from Honeywell’s mount pads: one on top of the gearbox and two at the hot end.',
+    key: 'Power required P = D · V / η_prop. At a 7,600 m loiter a clean Reaper needs only about 150 kW (the lab’s estimate), well under half of the ≈ 400 kW (530 shp) Honeywell’s TPE331-10 chart gives at 25,000 ft; 671 kW at sea level. The lab’s simpler lapse model gives ≈ 450 kW.',
     mode: 'xray', focus: ENGINE, view: { dir: [0.3, 0.08, 1], fill: 1.2 },
   },
   {

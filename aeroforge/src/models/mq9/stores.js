@@ -32,9 +32,13 @@ function fins(n, offset, ...args) {
 /** Narrow band (paint ring) slightly proud of a cylinder of radius r. */
 const band = (x0, x1, r) => cylX(x0, x1, r + 0.0015, r + 0.0015, 0, 0, 28, true);
 
+export const GBU_R = 0.1365, ER_R = 0.29;
+/** Two-rail launcher: top of the strongback and of the electronics housing above the launcher's centre line (m). */
+export const LAUNCHER_TOP = 0.065, LAUNCHER_BOX_TOP = 0.07;
+
 /** GBU-12 Paveway II: MAU-169-class guidance section, Mk 82 bomb body, folded airfoil group. */
 export function gbu12() {
-  const R = 0.1365, L = 3.27, h = L / 2;
+  const R = GBU_R, L = 3.27, h = L / 2;
   const body = latheX([
     [0.001, -h], [0.085, -h], [0.098, -h + 0.06], [0.104, -1.25], [0.122, -1.16], [R, -0.98],
     [R, 0.42], [0.128, 0.6], [0.105, 0.78], [0.082, 0.92], [0.076, 0.95],
@@ -76,9 +80,9 @@ export function hellfire() {
 /** Two-rail M299-family launcher: strongback, rails and the launcher electronics housing. */
 export function launcher() {
   const parts = [
-    box(1.55, 0.13, 0.12, [0, 0, 0]),
+    box(1.55, 2 * LAUNCHER_TOP, 0.12, [0, 0, 0]),
     latheX([[0.065, 0.775], [0.06, 0.82], [0.035, 0.88], [0.001, 0.92]], 12).scale(1, 1, 0.9),
-    box(0.42, 0.1, 0.2, [0.45, 0.02, 0]),                  // launcher electronics assembly
+    box(0.42, 0.1, 0.2, [0.45, LAUNCHER_BOX_TOP - 0.05, 0]),   // launcher electronics assembly
   ];
   for (const s of [1, -1]) {
     parts.push(box(1.45, 0.04, 0.05, [-0.02, -0.075, 0.12 * s]));     // rail
@@ -87,17 +91,23 @@ export function launcher() {
   return merge(parts);
 }
 
+/** Sway braces: fore and aft of the rack centre (m), and the z of the bolts under the arms' outer ends. */
+export const SWAY = { dx: 0.22, z: 0.066 };
+
 /**
- * Aerodynamic pylon: symmetric section lofted downward from the wing, with a rack body and four sway
- * braces (`rack`), and the release hardware under it (`release`): two suspension hooks 14 in
- * (0.356 m) apart, the electrical umbilical connector and the arming solenoid.
+ * Aerodynamic pylon: symmetric section lofted downward from the wing, with a rack body and its four sway-brace arms (`rack`),
+ * and the release hardware under it (`release`): two suspension hooks 14 in (0.356 m) apart, the electrical umbilical connector
+ * and the arming solenoid. `braces(contact)` builds the four brace bolts and pads set against a store: contact(dx) gives the
+ * pad's contact point { z, y } (pylon frame, z ≥ 0) and the store's outward surface normal there { nz, ny }; with no store
+ * (contact null) the bolts are wound in and the pads hang just under the arms.
  */
 export function pylon(chord, height, t = 0.13) {
   const skin = wingPanel({ root: { le: [0, 0, 0], chord, t }, tip: { le: [-0.04, 0, height], chord: chord * 0.92, t }, stations: 2, n: 14, withChord: false });
   skin.rotateX(Math.PI / 2);             // span +z → −y, thickness → z
   const xr = -chord * 0.45;
   const rack = [box(chord * 0.55, 0.05, 0.06, [xr, -height + 0.02, 0])];
-  for (const s of [1, -1]) for (const dx of [0.22, -0.22]) rack.push(box(0.025, 0.05, 0.025, [xr + dx, -height - 0.02, 0.07 * s], [0.5 * s, 0, 0]));
+  // each arm leaves the side of the rack body and reaches out over the store's shoulder
+  for (const s of [1, -1]) for (const dx of [SWAY.dx, -SWAY.dx]) rack.push(box(0.03, 0.018, 0.058, [xr + dx, -height - 0.006, 0.056 * s]));
   const release = [];
   for (const dx of [0.178, -0.178]) {
     release.push(box(0.036, 0.04, 0.024, [xr + dx, -height - 0.01, 0]));
@@ -105,7 +115,20 @@ export function pylon(chord, height, t = 0.13) {
   }
   release.push(new THREE.CylinderGeometry(0.02, 0.022, 0.03, 12).translate(xr + 0.075, -height - 0.008, 0.032));      // umbilical connector
   release.push(cylX(xr - 0.11, xr - 0.065, 0.013, 0.013, -height - 0.004, -0.03, 10));                                   // arming solenoid
-  return { skin, rack: merge(rack), release: merge(release) };
+  const braces = (contact) => {
+    const g = [];
+    for (const s of [1, -1]) for (const dx of [SWAY.dx, -SWAY.dx]) {
+      const c = contact ? contact(dx) : { z: SWAY.z, y: -height - 0.03, nz: 0, ny: 1 };
+      const n = new THREE.Vector3(0, c.ny, c.nz * s).normalize();
+      const pad = new THREE.Vector3(xr + dx, c.y, c.z * s).addScaledVector(n, 0.003);       // pad centre, its face on the store
+      const top = new THREE.Vector3(xr + dx, -height - 0.013, SWAY.z * s);                    // under the arm
+      const d = pad.clone().sub(top), len = d.length();
+      g.push(new THREE.CylinderGeometry(0.0065, 0.0065, len, 8).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())).translate((top.x + pad.x) / 2, (top.y + pad.y) / 2, (top.z + pad.z) / 2));
+      g.push(new THREE.CylinderGeometry(0.014, 0.014, 0.006, 12).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), n)).translate(pad.x, pad.y, pad.z));
+    }
+    return merge(g);
+  };
+  return { skin, rack: merge(rack), release: merge(release), braces };
 }
 
 /**
@@ -113,7 +136,7 @@ export function pylon(chord, height, t = 0.13) {
  * 3.4 m long, holding ≈ 740 L. Built along +x with its suspension lugs on top at y = +radius.
  */
 export function erPod() {
-  const R = 0.29, L = 3.4, h = L / 2;
+  const R = ER_R, L = 3.4, h = L / 2;
   const pr = [[0.001, h]];
   for (let i = 1; i <= 8; i++) { const t = i / 8; pr.push([R * Math.sqrt(1 - (1 - t) ** 2.2), h - 0.75 * t]); }
   pr.push([R, -h + 0.9]);

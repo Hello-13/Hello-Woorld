@@ -84,7 +84,7 @@ export function buildFuel({ P, L, m }) {
   const lt = (v) => `≈ ${Math.round(v / 10) * 10} L`;
   P('Forward fuel cell', {
     system: 'Fuel', material: 'Crash-resistant bladder cell', mass: 9, explode: [0.45, -0.95, 0],
-    desc: `The first of three bladder tanks in line in the fuselage, behind the avionics bay (${lt(litres.fwd)} in this model). In a 2020 loss over Africa the crew locked out both wing tanks, whose automatic mode kept drawing on them, and selected this tank by hand to refill the header (USAF investigation).`,
+    desc: `The first of three bladder tanks in line in the fuselage, behind the avionics bay (${lt(litres.fwd)} in this model). A jet pump at its low point empties it aft into the header cell; used in turn with the aft cell it keeps the centre of gravity within limits as fuel burns (sequence estimated).`,
   }, L(fwdG, m.fuel));
   P('Header fuel cell', {
     system: 'Fuel', material: 'Crash-resistant bladder cell', mass: 8, explode: [0, -1.15, 0],
@@ -177,7 +177,7 @@ export function buildFuel({ P, L, m }) {
     desc: 'Carries pressurised fuel from the header pumps to the selector block and on to every jet pump: forward to the forward cell, aft along the keel between the gear wells to the aft cell, and out along each wing (routing estimated).',
   }, L(merge(manifold), m.copper));
   const xferF = [
-    pipe([[fwdJP[0] - 0.06, fwdJP[1], 0.04], [X(3.8), fwdJP[1] + 0.01, 0.08], [X(4.08), fwdJP[1] + 0.03, 0.1], [X(4.2), prof(4.2).bot + 0.12, 0.1]], 0.012, 6, 20),
+    pipe([[fwdJP[0] - 0.06, fwdJP[1], 0.04], [X(3.8), fwdJP[1] + 0.01, 0.08], [X(4.06), fwdJP[1] + 0.025, 0.1], [X(4.126), prof(4.126).bot + 0.11, 0.1]], 0.012, 6, 20),   // into the header cell's forward wall
     pipe([[aftJP[0] - 0.06, aftJP[1], 0.03], [X(6.6), prof(6.6).bot + 0.11, 0.03], [X(6.0), keelY + 0.02, 0.025], [X(5.0), keelY + 0.02, 0.025], [X(4.76), prof(4.74).bot + 0.14, 0.05]], 0.012, 6, 40),
   ];
   P('Fuselage transfer lines', {
@@ -208,11 +208,12 @@ export function buildFuelLines({ P, L, m }, fu, prop) {
     system: 'Fuel', material: 'Aluminium tube, stainless and fire-sleeved aft of the firewall', mass: 2.5, explode: [0, -0.45, 0.75],
     desc: 'From the header pumps along the keel between the gear wells and under the aft cell’s floor, up behind the cell to the forward electric heater, through the FSOV at the firewall, then under the engine’s hot end to its own fuel heater and up the port side to the high-pressure pump on top of the engine (routing estimated).',
   }, L(merge([
-    pipe([[X(4.62), pumpY, 0.19], [X(4.72), pumpY - 0.005, 0.12], [X(4.8), prof(4.8).bot + 0.058, 0.03], [X(5.0), keelY - 0.01, -0.025], [X(6.0), keelY - 0.01, -0.025], [X(6.47), prof(6.47).bot + 0.03, 0.0],
+    pipe([[X(4.62), pumpY, 0.19], [X(4.72), pumpY - 0.005, 0.12], [X(4.8), prof(4.8).bot + 0.058, 0.03], [X(5.0), keelY - 0.01, -0.025], [X(6.0), keelY - 0.01, -0.025], [X(6.47), prof(6.47).bot + 0.036, 0.0],
       under(6.62, 0.035), under(6.95, 0.04), under(7.25, 0.045), [X(7.36), 1.26, 0.12], [X(7.42), 1.32, 0.16], [heaterP[0] + 0.1, heaterP[1], heaterP[2]]], 0.011, 6, 80),
     pipe([[heaterP[0] - 0.1, heaterP[1], heaterP[2]], [X(8.0), 1.38, 0.22], [X(8.5), 1.41, 0.21], [fsovP[0] + 0.035, fsovP[1], fsovP[2]]], 0.011, 6, 30),
-    pipe([[fsovP[0] - 0.035, fsovP[1], fsovP[2]], [X(9.05), 1.425, 0.15], [X(9.15), 1.415, 0.0], [X(9.22), 1.43, -0.14], [hp[0] + 0.095, hp[1], hp[2]]], 0.011, 6, 30),
-    pipe([[hp[0] - 0.09, hp[1], hp[2]], [X(9.5), 1.5, -0.235], [X(9.56), 1.68, -0.25], [X(9.62), 1.82, -0.16], [X(9.68), 1.89, -0.06], [pump[0], pump[1] - 0.005, pump[2] - 0.038]], 0.009, 6, 40),
+    // over the starboard mount strut, under the engine's hot end and inboard of the port rear mount pad, into the engine's fuel heater
+    pipe([[fsovP[0] - 0.035, fsovP[1], fsovP[2]], [X(9.0), 1.44, 0.165], [X(9.06), 1.448, 0.105], [X(9.15), 1.425, 0.0], [X(9.24), 1.398, -0.12], [X(9.31), 1.392, -0.19], [X(9.345), 1.408, -0.2], [hp[0] + prop.heatHL - 0.025, hp[1] - 0.044, hp[2]]], 0.011, 6, 40),
+    pipe([[hp[0] - prop.heatHL - 0.004, hp[1], hp[2]], [X(9.5), 1.5, -0.235], [X(9.56), 1.68, -0.25], [X(9.62), 1.82, -0.16], [X(9.68), 1.89, -0.06], [pump[0], pump[1] - 0.005, pump[2] - 0.038]], 0.009, 6, 40),
   ]), m.pipe));
   // fuselage-cell vents, sump drains, quantity probes, refuel ports and the dump system
   const top = (s) => fusePoint(s, Math.PI / 2 - 0.62, 0.05);
@@ -235,7 +236,7 @@ export function buildFuelLines({ P, L, m }, fu, prop) {
   for (const zs of [1, -1]) for (const z of [1.6, 3.4, 6.4]) FQ.push(tubeBetween(W(z, 0.42, 1, 0.025, zs), W(z, 0.42, -1, 0.025, zs), 0.01, 6));
   P('Fuel quantity probes', {
     system: 'Fuel', material: 'Capacitance probes', mass: 1.2, count: 9, xrayWeight: 0.5, explode: [0, 1.1, 0],
-    desc: 'Capacitance probes in every tank (two in each long inboard tank): fuel and air have different dielectric constants, so each probe’s capacitance tells how deep the fuel is around it. The readings give fuel remaining and, tank by tank, the centre of gravity (counts estimated).',
+    desc: 'Capacitance probes in every tank (two in each long inboard tank): fuel and air have different dielectric constants, so each probe’s capacitance tells how deep the fuel is around it. The readings give fuel remaining and, tank by tank, the centre of gravity (counts estimated). In a 2020 loss the gauges showed fuel “well short” of what was expected before the sensor operator turned the camera on the aircraft and saw it leaking; the investigation named the design of the fuel detection system as a factor (USAF).',
   }, L(merge(FQ), m.alu));
   const caps = [];
   for (const zs of [1, -1]) for (const z of [3.2, 6.6]) caps.push(new THREE.CylinderGeometry(0.045, 0.045, 0.006, 16).translate(...W(z, 0.42, 1, -0.002, zs)));
@@ -245,10 +246,13 @@ export function buildFuelLines({ P, L, m }, fu, prop) {
     desc: 'Flush filler caps over each wing tank and the forward and aft fuselage cells, for gravity refuelling where no pressure-refuelling equipment is available; the header fills from the others (positions estimated).',
   }, L(merge(caps), m.darkMetal));
   const dv = [X(4.66), fu.pumpY + 0.055, -0.06];            // above the port motive-manifold pipe
-  const mast = fusePoint(6.42, -Math.PI / 2 - 0.12, -0.002);
+  // the line drops under the selector block, lies on the keel skin in the channel between the main-gear wells, under the feed line,
+  // and ends in a mast on the centreline just aft of the wells, behind the doors' aft edges (s 6.5) and clear of their swing
+  const lo = (s, z, d = 0.0115) => [X(s), prof(s).bot + d, z];
+  const mastTop = lo(6.556, -0.004, 0.012), mastTip = [X(6.636), prof(6.636).bot - 0.09, -0.004];
   P('Fuel dump valve & outlet', {
     system: 'Fuel', material: 'Motorised dump valve, 20 mm line and a small outlet mast', mass: 1.2, explode: [0, -1.55, -0.45],
-    desc: 'A valve on the header pumps’ outlet sends fuel overboard through a line along the keel to an outlet mast under the fuselage. After an engine warning in 2018 a crew dumped fuel before an emergency landing, cutting the weight and the energy the brakes would have to absorb (USAF investigation; outlet position not public, estimated here).',
-  }, [L(merge([lru(0.06, 0.05, 0.05, dv), pipe([dv, [X(5.0), fu.keelY - 0.03, -0.012], [X(6.0), fu.keelY - 0.03, -0.012], [X(6.38), mast[1] + 0.03, mast[2]]], 0.01, 6, 30), tubeBetween([X(6.38), mast[1] + 0.03, mast[2]], [X(6.46), mast[1] - 0.09, mast[2]], 0.013, 8)]), m.darkMetal),
+    desc: 'A valve on the header pumps’ outlet sends fuel overboard through a line along the keel, between the main-gear wells, to a small outlet mast on the centreline just aft of them, where the fuel falls clear of the gear, the doors and the engine. After an engine warning in 2018 a crew dumped fuel before an emergency landing, cutting the weight and the energy the brakes would have to absorb (USAF investigation; the outlet’s real position is not public, so it is estimated here).',
+  }, [L(merge([lru(0.06, 0.05, 0.05, dv), pipe([dv, [X(4.72), 1.095, -0.05], lo(4.8, -0.028, 0.047), lo(4.95, -0.014, 0.022), lo(5.4, -0.012, 0.013), lo(6.0, -0.012), lo(6.45, -0.011), lo(6.53, -0.006), mastTop], 0.01, 6, 60), tubeBetween(mastTop, mastTip, 0.013, 8)]), m.darkMetal),
     L(pipe([[X(4.66), dv[1] + 0.022, dv[2]], [X(4.71), dv[1] + 0.035, -0.08], [X(4.748), dv[1] + 0.037, -0.09]], 0.004, 5, 8), m.harness)]);
 }

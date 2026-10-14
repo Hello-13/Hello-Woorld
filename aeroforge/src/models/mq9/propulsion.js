@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { loftRings, orientTubeOutward } from '../../engine/geometry.js';
 import { X, prof, fusePoint, merge, box, lru, cylX, tubeBetween, pipe, bulkhead } from './shape.js';
 import {
-  ENGINE_Y, SHAFT_Y, PROP_X, PROP_R, STATIONS, GEARBOX, PADS, FRONT_MOUNT_S, REAR_MOUNT_S, REAR_MOUNT_R, STACK_S,
+  ENGINE_Y, SHAFT_Y, PROP_X, PROP_R, STATIONS, GEARBOX, PADS, FRONT_MOUNT_S, REAR_MOUNT_S, REAR_MOUNT_R, REAR_MOUNT_Z, STACK_S,
   combustorGeo, turbineGeo, manifoldGeo, startManifoldGeo, ignitersGeo, exhaustGeo, stacksGeo, compressorGeo, impellersGeo,
   mainShaftGeo, screenGeo, plenumGeo, gearboxGeo, padsGeo, bladesGeo, hubGeo, pitchGeo, spinnerGeo,
 } from './powerplant.js';
@@ -41,11 +41,16 @@ export function duct(points, w, h, n = 16) {
 export function buildPropulsion({ P, L, m, role }) {
   const XT0 = XS(STATIONS.turbine0);
   const cb = combustorGeo();
+  // the lower pair of rear mount pads (Honeywell: 7.8 in below and 7.2 in either side of the centreline, so 0.27 m out at about
+  // 47° from the bottom): cast bosses on the hot-end case that the truss's isolators bolt to
+  const PAD_R = Math.hypot(REAR_MOUNT_R, REAR_MOUNT_Z);
+  const padAt = (zs, r) => [XS(REAR_MOUNT_S), ENGINE_Y - (REAR_MOUNT_R / PAD_R) * r, (REAR_MOUNT_Z / PAD_R) * r * zs];
+  const bosses = [1, -1].map((zs) => tubeBetween(padAt(zs, 0.21), padAt(zs, 0.249), 0.02, 12));
   role(P('TPE331 turbine case', {
     system: 'Propulsion', material: 'Steel case, nickel-alloy hot section', mass: 22, explode: [0.55, 1.25, 0],
     desc: 'The hot section of the Honeywell TPE331-10. USAF lists the MQ-9A’s engine as the TPE331-10GD at 900 shp; NASA gives Ikhana’s as a -10T and the NTSB the 2006 aircraft’s as a -10Y. Honeywell rates the basic engine at 940 shp (1,000 shp thermodynamic). The whole engine, gearbox included, is only 1.09 m long and 175 kg (385 lb) dry, because the reverse-flow combustor folds the gas path back around the turbine.',
     callout: true, anchor: [X(9.3), ENGINE_Y - 0.197, 0.114],   // on the case, 60° below the starboard side
-  }, L(cb.casing, m.hot)), 'turbine');
+  }, L(merge([cb.casing, ...bosses]), m.hot)), 'turbine');
   role(P('Annular combustor liner', {
     system: 'Propulsion', material: 'Nickel-alloy liner with cooling holes', mass: 6, explode: [0.55, 0.55, 0.55],
     desc: 'Compressed air runs toward the hot end outside the liner, turns 180° into it, burns with the fuel and turns again into the first turbine nozzle. Folding the flow this way is what keeps the TPE331 short.',
@@ -127,13 +132,15 @@ export function buildPropulsion({ P, L, m, role }) {
     desc: 'Driven from its own pad at 4,187 rpm, it makes a voltage proportional to engine speed for the rpm indication and the engine control (Honeywell pad table).',
   }, L(merge([cylX(tachX0, tachX0 + 0.11, 0.032, 0.032, PADS.tach.y, 0.03, 14), cylX(tachX0, tachX0 + 0.012, 0.04, 0.04, PADS.tach.y, 0.03, 14)]), m.darkMetal));
   const starterX0 = XS(GEARBOX.s0 - 0.075);
+  // its terminal box is on the outboard side, where the harness comes down the starboard wall (on top it would sit in the compressor housing)
+  const sgBox = [starterX0 + 0.12, PADS.starter.y, PADS.starter.z + 0.072 + 0.013];
   role(P('Starter-generator', {
-    system: 'Electrical', material: 'Air-cooled brush-type DC starter-generator', mass: 18, explode: [-0.45, -0.75, 0.75],
-    desc: 'An air-cooled, brush-type machine on the starter-generator pad: it spins the engine for starting, then becomes the main generator. Block 5 aircraft have a higher-capacity unit (45 kVA main power). In a 2015 loss its air temperature climbed and its output fell from 156 A to 0 (USAF investigation); the NTSB found debris in the cooling duct of the 2006 aircraft’s unit.',
-  }, L(merge([cylX(starterX0, starterX0 + 0.25, 0.072, 0.072, PADS.starter.y, PADS.starter.z, 20), cylX(starterX0 + 0.25, starterX0 + 0.27, 0.05, 0.05, PADS.starter.y, PADS.starter.z, 14), box(0.06, 0.03, 0.05, [starterX0 + 0.12, PADS.starter.y + 0.08, PADS.starter.z])]), m.darkMetal)), 'generator');
+    system: 'Electrical', material: 'Air-cooled starter-generator (GA-ASI: “high-capacity starter generator”; machine type not public)', mass: 18, explode: [-0.45, -0.75, 0.75],
+    desc: 'An air-cooled machine on the starter-generator pad (GA-ASI calls it a “high-capacity starter generator”): it spins the engine for starting, then becomes the main generator. Block 5 aircraft have a higher-capacity unit (45 kVA main power). In a 2015 loss its air temperature climbed and its output fell from 156 A to 0 (USAF investigation); the NTSB found debris in the cooling duct of the 2006 aircraft’s unit.',
+  }, L(merge([cylX(starterX0, starterX0 + 0.25, 0.072, 0.072, PADS.starter.y, PADS.starter.z, 20), cylX(starterX0 + 0.25, starterX0 + 0.27, 0.05, 0.05, PADS.starter.y, PADS.starter.z, 14), box(0.06, 0.05, 0.026, sgBox)]), m.darkMetal)), 'generator');
   role(P('Backup generator', {
-    system: 'Electrical', material: 'Brushless permanent-magnet alternator', mass: 9, explode: [-0.45, -0.75, -0.75],
-    desc: 'A second, independent source on the aircraft-accessory pad. Block 1 aircraft first had none: after a generator failure only the battery remained, so the Electrical Safety Improvement Program added a direct-drive brushless permanent-magnet alternator for the flight-critical avionics. The GA-ASI Block 5 sheet gives 4 kW of backup power.',
+    system: 'Electrical', material: 'Direct-drive brushless alternator (USAF)', mass: 9, explode: [-0.45, -0.75, -0.75],
+    desc: 'A second, independent source on the aircraft-accessory pad. Block 1 aircraft first had none: after a generator failure only the battery remained, so the Electrical Safety Improvement Program added a “direct drive brushless alternator” (USAF) for the flight-critical avionics. The GA-ASI Block 5 sheet gives 4 kW of backup power.',
   }, L(merge([cylX(starterX0, starterX0 + 0.2, 0.06, 0.06, PADS.accessory.y, PADS.accessory.z, 18), box(0.06, 0.04, 0.03, [XS(9.68), PADS.accessory.y + 0.01, PADS.accessory.z - 0.07])]), m.darkMetal)), 'generator');
   const fanEnd = [starterX0 + 0.27, PADS.starter.y, PADS.starter.z];
   const coolIn = fusePoint(9.49, -0.7, 0.03), scoopAt = fusePoint(9.49, -0.7, 0.006);
@@ -188,18 +195,18 @@ export function buildPropulsion({ P, L, m, role }) {
     system: 'Propulsion', material: 'Small accumulator and valve on the main manifold', mass: 0.4, explode: [0.6, -0.8, 0.2],
     desc: 'At shutdown it blows the fuel left in the manifolds and nozzles into the combustor so it cannot cook into carbon in the hot nozzle tips (Honeywell basic engine).',
   }, L(merge([cylX(xMan - 0.04, xMan + 0.04, 0.024, 0.024, ENGINE_Y - 0.27, 0.07, 12), tubeBetween([xMan, ENGINE_Y - 0.25, 0.07], [xMan, ENGINE_Y - 0.236, 0.02], 0.005, 5)]), m.alu));
-  const heatP = [XS(9.36), ENGINE_Y - 0.22, -0.2];
+  const heatP = [XS(9.39), ENGINE_Y - 0.22, -0.2], HEAT_HL = 0.06;        // just aft of the port rear mount pad
   P('Engine fuel heater', {
     system: 'Propulsion', material: 'Oil-to-fuel heat exchanger (fuel anti-ice)', mass: 1.5, explode: [0.3, -0.5, -0.8],
     desc: 'The TPE331-10’s own fuel anti-ice heating: warm engine oil heats the fuel before the high-pressure pump so that water in it cannot freeze into filter-blocking ice crystals at altitude (Honeywell basic engine; position estimated).',
-  }, L(merge([cylX(heatP[0] - 0.09, heatP[0] + 0.09, 0.038, 0.038, heatP[1], heatP[2], 14), cylX(heatP[0] + 0.03, heatP[0] + 0.05, 0.044, 0.044, heatP[1], heatP[2], 14)]), m.alu));
+  }, L(merge([cylX(heatP[0] - HEAT_HL, heatP[0] + HEAT_HL, 0.038, 0.038, heatP[1], heatP[2], 14), cylX(heatP[0] + 0.02, heatP[0] + 0.04, 0.044, 0.044, heatP[1], heatP[2], 14)]), m.alu));
 
   // ---- lubrication
-  const tankP = [XS(9.32), ENGINE_Y - 0.21, 0.2];
+  const tankP = [XS(9.3925), ENGINE_Y - 0.21, 0.2], TANK_HL = 0.0525, TANK_R = 0.052;   // just aft of the starboard rear mount pad
   role(P('Oil tank', {
     system: 'Propulsion', material: 'Aluminium tank with filler and sight gauge', mass: 4, explode: [0, -0.55, 0.95],
-    desc: 'Holds the engine and gearbox oil (a few litres; size and position estimated). The same oil cools the bearings, lubricates the gears, heats the fuel and works the propeller’s pitch-change piston.',
-  }, L(merge([cylX(tankP[0] - 0.11, tankP[0] + 0.11, 0.043, 0.043, tankP[1], tankP[2], 16), cylX(tankP[0] - 0.06, tankP[0] - 0.03, 0.016, 0.016, tankP[1] + 0.05, tankP[2], 8)]), m.alu)), 'oil');
+    desc: 'Holds the engine and gearbox oil (capacity, size and position estimated); it sits just aft of the starboard rear mount pad. The same oil cools the bearings, lubricates the gears, heats the fuel and works the propeller’s pitch-change piston.',
+  }, L(merge([cylX(tankP[0] - TANK_HL, tankP[0] + TANK_HL, TANK_R, TANK_R, tankP[1], tankP[2], 16), cylX(tankP[0] - 0.045, tankP[0] - 0.015, 0.016, 0.016, tankP[1] + TANK_R - 0.002, tankP[2], 8)]), m.alu)), 'oil');
   const filtX = XS(GEARBOX.s0 - 0.07);
   role(P('Oil filter & chip detector', {
     system: 'Propulsion', material: 'Filter canister with a magnetic chip detector plug', mass: 0.8, explode: [0.35, -1.0, -0.3],
@@ -225,7 +232,7 @@ export function buildPropulsion({ P, L, m, role }) {
   const oilLines = [
     pipe([[filtX + 0.07, PADS.tach.y - 0.025, -0.07], [XS(9.66), 1.385, -0.075], [XS(9.5), 1.37, -0.085], [XS(9.2), 1.365, -0.09], [XS(FIREWALL_S), 1.37, -0.1], [XS(8.4), 1.385, -0.14], [XS(7.95), 1.35, -0.15], [XS(7.76), tcvP[1], -0.14], [tcvP[0], tcvP[1], tcvP[2] - 0.026]], 0.008, 6, 60),
     pipe([[XS(7.91), 1.34, -0.05], [XS(8.0), 1.37, -0.06], [XS(8.4), 1.378, -0.09], [XS(FIREWALL_S), 1.362, -0.055], [XS(9.2), 1.358, -0.045], [XS(9.5), 1.362, -0.04], [XS(9.76), 1.372, -0.03], [XS(9.84), 1.405, -0.02]], 0.008, 6, 60),
-    pipe([[tankP[0] - 0.1, tankP[1] - 0.025, tankP[2] - 0.01], [XS(9.5), 1.40, 0.13], [XS(9.6), 1.372, 0.06], [XS(9.76), 1.366, 0.03], [XS(9.835), 1.385, 0.025], [XS(9.85), 1.405, 0.025]], 0.007, 6, 24),
+    pipe([[tankP[0] - TANK_HL - 0.004, tankP[1] - 0.022, tankP[2] - 0.01], [XS(9.49), 1.40, 0.13], [XS(9.6), 1.372, 0.06], [XS(9.76), 1.366, 0.03], [XS(9.835), 1.385, 0.025], [XS(9.85), 1.405, 0.025]], 0.007, 6, 24),
   ];
   role(P('Engine oil lines', {
     system: 'Propulsion', material: 'Stainless tube and fire-sleeved hose', mass: 2, count: 3, explode: [0, -0.3, -0.75],
@@ -244,7 +251,7 @@ export function buildPropulsion({ P, L, m, role }) {
     const a = ((k + 0.5) / 8) * Math.PI * 2;
     egt.push(tubeBetween([egtX, ENGINE_Y + Math.cos(a) * 0.14, Math.sin(a) * 0.14], [egtX, ENGINE_Y + Math.cos(a) * 0.205, Math.sin(a) * 0.205], 0.005, 5));
   }
-  egt.push(pipe([[egtX, ENGINE_Y + 0.14, 0.14], [XS(9.1), 1.82, 0.24], [XS(FIREWALL_S), 1.78, 0.25], [XS(8.82), 1.76, 0.23]], 0.005, 5, 20));
+  egt.push(pipe([[egtX, ENGINE_Y + 0.14, 0.14], [XS(9.1), 1.82, 0.24], [XS(FIREWALL_S), 1.78, 0.25], [XS(8.8), 1.765, 0.236], [XS(8.75), 1.757, 0.23]], 0.005, 5, 24));   // joins the engine-bay harness at s 8.75
   role(P('EGT thermocouple harness', {
     system: 'Propulsion', material: 'Chromel-alumel thermocouples on a ring harness', mass: 1, count: 8, xrayWeight: 0.5, explode: [0.95, 0.55, 0.5],
     desc: 'Probes in the gas path average the exhaust gas temperature, the TPE331’s key limit. The single red-line (SRL) limiting in the engine control keeps it below its maximum (probe count and position estimated).',
@@ -287,17 +294,36 @@ export function buildPropulsion({ P, L, m, role }) {
     system: 'Structure', material: 'Titanium sheet (est.)', mass: 9, explode: [0.15, 0.95, 0],
     desc: 'Fireproof bulkhead between the engine bay and the accessory bay ahead of it, with fire-sealed pass-throughs for the fuel, oil, control cables and harnesses. Titanium keeps its strength at flame temperatures where aluminium would melt.',
   }, L(bulkhead(FIREWALL_S), m.titanium));
+  // Welded tube truss on Honeywell's three mount points (tube layout estimated). Rear: the two lower hot-end pads (the upper pair
+  // sits where the exhaust pipes run in this installation), each braced by a V of tubes to the firewall. Front: the pad on top of
+  // the gearbox, which only a yoke from forward can reach (the gearbox top is 2 cm under the cowling): two long tubes from the
+  // V-tail rear spar frame run aft over the engine between the inlet duct and the exhaust pipes to a cross tube just ahead of
+  // the gearbox, and two short tubes carry the load to a plate on an isolator on the pad.
   const mt = [];
-  const lugTop = [XS(REAR_MOUNT_S), ENGINE_Y + REAR_MOUNT_R + 0.02, 0], lugBot = [XS(REAR_MOUNT_S), ENGINE_Y - REAR_MOUNT_R - 0.02, 0];
-  for (const lug of [lugTop, lugBot]) mt.push(box(0.05, 0.035, 0.06, lug), cylX(lug[0] - 0.03, lug[0] + 0.03, 0.01, 0.01, lug[1], 0, 8));
-  for (const th of [0.75, Math.PI - 0.75]) mt.push(tubeBetween(fusePoint(FIREWALL_S + 0.02, th, 0.05), lugTop, 0.012, 8));
-  for (const th of [-0.75, -Math.PI + 0.75]) mt.push(tubeBetween(fusePoint(FIREWALL_S + 0.02, th, 0.05), lugBot, 0.012, 8));
-  const fm = [XS(FRONT_MOUNT_S), ENGINE_Y + GEARBOX.top + 0.002, 0];
-  for (const th of [0.42, Math.PI - 0.42]) mt.push(tubeBetween(fusePoint(9.31, th, 0.05), fm, 0.0125, 8), tubeBetween(fusePoint(10.3, th + (th < 1.6 ? -0.15 : 0.15), 0.04), fm, 0.011, 8));
-  for (const th of [0.42, Math.PI - 0.42]) mt.push(tubeBetween(fusePoint(9.31, th, 0.05), lugTop, 0.01, 8));
+  const FW = FIREWALL_S + 0.022;                                   // aft face of the firewall root fittings
+  for (const zs of [1, -1]) {
+    const pad = padAt(zs, PAD_R);
+    mt.push(cylX(pad[0] - 0.035, pad[0] + 0.035, 0.021, 0.021, pad[1], pad[2], 14));            // rear mount isolator on its pad
+    for (const [th, inset] of [[-0.25, 0.06], [-1.15, 0.055]]) {         // one up the side, one down toward the keel
+      const t = zs > 0 ? th : Math.PI - th;
+      const root = fusePoint(FW, t, inset);
+      mt.push(box(0.02, 0.045, 0.045, [XS(FIREWALL_S + 0.016), root[1], root[2]]), tubeBetween(root, pad, 0.012, 8));
+    }
+  }
+  const KNEE_S = 9.8, KNEE = (zs) => [XS(KNEE_S), 2.048, 0.142 * zs];
+  const fmY = ENGINE_Y + GEARBOX.top + 0.002;                      // top face of the gearbox's front mount pad
+  mt.push(new THREE.CylinderGeometry(0.026, 0.026, 0.004, 16).translate(XS(FRONT_MOUNT_S), fmY + 0.002, 0));   // isolator
+  mt.push(box(0.05, 0.004, 0.124, [XS(FRONT_MOUNT_S), fmY + 0.006, 0]));                                            // yoke plate
+  mt.push(tubeBetween(KNEE(1), KNEE(-1), 0.0115, 8));
+  for (const zs of [1, -1]) {
+    const t = zs > 0 ? 1.16 : Math.PI - 1.16;
+    const root = fusePoint(9.335, t, 0.042);
+    mt.push(box(0.03, 0.03, 0.03, [XS(9.335), root[1], root[2]]), tubeBetween(root, KNEE(zs), 0.0115, 8));
+    mt.push(tubeBetween(KNEE(zs), [XS(FRONT_MOUNT_S) + 0.004, fmY + 0.004, 0.056 * zs], 0.009, 8));
+  }
   P('Engine mount truss', {
     system: 'Structure', material: 'Welded steel tube with elastomeric isolators (est.)', mass: 13, explode: [0, 1.15, 0],
-    desc: 'The TPE331 hangs from Honeywell’s three mount points: two rear mounts, top and bottom at the hot end 0.20 m from the centreline, tied by tubes to the firewall frame, and a front mount on top of the gearbox, 0.60 m further aft, braced to the V-tail spar frames. Rubber isolators keep engine vibration out of the airframe and the sensors (tube layout estimated).',
+    desc: 'The TPE331 hangs from Honeywell’s mount points: a front mount on top of the gearbox and, at the hot end, pads 7.8 in (0.198 m) above and below the centreline and 7.2 in (0.183 m) to either side of it, with rubber isolators to keep engine vibration out of the airframe and the sensors. This truss uses the lower pair, each braced by two tubes to the firewall, clear of the exhaust pipes on the upper sides; the front mount is picked up by a yoke whose long tubes run forward over the engine, between the inlet duct and the exhaust pipes, to the rear V-tail spar frame (which pads the MQ-9 uses and the tube layout are estimated).',
   }, L(merge(mt), m.darkMetal));
 
   // ---- propeller (rotating groups)
@@ -329,5 +355,5 @@ export function buildPropulsion({ P, L, m, role }) {
     desc: 'A large polished spinner, about 0.6 m across, fairs the hub and the pitch-change dome into the end of the cowling so that the flow into the propeller roots stays smooth.',
   }, L(spinnerGeo().translate(PROP_X, SHAFT_Y, 0), m.spinner));
 
-  return { propSpin, hubSpin, domeSpin, fanEnd, fcuP, pumpP, pumpH: PUMP_H, heatP, govP };
+  return { propSpin, hubSpin, domeSpin, fanEnd, fcuP, pumpP, pumpH: PUMP_H, heatP, heatHL: HEAT_HL, govP, sgBox };
 }

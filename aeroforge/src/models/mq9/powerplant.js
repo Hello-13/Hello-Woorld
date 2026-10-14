@@ -1,5 +1,5 @@
 // Honeywell TPE331-10 installation for the MQ-9A, in aircraft coordinates (see shape.js).
-// The TPE331 is a single-shaft turboprop: air enters behind the offset reduction gearbox, goes
+// The TPE331 is a single-shaft turboprop: air enters between the offset reduction gearbox and the compressor, goes
 // through a two-stage centrifugal compressor, turns into a reverse-flow annular combustor wrapped
 // around a three-stage axial turbine and leaves at the end opposite the gearbox. In the pusher
 // MQ-9 the gearbox faces aft and drives the propeller directly (USAF engine-change photographs
@@ -10,8 +10,10 @@
 // length 1.088 m (42.82 in) from the exhaust flange to the propeller flange; the gearbox is the
 // largest section, 0.533 m wide × 0.676 m tall (20.98 × 26.62 in), with the output shaft 0.090 m
 // (3.53 in) above the engine centreline and its top 0.300 m (11.8 in) above the output shaft; rear
-// mounts top and bottom at the hot end 0.198 m (7.8 in) from the centreline; front mount on top of
-// the gearbox 0.603 m (23.75 in) aft of them; exhaust outlet Ø 0.277 m (10.9 in); 175 kg (385 lb).
+// mount pads at the hot end, 0.198 m (7.8 in) above and below the centreline (side view) and
+// 0.183 m (7.2 in) to either side of it (front view), so 0.27 m out at about 47° from the vertical;
+// front mount on top of the gearbox 0.603 m (23.75 in) from them; exhaust outlet Ø 0.277 m
+// (10.9 in); 175 kg (385 lb).
 // Module lengths inside that envelope and every internal size are estimates.
 //
 // Fuselage stations (s, metres aft of the nose): exhaust flange 9.17, combustor and turbine
@@ -30,7 +32,7 @@ export const PROP_R = 1.397;           // McCauley 110GFA blades: 110 in (2.79 m
 export const STATIONS = { exhaust: 9.17, turbine0: 9.2, turbine1: 9.5, comp1: 9.79, inlet1: 9.87, gear1: 10.255 };
 export const ENGINE_LENGTH = STATIONS.gear1 - STATIONS.exhaust;
 export const GEARBOX = { s0: 9.87, s1: 10.215, top: 0.389, bot: 0.287, hw: 0.2665 };   // offsets from the engine centreline
-export const FRONT_MOUNT_S = 9.89, REAR_MOUNT_S = 9.287, REAR_MOUNT_R = 0.198;
+export const FRONT_MOUNT_S = 9.89, REAR_MOUNT_S = 9.287, REAR_MOUNT_R = 0.198, REAR_MOUNT_Z = 0.183;   // rear pads: 7.8 in up or down, 7.2 in to the side
 
 const XS = (s) => X(s);
 const ring = (x, r, tube, seg = 32, y = ENGINE_Y) => new THREE.TorusGeometry(r, tube, 6, seg).rotateY(Math.PI / 2).translate(x, y, 0);
@@ -68,6 +70,8 @@ export function turbineGeo() {
       blades.push(new THREE.BoxGeometry(0.022, rt - r0, 0.003).rotateX(0.0).rotateY(0.55).translate(xr, (r0 + rt) / 2, 0).rotateX(a));
     }
     nozzles.push(cylX(xn - 0.008, xn + 0.008, rt + 0.012, rt + 0.012, ENGINE_Y, 0, 30, true), cylX(xn - 0.008, xn + 0.008, r0 - 0.004, r0 - 0.004, ENGINE_Y, 0, 24, true));
+    // mounting flange from the outer shroud to the liner's inner wall (r 0.155), which carries the ring
+    nozzles.push(latheX([[rt + 0.011, xn - 0.004], [0.1548, xn - 0.004], [0.1548, xn + 0.004], [rt + 0.011, xn + 0.004], [rt + 0.011, xn - 0.004]], 30).translate(0, ENGINE_Y, 0));
     for (let j = 0; j < 25; j++) {
       const a = ((j + 0.5) / 25) * Math.PI * 2;
       vanes.push(new THREE.BoxGeometry(0.026, rt - r0 + 0.012, 0.004).rotateY(-0.7).translate(xn, (r0 + rt) / 2, 0).rotateX(a));
@@ -89,11 +93,14 @@ export function manifoldGeo(n = 10) {
   return merge(out);
 }
 
-/** Starting fuel manifold: a lower arc with a few small nozzles that light first, ahead of the main manifolds. */
+/**
+ * Starting fuel manifold: a short arc under the case with three small nozzles that light first. It spans ±36° about the
+ * bottom, so it stays inboard of the lower rear mount pads (47° out) beside it.
+ */
 export function startManifoldGeo() {
   const x = XS(STATIONS.turbine0) - 0.075;
-  const out = [new THREE.TorusGeometry(0.238, 0.005, 5, 20, Math.PI * 0.75).rotateZ(-Math.PI * 0.875).rotateY(Math.PI / 2).translate(x, ENGINE_Y, 0)];
-  for (const a of [Math.PI * 0.72, Math.PI, Math.PI * 1.28]) out.push(cylX(x - 0.02, x + 0.006, 0.007, 0.007, ENGINE_Y + Math.cos(a) * 0.238, Math.sin(a) * 0.238, 6));
+  const out = [new THREE.TorusGeometry(0.238, 0.005, 5, 12, Math.PI * 0.4).rotateZ(-Math.PI * 0.7).rotateY(Math.PI / 2).translate(x, ENGINE_Y, 0)];
+  for (const a of [Math.PI * 0.86, Math.PI, Math.PI * 1.14]) out.push(cylX(x - 0.02, x + 0.006, 0.007, 0.007, ENGINE_Y + Math.cos(a) * 0.238, Math.sin(a) * 0.238, 6));
   out.push(pipe([[x, ENGINE_Y - 0.238, 0], [x - 0.08, ENGINE_Y - 0.25, 0.04], [XS(9.6), ENGINE_Y - 0.25, 0.08]], 0.005, 5, 12));
   return merge(out);
 }
@@ -163,7 +170,7 @@ export function compressorGeo() {
 export function impellersGeo() {
   const xa = XS(STATIONS.comp1), xf = XS(STATIONS.turbine1);
   const L = xf - xa;
-  const imp = (x0, r) => latheX([[0.04, x0], [0.055, x0 + 0.015], [0.09, x0 + 0.04], [r, x0 + 0.06], [r, x0 + 0.068], [0.04, x0 + 0.075]], 28);
+  const imp = (x0, r) => latheX([[0.027, x0], [0.055, x0 + 0.015], [0.09, x0 + 0.04], [r, x0 + 0.06], [r, x0 + 0.068], [0.027, x0 + 0.075]], 28);   // hub bore on the 0.026 m shaft
   const vanes = [];
   for (const [x0, r] of [[xa + L * 0.05, 0.15], [xa + L * 0.52, 0.16]]) {
     for (let k = 0; k < 16; k++) {
@@ -227,7 +234,7 @@ function housingRing(x, k, n = 40) {
 export function gearboxGeo() {
   const rings = [[GEARBOX.s0, 0.95], [GEARBOX.s0 + 0.012, 1.0], [10.02, 1.0], [10.14, 0.965], [GEARBOX.s1 - 0.012, 0.9], [GEARBOX.s1, 0.86]].map(([s, k]) => housingRing(XS(s), k));
   const housing = orientOutward(loftRings(rings, { capStart: true, capEnd: true, uvMode: 'metric' }));
-  const mount = [box(0.06, 0.012, 0.1, [XS(FRONT_MOUNT_S), ENGINE_Y + GEARBOX.top - 0.004, 0]), cylX(XS(FRONT_MOUNT_S) - 0.025, XS(FRONT_MOUNT_S) + 0.025, 0.009, 0.009, ENGINE_Y + GEARBOX.top + 0.004, 0, 10)];
+  const mount = [box(0.06, 0.012, 0.1, [XS(FRONT_MOUNT_S), ENGINE_Y + GEARBOX.top - 0.004, 0])];      // front mount pad (Honeywell drawing)
   // accessory case: a deeper lower section on the engine side of the housing, carrying the drive pads; its top face, 0.17 m
   // below the engine centreline, is the inlet plenum's floor, so the two meet at a surface
   const accessory = [lru(0.07, 0.115, 0.36, [XS(GEARBOX.s0 - 0.03), ENGINE_Y - 0.2275, 0], 0.03)];
