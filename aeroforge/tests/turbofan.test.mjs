@@ -239,7 +239,13 @@ test('accessory gearbox: one meshing spur train, pad gears sized by the publishe
   const by = (name) => train.find((g) => g.name === name);
   const idg = by('IDG'), edp = by('hydraulic pump');
   close(edp.r / idg.r, idg.ratio / edp.ratio, 0.05, 'hydraulic-pump / generator gear size');
-  assert.ok(by('VSCF backup generator').r < idg.r, 'the fastest pad (VSCF, 2.4126 × N2) has the smallest gear');
+  // the fastest pad (VSCF, 2.4126 × N2) is stepped up again: its train gear's layshaft carries a
+  // larger gear that meshes with a small pinion on the pad shaft
+  const lay = by('VSCF step-up gear'), st = lay.stepUp;
+  assert.ok(lay.r < idg.r && st.pinion < lay.r, 'the step-up layshaft gear and the VSCF pinion are the smallest');
+  close(AGB.R * (lay.phi - st.phi), st.r + st.pinion, 0.002, 'step-up pair meshes');
+  close((idg.ratio * idg.r / lay.r) * (st.r / st.pinion), st.ratio, 0.01, 'VSCF pinion speed / N2');
+  assert.ok(AGB.R + st.r + 0.0035 <= AGB.interior[1] + 0.008, 'step-up gear fits the housing');
   assert.equal(train.filter((g) => g.kind !== 'idler').length, AGB_PADS.length);
 });
 

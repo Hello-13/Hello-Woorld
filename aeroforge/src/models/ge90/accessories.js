@@ -139,17 +139,22 @@ export function buildAccessories(ctx) {
   // gear train: pad gears sized from the published pad ratios where they fit (the hydraulic pump,
   // slowest at 0.3783 × N2, gets about 2.1 times the generator gear's diameter at 0.7947 × N2)
   const TRAIN = agbTrain(R_AGB, AGB_PADS);
-  const GY = (Y_AGB_F + Y_AGB_A) / 2;
+  const GY = (Y_AGB_F + Y_AGB_A) / 2, GY2 = GY - 0.07;     // main gear plane, and the step-up plane behind it
   const gears = [], shafts = [];
   for (const g of TRAIN) {
     gears.push(axialGear(R_AGB, GY, g.phi, g.r, 0.028));
     if (g.kind === 'idler') shafts.push(axialCyl(R_AGB, GY, g.phi, 0.011, 0.07, 10));
-    else shafts.push(axialCyl(R_AGB, GY, g.phi, 0.013, Y_AGB_F - Y_AGB_A - 0.03, 10));
+    else if (g.kind === 'compound') {
+      // layshaft carrying the train gear and the step-up gear, and the pinion on the pad shaft
+      const st = g.stepUp;
+      gears.push(axialGear(R_AGB, GY2, g.phi, st.r, 0.024), axialGear(R_AGB, GY2, st.phi, st.pinion, 0.024));
+      shafts.push(axialCyl(R_AGB, (GY + GY2) / 2, g.phi, 0.011, 0.13, 10), axialCyl(R_AGB, (GY2 + Y_AGB_A) / 2, st.phi, 0.012, GY2 - Y_AGB_A + 0.02, 10));
+    } else shafts.push(axialCyl(R_AGB, GY, g.phi, 0.013, Y_AGB_F - Y_AGB_A - 0.03, 10));
   }
   P('AGB gear train', {
-    system: 'Drive system', material: 'Carburised steel spur gears on roller-bearing shafts (layout estimated)', mass: 30, count: TRAIN.length,
+    system: 'Drive system', material: 'Carburised steel spur gears on roller-bearing shafts (layout estimated)', mass: 30, count: TRAIN.length + 2,
     explode: [0.45, 0.1, 1.75], temp: 360,
-    desc: 'Every pad turns at a fixed ratio of N2 set by its gear: the generator at 0.7947 (7,416 rpm at 100 %), the hydraulic pump at 0.3783 (3,530 rpm) and the backup generator at 2.4126 (22,515 rpm) (EASA type certificate). So the slow hydraulic-pump gear is about twice the generator gear\'s diameter; idlers carry the drive between pads. The real gear layout is not published.',
+    desc: 'Every pad turns at a fixed ratio of N2 set by its gears: the generator at 0.7947 (7,416 rpm at 100 %), the hydraulic pump at 0.3783 (3,530 rpm) and the backup generator at 2.4126 (22,515 rpm) (EASA type certificate). So the slow hydraulic-pump gear is about twice the generator gear\'s diameter; idlers carry the drive between pads. The backup generator is too fast for one gear, so its train gear sits on a layshaft whose second, larger gear drives a small pinion on the pad shaft, stepping it up 26 : 12. The real gear layout is not published.',
   }, [m(merge(gears), GM.gear()), m(merge(shafts), GM.steel())]);
   P('AGB hand-cranking pad', {
     system: 'Drive system', material: 'Steel drive socket under a bolted cover', mass: 1,

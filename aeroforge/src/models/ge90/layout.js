@@ -128,8 +128,13 @@ export const STATION_NAMES = {
 /** Accessory-gearbox pitch-line radius (m) and the pad gears round its crescent: phi (rad), pitch
  *  radius (m; null = sized to touch the gear before it) and what each pad drives. */
 export const AGB = { R: 1.845, interior: [1.785, 1.905] };
+// The backup generator's pad (2.4126 × N2) is too fast for a plain train gear: its train gear
+// (r 0.02, on a layshaft beside the pad) carries a second, larger gear that drives a small pinion
+// on the pad shaft, a 26 : 12 step-up (layout estimated; speed × pitch radius is constant in each mesh).
+const VSCF_STEP = { phi: 0.5, r: 0.039, pinion: 0.018, name: 'VSCF backup generator', ratio: 2.4126 };
 export const AGB_PADS = [
-  { phi: 0.5, r: 0.02, kind: 'pad', name: 'VSCF backup generator', ratio: 2.4126 }, { phi: 0.62, r: 0.05, kind: 'pad', name: 'starter' },
+  { phi: VSCF_STEP.phi + (VSCF_STEP.r + VSCF_STEP.pinion) / AGB.R, r: 0.02, kind: 'compound', name: 'VSCF step-up gear', stepUp: VSCF_STEP },
+  { phi: 0.62, r: 0.05, kind: 'pad', name: 'starter' },
   { phi: 0.7, r: 0.028, kind: 'pad', name: 'IDG', ratio: 0.7947 }, { phi: 0.82, r: 0.04, kind: 'pad', name: 'fuel pump' },
   { phi: 0.95, r: 0.059, kind: 'pad', name: 'hydraulic pump', ratio: 0.3783 }, { phi: 1.0, r: null, kind: 'pad', name: 'HMU drive' },
   { phi: Math.PI / 3, r: null, kind: 'input', name: 'input' }, { phi: 1.205, r: 0.035, kind: 'pad', name: 'lubrication unit / PMA' },
