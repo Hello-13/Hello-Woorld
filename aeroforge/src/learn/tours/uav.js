@@ -111,7 +111,7 @@ export default [
     title: 'Fuel and time on station',
     body: 'About 1,800 kg of JP-8 fills seven tanks: forward, header and aft cells in the fuselage and two tanks in each wing. The engine draws only from the header cell at the centre of gravity. Its two pumps feed the engine and also drive a jet-pump manifold: solenoid valves send that fuel to the jet pump in the selected tank, whose suction refills the header. The feed runs through an electric heater and the shutoff valve at the firewall to the engine. GA-ASI’s ER pods add 1,200 kg more: try them in the Mission endurance lab.',
     key: 'Breguet endurance E = (η / c) · (L/D) · (1/V) · ln(W₀ / W₁).',
-    mode: 'systems', focus: FUEL, view: { dir: [-1, 0.95, -0.75], fill: 0.72 },
+    mode: 'systems', focus: FUEL, view: { dir: [-1, 0.95, -0.75], fill: 0.6 },
   },
   {
     title: 'Seven stations',
@@ -123,6 +123,6 @@ export default [
     title: 'Wheels and control surfaces',
     body: 'Trailing-arm main legs, each with its own shock absorber, brake servo and retraction actuator and driver, and a steerable oleo nose leg fold into wells in about 25 s. Electric servos drive the eight wing surfaces, the two ruddervators and the ventral rudder, so one failed actuator leaves the others working. Watch the demonstration: roll, then pitch, then yaw, the ruddervators moving together for pitch and apart for yaw.',
     key: 'Ruddervator mixing: δ_left,right = δ_pitch ± δ_yaw.',
-    focus: [...CONTROLS, ...GEAR], view: { dir: [-1, 0.55, 0.8], fill: 0.72 }, demo: 'surfaces',
+    focus: [...CONTROLS, ...GEAR], view: { dir: [-1, 0.55, 0.8], fill: 0.62 }, demo: 'surfaces',
   },
 ];
