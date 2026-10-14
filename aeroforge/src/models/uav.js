@@ -111,8 +111,7 @@ function secAngle(s, y, z) {
 /**
  * Main-gear door opening (starboard; mirrored for port). Photographs of MQ-9As show one door per side: a narrow slot that runs
  * from the trunnion at the lower corner aft and inboard along the folded leg, widening at its aft end, where a shallow blister
- * covers the wheel. The inboard edge is the door's straight hinge line (hingePoint); the skin rings put a vertex exactly on its
- * section angle. The outer edge, MAIN_SLOT as [station, angle],
+ * covers the wheel. The inboard edge is the door's straight hinge line (hingePoint); the outer edge (MAIN_EDGE)
  * is the strip the folding leg and wheel actually cross in this model's retraction, with a margin. Every skin triangle between
  * the two is cut away, and the door covers the cut.
  */
@@ -125,16 +124,24 @@ function hingePoint(s) {
   return [0, 1, 2].map((k) => HINGE_A[k] + (HINGE_B[k] - HINGE_A[k]) * f);
 }
 function hingeAngle(s) { const p = hingePoint(s); return secAngle(s, p[1], p[2]); }
-const MAIN_SLOT = [[4.87, 1.296], [4.92, 1.297], [4.97, 1.297], [5.02, 1.297], [5.07, 1.227], [5.12, 1.138], [5.17, 1.067], [5.22, 0.95], [5.27, 0.913],
-  [5.32, 0.89], [5.37, 0.859], [5.42, 0.832], [5.47, 0.843], [5.52, 0.843], [5.57, 0.843], [5.62, 0.83], [5.67, 0.795], [5.72, 0.786], [5.77, 0.78],
-  [5.82, 0.76], [5.87, 0.76], [5.92, 0.748], [5.97, 0.735], [6.02, 0.689], [6.07, 0.685], [6.12, 1.073], [6.17, 1.257], [6.22, 1.281], [6.27, 1.281],
-  [6.32, 1.281], [6.37, 1.26], [6.42, 1.128], [6.47, 0.99], [6.5, 0.99]];
-/** [hinge, outer edge] section angles of the main-gear opening at station s. */
-function slotAt(s) {
+// outer edge of the opening as [station, angle on the forward side, angle on the aft side] at each skin ring over the well: it
+// covers every crossing of the swing with a 2.5 cm margin, falls going aft no faster than one ring column per ring (so the cut
+// follows it exactly) and steps out once, at s 6.12, where the wider wheel end of the door begins
+const MAIN_EDGE = [[4.87, 1.307, 1.307], [4.92, 1.307, 1.307], [4.97, 1.307, 1.307], [5.02, 1.27, 1.27], [5.07, 1.21, 1.21], [5.12, 1.15, 1.15],
+  [5.17, 1.09, 1.09], [5.22, 1.03, 1.03], [5.27, 0.97, 0.97], [5.32, 0.91, 0.91], [5.37, 0.856, 0.856], [5.42, 0.856, 0.856], [5.47, 0.856, 0.856],
+  [5.52, 0.856, 0.856], [5.57, 0.856, 0.856], [5.62, 0.812, 0.812], [5.67, 0.8, 0.8], [5.72, 0.79, 0.79], [5.77, 0.777, 0.777], [5.82, 0.767, 0.767],
+  [5.87, 0.762, 0.762], [5.92, 0.754, 0.754], [5.97, 0.754, 0.754], [6.02, 0.754, 0.754], [6.07, 0.754, 0.754], [6.12, 0.754, 1.289], [6.17, 1.289, 1.289],
+  [6.22, 1.289, 1.289], [6.27, 1.289, 1.289], [6.3, 1.287, 1.287], [6.32, 1.263, 1.263], [6.37, 1.227, 1.227], [6.42, 1.167, 1.167], [6.47, 1.107, 1.107],
+  [6.5, 1.071, 1.071]];
+/** Outer-edge angle of the main-gear opening at station s; on a ring, `aft` picks the value for the band behind it. */
+function edgeAngle(s, aft = true) {
   let i = 0;
-  while (i < MAIN_SLOT.length - 2 && s > MAIN_SLOT[i + 1][0]) i++;
-  const a = MAIN_SLOT[i], b = MAIN_SLOT[i + 1], t = Math.min(1, Math.max(0, (s - a[0]) / (b[0] - a[0])));
-  return [hingeAngle(s), a[1] + (b[1] - a[1]) * t];
+  while (i < MAIN_EDGE.length - 2 && s > MAIN_EDGE[i + 1][0] + 1e-4) i++;
+  const a = MAIN_EDGE[i], b = MAIN_EDGE[i + 1];
+  if (Math.abs(s - a[0]) < 1e-4) return aft ? a[2] : a[1];
+  if (Math.abs(s - b[0]) < 1e-4) return aft ? b[2] : b[1];
+  const f = Math.min(1, Math.max(0, (s - a[0]) / (b[0] - a[0])));
+  return a[2] + (b[1] - a[2]) * f;
 }
 
 /** Conformal skin patch (doors, access panels) over stations s0..s1 and section angles th0..th1. */
@@ -167,29 +174,31 @@ export function buildUAV() {
   const L = (geo, material, o) => mesh(geo, material, o);
 
   // ============================================================== fuselage skins
-  // the skin is cut away under the gear doors (the main-gear slots, MAIN_SLOT; the nose well s 1.92–3.125). The loft is finer around
+  // the skin is cut away under the gear doors (the main-gear openings, between hingePoint and MAIN_EDGE; the nose well s 1.92–3.125). The loft is finer around
   // and along the main slots, and each main door is shaped from the very skin it replaces, so it covers its cut-out exactly.
   const opening = (s, y, z, pos, t) => {
     if (s > 4.87 && s < 6.5) {
-      // judged by the triangle's corners: cut if it lies outboard of the hinge line (whose vertices sit exactly on it) and reaches
-      // inside the outer edge, so no skin is left anywhere the leg crosses
-      let out = true, mn = 9, hi = -9;
+      // judged by the triangle's corners, which on these rings sit exactly on the hinge line and the outer edge: cut if all of
+      // them lie between the two
+      let inside = true;
       for (let j = t; j < t + 9; j += 3) {
-        const q = 5.5 - pos[j], th = secAngle(q, pos[j + 1], pos[j + 2]), [l, h] = slotAt(q);
-        if (th < l - 1e-4) out = false;
-        mn = Math.min(mn, th); hi = Math.max(hi, h);
+        const q = 5.5 - pos[j], th = secAngle(q, pos[j + 1], pos[j + 2]);
+        if (th < hingeAngle(q) - 1e-4 || th > edgeAngle(q, s > q) + 1e-4) inside = false;
       }
-      if (out && mn < hi) return z > 0 ? 'cutS' : 'cutP';
+      if (inside) return z > 0 ? 'cutS' : 'cutP';
     }
     return s > 1.92 && s < 3.125 && secAngle(s, y, z) < 0.41 ? 'cutN' : null;          // the nose leg folds along the centreline
   };
   const slotBreaks = Array.from({ length: 33 }, (_, k) => +(4.87 + k * 0.05).toFixed(2));
-  // over the main wells, the ring vertex nearest each door's hinge line is moved onto it, so the cut's inboard edge is that line
+  // over the main wells, the ring vertices nearest each door's hinge line and outer edge are moved onto them, so the cut
+  // follows both exactly
   const onHinge = (s, r) => {
     if (s < 4.87 - 1e-6 || s > 6.5 + 1e-6) return null;
-    const th = hingeAngle(s), j = Math.round(th / ((2 * Math.PI) / 96));
-    r[j] = fusePoint(s, -Math.PI / 2 + th);
-    r[96 - j] = fusePoint(s, -Math.PI / 2 - th);
+    for (const th of new Set([hingeAngle(s), edgeAngle(s, false), edgeAngle(s, true)])) {
+      const j = Math.round(th / ((2 * Math.PI) / 96));
+      r[j] = fusePoint(s, -Math.PI / 2 + th);
+      r[96 - j] = fusePoint(s, -Math.PI / 2 - th);
+    }
     return r;
   };
   const fl = fuselageLoft(stationsWithBreaks([0.95, 1.92, 2.05, 3.125, 4.0, ...slotBreaks, 6.3, 6.5, FIREWALL_S], 0.2), 96, onHinge);
@@ -315,7 +324,7 @@ export function buildUAV() {
   }
   P('Main gear wells', {
     system: 'Structure', material: 'Composite well liners on a keel web (est.)', mass: 14, count: 2, explode: [0, -0.3, 0],
-    desc: 'Two boxed wells, 1.64 m long, take the folded main legs, one each side of a keel web that carries fuselage bending past the cut-outs: each strut lies low along its well, its knee hooked by the uplock on the keel web, and the wheel lies tilted in a pocket at the aft end. The roof steps up behind the wing box; the fuselage-tank feed, the fuel lines and the harness run in the keel channel between the webs (layout estimated).',
+    desc: 'Two boxed wells, 1.64 m long, take the folded main legs, one each side of a keel web that carries fuselage bending past the cut-outs: each strut lies low along its well, its knee hooked by the uplock on the keel web, and the wheel lies tilted at the aft end, over the door’s blister. The roof steps up behind the wing box; the fuselage-tank feed, the fuel lines and the harness run in the keel channel between the webs (layout estimated).',
   }, L(merge(bays), m.primer));
 
   // wing carry-through: the two spars continue across the body; the wings bolt to fittings at its ends
@@ -755,10 +764,12 @@ export function buildUAV() {
 
   // ---- main gear: trailing-arm legs on trunnions at the lower corners of the body, retracting aft into the wells
   // Offsets from the trunnion with the leg down (x forward, starboard side; mirrored for port). Photographs show long, splayed
-  // legs (about 40° from vertical, a track of about 2.4 m) and small wheels, about 0.38 m across; the legs fold aft into slots
-  // along the lower corners, the wheels into pockets at the aft end. The leg turns as one rigid unit (strut, trailing arm,
-  // shock absorber, brake and wheel) about a single fixed hinge axis, `hinge`, by `stow` radians; axis and angle were
-  // chosen so the folded leg clears the well walls, the keel web and the frames (kinematics estimated).
+  // legs (about 40° from vertical, a track of about 2.4 m) and small wheels, about 0.38 m across; each leg folds aft and inboard
+  // under one long door, the wheel ending at the door's blistered aft end. The leg turns as one rigid unit (strut, trailing arm,
+  // shock absorber, brake and wheel) about a single fixed hinge axis, `hinge`, by `stow` radians. Axis and angle were searched
+  // so that the leg and wheel pass outboard of that door hanging open from its straight inboard hinge, cross the skin only
+  // inside its outline, fold clear of the keel web, roofs, frames, longeron and retract driver, and leave the wheel just above
+  // the blister (kinematics estimated).
   const MG = { pivot: [4.95, 1.2, 0.31], knee: [0, -0.87, 0.74], axle: [-0.22, -1.01, 0.84], wheelOff: 0.06, hinge: [0.46367, -0.26307, -0.84605], stow: 1.80292 };
   const mainLegs = [], uplockAt = [];
   for (const side of [1, -1]) {
@@ -800,7 +811,7 @@ export function buildUAV() {
     const w = [new THREE.TorusGeometry(0.135, 0.055, 14, 32), merge([new THREE.CylinderGeometry(0.1, 0.1, 0.1, 24).rotateX(Math.PI / 2), new THREE.CylinderGeometry(0.03, 0.03, 0.1, 12).rotateX(Math.PI / 2).translate(0, 0, -0.02 * side)]), new THREE.CylinderGeometry(0.085, 0.085, 0.025, 20).rotateX(Math.PI / 2).translate(0, 0, -0.055 * side)];
     const wheel = P(`Main wheel & brake (${sd})`, {
       system: 'Landing gear', material: 'Parker Hannifin wheel and multi-disc brake, tubeless tyre', mass: 16, explode: [0, -0.15, 0.4 * side],
-      desc: 'Parker Hannifin wheel and brake, about 0.38 m in diameter (estimated from photographs), with provisions for anti-lock braking. It retracts with its leg and lies tilted in a pocket at the aft end of the well. The brakes work only with the gear down and are commanded from the ground station or the automatic landing system; reverse propeller pitch does most of the stopping (GA-ASI; USAF).',
+      desc: 'Parker Hannifin wheel and brake, about 0.38 m in diameter (estimated from photographs), with provisions for anti-lock braking. It retracts with its leg, rolling about 50° on the way up, and lies tilted at the aft end of the well, just above the door’s blister. The brakes work only with the gear down and are commanded from the ground station or the automatic landing system; reverse propeller pitch does most of the stopping (GA-ASI; USAF).',
     }, [L(w[0], m.rubber), L(w[1], m.alu), L(w[2], m.darkMetal)], piv);
     wheel.position.set(Ax.x, Ax.y, Ax.z + MG.wheelOff * side);
     // retraction actuator from the well's forward upper corner to a lug on the strut
@@ -833,7 +844,7 @@ export function buildUAV() {
   // gear electrics: a branch from each main power feeder down behind the wing box to its retract driver, on to the trunnion where
   // the brake line starts; and a branch from the avionics bay harness under the floor to the nose retract driver and steering controller
   const lgh = [];
-  const DOOR_ACT = [5.35, 1.25, 0.062];            // fixed end of each main-door actuator (starboard; mirrored for port)
+  const DOOR_ACT = [6.2, 1.22, 0.069];            // fixed end of each main-door actuator, on the keel web just ahead of the folded wheel (starboard; mirrored for port)
   for (const zs of [1, -1]) {
     const ul = uplockAt[zs > 0 ? 0 : 1];
     // feeder → down behind the wing box, inboard of the upper longeron → retract driver
@@ -842,7 +853,7 @@ export function buildUAV() {
     lgh.push(pipe([[X(5.063), 1.445, 0.215 * zs], [X(4.95), 1.42, 0.2 * zs], [X(4.885), 1.36, 0.2 * zs], [X(4.882), 1.27, 0.215 * zs], [X(4.886), 1.205, 0.229 * zs]], 0.007, 5, 24));
     // driver → inboard under the roof to the keel web, aft along it with a drop to the door actuator, then down to the uplock's release
     lgh.push(pipe([[X(5.16), 1.468, 0.19 * zs], [X(5.21), 1.472, 0.11 * zs], [X(5.32), 1.468, 0.056 * zs], [X(5.7), 1.458, 0.056 * zs], [X(5.9), 1.38, 0.056 * zs], [ul[0], ul[1] + 0.02, 0.058 * zs], [ul[0], ul[1] - 0.006, 0.06 * zs]], 0.006, 5, 40));
-    lgh.push(pipe([[X(5.34), 1.468, 0.056 * zs], [X(DOOR_ACT[0]), 1.36, 0.056 * zs], [X(DOOR_ACT[0]), DOOR_ACT[1] + 0.02, 0.058 * zs], [X(DOOR_ACT[0]), DOOR_ACT[1], DOOR_ACT[2] * zs]], 0.005, 5, 16));
+    lgh.push(pipe([[X(5.9), 1.38, 0.056 * zs], [X(6.05), 1.33, 0.056 * zs], [X(DOOR_ACT[0]), DOOR_ACT[1] + 0.05, 0.056 * zs], [X(DOOR_ACT[0]), DOOR_ACT[1] + 0.02, 0.058 * zs], [X(DOOR_ACT[0]), DOOR_ACT[1], DOOR_ACT[2] * zs]], 0.005, 5, 16));
   }
   // nose: from the avionics bay harness through the well's aft wall to the retract driver, and under the driver to the steering controller
   lgh.push(pipe([[X(3.35), 1.45, -0.29], [X(3.24), 1.425, -0.21], [X(3.12), 1.425, -0.13], [X(3.04), 1.44, -0.127], [X(2.985), 1.45, -0.125]], 0.006, 5, 20));
@@ -877,25 +888,30 @@ export function buildUAV() {
       const nn = surf(q + 0.002, a).sub(surf(q - 0.002, a)).cross(surf(q, a + 0.002).sub(surf(q, a - 0.002))).normalize().multiplyScalar(-side);
       dp.setXYZ(k, p.x, p.y, p.z); dn.setXYZ(k, nn.x, nn.y, nn.z);
     }
+    // a short horn on the hinge line: up through the opening just outboard of the hinge, then inboard just above the skin, where the
+    // door actuator pulls on it; opening the door swings it up and out, and it never crosses the gear's path
+    const hh = hingePoint(DOOR_ACT[0]), ys = fusePoint(DOOR_ACT[0], -Math.PI / 2 + hingeAngle(DOOR_ACT[0]))[1] + 0.015, zv = hh[2] + 0.008;
+    const hornTip = new THREE.Vector3(hh[0], ys, (zv - 0.031) * side);
+    const horn = merge([box(0.014, ys - hh[1] + 0.006, 0.012, [hh[0], (ys + hh[1]) / 2, zv * side]), box(0.014, 0.012, 0.037, [hh[0], ys, (zv - 0.0155) * side])]);
     const hp0 = hingePoint(4.87), hp1 = hingePoint(6.5);
-    const mainDoor = hingedMesh(dg, m.skinDouble, new THREE.Vector3(hp0[0], hp0[1], hp0[2] * side), new THREE.Vector3(hp1[0], hp1[1], hp1[2] * side));
+    const mainDoor = hingedMesh(merge([dg, horn]), m.skinDouble, new THREE.Vector3(hp0[0], hp0[1], hp0[2] * side), new THREE.Vector3(hp1[0], hp1[1], hp1[2] * side));
     mainDoor.mesh.castShadow = true;
     P(`Main gear door (${sd})`, {
       system: 'Landing gear', skin: true, material: 'Composite door with a moulded blister (est.)', mass: 4, explode: [0, -0.6, 0.55 * side],
-      desc: 'One long door per side, as photographs of USAF and GA-ASI MQ-9As show (USAF 230430-F-UB655-0794, an MQ-9A taking off from a Wyoming highway in 2023; GA-ASI’s N428HK in Poland, USAF 5147992): it hangs open below the belly whenever the gear is down and is shut in flight. It covers a narrow slot that runs from the trunnion at the lower corner aft and inboard along the folded leg and widens at its aft end, where a shallow blister lies over the folded wheel, and it hinges on its straight inboard edge. The leg folds about a single fixed axis chosen so that leg and wheel come up through this one door, past it as it hangs open, with the wheel ending just above the blister. That fold rolls the wheel about 45° on the way up, so the door’s aft end here is about 0.4 m wide and wraps round the lower corner, wider than it looks in the photographs (perhaps 0.2–0.25 m); the real gear may turn its wheel as it folds (hinge line, opening angle and widths estimated).',
+      desc: 'One long door per side, as photographs of USAF and GA-ASI MQ-9As show (USAF 230430-F-UB655-0794, an MQ-9A taking off from a Wyoming highway in 2023; GA-ASI’s N428HK in Poland, USAF 5147992): it hangs open below the belly whenever the gear is down and is shut in flight. It covers a narrow slot (about 0.17–0.2 m wide here) that runs from the trunnion at the lower corner aft and inboard along the folded leg and widens at its aft end, where a shallow blister lies over the folded wheel, and it hinges on its straight inboard edge. The leg folds about a single fixed axis chosen so that leg and wheel come up through this one door, past it as it hangs open, with the wheel ending just above the blister. That fold rolls the wheel about 50° on the way up, so the door’s aft end here is about 0.4 m wide and wraps round the lower corner, wider than it looks in the photographs (perhaps 0.2–0.25 m). With the leg geometry seen in the photographs, no single fixed axis that folds the leg into the well gets the wheel through less than about 0.3 m, so the real gear may turn its wheel as it folds (hinge line, opening angle and widths estimated).',
     }, mainDoor.pivot);
     doors.push({ h: mainDoor, sign: -side, open: 2.0 });
     doors.push({ h: doorPart(`Nose gear door (${sd})`, 1.92, 3.125, -Math.PI / 2 + 0.002 * side, -Math.PI / 2 + 0.42 * side, 'outer', {
       mass: 1.5, explode: [0, -0.55, 0.35 * side], desc: 'One of a pair of nose-gear doors hinged along the outer edge of the well, linked to open with the leg.',
     }), sign: side, open: 1.45 });
-    // door actuator: from a bracket on the keel web down to a lug on the door's inner face, just outboard of the hinge
+    // door actuator: from a bracket on the keel web down to the horn on the door's hinge line
     const act = makeActuator(0.016, 0.009, 0.1, m.darkMetal);
     const anchor = new THREE.Vector3(X(DOOR_ACT[0]), DOOR_ACT[1], DOOR_ACT[2] * side);
-    const lugClosed = new THREE.Vector3(...fusePoint(DOOR_ACT[0], -Math.PI / 2 + (slotAt(DOOR_ACT[0])[0] + 0.11) * side, -0.003));
+    const lugClosed = hornTip;
     const p0 = mainDoor.pivot.position.clone();
     P(`Main gear door actuator (${sd})`, {
       system: 'Landing gear', material: 'Small linear actuator (est.)', mass: 1, explode: [0, -0.2, 0.45 * side],
-      desc: 'An electric linear actuator from a bracket on the keel web to a lug just outboard of the door’s hinge: it lowers the door before the leg moves and pulls it shut once the leg is up (position and type estimated).',
+      desc: 'An electric linear actuator from a bracket on the keel web, just ahead of the folded wheel, to a short horn on the door’s hinge line: pulling the horn up swings the door down and open before the leg moves, and pushing it shuts the door once the leg is up (position and type estimated).',
     }, act.meshes);
     movers.push(() => act.set(anchor, lugClosed.clone().sub(p0).applyQuaternion(mainDoor.pivot.quaternion).add(p0)));
   }
@@ -1275,7 +1291,7 @@ export function buildUAV() {
       ['Stores stations', '7: six under-wing, one centreline'], ['Wing station ratings', '1,500 / 600 / 200 lb inboard / middle / outboard (USAF T.O. figures as reported: 1,500 / 750 / 150 lb)'], ['Electrical power', '45 kVA main, 4 kW backup (Block 5)'], ['Crew', '2 remote: pilot and sensor operator'],
     ],
     heroStats: [['27', 'h', 'Endurance'], ['15.2', 'km', 'Ceiling'], ['1,701', 'kg', 'Payload']],
-    sources: 'USAF MQ-9 Reaper fact sheet (af.mil); GA-ASI MQ-9A and MQ-9A Block 5 specification sheets; NAVAIR MQ-9A product page; DOT&E annual reports FY2011 and FY2017; NASA Ikhana (Predator B) fact sheets; NTSB final report CHI06MA121 (Predator B, Nogales, 2006); USAF accident investigation reports on MQ-9A losses (Seychelles and Nevada 2012, 2015, 2018, 2020, 2025, as published and as reported by Air & Space Forces Magazine and Aerossurance); Honeywell TPE331-10 brochure N61-1491 (specifications, drive pads, installation drawing); McCauley 3GFR36C606/110GFA-0 propeller records; GA-ASI releases on the trailing-arm main gear (2012) and the Block 5 electrical system; Sandia National Laboratories, “Lynx: A high-resolution synthetic aperture radar” (OSTI 4263), and the GA-ASI Lynx datasheet; Lockheed Martin M299 and Marvin Engineering M299/M310 launcher data; MIL-STD-8591 (store suspension); Aerospace America (2016) on Reaper icing; Wikipedia articles on the MQ-9, TPE331, GBU-12 and AGM-114. Main-gear geometry (splay, track, wheel size) is estimated from NASA and USAF photographs. Internal layout, routing, retraction kinematics and component masses are estimates.',
+    sources: 'USAF MQ-9 Reaper fact sheet (af.mil); GA-ASI MQ-9A and MQ-9A Block 5 specification sheets; NAVAIR MQ-9A product page; DOT&E annual reports FY2011 and FY2017; NASA Ikhana (Predator B) fact sheets; NTSB final report CHI06MA121 (Predator B, Nogales, 2006); USAF accident investigation reports on MQ-9A losses (Seychelles and Nevada 2012, 2015, 2018, 2020, 2025, as published and as reported by Air & Space Forces Magazine and Aerossurance); Honeywell TPE331-10 brochure N61-1491 (specifications, drive pads, installation drawing); McCauley 3GFR36C606/110GFA-0 propeller records; GA-ASI releases on the trailing-arm main gear (2012) and the Block 5 electrical system; Sandia National Laboratories, “Lynx: A high-resolution synthetic aperture radar” (OSTI 4263), and the GA-ASI Lynx datasheet; Lockheed Martin M299 and Marvin Engineering M299/M310 launcher data; MIL-STD-8591 (store suspension); Aerospace America (2016) on Reaper icing; Wikipedia articles on the MQ-9, TPE331, GBU-12 and AGM-114. Main-gear geometry (splay, track, wheel size) and the one-door-per-side arrangement are estimated from NASA, USAF and GA-ASI photographs. Internal layout, routing, retraction kinematics and component masses are estimates.',
     fleetTag: '27 h loiter',
     aero: true,
     root: A.root,

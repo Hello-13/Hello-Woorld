@@ -171,3 +171,13 @@ test('main legs fold as rigid units about one hinge axis each', () => {
   assert.match(uav, /const MG = \{[^}]*hinge: \[[^\]]+\][^}]*stow: [\d.]+/, 'main gear hinge axis and stow angle');
   assert.ok(!/wheel\.quaternion/.test(uav), 'no wheel is turned separately from its leg');
 });
+
+test('each main-gear well has one door, hinged on a straight inboard line, as photographed', () => {
+  const uav = read('../src/models/uav.js');
+  assert.equal((uav.match(/P\(`Main gear door \(\$\{sd\}\)`/g) || []).length, 1, 'one main-gear door part per side');
+  assert.ok(!/pocket door/i.test(uav), 'no separate wheel-pocket door');
+  const h = (name) => uav.match(new RegExp(`${name} = \\[([^\\]]+)\\]`))[1].split(',').map(Number);
+  const [a, b] = [h('HINGE_A'), h('HINGE_B')];
+  assert.ok(a.length === 3 && b.length === 3 && a[0] > b[0], 'hinge line runs aft from the front of the well');
+  assert.ok(a[2] > b[2] && b[2] > 0.044, 'hinge line runs aft and inboard, outboard of the keel web');
+});
