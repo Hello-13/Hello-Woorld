@@ -15,47 +15,13 @@ const { X, lerp, mono } = FR;
 
 const mirrorPts = (ring) => ring.map((p) => [p[0], p[1], -p[2]]).reverse();
 
-/** Duct liner rings (right side): the lip ring shrunk by the lip thickness, then the S-duct. */
-function ductRings() {
-  const lip = FR.cowlRing(0);
-  const n = lip.length;
-  let cz = 0, cy = 0;
-  for (const p of lip) { cz += p[2]; cy += p[1]; }
-  cz /= n; cy /= n;
-  const inner = lip.map((p) => {
-    const dz = p[2] - cz, dy = p[1] - cy, L = Math.hypot(dz, dy) || 1;
-    const k = Math.max(0, 1 - 0.04 / L);
-    return [p[0] - 0.03, cy + dy * k, cz + dz * k];
-  });
-  const rel = inner.map((p) => [p[2] - cz, p[1] - cy]);
-  const ang = rel.map(([dz, dy]) => Math.atan2(dy, dz));
-  const w0 = Math.max(...rel.map((r) => r[0])) - Math.min(...rel.map((r) => r[0]));
-  const h0 = Math.max(...rel.map((r) => r[1])) - Math.min(...rel.map((r) => r[1]));
-  const col = (c) => FR.DUCT.map((row) => [row[0], row[c]]);
-  const cols = [1, 2, 3, 4, 5].map(col);
-  const rings = [inner];
-  const st = [];
-  for (let s = FR.DUCT[0][0]; s < FR.FAN_S - 0.01; s += 0.22) st.push(s);
-  st.push(FR.FAN_S);
-  for (const s of st) {
-    const [zc, yc, w, h, r] = cols.map((k) => mono(k, s));
-    rings.push(rel.map(([dz, dy], j) => {
-      const a = ang[j];
-      const e = [Math.cos(a) * w / 2, Math.sin(a) * h / 2];
-      const l = [(dz * w) / w0, (dy * h) / h0];
-      return [X(s), yc + lerp(l[1], e[1], r), zc + lerp(l[0], e[0], r)];
-    }));
-  }
-  return { lip, inner, rings, st: [null, ...st] };
-}
-
 const ductColsP = [1, 2, 3, 4, 5].map((c) => FR.DUCT.map((r) => [r[0], r[c]]));
 /** Inlet duct centre and size at station s (right side). */
 function ductAtLocal(s) { const [zc, yc, w, h] = ductColsP.map((k) => mono(k, s)); return { zc, yc, w, h }; }
 
 export function buildPropulsion(ctx) {
   const { P, anim } = ctx;
-  const D = ductRings();
+  const D = FR.ductRings();
   const cowlRings = FR.COWL_TAUS.map((t) => FR.cowlRing(t));
   const iSplit = D.st.findIndex((s) => s != null && s >= 9.4);
   anim.turbine = M.turbineGlow().clone();
