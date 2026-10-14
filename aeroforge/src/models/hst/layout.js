@@ -29,6 +29,7 @@ export const RAD = {
   shell: 1.55,         // forward shell / light shield outer radius over the blankets (3.1 m)
   inner: 1.5,          // light shield inside radius (3.0 m)
   truss: 1.36,         // metering truss radius (2.7 m diameter, SM3A guide)
+  gap: 1.52,           // harness runs through the light shield: between the liner and the skin, outside the baffles
 };
 
 const D = hubbleDesign();

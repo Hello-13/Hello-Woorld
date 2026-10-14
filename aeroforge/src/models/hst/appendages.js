@@ -269,12 +269,10 @@ export function buildAppendages(P, body) {
     const bar = [rod(az(p, RAD.shell + 0.15, MT0), az(p, RAD.shell + 0.15, MT1), 0.045, 16)];
     for (const x of [MT0 + 0.1, MT1 - 0.1]) bar.push(new THREE.BoxGeometry(0.14, 0.16, 0.16).translate(0, RAD.shell + 0.08, 0).rotateX(p).translate(x, 0, 0));
     for (const x of [MT0, MT1]) bar.push(new THREE.CylinderGeometry(0.06, 0.06, 0.05, 16).rotateZ(Math.PI / 2).translate(x, 0, 0).translate(0, ...az(p, RAD.shell + 0.15).slice(1)));
-    const mtb = P(`Magnetic torquer bar ${n}`, {
+    P(`Magnetic torquer bar ${n}`, {
       system: 'Attitude control', material: 'Ferromagnetic-core electromagnet with redundant windings, 2.5 m long', mass: 45, massSource: 'NASA SM3A Media Guide (100 lb)', temp: 255,
       explode: az(p, 0.9, 0.3), desc: 'One of four bars on the forward shell. Driven against the Earth\'s magnetic field, it bleeds off the momentum the reaction wheels build up from gravity-gradient and aerodynamic torques, and can hold attitude in a contingency. Hubble carries no thrusters at all.',
-      callout: n === 1, anchor: az(p, RAD.shell + 0.2, MT0 + 0.9),
     }, mesh(merge(bar), HM.mtb()));
-    if (n === 1) mtb.userData.part.tourLabel = true;   // labelled only while the tour focuses the torquers
   }
 
   // ------------------------------------------------------------------ magnetometers and coarse sun sensors
@@ -307,14 +305,17 @@ export function buildAppendages(P, body) {
   }, mesh(cssGeo([[0.85, RAD.big, 20], [0.85, RAD.big, 180], [0.85, RAD.big, 340]]), HM.box()));
 
   // ------------------------------------------------------------------ wiring: forward trunk, array power, RF
-  // trunk bundles from the equipment section's forward ring harness to the light-shield hardware
+  // trunk bundles from the equipment section's forward ring harness to the light-shield hardware:
+  // inside the forward shell, then in the gap between the light shield's liner and skin, outside the
+  // stray-light baffles
+  const XJ = ST.fwdShell - 0.05, XG = ST.fwdShell + 0.1;
   const hz = [];
   for (const c of [62, 118, 242, 298]) {
-    hz.push(...cablePath([az(deg(c), 1.68, 4.98), az(deg(c), 1.485, ST.equip + 0.02), az(deg(c), 1.485, ST.fwdShell), az(deg(c), 1.485, 12.6)], 0.016, 6));
+    hz.push(...cablePath([az(deg(c), 1.68, 4.98), az(deg(c), 1.485, ST.equip + 0.02), az(deg(c), 1.485, XJ), az(deg(c), RAD.gap, XG), az(deg(c), RAD.gap, 12.6)], 0.016, 6));
   }
   P('Forward harness trunk', {
     system: 'Electrical', material: 'Shielded copper wiring bundles and connectors', mass: 60, temp: 285, explode: [0, 0, 0], xrayWeight: 0.4,
-    desc: 'Four bundles leave the equipment section\'s forward ring harness and run up the inside of the forward shell and light shield to the torquer bars, magnetometers, sun sensors and the forward low-gain antenna. Hubble carries kilometres of wire through hundreds of connectors. Routing simplified.',
+    desc: 'Four bundles leave the equipment section\'s forward ring harness and run up the inside of the forward shell, then between the light shield\'s black liner and its skin, clear of the baffles, to the torquer bars, magnetometers, sun sensors and the forward low-gain antenna. Hubble carries kilometres of wire through hundreds of connectors. Routing simplified.',
   }, mesh(merge(hz), HM.harness()));
 
   // array power: each wing's diode box → into the shell → aft along the forward shell → round the
@@ -341,7 +342,7 @@ export function buildAppendages(P, body) {
   arc(rf, 1.62, 4.88, B5, 360, 0.016);
   arc(rf, 1.62, 4.88, B5, 180, 0.016);
   for (const c of [0, 180]) rf.push(rod(az(deg(c), 1.62, 4.88), az(deg(c), 1.47, 5.05), 0.016, 6), rod(az(deg(c), 1.47, 5.05), az(deg(c), 1.47, HGA.x), 0.016, 6), rod(az(deg(c), 1.47, HGA.x), az(deg(c), RAD.shell + 0.05, HGA.x), 0.016, 6));
-  rf.push(rod(az(deg(200), 1.62, 4.88), az(deg(200), 1.47, 5.05), 0.014, 6), rod(az(deg(200), 1.47, 5.05), az(deg(200), 1.47, ST.front - 0.15), 0.014, 6), rod(az(deg(200), 1.47, ST.front - 0.15), az(deg(200), RAD.shell + 0.1, ST.front - 0.15), 0.014, 6));
+  rf.push(...cablePath([az(deg(200), 1.62, 4.88), az(deg(200), 1.47, 5.05), az(deg(200), 1.47, XJ), az(deg(200), RAD.gap, XG), az(deg(200), RAD.gap, ST.front - 0.15), az(deg(200), RAD.shell + 0.1, ST.front - 0.15)], 0.014, 6));   // forward LGA, outside the baffles
   rf.push(rod(az(deg(297), 1.62, 4.88), az(deg(297), 1.62, 3.62), 0.016, 6), rod(az(deg(297), 1.62, 3.62), az(deg(297), 1.9, 3.5), 0.016, 6), rod(az(deg(297), 1.9, 3.5), az(deg(297), 1.9, 0.3), 0.016, 6), rod(az(deg(297), 1.9, 0.3), az(deg(270), 1.75, 0.08), 0.016, 6));
   P('RF cables & waveguide', {
     system: 'Communications', material: 'Low-loss S-band coaxial cable and waveguide, with RF transfer switches', mass: 20, temp: 280, explode: [0, 0, 0], xrayWeight: 0.6,

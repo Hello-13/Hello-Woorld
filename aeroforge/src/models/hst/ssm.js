@@ -75,7 +75,7 @@ function oru(k, boxes, mat, { coax = 0 } = {}) {
     for (const dt of [-ht, ht]) det.push(inBay(k, new THREE.BoxGeometry(0.02, 0.05, 0.02).translate(x - sx * 0.3, top + s * 0.025, t + dt)));
     det.push(inBay(k, new THREE.BoxGeometry(0.022, 0.02, 2 * ht + 0.02).translate(x - sx * 0.3, top + s * 0.055, t)));
   }
-  return [mesh(merge(body), mat), mesh(merge(det), HM.box())];
+  return mat === HM.box() ? [mesh(merge([...body, ...det]), mat)] : [mesh(merge(body), mat), mesh(merge(det), HM.box())];
 }
 
 const addConn = (k, x, r, t = 0) => (CONN[k] || (CONN[k] = [])).push(new THREE.Vector3(x, r, t).applyAxisAngle(X_AXIS, BAY_PHI[k]).toArray());
@@ -230,7 +230,7 @@ export function buildSSM(P) {
   P('OTA equipment section', {
     system: 'Structure', material: 'Semicircular aluminium compartment ring: two flanges and ten bay walls', mass: 70, temp: 270, explode: [0, 5.6, 0],
     desc: 'A half-ring of nine small bays outside the forward shell, seven for the telescope\'s own electronics and two for support, separate from the spacecraft\'s. NASA\'s text puts it on the +V3 side, but its own figure drawn looking forward shows it on the −V3 half, so the side is uncertain; bay depth estimated.',
-  }, [mesh(merge(oes), HM.al()), mesh(merge(oHw), HM.al())]);
+  }, mesh(merge([...oes, ...oHw]), HM.al()));
   const oDoors = [];
   for (let i = 0; i < 9; i++) oDoors.push(shellPatch(rO + 0.01, O0 + 0.02, O1 - 0.02, OPHI(i) + deg(0.7), OPHI(i + 1) - deg(0.7), { nphi: 4, nx: 1 }));
   P('OTA equipment section doors', {
@@ -402,13 +402,13 @@ export function buildSSM(P) {
     p.userData.part.thermalRole = 'battery';
   }
   P('Battery isolation switches & connectors', {
-    system: 'Power', material: 'One isolation switch and one harness connector per battery, six of each', mass: 3, count: 12, temp: 280, explode: [0, -1.4, 0],
+    system: 'Power', material: 'One isolation switch and one harness connector per battery, six of each', mass: 3, count: 12, temp: 280, explode: [0, -1.4, 0], xrayWeight: 0.4,
     desc: 'Each 2009 battery has an isolation switch that dead-faces its connector, so a spacewalker never touches a live plug: the last step of the change-out was turning each switch on. Positions on the modules approximate.',
   }, [mesh(merge(batSw), HM.box()), mesh(merge(batConn), HM.iridite())]);
   const ccc = [];
   for (const k of [2, 3]) for (const t of [-0.26, 0, 0.26]) { ccc.push(bayBox(k, 0.26, 0.1, 0.22, X_EQ0 + 0.23, DOOR_IN - 0.05, t)); addConn(k, X_EQ0 + 0.23, DOOR_IN - 0.1, t); }
   P('Charge current controllers', {
-    system: 'Power', material: 'Six voltage–temperature charge regulators, one per battery', mass: 24, count: 6, temp: 296, explode: [0, -1.0, 0],
+    system: 'Power', material: 'Six voltage–temperature charge regulators, one per battery', mass: 24, count: 6, temp: 296, explode: [0, -1.0, 0], xrayWeight: 0.4,
     desc: 'Each battery has its own controller, which tapers the charging current from the arrays as the battery\'s voltage and temperature rise so it is never overcharged — the care that let the 1990 batteries last 19 years. Placed in bays 2 and 3 beside their batteries; exact position approximate.',
   }, mesh(merge(ccc), HM.iridite()));
   B(2, 'Oscillators (bay 2)', {
@@ -507,7 +507,7 @@ export function buildSSM(P) {
     desc: 'Bay 10. Commands the instruments and formats their data for the data management unit. Its side A failed in September 2008, delaying the last servicing mission. In 2009 astronauts removed ten bolts and turned one connector drive stud to unplug the whole unit from receptacles on the door, then drove the new one down evenly onto them.',
   }, [mesh(sicTray, HM.iridite()), mesh(merge(recept), HM.al())]);
   out.sicdh = sic;
-  const SUB = (name, info, objs) => P(name, { temp: 298, explode: [0, 0, 0], ...info }, objs, sic);
+  const SUB = (name, info, objs) => P(name, { temp: 298, explode: [0, 0, 0], xrayWeight: 0.4, ...info }, objs, sic);
   SUB('NASA standard spacecraft computer (NSSC-I)', {
     system: 'Avionics', material: 'One central processor (and a spare) with eight 8,192-word, 18-bit memory modules',
     desc: 'The SI C&DH\'s own computer runs the instrument "applications": it moves commands and programs in and out of the processor, checks each instrument\'s health and stores timed commands for when Hubble is out of contact. Part of the SI C&DH; mass included.',
@@ -544,7 +544,7 @@ export function buildSSM(P) {
   addConn(10, X_EQ0 + 0.11, DOOR_IN - 0.06, 0);
   DIU(10, 'bay 10', X_EQ1 - 0.3, RAD.shell + 0.1, 0.2);
   P('Data interface unit (OTA equipment section)', {
-    system: 'Avionics', material: 'Dual-redundant command/data interface box, 38 × 41 × 18 cm', mass: 16, massSource: 'NASA SM3A Media Guide (35 lb)', temp: 296, explode: [0, 5.9, 0],
+    system: 'Avionics', material: 'Dual-redundant command/data interface box, 38 × 41 × 18 cm', mass: 16, massSource: 'NASA SM3A Media Guide (35 lb)', temp: 296, explode: [0, 5.9, 0], xrayWeight: 0.4,
     desc: 'The fourth DIU, in the OTA equipment section beside the optical control electronics (SM3A Fig. 5-25): it relays commands and data between the data management unit and the telescope\'s own electronics. Bay D assumed.',
   }, mesh(oBox(3, 0.38, 0.2, 0.34), HM.box()));
 
@@ -608,9 +608,9 @@ export function buildSSM(P) {
     desc: 'Before opening the gyro doors in 2009 spacewalkers first retracted the star trackers\' door seal bolts, and the job was not done until the seals were extended again so no stray light could leak in. Ring size estimated.',
   }, mesh(merge(seals), HM.fitting()));
 
-  // interior lights at the internal rings near each door pair, for the spacewalkers
+  // interior lights bolted to the faces of the internal rings near each door pair, for the spacewalkers
   const il = [], lens = [];
-  for (const [x, a] of [[0.4, 90], [0.4, 180], [0.4, 270], [3.3, 72], [3.3, 165], [3.3, 288]]) {
+  for (const [x, a] of [[0.32, 90], [0.32, 180], [0.32, 270], [3.3, 72], [3.3, 165], [3.3, 288]]) {
     il.push(atPhi(deg(a), new THREE.BoxGeometry(0.15, 0.08, 0.1).translate(x, 2.0, 0)));
     lens.push(atPhi(deg(a), new THREE.BoxGeometry(0.11, 0.01, 0.07).translate(x, 1.955, 0)));
   }
@@ -749,7 +749,7 @@ export function buildSSM(P) {
   }, mesh(merge(gf), HM.al()));
 
   // ------------------------------------------------------------------ EVA aids (handrails and foot-restraint sockets)
-  // aft shroud: along the outer edges of the axial door pairs, beside the −V3 doors and the WFC3 radiator, two ring rails
+  // aft shroud: along the outer edges of the axial door pairs, beside the −V3 doors and the WFC3 radiator
   const rR = RAD.big + 0.09;
   for (const c of [42, 138, 222, 318]) {
     rail(rails.aft, az(deg(c), rR, AX0 + 0.1), az(deg(c), rR, AX1 - 0.05));
@@ -764,6 +764,12 @@ export function buildSSM(P) {
     rail(rails.aft, az(deg(c + s * 16), rR, 1.95), az(deg(c + s * 16), rR, 3.3));
     for (const x of [2.0, 2.62, 3.25]) standoff(rails.aft, deg(c + s * 16), RAD.big + 0.02, x);
   }
+  // inside the shroud: a rail round its forward end on stand-offs from the forward flange, from the
+  // COS bay over the −V3 side to the NICMOS cooler; the Cross Aft Shroud Harness is clamped to it
+  const rI = 2.0, xI = 3.52;
+  const ipts = arcPts(rI, xI, 46, 249, 8);
+  for (let i = 0; i < ipts.length - 1; i++) rail(rails.aft, ipts[i], ipts[i + 1]);
+  for (let a = 52; a < 249; a += 24) rails.aft.push(rod(az(deg(a), rI + 0.012, xI), az(deg(a), RAD.big - 0.02, xI), 0.012, 4));
   // forward shell: four longitudinal rails between the masts, torquers and grapple fixtures, and a ring rail
   const rF = RAD.shell + 0.09;
   for (const c of [22.5, 112.5, 247.5, 337.5]) {
@@ -780,7 +786,7 @@ export function buildSSM(P) {
   }, mesh(merge(list), HM.handrail()));
   out.railLength = railLen;
   const m = (k) => Math.round(railLen[k]);
-  HR('aft shroud', rails.aft, 14, `Rails along the edges of every instrument door, about ${m('aft')} m here. Hubble was designed to be repaired by hand: 225 ft (69 m) of handrails in all let spacewalkers move hand over hand to every door. Runs simplified.`);
+  HR('aft shroud', rails.aft, 14, `Rails along the edges of every instrument door and, inside, a rail round the shroud's forward end that also carries the Cross Aft Shroud Harness: about ${m('aft')} m here. Hubble was designed to be repaired by hand: 225 ft (69 m) of handrails in all let spacewalkers move hand over hand to every door. Runs simplified.`);
   HR('equipment section', rails.eq, 16, `Two rails on every bay door, ${m('eq')} m in all, give a spacewalker something to hold while the J-hooks are released and the door swings open.`);
   HR('forward shell', rails.fs, 12, `Four runs along the barrel, joined by short arcs at the equipment section (${m('fs')} m), lead forward past the antenna masts, torquer bars and grapple fixtures. Runs simplified.`);
   HR('light shield', rails.ls, 14, `Four runs toward the aperture and arcs between the antenna latch lines and scuff plates, ${m('ls')} m in all. Runs simplified.`);

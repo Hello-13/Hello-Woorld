@@ -6,18 +6,22 @@
 //
 // Topology from the SM3A Media Reference Guide §5.1.3–5.1.5, §5.2.4 and §5.5 and the SM4 Media
 // Guide; the runs themselves are simplified (real harnesses follow cable trays and clamp to the
-// structure all the way). Model azimuth from +V3 (+y) toward −V2 (+z), in degrees here.
+// structure all the way). Through the light shield every run keeps to the gap between the black
+// liner and the outer skin (RG), outside the stray-light baffles. Model azimuth from +V3 (+y) toward
+// −V2 (+z), in degrees here.
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { mergeGeometries } from '../../engine/geometry.js';
-import { az, deg, ix, arcPts, cablePath, pathLength } from './layout.js';
+import { RAD, ST, az, deg, ix, arcPts, cablePath, pathLength } from './layout.js';
 import { BAY_PHI, CONN, X_EQ0, X_EQ1 } from './ssm.js';
 import { HM } from './materials.js';
 
 const merge = (list) => mergeGeometries(list.map(ix));
 const A = (a, r, x) => az(deg(a), r, x);
 const BAY = (k) => (BAY_PHI[k] * 180) / Math.PI;
+// light shield: runs step out from inside the forward shell to the liner–skin gap just past the joint
+const RG = RAD.gap, XJ = ST.fwdShell - 0.05, XG = ST.fwdShell + 0.1;
 
 export function buildWiring(P, { oes }) {
   const out = { length: {} };
@@ -91,13 +95,15 @@ export function buildWiring(P, { oes }) {
   const o = (i) => oes.phiDeg(i);
   run('ota', ota, arcPts(1.58, 5.2, o(1) - 5, o(7) + 5, 8), 0.012);
   for (const i of [1, 2, 3, 4, 5, 6, 7]) run('ota', ota, [A(o(i), 1.58, 5.2), A(o(i), 1.6, oes.x - 0.1)], 0.009);
-  run('ota', ota, [A(30, 1.58, 5.2), A(30, 1.47, 5.12), A(30, 1.47, 3.72), A(30, 1.36, 3.69), A(30, 1.36, 3.57), A(30, 0.9, 3.5)], 0.016);
+  // the trunk passes the main ring at 37.5°, between two of its stiffening fins
+  run('ota', ota, [A(30, 1.58, 5.2), A(37.5, 1.47, 5.14), A(37.5, 1.47, 3.72), A(30, 1.36, 3.69), A(30, 1.36, 3.57), A(30, 0.9, 3.5)], 0.016);
   run('ota', ota, arcPts(0.9, 3.5, 30, 390, 10), 0.011);
   for (const a of [30, 120, 210, 300]) run('ota', ota, [A(a, 0.9, 3.5), A(a + 6, 0.92, 3.6)], 0.009);
-  run('ota', ota, [A(30, 1.47, 4.25), A(30, 1.41, 4.14), A(45, 1.41, 6.56), A(30, 1.41, 9.0), ...arcPts(1.41, 9.02, 30, 2, 7), A(2, 1.36, 9.11), A(2, 0.42, 9.11), A(2, 0.22, 9.13), A(2, 0.2, 9.2)], 0.012);
-  run('ota', ota, [A(30, 1.47, 3.72), A(30, 1.52, 3.48), A(30, 1.9, 3.47)], 0.014);
+  run('ota', ota, [A(37.5, 1.47, 4.25), A(37.5, 1.41, 4.14), A(45, 1.41, 6.56), A(30, 1.41, 9.0), ...arcPts(1.41, 9.02, 30, 2, 7), A(2, 1.36, 9.11), A(2, 0.42, 9.11), A(2, 0.22, 9.13), A(2, 0.2, 9.2)], 0.012);
+  run('ota', ota, [A(37.5, 1.47, 3.72), A(30, 1.52, 3.48), A(30, 1.9, 3.47)], 0.014);
   run('ota', ota, arcPts(1.9, 3.47, -90, 90, 8), 0.013);
-  for (const c of [0, 90, 270]) run('ota', ota, [A(c + 5, 1.9, 3.47), A(c + 5, 2.08, 3.44), A(c + 5, 2.08, 2.12), A(c + 5, 2.06, 2.1)], 0.01);
+  // down the shroud wall to each guider, between the door's radiation shield and the skin, past the x 3.4 ring
+  for (const c of [0, 90, 270]) run('ota', ota, [A(c + 5, 1.9, 3.47), A(c + 5, 2.088, 3.44), A(c + 5, 2.088, 2.12), A(c + 5, 2.06, 2.1)], 0.008);
   P('OTA harness', {
     system: 'Electrical', material: 'Wire bundles from the OTA equipment section to the mirror actuators, heaters, secondary mirror and guiders', mass: 20, temp: 290, explode: [0, 0, 0], xrayWeight: 0.4,
     desc: 'The telescope\'s own wiring. The actuator control electronics pick which of the 24 primary and 6 secondary actuators to move; the three fine guidance electronics boxes power and command their guiders and pass guide-star errors to the pointing system; the EP/TCE\'s thermostats keep the mirrors near 21 °C. Routing simplified.',
@@ -107,15 +113,15 @@ export function buildWiring(P, { oes }) {
   // from the MCU and solar-array drive electronics in bay 7 to the door's hinge drive, the antenna
   // hinge drives and latches, and the two solar-array drives
   const mc = [];
-  run('mech', mc, [A(345, 1.72, 4.7), A(350, 1.6, X_EQ1 + 0.01), A(352, 1.47, X_EQ1 + 0.1), A(352, 1.47, 12.25), A(357, 1.62, 12.3), A(0, 1.62, 12.34)], 0.014);
+  run('mech', mc, [A(345, 1.72, 4.7), A(350, 1.6, X_EQ1 + 0.01), A(352, 1.47, X_EQ1 + 0.1), A(352, 1.47, XJ), A(352, RG, XG), A(352, RG, 12.25), A(357, 1.62, 12.3), A(0, 1.62, 12.34)], 0.014);
   run('mech', mc, [A(352, 1.47, 6.95), A(5, 1.58, 6.85), A(10, 1.63, 6.85)], 0.01);                         // +V3 antenna hinge drive and gimbal
-  for (const x of [10.0, 10.95]) run('mech', mc, [A(352, 1.47, x), A(358, 1.6, x), A(0, 1.62, x - 0.12)], 0.009);   // +V3 antenna latches
+  for (const x of [10.0, 10.95]) run('mech', mc, [A(352, RG, x - 0.07), A(358, 1.6, x - 0.07)], 0.009);   // +V3 antenna latches, beside their support rings
   run('mech', mc, [A(352, 1.44, 6.25), ...arcPts(1.44, 6.25, 352, 172, 8)], 0.012);
   run('mech', mc, [A(352, 1.44, 6.25), ...arcPts(1.44, 6.25, 352, 450, 8)], 0.012);
   for (const c of [90, 270]) run('mech', mc, [A(c, 1.44, 6.25), A(c, 1.5, 6.12), A(c, 1.62, 6.12)], 0.01);          // solar array drives
-  run('mech', mc, [A(172, 1.44, 6.25), A(172, 1.47, 6.4), A(172, 1.47, 10.95)], 0.012);
+  run('mech', mc, [A(172, 1.44, 6.25), A(172, 1.47, 6.4), A(172, 1.47, XJ), A(172, RG, XG), A(172, RG, 10.88)], 0.012);
   run('mech', mc, [A(172, 1.47, 6.95), A(185, 1.58, 6.85), A(190, 1.63, 6.85)], 0.01);                       // −V3 antenna hinge drive and gimbal
-  for (const x of [10.0, 10.95]) run('mech', mc, [A(172, 1.47, x), A(178, 1.6, x), A(180, 1.62, x - 0.12)], 0.009);
+  for (const x of [10.0, 10.95]) run('mech', mc, [A(172, RG, x - 0.07), A(178, 1.6, x - 0.07)], 0.009);
   P('Mechanism control harness', {
     system: 'Electrical', material: 'Drive cables for the stepper-motor actuators', mass: 12, temp: 285, explode: [0, 0, 0], xrayWeight: 0.5,
     desc: 'Nine latches (four antenna, four array, one door) and three hinge drives work through stepper-motor rotary drive actuators; this harness carries their drive pulses from the mechanism control unit in bay 7, and the array drive electronics\' signals to the two wing drives. The array latches have been unused since the rigid SA3 wings arrived in 2002. Routing simplified.',
@@ -123,11 +129,13 @@ export function buildWiring(P, { oes }) {
 
   // ------------------------------------------------------------------ Cross Aft Shroud Harness (2002)
   const cash = [];
-  run('cash', cash, [A(47, 1.62, 2.6), A(47, 1.62, 3.3), A(50, 2.0, 3.47), ...arcPts(2.0, 3.47, 50, 245, 8), A(248, 1.97, 3.3), A(248, 1.97, 2.55), A(248, 1.8, 2.5), A(248, 1.77, 2.47)], 0.015);
+  run('cash', cash, [A(47, 1.62, 2.6), A(47, 1.62, 3.3), A(50, 2.0, 3.47), ...arcPts(2.0, 3.47, 50, 245, 8), A(247, 1.95, 3.45), A(248, 1.95, 3.3), A(248, 1.95, 2.56), A(249.85, 1.855, 2.51)], 0.015);
+  const clamps = [];
+  for (let a = 64; a < 245; a += 24) clamps.push(new THREE.BoxGeometry(0.09, 0.045, 0.03).translate(3.495, 2.0, 0).rotateX(deg(a)));
   P('Cross Aft Shroud Harness (CASH)', {
     system: 'Electrical', material: 'Power harness clamped to the internal handrails', mass: 6, temp: 285, explode: [0, 0, 0], xrayWeight: 0.6,
-    desc: 'Spacewalkers added it in 2002 to power the NICMOS cooling system, from the bay COSTAR then held (now COS) round the −V3 side to the cooler. In 2009 they had to move it to a lower handrail just to reach the gyros — a measure of how crowded the aft shroud is. Route approximate.',
-  }, mesh(merge(cash), HM.powerCable()));
+    desc: 'Spacewalkers added it in 2002 to power the NICMOS cooling system, from the bay COSTAR then held (now COS) round the −V3 side to the cooler\'s electronics, clamped along the rail inside the shroud\'s forward end. In 2009 they had to move it to a lower handrail just to reach the gyros — a measure of how crowded the aft shroud is. Route approximate.',
+  }, [mesh(merge(cash), HM.powerCable()), mesh(merge(clamps), HM.al())]);
 
   // ------------------------------------------------------------------ gyro harness (RSU → ECU)
   const gy = [];
@@ -143,8 +151,8 @@ export function buildWiring(P, { oes }) {
   // torquer bars, magnetometers and the five coarse sun sensors join the forward trunk or run to bay 8
   const ps = [];
   for (const [c, t] of [[45, 62], [135, 118], [225, 242], [315, 298]]) run('pointing', ps, [A(c, 1.62, 6.4), A(c, 1.485, 6.45), ...arcPts(1.485, 6.45, c, t, 6)], 0.009);
-  for (const [t, c] of [[62, 70], [298, 290]]) run('pointing', ps, [A(t, 1.485, 12.6), A(c, 1.53, 12.62)], 0.008);
-  for (const [t, c] of [[118, 110], [242, 250]]) run('pointing', ps, [A(t, 1.485, 12.6), A(c, 1.5, 12.8), A(c, 1.56, 12.82)], 0.008);
+  for (const [t, c] of [[62, 70], [298, 290]]) run('pointing', ps, [A(t, RG, 12.6), A(c, 1.55, 12.6)], 0.008);            // magnetometers
+  for (const [t, c] of [[118, 110], [242, 250]]) run('pointing', ps, [A(t, RG, 12.6), A(c, RG, 12.8), A(c, 1.58, 12.82)], 0.008);   // forward sun sensors
   run('pointing', ps, [A(180, 2.07, 0.85), ...arcPts(1.96, 0.85, 180, 20, 8), A(20, 1.96, 3.45), A(18, 1.85, X_EQ0 + 0.06), A(17, 1.75, X_EQ0 + 0.09)], 0.01);
   run('pointing', ps, [A(340, 2.07, 0.85), ...arcPts(1.96, 0.85, 340, 380, 8)], 0.01);
   run('pointing', ps, [A(20, 1.96, 0.85), A(20, 2.07, 0.85)], 0.008);

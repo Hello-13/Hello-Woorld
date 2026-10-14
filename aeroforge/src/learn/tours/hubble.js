@@ -68,9 +68,10 @@ export default [
     body: 'Six gyroscopes in three rate sensor units feel every motion. Three star trackers fix the attitude to an arc-minute, enough to put guide stars in the Fine Guidance Sensors, which lock on two of them 40 times a second. If the computer falls silent, bay 8\'s safe-mode electronics turn the arrays to the Sun.',
     key: 'Held to 0.007″ for 24 hours: about the width of a human hair seen from 1.6 km.',
     focus: ['Rate sensor unit 1', 'Rate sensor unit 2', 'Rate sensor unit 3', 'Gyro electronics control units', 'Fixed-head star trackers', 'Fine Guidance Sensor 1', 'Fine Guidance Sensor 2', 'Fine Guidance Sensor 3', 'FGS 1 star selectors & interferometers', 'FGS 2 star selectors & interferometers', 'FGS 3 star selectors & interferometers', 'Fine guidance electronics', 'Pointing/safemode electronics assembly', 'Retrieval mode gyro assembly', 'Coarse sun sensors (aft)', 'Gyro harness (RSU → ECU)', 'FPS −V3 equipment shelves'],
-    // steeply from above the +V2 side: the camera cannot go below the horizon, and from up here the
-    // −V3 gyros and trackers show through the ghosted skins with their labels apart
-    mode: 'systems', explode: 0.35, view: { dir: [-0.3, 1.3, -1], fill: 1.6, lift: -0.85 },
+    // from below the −V3 side, aft: the orbit look lets the camera under the vehicle, so the −V3 gyros
+    // and star trackers face it through the ghosted shroud with the guiders either side (in the
+    // showroom look the floor holds the camera at the horizon, a side view of the same parts)
+    mode: 'systems', explode: 0.35, view: { dir: [-0.4, -1.0, 0.6], fill: 1.25, lift: -0.8 },
   },
   {
     title: 'Power',

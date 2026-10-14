@@ -390,10 +390,15 @@ export function buildInstruments(P, root) {
     system: 'Thermal control', material: 'Reverse-Brayton cryocooler: compressor, turboalternator, recuperator, on a mounting plate', mass: 50, temp: 300, explode: az(ncsPhi, 1.2, -0.3), xrayWeight: 0.6,
     desc: 'Installed in 2002 to revive NICMOS after its solid-nitrogen dewar ran dry. A compressor drives neon gas through a recuperator heat exchanger to a tiny turboalternator spinning at about 7,000 revolutions per second, where the expanding gas gets cold. Layout and location approximate.',
   }, [mesh(merge(cc), HM.al()), mesh(merge(ccParts), HM.iridite()), mesh(merge(ccDet), HM.box())]);
+  // the ESM hangs on a flat plate bolted across two of the shroud's internal longerons (236.25° and
+  // 258.75°); the plate's ends meet the longerons' inner faces, the box sits on its inner face
+  const esmPhi = deg(247.5);
+  const esmPlate = [rbox(esmPhi, 0.5, 0.02, 0.84, 2.25, 1.975)];
+  for (const t of [-0.39, 0.39]) for (const x of [2.06, 2.44]) esmPlate.push(rcyl(esmPhi, 0.012, 0.02, 'r', x, 1.955, t, 6));   // bolts at the longerons
   P('NCS electronics support module', {
-    system: 'Thermal control', material: 'ESM: cryocooler drive and control electronics', mass: 15, temp: 298, explode: az(deg(248), 1.2, -0.3),
-    desc: 'The cooler\'s electronics box, installed with it in 2002, sets the compressor and turbine speeds. Power reaches it over the Cross Aft Shroud Harness. Position approximate.',
-  }, [mesh(rbox(deg(248), 0.4, 0.22, 0.3, 2.25, 1.76), HM.box()), mesh(merge([rcyl(deg(248), 0.022, 0.05, 'x', 2.47, 1.76, -0.08, 10), rcyl(deg(248), 0.022, 0.05, 'x', 2.47, 1.76, 0.06, 10)]), HM.box())]);
+    system: 'Thermal control', material: 'ESM: cryocooler drive and control electronics, on a mounting plate across two shroud longerons', mass: 15, temp: 298, explode: az(esmPhi, 1.2, -0.3),
+    desc: 'The cooler\'s electronics box, installed with it in 2002, sets the compressor and turbine speeds. Power reaches it over the Cross Aft Shroud Harness. Drawn on a plate bolted across two of the shroud\'s longerons; position approximate.',
+  }, [mesh(merge([rbox(esmPhi, 0.4, 0.22, 0.3, 2.25, 1.855), rcyl(esmPhi, 0.022, 0.05, 'x', 2.47, 1.855, -0.08, 10), rcyl(esmPhi, 0.022, 0.05, 'x', 2.47, 1.855, 0.06, 10)]), HM.box()), mesh(merge(esmPlate), HM.al())]);
   const loop = [
     ...cablePath([az(deg(236), 1.53, 2.68), [2.45, -0.8, -1.0], [2.2, -0.7, -0.93], [2.0, -0.62, -0.62]], 0.012, 8),
     ...cablePath([az(deg(232), 1.53, 2.62), [2.4, -0.86, -0.99], [2.15, -0.76, -0.93], [2.0, -0.55, -0.7]], 0.012, 8),
