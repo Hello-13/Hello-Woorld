@@ -421,34 +421,46 @@ export function buildWeapons(ctx) {
     // muzzle blast trough up to the gun port in the glove skin
     g.push(rectTube([[8.6, 0.045, gz], [8.6, 0.085, gz]], 0.12, 0.2, { n: 2, up: [1, 0, 0] }));
     P('M61A2 20 mm cannon', {
-      system: 'Weapons', material: 'Steel barrels, lightweight composite housing', mass: 92, massSource: 'GD-OTS via Wikipedia: 202 lb (92 kg)',
+      system: 'Weapons', material: 'Steel barrels, lightweight composite housing', mass: 92, massSource: 'GD-OTS F-22A 20 mm gun system sheet: 202 lb (91.6 kg)',
       explode: [0.9, 1.35, 1.4], callout: true, anchor: [X(9.4), gy + 0.18, gz],
       desc: 'A six-barrel 20 mm Gatling gun in the right wing root, 1.83 m (71.93 in) long. Mechanically it is an M61A1 with thinner barrels, which cut its weight from 248 lb to 202 lb; its rate is switchable between 4,000 and 6,000 rounds per minute (about 100 per second).',
     }, mesh(merge(g), F.gun()));
     // hydraulic drive behind the breech, geared to the rotor, with a flexible shaft to the conveyor
+    let gunDrive = null;
     {
       const d = [FR.boxS(10.52, 0.05, 1.6, 0.2, 0.16, 0.13), FR.cylX(10.68, 0.05, 1.6, 0.12, 0.055, 0.05, 14)];   // gearbox, then motor; container starts at s 10.75
       d.push(FR.pipe([[10.45, 0.05, 1.64], [10.41, 0.045, 1.7], [10.37, 0.02, 1.72]], 0.025, 8, 6));      // output to the rotor
-      const f = [FR.pipe([[10.62, -0.03, 1.64], [10.7, -0.08, 1.66], [10.8, -0.09, 1.68]], 0.015, 6, 8)];
-      P('M61A2 hydraulic gun drive & flexible shafts', {
-        system: 'Weapons', material: 'Hydraulic motor and gearbox (two subassemblies in one unit), flexible drive shafts', mass: 24,
-        explode: [0.4, 1.7, 1.55],
-        desc: 'Aircraft M61s are hydraulically driven: one motor spins the rotor and barrels and, through a flexible shaft, the ammunition conveyor, so gun and feed always stay in step. The F-22\'s drive is two subassemblies in one unit, started by a computer command or the trigger.',
-      }, [mesh(merge(d), F.hyd()), mesh(merge(f), F.steel())]);
+      gunDrive = d;
     }
-    const a = [];
-    // storage container, s 10.75–12.65, under the right wing root
-    a.push(FR.boxS(11.7, -0.06, 1.66, 1.9, 0.30, 0.26));
-    const ribs = [];
-    for (let s = 10.95; s < 12.6; s += 0.3) ribs.push(FR.boxS(s, -0.06, 1.66, 0.025, 0.315, 0.27));
-    // feed chute (rounds to the gun) and return chute (empty cases back to the container)
-    const ch = [rectTube([[10.78, 0.0, 1.7], [10.6, -0.01, 1.74], [10.4, -0.04, 1.75]], 0.12, 0.06, { n: 8 }),
-      rectTube([[10.4, -0.13, 1.68], [10.6, -0.15, 1.66], [10.78, -0.15, 1.64]], 0.12, 0.06, { n: 8 })];
-    P('Linear linkless ammunition system', {
-      system: 'Weapons', material: 'Aluminium storage container with internal conveyor, feed and return chutes', mass: 230,
-      explode: [0.2, 1.45, 1.2],
-      desc: 'Holds 480 rounds (each 20 × 102 mm, about 168 mm long) under the right wing for easy upload, and feeds them to the gun at up to 100 per second without links. Spent cases ride the return chute back into the container rather than being thrown overboard where they could strike the airframe.',
-    }, [mesh(merge(a), F.boxLight()), mesh(merge(ribs), F.alu()), mesh(merge(ch), F.box())]);
+    // linear linkless ammunition handling system: a composite container laid across the belly behind the main bay,
+    // a single conveyor loop of 473 elements through it, a semi-flexible recoil track up to the ammunition transfer
+    // unit on the gun, and a drive shaft from the gun drive to the container (GD-OTS; Wolff, NDIA 2007)
+    {
+      const A = FR.AMMO, sm = (A.s0 + A.s1) / 2, ym = (A.y0 + A.y1) / 2, zm = (A.z0 + A.z1) / 2;
+      const a = [FR.boxS(sm, ym, zm, A.s1 - A.s0, A.y1 - A.y0, A.z1 - A.z0 - 0.12)];
+      // turnaround guide housings at both ends, a little proud of the panels; access gates in the top cover
+      const ends = [];
+      for (const z of [A.z0 + 0.04, A.z1 - 0.04]) ends.push(FR.boxS(sm, ym, z, A.s1 - A.s0 + 0.012, A.y1 - A.y0 + 0.012, 0.08));
+      for (const z of [-0.3, 0.3, 0.9]) ends.push(FR.boxS(sm, A.y1 + 0.004, z, 0.16, 0.008, 0.22));
+      // the recoil track: a chute of articulated links from the container's gun end up and forward to the transfer
+      // unit under the breech; feed and return lanes side by side
+      const track = [[A.s0 + 0.12, A.y1 - 0.02, A.z1 - 0.1], [A.s0 + 0.1, -0.62, A.z1 - 0.06], [A.s0 + 0.02, -0.42, A.z1 + 0.06], [10.62, -0.24, 1.55], [10.44, -0.14, 1.61], [10.31, -0.1, 1.63]];
+      const ch = [rectTube(track, 0.14, 0.07, { n: 20 })];
+      // link joints along the track
+      const tu = [FR.boxS(10.27, -0.09, 1.63, 0.14, 0.1, 0.15)];                                  // ammunition transfer unit
+      P('Linear linkless ammunition system', {
+        system: 'Weapons', material: 'Glass / carbon-epoxy container panels on aluminium honeycomb, PEEK conveyor elements, semi-flexible recoil track, transfer unit', mass: 187,
+        explode: [0.2, -1.45, 0.6],
+        desc: 'Holds 480 rounds on one continuous conveyor of 473 composite elements that loops through a 2.3 m container laid across the belly behind the main weapons bay, just forward of the right main-gear well (T.O. 00-105E-9; GD-OTS). A semi-flexible recoil track carries the rounds up to the transfer unit on the gun and lets the belt move with the recoiling gun, and the fired cases ride back into the container instead of being thrown overboard. GD-OTS gives 178 lb (81 kg) for the feed system and 288 lb (131 kg) for a full load of ammunition.',
+      }, [mesh(merge(a), F.boxLight()), mesh(merge(ends), F.alu()), mesh(merge(ch), F.box()), mesh(merge(tu), F.gun())]);
+      // the gun drive's flexible container drive shaft runs down beside the recoil track to the container's drive end
+      const f = [FR.pipe([[10.6, -0.02, 1.66], [10.68, -0.2, 1.6], [10.82, -0.42, A.z1 + 0.1], [A.s0 + 0.15, -0.64, A.z1 + 0.02], [A.s0 + 0.16, A.y1 - 0.01, A.z1 - 0.05]], 0.014, 6, 24)];
+      P('M61A2 hydraulic gun drive & flexible shafts', {
+        system: 'Weapons', material: 'Hydraulic motor and gearbox (two subassemblies in one unit), flexible container drive shaft', mass: 24,
+        explode: [0.4, 1.7, 1.55],
+        desc: 'Aircraft M61s are hydraulically driven: one motor at the breech spins the rotor and barrels and, through a flexible drive shaft down to the container, the ammunition conveyor, so gun and feed always stay in step. The F-22\'s drive is two subassemblies in one unit, started by a computer command or the trigger (GD-OTS lists the hydraulic drive, container drive shaft and transfer unit as separate replaceable units).',
+      }, [mesh(merge(gunDrive), F.hyd()), mesh(merge(f), F.steel())]);
+    }
     // gun-port door: flush panel on the upper glove over the muzzle
     const gst = [8.45, 8.6, 8.75];
     const grid = toothedGrid((s, u) => { const z = lerp(1.64, 1.8, u); return [X(s), FR.topAt(s, z) + 0.004, z]; }, gst, { width: 0.16 });

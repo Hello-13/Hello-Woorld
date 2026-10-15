@@ -733,6 +733,8 @@ export const WING = {
   bodyZ: 2.2,
 };
 export const wingLE = (z) => WING.apex + z * tan(WING.le);
+/** Station where the wing spar at chord fraction f meets the side of the body (the fuselage frame it bolts to). */
+export const sparStation = (f) => wingLE(WING.bodyZ) + f * (wingTE(WING.bodyZ) - wingLE(WING.bodyZ));
 /** Reference-trapezoid trailing edge (defines the 78.04 m² area and the section chords inboard of the kink). */
 export const wingTEref = (z) => WING.apex + WING.c0 + z * tan(WING.te);
 /** Real trailing edge: the reference line to the kink, then the 42° tip clip. */
@@ -857,6 +859,38 @@ export const OPEN_DOOR_Z = MAIN_BAY.z - 2 * MAIN_DOOR.thick + 0.005;
  * the panel's inner face; crank and fitting arm stay parallel, so the link keeps its length through the swing.
  */
 export const BAY_DRIVE = { z: MAIN_BAY.z + 0.025, y: -0.865, r: 0.035, shaftR: 0.016, stations: [7.42, 8.82, 10.22], s0: 7.36, s1: 10.28, pdu: 8.15, fit: [-0.03, 0.033] };
+
+// ------------------------------------------------------------------ gun, ammunition, APU / SES, accessory drives
+/** M61A2 in the right wing root: barrel axis (z, y), muzzle and breech stations (1.83 m gun; T.O. 00-105E-9 top panel
+ *  map: gun port 8.4–9.3, gun access panel to 10.5). */
+export const GUN = { z: 1.72, y: 0.0, muzzle: 8.55, breech: 10.38 };
+/**
+ * Linear linkless ammunition container (GD-OTS F-22A gun system sheet and Wolff, NDIA 2007): a 9.1 × 9.3 in box laid
+ * across the aircraft, 99.8 in from the gun's outer side to its far end, its top 44 in below the gun's transfer unit;
+ * T.O. 00-105E-9: "immediately forward of the right main landing gear door and across the belly", just behind the
+ * main weapons bay (its side view shows it there, ahead of the main wheel). [s0, s1] × [z0 (far end), z1 (gun end)] ×
+ * [y0, y1].
+ */
+export const AMMO = { s0: 10.77, s1: 11.0, z0: -0.705, z1: 1.40, y0: -0.972, y1: -0.735 };
+/** APU in the left wing root between its upper-surface inlet and exhaust doors (T.O. top panel map: inlet door #4263
+ *  ≈ 9.75–10.2, exhaust door #4289 ≈ 10.5–10.95; NAWDC top view: exhaust diamond at 10.45–10.95, z ≈ −1.45…−1.75),
+ *  between the wing-carry-through frames; the SES air and fuel bottles are under the upper panel between the engines
+ *  (T.O. panel #4336, ≈ 13.5–14.3). */
+export const APU = { s0: 10.3, s1: 10.92, z: -1.70, y: -0.03, inlet: [9.75, 10.2], exhaust: [10.5, 10.95] };
+export const SES = { s0: 13.5, s1: 14.3 };
+/** Airframe-mounted accessory drive under the front of each engine, over the AMAD bay screens on the belly (T.O. bottom
+ *  panel map: AMAD screens #4223 / #4224 ≈ 11.3–11.7, z ≈ ±0.45–0.8; air-turbine-starter exhaust screens ≈ 12.0–12.4). */
+export const AMAD = { s0: 11.36, s1: 11.84, z: 0.62, y: -0.865, w: 0.27, h: 0.2 };
+/**
+ * Space kept free for the landing-gear wells, which the next phase re-designs: the main wheel bays (NAWDC / T.O. bottom
+ * views: doors ≈ 11.0–12.3, z ≈ 1.1–2.45, outboard of the engine bays) up to y −0.25, and the nose well between the
+ * inlets (doors ≈ 4.65–6.0) up to the cockpit floor. Nothing new is placed in them.
+ */
+export const WELL_RESERVE = { main: { s0: 10.98, s1: 12.4, z0: 1.08, z1: 2.5, y1: -0.25 }, nose: { s0: 4.45, s1: 6.15, z: 0.30, y1: -0.05 } };
+
+/** F119 mounts: forward trunnions on the engine-bay frame at the wing's mid titanium spar (into the keel web and the
+ *  titanium boom, whose inner face is at boomZ), aft link at the rear engine-bay frame, up to a fitting at aftY. */
+export const ENGINE_MOUNTS = { fwd: sparStation(0.49), aft: 14.75, boomZ: 1.45, aftY: upperB(14.75, ENG_Z + 0.3) - 0.085 };
 
 // ------------------------------------------------------------------ lighting
 /**

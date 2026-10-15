@@ -404,55 +404,64 @@ export function buildPropulsion(ctx) {
       }, [mesh(merge(acts), F.hyd()), mesh(merge(lines), F.pipe())]);
     }
     // ---------------------------------------------------------------- gearbox, AMAD, engine fuel, lube, ignition, mounts
+    // Under the front of each engine (T.O. 00-105E-9 bottom panel map: AMAD bay screens at ≈ 11.3–11.7 and the air
+    // turbine starter's exhaust screens at ≈ 12.0–12.4, inboard of the main-gear wells): the airframe-mounted
+    // accessory drive (FR.AMAD) with the generator on its front face and the starter and hydraulic pumps on its aft
+    // face, and behind it the engine's own gearbox, joined to it by the power take-off shaft
     {
-      // hung close under the fan case, so it and its drive pads stay above the engine-change door's inner face
-      const gy = yc - 0.65;
+      const AM = FR.AMAD, az = AM.z * side, ay = AM.y;
+      // engine-mounted gearbox under the fan case's aft end, driven by a radial tower shaft from the HP spool
+      const G0 = 12.2, G1 = 12.7, gy = -0.79, gm = (G0 + G1) / 2;
       const g = [];
-      g.push(new THREE.BoxGeometry(0.5, 0.12, 0.34).translate(X(EM(13.85)), gy, zc));
-      g.push(FR.cylX(EM(13.85), gy + 0.07, zc, 0.46, 0.05, 0.05, 10));                         // tower-shaft housing
-      for (const s of [EM(13.66), EM(14.02)]) g.push(new THREE.CylinderGeometry(0.045, 0.045, 0.06, 12).rotateX(Math.PI / 2).translate(X(s), gy, zc - side * 0.2));   // drive pads on the inboard face
+      g.push(new THREE.BoxGeometry(G1 - G0, 0.11, 0.34).translate(X(gm), gy, zc));
+      g.push(new THREE.CylinderGeometry(0.045, 0.045, 0.12, 12).translate(X(12.36), gy + 0.11, zc));             // tower-shaft housing up into the case
+      for (const s of [12.3, 12.58]) g.push(new THREE.CylinderGeometry(0.042, 0.042, 0.05, 12).rotateX(Math.PI / 2).translate(X(s), gy, zc - side * 0.19));   // drive pads on the inboard face
+      g.push(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 14).rotateZ(Math.PI / 2).translate(X(G0 - 0.02), gy - 0.02, zc));   // PTO pad on the front face
       P(`F119 accessory gearbox (${R})`, {
         system: 'Propulsion', material: 'Aluminium / magnesium gear case, steel gears, mounted under the fan case', mass: 55,
         explode: [0.2, -0.95, 0.55 * side],
-        desc: 'The engine-mounted gearbox takes power off the HP spool through a radial tower shaft and drives the engine\'s own fuel and lube pumps; a power take-off pad on its outboard side drives the shaft to the airframe gearbox.',
+        desc: 'The engine-mounted gearbox takes power off the HP spool through a radial tower shaft and drives the engine\'s own fuel, augmentor and lube pumps; a power take-off pad on its front face drives the shaft forward to the airframe gearbox.',
       }, mesh(merge(g), F.boxLight()));
-      // power take-off shaft up and outboard to the AMAD, with flexible couplings at both ends
-      const pA = new THREE.Vector3(X(EM(13.72)), gy + 0.03, zc + side * 0.17), pB = new THREE.Vector3(X(EM(13.74)), -0.44, side * 1.255);
-      const sh = [FR.pipe([[EM(13.72), pA.y, pA.z], [EM(13.73), (pA.y + pB.y) / 2, (pA.z + pB.z) / 2], [EM(13.74), pB.y, pB.z]], 0.03, 10, 4)];
-      for (const p of [pA, pB]) sh.push(new THREE.CylinderGeometry(0.045, 0.045, 0.04, 14).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), pB.clone().sub(pA).normalize())).translate(p.x, p.y, p.z));
+      // power take-off shaft forward to the AMAD, with flexible diaphragm couplings at both ends
+      const pA = new THREE.Vector3(X(G0 - 0.04), gy - 0.02, zc), pB = new THREE.Vector3(X(AM.s1 + 0.02), ay - 0.01, az);
+      const sh = [FR.pipe([[G0 - 0.04, pA.y, pA.z], [(G0 + AM.s1) / 2, (pA.y + pB.y) / 2, (pA.z + pB.z) / 2], [AM.s1 + 0.02, pB.y, pB.z]], 0.026, 10, 4)];
+      for (const q of [pA, pB]) sh.push(new THREE.CylinderGeometry(0.04, 0.04, 0.035, 14).rotateZ(Math.PI / 2).translate(q.x, q.y, q.z));
       P(`Power take-off shaft (${R})`, {
         system: 'Propulsion', material: 'Steel shaft with flexible diaphragm couplings', mass: 6,
         explode: [0.45, -1.35, 0.95 * side],
-        desc: 'A short, fast-turning shaft carries engine power out of the engine to the airframe-mounted accessory drive; its flexible couplings let the engine grow and move on its mounts without loading the gearboxes. During a start, power flows the other way along it to spin the engine up.',
+        desc: 'A short, fast-turning shaft carries engine power out of the engine to the airframe-mounted accessory drive just ahead of it; its flexible couplings let the engine grow and move on its mounts without loading the gearboxes. During a start, power flows the other way along it to spin the engine up.',
       }, mesh(merge(sh), F.steel()));
-      const am = [new THREE.BoxGeometry(0.5, 0.2, 0.24).translate(X(EM(13.75)), -0.42, side * 1.38)];
-      am.push(new THREE.BoxGeometry(0.06, 0.24, 0.2).translate(X(EM(13.5)), -0.42, side * 1.38), new THREE.BoxGeometry(0.06, 0.24, 0.2).translate(X(EM(14.01)), -0.42, side * 1.38));   // mounting faces
-      am.push(FR.cylX(EM(13.75), -0.3, side * 1.38, 0.12, 0.035, 0.035, 10));                   // oil filler / breather
+      const am = [new THREE.BoxGeometry(AM.s1 - AM.s0, AM.h, AM.w).translate(X((AM.s0 + AM.s1) / 2), ay, az)];
+      for (const s of [AM.s0 + 0.03, AM.s1 - 0.03]) am.push(new THREE.BoxGeometry(0.05, AM.h + 0.03, AM.w + 0.03).translate(X(s), ay, az));   // mounting faces
+      am.push(FR.cylX((AM.s0 + AM.s1) / 2, ay + AM.h / 2 + 0.03, az, 0.1, 0.03, 0.03, 10));                      // oil filler / breather
+      // air turbine starter on the aft face, inboard, its exhaust down to the screens in the belly
+      const st = [FR.cylX(AM.s1 + 0.11, ay - 0.01, az - side * 0.15, 0.22, 0.07, 0.065, 14)];
+      st.push(FR.pipe([[AM.s1 + 0.2, ay - 0.04, az - side * 0.15], [AM.s1 + 0.27, ay - 0.08, az - side * 0.15], [AM.s1 + 0.3, -FR.bD(AM.s1 + 0.3) + 0.03, az - side * 0.15]], 0.045, 10, 6));
       P(`Airframe-mounted accessory drive (${R})`, {
-        system: 'Propulsion', material: 'AMAD: aluminium gear case, steel gears, own lube system', mass: 45,
+        system: 'Propulsion', material: 'AMAD: aluminium gear case, steel gears, own lube system; air turbine starter on its aft face', mass: 45,
         explode: [0.3, -0.55, 1.55 * side],
-        desc: 'The AMAD is the airframe gearbox: it turns this side\'s 270 V DC generator (bolted to its forward face) and the engine-driven hydraulic pumps (aft face), and spins the engine for a start. If one fails, that side loses hydraulic and electrical power; every F-22 AMAD is validated on a single depot test stand at Hill AFB.',
-      }, mesh(merge(am), F.boxLight()));
+        desc: 'The AMAD is the airframe gearbox under the front of the engine: it turns this side\'s 270 V DC generator (forward face) and the engine-driven hydraulic pumps (aft face), and its air turbine starter, blown by the APU, spins the engine for a start; the T.O. shows its cooling screens and the starter\'s exhaust screens in the belly. If one fails, that side loses hydraulic and electrical power; every F-22 AMAD is validated on a single depot test stand at Hill AFB.',
+      }, [mesh(merge(am), F.boxLight()), mesh(merge(st), F.tiDull())]);
 
       const f = [];
-      // (on the gearbox's front face, aft of the gap under the fan face where the airframe lines cross)
-      f.push(new THREE.BoxGeometry(0.14, 0.14, 0.16).translate(X(EM(13.53)), gy - 0.01, zc + side * 0.1));       // main fuel pump
-      f.push(new THREE.BoxGeometry(0.15, 0.12, 0.14).translate(X(EM(13.525)), gy - 0.01, zc - side * 0.1));     // fuel metering unit
-      f.push(FR.pipe([[EM(13.5), gy + 0.05, zc - side * 0.1], [EM(13.9), gy + 0.08, zc - side * 0.18], [EM(14.5), yc - 0.62, zc - side * 0.22], [EM(14.75), yc - 0.4, zc - side * 0.12], [EM(14.79), yc - 0.29, zc - side * 0.04]], 0.016, 6));
+      // on the gearbox's front face, either side of the PTO pad
+      f.push(new THREE.BoxGeometry(0.12, 0.1, 0.12).translate(X(G0 - 0.06), gy - 0.005, zc + side * 0.12));       // main fuel pump
+      f.push(new THREE.BoxGeometry(0.12, 0.1, 0.11).translate(X(G0 - 0.06), gy - 0.005, zc - side * 0.12));      // fuel metering unit
+      f.push(FR.pipe([[G0 - 0.06, gy + 0.05, zc - side * 0.12], [G0 + 0.1, -0.715, zc - side * 0.2], [12.85, -0.66, zc - side * 0.22], [EM(14.72), yc - 0.48, zc - side * 0.14], [EM(14.79), yc - 0.3, zc - side * 0.03]], 0.016, 6, 24));
       P(`Engine fuel pump & metering unit (${R})`, {
         system: 'Propulsion', material: 'Gear-driven high-pressure pump, FADEC-controlled metering unit', mass: 40,
         explode: [0.9, -1.15, 0.65 * side],
-        desc: 'On the gearbox: the main fuel pump raises the fuel delivered by the airframe boost pumps to injection pressure, and the metering unit, set by the FADEC, meters it into the combustor manifold. The same fuel first cools the engine oil.',
+        desc: 'On the front of the engine gearbox: the main fuel pump raises the fuel delivered by the airframe boost pumps to injection pressure, and the metering unit, set by the FADEC, meters it to the combustor\'s fuel manifold. The same fuel first cools the engine oil.',
       }, mesh(merge(f), F.boxLight()));
       const a = [];
-      a.push(FR.cylX(EM(14.2), gy, zc, 0.24, 0.07, 0.07, 14));                                     // augmentor pump
-      a.push(FR.pipe([[EM(14.3), gy, zc], [EM(15.1), yc - 0.64, zc + side * 0.05], [EM(15.55), yc - 0.62, zc + side * 0.05], [EM(15.75), yc - 0.56, zc]], 0.018, 6));
+      a.push(FR.cylX(G1 + 0.11, gy, zc, 0.22, 0.065, 0.065, 14));                                                 // augmentor pump on the gearbox's aft face
+      a.push(FR.pipe([[G1 + 0.22, gy, zc], [13.2, yc - 0.635, zc + side * 0.05], [EM(15.55), yc - 0.6, zc + side * 0.05], [EM(15.75), yc - 0.56, zc]], 0.018, 6, 20));
       a.push(tor(0.556, 0.012, EM(15.75), 40));                                                  // zone manifold in the case / liner gap
       for (let k = 0; k < 3; k++) { const ang = Math.PI + (k - 1) * 0.5; a.push(FR.pipe([[EM(15.75), yc + Math.cos(ang) * 0.556, zc + Math.sin(ang) * 0.556 * side], [EM(15.8), yc + Math.cos(ang) * 0.48, zc + Math.sin(ang) * 0.48 * side]], 0.01, 5, 2)); }
       P(`Augmentor fuel pump & zone manifolds (${R})`, {
         system: 'Propulsion', material: 'Centrifugal augmentor pump, three-zone fuel manifolds', mass: 30,
         explode: [-0.7, -1.2, 0.8 * side],
-        desc: 'A separate pump supplies the afterburner, whose demand is several times the dry flow. Fuel goes to three zones lit in sequence as the throttle moves through the afterburner range, feeding the injectors inside the curved augmentor vanes.',
+        desc: 'A separate pump on the back of the engine gearbox supplies the afterburner, whose demand is several times the dry flow. Fuel goes to three zones lit in sequence as the throttle moves through the afterburner range, feeding the injectors inside the curved augmentor vanes.',
       }, mesh(merge(a), F.pipe()));
       const o = [];
       const oy = yc + 0.58, oz = zc - side * 0.33;
@@ -463,7 +472,7 @@ export function buildPropulsion(ctx) {
       P(`Oil tank & lube system (${R})`, {
         system: 'Propulsion', material: 'Aluminium oil tank, lube and scavenge pumps, fuel-cooled oil cooler', mass: 25,
         explode: [0.4, 1.25, -0.5 * side],
-        desc: 'A self-contained lubrication system: a tank on the upper fan case, a pump and filter, and lines to the bearing sumps; scavenge pumps return the oil through a cooler that dumps its heat into the fuel (position approximate).',
+        desc: 'A self-contained lubrication system: a tank on the upper fan case, a pump and filter, and lines to the bearing sumps; scavenge pumps return the oil through a cooler that dumps its heat into the fuel (T.O. 00-105E-9: about 6 US gal of oil per jet; position approximate).',
       }, mesh(merge(o), F.boxLight()));
       const ig = [];
       const ex = [EM(14.5), yc - 0.5, zc + side * 0.36];
@@ -479,31 +488,39 @@ export function buildPropulsion(ctx) {
         desc: 'A high-energy capacitor-discharge exciter fires two igniter plugs in the combustor for starting and relight; the FADEC switches them on automatically if it senses a flame-out.',
       }, mesh(merge(ig), F.copper()));
 
-      const m = [];
-      for (const dz of [-1, 1]) m.push(FR.pipe([[EM(13.9), yc, zc + dz * (E.rCase + 0.01)], [EM(13.75), yc + 0.05, zc + dz * (E.rCase + 0.07)]], 0.03, 6));
-      m.push(FR.pipe([[EM(16.55), yc + 0.1, zc + side * 0.575], [EM(16.4), yc + 0.1, zc + side * 0.65]], 0.025, 6));
-      m.push(FR.pipe([[EM(14.1), yc + E.rCase + 0.01, zc], [EM(13.7), yc + E.rCase + 0.05, zc]], 0.022, 6));
+      // mounts: forward trunnions either side of the fan case on the engine-bay frame (FR.ENGINE_MOUNTS: the
+      // wing's mid titanium spar station), inboard into the keel web and outboard into the titanium boom; an aft
+      // link at the augmentor up to the rear engine-bay frame lets the hot engine grow in length
+      const EMT = FR.ENGINE_MOUNTS, m = [];
+      const sF = EMT.fwd, sA = EMT.aft;
+      m.push(FR.pipe([[sF, yc, zc + side * (E.rCase + 0.005)], [sF, yc, side * (EMT.boomZ - 0.005)]], 0.032, 8, 2));   // outboard trunnion to the boom
+      m.push(FR.pipe([[sF, yc, zc - side * (E.rCase + 0.005)], [sF, yc, side * 0.022]], 0.03, 8, 2));                  // inboard trunnion to the keel
+      for (const zz of [zc + side * (E.rCase + 0.03), side * (EMT.boomZ - 0.04), zc - side * (E.rCase + 0.025)]) m.push(new THREE.BoxGeometry(0.1, 0.11, 0.05).translate(X(sF), yc, zz));
+      const ra = FR.mono(FR.F119_AUG.map(([r, s]) => [s, r]), sA), a45 = Math.PI / 4;
+      const pa = [sA, yc + ra * Math.cos(a45) + 0.005, zc + side * ra * Math.sin(a45)];
+      m.push(FR.pipe([pa, [sA, EMT.aftY, zc + side * 0.3]], 0.024, 6, 2));
+      m.push(new THREE.BoxGeometry(0.08, 0.05, 0.12).translate(X(sA), EMT.aftY, zc + side * 0.3));
       P(`Engine mounts (${R})`, {
-        system: 'Propulsion', material: 'Steel trunnions and links', mass: 35,
+        system: 'Propulsion', material: 'Steel trunnions and links, titanium fittings', mass: 35,
         explode: [0.2, 1.0, 0.7 * side],
-        desc: 'Trunnions on the fan case take thrust and vertical loads into the engine-bay frames; an aft link at the augmentor lets the hot engine grow in length as it heats up. The engine drops out downward for change.',
+        desc: 'Trunnions either side of the fan case take thrust and vertical loads into the engine-bay structure — the keel web inboard and the titanium boom outboard — and an aft link at the augmentor, up to the rear engine-bay frame, lets the hot engine grow in length as it heats up. The engine drops out downward for change (arrangement approximate).',
       }, mesh(merge(m), F.steel()));
-      // dual-channel FADEC on the lower outboard side of the case, with its harness to the fan case
+      // dual-channel FADEC on the lower outboard side of the case, with its harness up the side and along the case
       const th = side > 0 ? 0.542 : Math.PI - 0.542;
       const fy = yc - 0.33, fz = zc + side * 0.55;
       const fd = [new THREE.BoxGeometry(0.4, 0.2, 0.08).rotateX(th).translate(X(EM(14.75)), fy, fz)];
-      fd.push(FR.pipe([[EM(14.55), fy + 0.05, fz], [EM(14.2), fy + 0.1, zc + side * 0.6], [EM(13.9), fy + 0.15, zc + side * 0.6]], 0.012, 5));
+      fd.push(FR.pipe([[EM(14.55), fy + 0.06, fz], [EM(14.4), yc - 0.12, zc + side * 0.61], [EM(14.0), yc, zc + side * 0.61]], 0.012, 5));
       // colour-coded harnesses along the case from the FADEC, and the engine's own sensors
       {
-        const hz = zc + side * 0.6, hz2 = zc + side * 0.56;
-        const blue = [FR.pipe([[EM(14.55), fy + 0.02, fz], [EM(14.3), yc - 0.42, hz], [EM(13.9), yc - 0.42, hz], [EM(13.45), yc - 0.4, hz]], 0.011, 6, 16)];
+        const hz = zc + side * 0.61, hz2 = zc + side * 0.56;
+        const blue = [FR.pipe([[EM(14.55), fy + 0.02, fz], [EM(14.35), yc - 0.14, hz], [EM(13.9), yc - 0.13, hz], [EM(13.45), yc - 0.12, hz]], 0.011, 6, 16)];
         const orange = [FR.pipe([[EM(14.95), fy, fz], [EM(15.2), yc - 0.38, hz2], [EM(15.6), yc - 0.36, zc + side * 0.53]], 0.011, 6, 12)];
-        const green = [FR.pipe([[EM(14.6), fy - 0.05, fz], [EM(14.3), yc - 0.55, zc + side * 0.42], [EM(13.85), gy + 0.08, zc + side * 0.2]], 0.01, 6, 12)];
+        const green = [FR.pipe([[EM(14.6), fy - 0.05, fz], [EM(14.45), yc - 0.5, zc + side * 0.42], [EM(14.3), yc - 0.6, zc + side * 0.18], [12.5, gy + 0.06, zc + side * 0.12]], 0.01, 6, 12)];
         const sens = [];
         // fan-inlet temperature / pressure probes (T2 / P2) through the case at the fan face
         for (const a of [0.6, 2.4]) sens.push(new THREE.CylinderGeometry(0.008, 0.008, 0.1, 6).translate(0, 0.45, 0).rotateX(a * side).translate(X(EM(13.39)), yc, zc));
         // N1 / N2 speed pickups on the gearbox
-        for (const dz of [-0.2, 0.2]) sens.push(new THREE.CylinderGeometry(0.014, 0.014, 0.06, 8).rotateX(Math.PI / 2).translate(X(EM(13.86)), gy, zc + dz));
+        for (const dz of [-0.2, 0.2]) sens.push(new THREE.CylinderGeometry(0.014, 0.014, 0.06, 8).rotateX(Math.PI / 2).translate(X(12.45), gy, zc + dz));
         // turbine-exhaust thermocouples: a ring of probes and their harness at the LP turbine exit
         sens.push(tor(0.555, 0.008, EM(15.6), 40));
         for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; sens.push(new THREE.CylinderGeometry(0.006, 0.006, 0.2, 5).translate(0, 0.46, 0).rotateX(a).translate(X(EM(15.6)), yc, zc)); }
