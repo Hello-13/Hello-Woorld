@@ -48,7 +48,7 @@ export default [
   },
   {
     title: 'Caret inlets, S-ducts',
-    body: 'Each fixed caret inlet has two swept lips that make oblique shocks, slowing supersonic air with little loss. Perforated walls bleed off the slow boundary layer, a bypass door spills surplus air, and the 7 m S-duct hides the fan from any outside view.',
+    body: 'Each fixed caret inlet has two swept lips that make oblique shocks, slowing supersonic air with little loss. Perforated walls bleed off the slow boundary layer, a bypass door spills surplus air, and the 6 m S-duct hides the fan from any outside view.',
     key: 'A single normal shock at Mach 2 wastes 28 % of total pressure; oblique shocks first recover over 90 %.',
     focus: ['Caret inlet cowl (right)', 'Inlet throat & boundary-layer bleed (right)', 'Inlet bleed plenum & exit duct (right)', 'Upper bleed exit grille (right)', 'Serpentine inlet duct (right)',
       'Inlet bypass duct (right)', 'Inlet bypass door (right)', 'F119 variable inlet guide vanes (right)', 'F119 fan (right)'],
@@ -104,7 +104,7 @@ export default [
   },
   {
     title: 'Landing gear',
-    body: 'A steerable nose leg folds aft under the cockpit; two main legs swing up and aft into wells behind the weapons bay, each wheel turning to lie flat. Folding braces lock each leg down, uplocks hold it up, and the door edges are serrated.',
+    body: 'A steerable nose leg folds forward under the cockpit; two main legs swing up and aft into wells behind the weapons bay, each wheel turning to lie flat. Folding braces lock each leg down, uplocks hold it up, and the door edges are serrated.',
     key: 'An oleo strut turns sink energy ½ m v² into heat: a 29 t jet landing at 3 m/s brings about 130 kJ.',
     focus: ['Nose gear shock strut', 'Nose-wheel steering unit', 'Nose gear torque links', 'Nose wheel & tyre', 'Nose gear drag brace & downlock', 'Nose gear retraction actuator', 'Nose gear doors',
       'Nose gear door linkage', 'Nose gear weight-on-wheels switch', 'Taxi / landing light', ...BOTH('Main gear weight-on-wheels switch'),
@@ -125,7 +125,7 @@ export default [
   {
     title: 'One pilot, fused sensors',
     body: 'One pilot sits on an ACES II zero-zero seat — catapult, rocket, parachutes and a digital sequencer — under a frameless canopy, side-stick right, throttles left. OBOGS and a BRAG valve feed oxygen; six displays show one fused picture.',
-    key: 'The canopy is 140 × 45 × 27 in (3.56 × 1.14 × 0.69 m) and 360 lb; its gold film reflects radar away.',
+    key: 'The canopy is quoted as 140 × 45 × 27 in and 360 lb, yet spans 2.85 m in side view; gold film reflects radar.',
     focus: ['Canopy', 'Canopy sill frame & seals', 'Canopy actuator & jettison rockets', 'Cockpit tub & floor', 'Right console', 'Left console', 'Instrument panel & glare shield',
       'Rudder pedals', 'ACES II ejection seat', 'Seat guide rails', 'Seat headbox (drogue & main parachute)', 'Seat survival kit', 'Seat catapult & under-seat rocket',
       'Seat recovery sequencer', 'Ejection handle', 'BRAG valve & oxygen hoses', 'Automatic backup oxygen system (ABOS)', 'OBOGS oxygen concentrator', 'Pilot',

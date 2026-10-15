@@ -152,7 +152,9 @@ export function mountFighterLab(root, ctx) {
   };
 
   // lift ⟂ flight path, drag along it, thrust along the body axis, weight straight down — 4.2 m per W
-  const cg = new THREE.Vector3(-0.8, 0.1, 0);
+  // centre of gravity near s 11.3 (about 35 % of the 6.7 m mean aerodynamic chord, aft of the weapons bay); thrust
+  // acts at the nozzle exits (s ≈ 16.5), 5.2 m behind it
+  const cg = new THREE.Vector3(9.46 - 11.3, 0.1, 0);
   const UP_NUDGE = new THREE.Vector3(0, 1.1, 0), DOWN_NUDGE = new THREE.Vector3(0, -1.1, 0);
   function placeForces() {
     const f = v.state.flight;
@@ -164,7 +166,7 @@ export function mountFighterLab(root, ctx) {
     forces.set('lift', { origin: o, dir: new THREE.Vector3(0, 1, 0), length: Math.min(f.L, W * 2.5) * k, text: kN(f.L), name: 'Lift' });
     forces.set('weight', { origin: o, dir: new THREE.Vector3(0, -1, 0), length: W * k, text: kN(W), name: 'Weight' });
     forces.set('drag', { origin: o.clone().add(new THREE.Vector3(-1.0, 0, 0)), dir: new THREE.Vector3(-1, 0, 0), length: f.D * k, text: kN(f.D), name: 'Drag', labelOffset: UP_NUDGE });
-    forces.set('thrust', { origin: o.clone().add(new THREE.Vector3(-7.5, 0, 0)), dir: new THREE.Vector3(Math.cos(a), Math.sin(a), 0), length: f.T * k, text: kN(f.T), name: 'Thrust', labelOffset: DOWN_NUDGE });
+    forces.set('thrust', { origin: o.clone().add(new THREE.Vector3(-5.2, 0, 0)), dir: new THREE.Vector3(Math.cos(a), Math.sin(a), 0), length: f.T * k, text: kN(f.T), name: 'Thrust', labelOffset: DOWN_NUDGE });
   }
 
   const api = {

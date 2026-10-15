@@ -95,7 +95,7 @@ export function buildPropulsion(ctx) {
     P(`Serpentine inlet duct (${R})`, {
       system: 'Propulsion', material: 'Composite duct with radar-absorbent lining', mass: 160,
       explode: [0, -0.15, 1.0 * side], callout: side > 0, anchor: [X(SM(10.6)), FR.ductSpan(SM(10.6), 0.6).hi, 0.6 * side],
-      desc: 'From the caret inlet the duct climbs and swings inboard over the weapons bay, then turns back down and outboard onto the engine, about 7 m in all. The serpentine ducts keep the fan faces — normally the brightest radar reflectors on a jet — out of line of sight from any exterior view, and an absorbent lining soaks up energy that bounces in. The real duct shape is not published; the model\'s is solved so that no straight line from outside reaches its fan face.',
+      desc: 'From the caret inlet the duct climbs and swings inboard over the weapons bay, then turns back down and outboard onto the engine, about 6 m in all (Lockheed Martin gives its length as 6.35 diameters). The serpentine ducts keep the fan faces — normally the brightest radar reflectors on a jet — out of line of sight from any exterior view, and an absorbent lining soaks up energy that bounces in. The real duct shape is not published; the model\'s is solved so that no straight line from outside reaches its fan face.',
     }, mesh(FR.gridSurface(aft, { closed: true, uv: 'n' }), F.duct()));
     {
       // bypass (spill) door on the upper aft fuselage over the end of the duct, with the short duct to it
