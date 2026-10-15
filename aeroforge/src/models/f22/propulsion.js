@@ -504,7 +504,7 @@ export function buildPropulsion(ctx) {
       const sF = EMT.fwd, sA = EMT.aft;
       m.push(FR.pipe([[sF, yc, zc + side * (E.rCase + 0.005)], [sF, yc, side * (EMT.boomZ - 0.005)]], 0.032, 8, 2));   // outboard trunnion to the boom
       m.push(FR.pipe([[sF, yc, zc - side * (E.rCase + 0.005)], [sF, yc, side * 0.022]], 0.03, 8, 2));                  // inboard trunnion to the keel
-      for (const zz of [zc + side * (E.rCase + 0.03), side * (EMT.boomZ - 0.04), zc - side * (E.rCase + 0.025)]) m.push(new THREE.BoxGeometry(0.1, 0.11, 0.05).translate(X(sF), yc, zz));
+      for (const zz of [zc + side * (E.rCase + 0.03), side * (EMT.boomZ - 0.04), zc - side * (E.rCase + 0.025)]) m.push(new THREE.BoxGeometry(0.07, 0.11, 0.05).translate(X(sF), yc, zz));   // (not proud of the frame's forward face, the main well's aft wall)
       const ra = FR.mono(FR.F119_AUG.map(([r, s]) => [s, r]), sA), a45 = Math.PI / 4;
       const pa = [sA, yc + ra * Math.cos(a45) + 0.005, zc + side * ra * Math.sin(a45)];
       m.push(FR.pipe([pa, [sA, EMT.aftY, zc + side * 0.3]], 0.024, 6, 2));
