@@ -55,7 +55,7 @@ export function buildFighter() {
     lef: [], flaperon: [], aileron: [], stab: [], rudder: [], tvc: [], gear: [], gearDoors: [],
     bay: { doors: [], ejectors: [], trapeze: [] },
   };
-  const ctx = { P, anim, A };
+  const ctx = { P, anim, A, attitude };
 
   // order matters only for shared lookups: the airframe publishes station lists the doors reuse
   const air = buildAirframe(ctx);
@@ -89,17 +89,17 @@ export function buildFighter() {
     const at = [X(FR.FIN.rootS + 1.25 + sp * Math.tan(FR.FIN.sweep)), FR.FIN.rootY + sp * Math.cos(c), side * (FR.FIN.rootZ + sp * Math.sin(c))].map((v, i) => v + n[i] * 0.06);
     add(`Vertical tail (${R})`, tailCode('FF', 'AF 05-4100'), { at, dir: n, size: [1.25, 1.25, 0.12] });
     // national insignia on the intake trunk sides
-    add(`Caret inlet cowl (${R})`, usafInsignia(), { at: [X(7.75), -0.42, side * 1.72], dir: [0, -0.15, side], size: [0.9, 0.45, 0.25] });
-    add(`Wing skin (${R})`, stencilText('NO STEP', 'rgba(30,34,38,0.85)', true), { at: [X(13.0), FR.wingY(3.2) + 0.12, side * 3.2], dir: [0, 1, 0], size: [0.6, 0.15, 0.3], angle: Math.PI / 2 });
+    add(`Caret inlet cowl (${R})`, usafInsignia(), { at: [X(6.25), -0.45, side * 1.68], dir: [0, -0.15, side], size: [0.9, 0.45, 0.3] });
+    add(`Wing skin (${R})`, stencilText('NO STEP', 'rgba(30,34,38,0.85)', true), { at: [X(FR.WM(13.0)), FR.wingY(3.2) + 0.12, side * 3.2], dir: [0, 1, 0], size: [0.6, 0.15, 0.3], angle: Math.PI / 2 });
   }
   // small servicing panels too small to model as doors: single-point refuel and hydraulic / oil fill
-  // on the belly ahead of the engine bays, battery and oxygen-system service under the forward fuselage
-  for (const [s, z, w, l] of [[12.6, -0.45, 0.26, 0.2], [12.6, 0.45, 0.22, 0.18], [13.1, -1.15, 0.18, 0.18], [13.1, 1.15, 0.18, 0.18]]) {
+  // on the belly ahead of the engine bays, battery and oxygen-system service under the forward fuselage (positions approximate)
+  for (const [s, z, w, l] of [[11.22, -0.45, 0.26, 0.2], [11.22, 0.45, 0.22, 0.18], [11.0, -1.25, 0.18, 0.18], [11.0, 1.25, 0.18, 0.18]]) {
     add('Intake trunk & lower fuselage skin', panelOutline('f22.service'), { at: [X(s), -FR.bD(s) - 0.01, z], dir: [0, -1, 0], size: [l, w, 0.12] });
   }
-  for (const side of [1, -1]) add('Forward fuselage skin', panelOutline('f22.service'), { at: [X(6.3), FR.bottomAt(6.3, 0.55) - 0.01, side * 0.55], dir: [0, -1, 0.25 * side], size: [0.3, 0.22, 0.15] });
-  add('Wing skin (left)', usafInsignia(), { at: [X(11.6), FR.wingY(4.4) + 0.12, -4.4], dir: [0, 1, 0], size: [1.4, 0.7, 0.3], angle: -Math.PI / 2 });
-  add('Forward fuselage skin', stencilText('U.S. AIR FORCE', 'rgba(36,40,46,0.85)'), { at: [X(5.0), FR.aYC(5.0) - 0.2, 0.86], dir: [0, -0.3, 1], size: [1.1, 0.22, 0.3] });
+  for (const side of [1, -1]) add('Forward fuselage skin', panelOutline('f22.service'), { at: [X(6.4), FR.bottomAt(6.4, 0.32) - 0.01, side * 0.32], dir: [0, -1, 0.1 * side], size: [0.3, 0.2, 0.15] });
+  add('Wing skin (left)', usafInsignia(), { at: [X(FR.WM(11.6)), FR.wingY(4.4) + 0.12, -4.4], dir: [0, 1, 0], size: [1.4, 0.7, 0.3], angle: -Math.PI / 2 });
+  add('Forward fuselage skin', stencilText('U.S. AIR FORCE', 'rgba(36,40,46,0.85)'), { at: [X(3.6), FR.aYC(3.6) - 0.2, 0.74], dir: [0, -0.3, 1], size: [1.1, 0.22, 0.3] });
 
   // ------------------------------------------------------------------ vapour cone (effect)
   const vcMat = vaporConeMaterial();

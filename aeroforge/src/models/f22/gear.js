@@ -88,7 +88,7 @@ export function buildGear(ctx) {
   };
   const pivotAt = (T) => { const g = new THREE.Group(); g.position.copy(T); return g; };
 
-  // ================================================================== nose gear (retracts aft under the cockpit floor)
+  // ================================================================== nose gear (retracts forward under the cockpit floor)
   {
     const G = FR.GEAR.nose;
     const T = V(X(G.trunnion[0]), G.trunnion[1], G.trunnion[2]);
@@ -98,8 +98,8 @@ export function buildGear(ctx) {
     const L = leg.length();
     const dir = leg.clone().normalize();
     const at = (k) => dir.clone().multiplyScalar(L * k);
-    // stowed: leg lies aft, very slightly nose-down, wheel centred under the floor hump
-    const stowDir = V(X(4.06 + L) - T.x, -0.3 - T.y, 0).normalize();
+    // stowed: the leg lies forward, very slightly nose-down, the wheel under the cockpit floor
+    const stowDir = V(X(G.stowS) - T.x, G.stowY - T.y, 0).normalize();
     const q = new THREE.Quaternion().setFromUnitVectors(dir, stowDir);
     const pv = [];
 
@@ -114,7 +114,7 @@ export function buildGear(ctx) {
     P('Nose gear shock strut', {
       system: 'Landing gear', material: '300M steel / titanium oleo-pneumatic strut, chromed piston', mass: 85,
       explode: [0.4, -0.85, 0],
-      desc: 'A single-wheel oleo-pneumatic strut: nitrogen and hydraulic oil inside it absorb the landing and taxi loads. It retracts aft into a well under the cockpit floor (geometry approximate).',
+      desc: 'A single-wheel oleo-pneumatic strut: nitrogen and hydraulic oil inside it absorb the landing and taxi loads. Its trunnion sits at the aft end of the well and it retracts forward into the well under the cockpit floor, as photographs and the T.O. side view show (geometry approximate).',
     }, pA);
     pv.push(pA);
     // taxi / landing light on a bracket at the front of the strut
@@ -182,7 +182,7 @@ export function buildGear(ctx) {
     const brace = [];
     const bg = new THREE.Group();
     for (const dz of [-0.13, 0.13]) {
-      const Fp = V(X(4.75), -0.2, dz);
+      const Fp = V(X(G.trunnion[0] - 1.06), -0.15, dz);
       const Ad = legPoint(T, q, at(0.3).add(V(0, 0, dz)));
       const fb = foldingBrace(Fp, Ad(0).clone(), Ad(1).clone(), V(0.3, -1, 0));
       const up = unitRod(0.03, F.gear()), lo = unitRod(0.028, F.gear()), lock = mesh(new THREE.BoxGeometry(0.06, 0.06, 0.05), F.yellow());
@@ -193,20 +193,21 @@ export function buildGear(ctx) {
     P('Nose gear drag brace & downlock', {
       system: 'Landing gear', material: 'Steel twin-link folding brace, spring-loaded downlock', mass: 18,
       explode: [0.2, -0.55, 0.55],
-      desc: 'A folding brace straddling the strut holds the leg against drag loads. Locked straight with the gear down (the yellow downlock at the knee), it breaks at the knee and folds flat as the leg swings up and aft.',
+      desc: 'A folding brace straddling the strut holds the leg against drag loads. Locked straight with the gear down (the yellow downlock at the knee), it breaks at the knee and folds flat as the leg swings up and forward (arrangement approximate).',
     }, bg);
-    // retraction actuator, airframe end on a fitting under the forward cockpit bulkhead
-    const Fa = V(X(4.35), -0.11, 0);
+    // retraction actuator, airframe end on a fitting in the well roof just ahead of the trunnion
+    const Fa = V(X(G.trunnion[0] + 0.09), -0.06, 0);
     const Aa = legPoint(T, q, at(0.12).add(V(0, 0.0, 0)));
     const aBar = unitRod(0.042, F.hyd(), 12), aRod = unitRod(0.022, F.chrome(), 8);
     const aLen = Math.min(Fa.distanceTo(Aa(0)), Fa.distanceTo(Aa(1))) * 0.85;
     P('Nose gear retraction actuator', {
       system: 'Landing gear', material: 'Hydraulic jack, 4,000 psi', mass: 12,
       explode: [0.35, -0.3, -0.5],
-      desc: 'A hydraulic jack between a fitting under the cockpit floor and the top of the strut pulls the leg up and aft into its well; hydraulic pressure also keeps the gear down until the downlock engages.',
+      desc: 'A hydraulic jack between a fitting in the roof of the well and the top of the strut swings the leg up and forward into its well; hydraulic pressure also keeps the gear down until the downlock engages.',
     }, [aBar, aRod]);
     // uplock: hook on the well roof that catches a roller on the stowed leg
-    const ul = [new THREE.BoxGeometry(0.1, 0.12, 0.08).translate(X(5.0), -0.135, 0), new THREE.TorusGeometry(0.035, 0.012, 6, 12, Math.PI).rotateZ(Math.PI).translate(X(5.0), -0.2, 0)];
+    const sU = G.trunnion[0] - 0.6 * L, yHi = -0.03, yLo = G.stowY + 0.13;      // from the well roof down to the stowed leg
+    const ul = [new THREE.BoxGeometry(0.1, yHi - yLo, 0.08).translate(X(sU), (yHi + yLo) / 2, 0), new THREE.TorusGeometry(0.035, 0.012, 6, 12, Math.PI).rotateZ(Math.PI).translate(X(sU), yLo - 0.03, 0)];
     P('Nose gear uplock', {
       system: 'Landing gear', material: 'Steel hook with hydraulic release and manual (free-fall) release', mass: 3,
       explode: [0.0, 0.35, 0.35],
@@ -263,7 +264,7 @@ export function buildGear(ctx) {
     pA.add(mesh(rodV(at(0.86).add(V(0, 0, side * 0.06)), at(0.86).add(V(0, 0, side * 0.17)), 0.015, 8), F.steel()));   // uplock roller pin
     P(`Main gear shock strut (${R})`, {
       system: 'Landing gear', material: '300M high-strength steel, chromed oleo piston', mass: 200,
-      explode: [0, -0.95, 0.45 * side], callout: side > 0, anchor: [X(11.95), -1.15, side * 1.4],
+      explode: [0, -0.95, 0.45 * side], callout: side > 0, anchor: [X(11.45), -1.25, side * 1.4],
       desc: 'Oleo-pneumatic shock strut on a trunnion in the well under the intake trunk. Its wheel rides on a stub axle outboard of the leg; to stow, the leg swings up and aft while the wheel turns over to lie flat in the well behind the weapons bay (geometry approximate).',
     }, pA);
     pv.push(pA);
@@ -324,7 +325,7 @@ export function buildGear(ctx) {
     });
 
     // folding drag brace from a fitting on the wheel-bay roof, aft of the leg, to the strut, and its downlock
-    const Fp = V(X(12.55), -0.36, side * 1.12);
+    const Fp = V(X(12.05), -0.48, side * 1.12);
     const Ad = legPoint(T, q, at(0.45));
     const fb = foldingBrace(Fp, Ad(0).clone(), Ad(1).clone(), V(1, -0.3, 0));
     const up = unitRod(0.042, F.gear()), lo = unitRod(0.038, F.gear()), lock = mesh(new THREE.BoxGeometry(0.08, 0.08, 0.07), F.yellow());
@@ -335,7 +336,7 @@ export function buildGear(ctx) {
       desc: 'A two-piece drag brace runs forward and down from a fitting in the roof of the well to the strut and takes the drag loads. With the gear down it is locked straight by the yellow downlock link at its knee; it breaks there and folds as the leg swings back.',
     }, [up, lo, lock, fit]);
     // retraction actuator from the outboard roof of the well, aft of the trunnion, to the top of the strut
-    const Fa = V(X(12.30), -0.36, side * 1.36);
+    const Fa = V(X(11.80), -0.48, side * 1.36);
     const Aa = legPoint(T, q, at(0.2));
     const aBar = unitRod(0.055, F.hyd(), 12), aRod = unitRod(0.03, F.chrome(), 10);
     const aLen = Math.min(Fa.distanceTo(Aa(0)), Fa.distanceTo(Aa(1))) * 0.85;
@@ -346,7 +347,7 @@ export function buildGear(ctx) {
     }, [aBar, aRod]);
     // uplock hanging from the wheel-bay roof beside the stowed leg; its hook closes round a roller pin on the
     // outboard side of the strut
-    const ul = [new THREE.BoxGeometry(0.12, 0.085, 0.07).translate(X(12.73), -0.348, side * 1.205), new THREE.TorusGeometry(0.035, 0.012, 6, 14, Math.PI * 1.3).rotateZ(-Math.PI * 0.15).translate(X(12.73), -0.432, side * 1.205)];
+    const ul = [new THREE.BoxGeometry(0.12, 0.085, 0.07).translate(X(12.23), -0.468, side * 1.205), new THREE.TorusGeometry(0.035, 0.012, 6, 14, Math.PI * 1.3).rotateZ(-Math.PI * 0.15).translate(X(12.23), -0.552, side * 1.205)];
     P(`Main gear uplock (${R})`, {
       system: 'Landing gear', material: 'Steel hook, hydraulic and free-fall release', mass: 6,
       explode: [-0.4, 0.35, 0.4 * side],
@@ -356,10 +357,10 @@ export function buildGear(ctx) {
     // main door over the wheel bay, hinged on its inboard edge; a strut door over the leg slot ahead of it,
     // hinged on its outboard edge, folds up inside the well against the trunk wall
     const stM = ctx.sB.filter((s) => s >= W.sStep - 1e-6 && s <= W.s1 + 1e-6);
-    const grid = toothedGrid((s, u) => [X(s), -FR.bD(s) - 0.002, side * lerp(FR.wellInner(s), FR.wellOuter(s) + 0.004, u)], stM, { width: FR.wellOuter(13) - W.z0, fore: false, pitch: 0.1 });
+    const grid = toothedGrid((s, u) => [X(s), -FR.bD(s) - 0.002, side * lerp(FR.wellInner(s), FR.wellOuter(s) + 0.004, u)], stM, { width: FR.wellOuter(W.s1 - 0.33) - W.z0, fore: false, pitch: 0.1 });
     const door = slab(grid, () => [0, 0.02, 0], V(0, -1, 0));
     const hp0 = V(X(W.sStep), -FR.bD(W.sStep), side * W.z0);
-    const h = hinge(mesh(door, F.door()), hp0, V(X(W.s1), -FR.bD(W.s1), side * W.z0), V(X(12.85), -0.9, side * 1.0), V(0, -1, 0));
+    const h = hinge(mesh(door, F.door()), hp0, V(X(W.s1), -FR.bD(W.s1), side * W.z0), V(X(12.35), -1.0, side * 1.0), V(0, -1, 0));
     P(`Main gear door (${R})`, {
       system: 'Skin & fairings', skin: true, material: 'Composite door with saw-tooth edges', mass: 28,
       explode: [0, -1.65, 1.15 * side],
@@ -369,7 +370,7 @@ export function buildGear(ctx) {
     const stS = ctx.sB.filter((s) => s >= W.s0 - 1e-6 && s <= W.sStep + 1e-6);
     const zo = FR.wellOuter(W.s0);
     const gridS = toothedGrid((s, u) => [X(s), -FR.bD(s) - 0.002, side * lerp(W.zSlot, FR.wellOuter(s) + 0.004, u)], stS, { width: zo - W.zSlot, aft: false });
-    const hS = hinge(mesh(slab(gridS, () => [0, 0.03, 0], V(0, -1, 0)), F.door()), V(X(W.s0), -FR.bD(W.s0), side * zo), V(X(W.sStep), -FR.bD(W.sStep), side * zo), V(X(12.1), -0.9, side * 1.25), V(0, 1, 0));
+    const hS = hinge(mesh(slab(gridS, () => [0, 0.03, 0], V(0, -1, 0)), F.door()), V(X(W.s0), -FR.bD(W.s0), side * zo), V(X(W.sStep), -FR.bD(W.sStep), side * zo), V(X(11.6), -1.0, side * 1.25), V(0, 1, 0));
     P(`Main gear strut door (${R})`, {
       system: 'Skin & fairings', skin: true, material: 'Composite door, saw-tooth fore edge', mass: 6,
       explode: [0.3, -1.45, 1.35 * side],
@@ -377,7 +378,7 @@ export function buildGear(ctx) {
     }, hS.pivot);
     anim.gearDoors.push({ h: hS, angle: 1.56 });
     // main-door jack at the forward inboard corner of the wheel bay, near the hinge, clear of the stowed wheel
-    const Fd = V(X(12.53), -0.5, side * 0.62), Pd = V(X(12.53), -FR.bD(12.53) + 0.025, side * 0.7);
+    const Fd = V(X(12.03), -0.62, side * 0.62), Pd = V(X(12.03), -FR.bD(12.03) + 0.025, side * 0.7);
     const dBar = unitRod(0.03, F.hyd(), 10), dRod = unitRod(0.016, F.chrome(), 8);
     const dLen = Fd.distanceTo(Pd) * 0.85;
     const dq = new THREE.Quaternion(), dp = new THREE.Vector3();
@@ -415,7 +416,7 @@ export function buildGear(ctx) {
       // each door runs from the centre line, where the pair meet, to its hinge on the cut-out's edge
       const grid = toothedGrid((s, u) => { const zz = side * lerp(0, z, u); return [X(s), FR.bottomAt(s, zz) - 0.002, zz]; }, st, { width: 0.24 });
       const door = slab(grid, () => [0, 0.03, 0], V(0, -1, 0));
-      const h = hinge(mesh(door, F.door()), V(X(s0), FR.bottomAt(s0, z), side * z), V(X(s1), FR.bottomAt(s1, z), side * z), V(X(4.8), -0.7, side * 0.05), V(0, -1, 0));
+      const h = hinge(mesh(door, F.door()), V(X(s0), FR.bottomAt(s0, z), side * z), V(X(s1), FR.bottomAt(s1, z), side * z), V(X((s0 + s1) / 2), -0.95, side * 0.05), V(0, -1, 0));
       pivots.push(h.pivot);
       hs.push({ h, side });
       anim.gearDoors.push({ h, angle: 1.55 });
@@ -423,14 +424,15 @@ export function buildGear(ctx) {
     P('Nose gear doors', {
       system: 'Skin & fairings', skin: true, material: 'Composite doors with saw-tooth fore and aft edges', mass: 18,
       explode: [0.4, -1.4, 0],
-      desc: 'Two 1.8 m doors hinged at their outer edges close the nose-gear well under the cockpit; a mechanical linkage opens them with the leg, and their fore and aft edges are saw-toothed like every other door.',
+      desc: 'Two 2 m doors hinged at their outer edges close the nose-gear well between the inlets; a mechanical linkage opens them with the leg, and their fore and aft edges are saw-toothed like every other door.',
     }, pivots);
     // door linkage: a bellcrank on the well roof, driven by the leg near its trunnion, with a rod to a horn
     // on each door's hinge line
-    const crank = V(X(4.2), -0.1, 0);
+    const sK = s1 - 0.12;
+    const crank = V(X(sK), -0.1, 0);
     const rods = [], horns = [];
     for (const { h, side } of hs) {
-      const horn = V(X(4.2), FR.bottomAt(4.2, z) + 0.06, side * (z - 0.05));
+      const horn = V(X(sK), FR.bottomAt(sK, z) + 0.06, side * (z - 0.05));
       const rod = mesh(new THREE.CylinderGeometry(0.0075, 0.0075, 1, 6), F.steel());
       rods.push(rod);
       horns.push({ h, horn, rod, p0: V(X(s0), FR.bottomAt(s0, z), side * z) });
@@ -452,16 +454,18 @@ export function buildGear(ctx) {
 
   // ------------------------------------------------------------------ arresting hook and its door
   {
-    const g = [rodV(V(X(15.7), -0.5, 0), V(X(17.1), -0.5, 0), 0.04, 10)];
-    g.push(new THREE.BoxGeometry(0.14, 0.08, 0.16).translate(X(17.12), -0.52, 0));
-    g.push(new THREE.CylinderGeometry(0.05, 0.05, 0.2, 12).rotateX(Math.PI / 2).translate(X(15.7), -0.5, 0));
-    const a = [rodV(V(X(15.9), -0.45, 0), V(X(16.4), -0.4, 0), 0.035, 10), rodV(V(X(15.62), -0.42, 0), V(X(15.9), -0.45, 0), 0.02, 8)];
+    const h0 = 14.0, h1 = 16.3, hy = -0.56;
+    const g = [rodV(V(X(h0), hy, 0), V(X(h1), hy, 0), 0.04, 10)];
+    g.push(new THREE.BoxGeometry(0.14, 0.08, 0.16).translate(X(h1 + 0.02), hy - 0.02, 0));
+    g.push(new THREE.CylinderGeometry(0.05, 0.05, 0.2, 12).rotateX(Math.PI / 2).translate(X(h0), hy, 0));
+    const a = [rodV(V(X(h0 + 0.2), hy + 0.05, 0), V(X(h0 + 0.7), hy + 0.1, 0), 0.035, 10), rodV(V(X(h0 - 0.08), hy + 0.08, 0), V(X(h0 + 0.2), hy + 0.05, 0), 0.02, 8)];
     P('Arresting hook', {
       system: 'Landing gear', material: 'Steel shank and hook point, hydraulic hold-down / damper', mass: 40,
       explode: [-0.6, -1.0, 0],
-      desc: 'An emergency tail hook stowed between the engines. A hydraulic damper holds it up and, when released, drops it to catch a runway cable if brakes or steering fail.',
+      desc: 'An emergency tail hook stowed on the centre line between the engines and in the stinger between the nozzles. A damper holds it up and, when released, drops it to catch a runway cable if brakes or steering fail (the T.O. calls it pneumatically extended and retracted).',
     }, [mesh(merge(g), F.steel()), mesh(merge(a), F.hyd())]);
-    const door = slab(toothedGrid((s, u) => [X(s), -FR.bD(s) - 0.002, lerp(-0.1, 0.1, u)], [15.65, 16.0, 16.35, 16.7, 17.05], { width: 0.2 }), () => [0, 0.02, 0], V(0, -1, 0));
+    const yD = (s) => -FR.bD(s) - 0.002;
+    const door = slab(toothedGrid((s, u) => [X(s), yD(s), lerp(-0.1, 0.1, u)], [h0 - 0.05, 14.7, 15.4, 16.0, h1 + 0.05], { width: 0.2 }), () => [0, 0.02, 0], V(0, -1, 0));
     P('Arresting hook door', {
       system: 'Skin & fairings', skin: true, material: 'Composite door, saw-tooth ends', mass: 5,
       explode: [-0.6, -1.5, 0],

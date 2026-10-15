@@ -12,7 +12,7 @@ const { X } = FR;
 
 
 /**
- * The transparency as a smooth parametric surface: an elliptical cross-section from sill to sill
+ * The transparency as a smooth parametric surface: a parabolic cross-section from sill to sill
  * at every station, with dense, evenly spaced segments and normals taken from the analytic
  * surface so highlights travel across it continuously.
  */
@@ -28,8 +28,10 @@ function canopyGeometry(nu = 84, nv = 56) {
     const a = FR.sillW(s);
     const ys = FR.upperA(s, a) - 0.018;
     const yt = FR.canopyTop(s);
-    const phi = Math.PI * (v - 0.5);
-    return [X(s), ys + (yt - ys) * Math.cos(phi), a * Math.sin(phi)];
+    // the cross-section is a parabola from sill to sill (NAWDC front view: half-width 0.50 at a fifth of the depth below
+    // the crown... 0.40 at half depth), parametrised so the spacing tightens toward the crown
+    const w = Math.sin(Math.PI * (v - 0.5) * 0.9) / Math.sin(Math.PI * 0.45);
+    return [X(s), ys + (yt - ys) * (1 - w * w), a * w];
   };
   const pos = [], nrm = [], uv = [], idx = [];
   const e = 1e-3;
@@ -87,9 +89,11 @@ function canopyGeometry(nu = 84, nv = 56) {
 
 const box = (s, y, z, ls, h, w) => FR.boxS(s, y, z, ls, h, w);
 
-// cockpit layout (stations s, metres aft of the nose): forward pressure bulkhead and instrument
-// panel at s 4.45–4.9, HUD combiner at s 4.98 (≈ 0.6 m ahead of the pilot's eye, about a third of
-// the way back along the canopy), design eye near s 5.56 under the canopy apex (s 5.65)
+// cockpit layout. The contents below were laid out on the pre-2025 stations and are carried as one rigid block,
+// COCKPIT_SHIFT (−1.46 m in station, +0.10 m up), to the measured cockpit under the canopy (2.55 → 5.40, apex 4.2):
+// in block coordinates the forward pressure bulkhead and instrument panel sit at s 4.45–4.9, the HUD combiner at
+// s 4.98 (≈ 0.6 m ahead of the pilot's eye) and the design eye near s 5.56 — on the aircraft s 2.99–3.44, 3.52 and
+// 4.10, under the canopy apex
 const PANEL_S = 4.86, PANEL_TILT = -0.22;
 const SEAT_S = 5.7;
 const EYE = [5.56, 0.95];
@@ -103,16 +107,22 @@ function onPanel(y, z, w, h, d = 0.035, depth = 0.02) {
   return g.translate(x, y, z);
 }
 
+export const COCKPIT_SHIFT = { ds: -1.46, dy: 0.10 };
+
 export function buildCockpit(ctx) {
-  const { P } = ctx;
+  const P0 = ctx.P;
+  let P = P0;
+  const blk = new THREE.Group();
+  blk.position.set(-COCKPIT_SHIFT.ds, COCKPIT_SHIFT.dy, 0);
+  ctx.attitude.add(blk);
 
   // ------------------------------------------------------------------ canopy
   const can = mesh(canopyGeometry(), F.canopy(), { cast: false, receive: false });
   can.renderOrder = 2;
   P('Canopy', {
     system: 'Crew systems', skin: true, material: 'Monolithic polycarbonate (two 3/8 in sheets fusion-bonded), gold indium-tin-oxide coating', mass: 163,
-    explode: [0, 4.2, 0], callout: true, anchor: [X(4.75), FR.canopyTop(4.75) + 0.005, 0],
-    desc: 'A single frameless bubble about 140 × 45 × 27 in (3.56 × 1.14 × 0.69 m), among the largest monolithic polycarbonate parts ever formed (about 360 lb). Its thin gold indium-tin-oxide film conducts, so radar energy reflects off the canopy instead of entering the cockpit and bouncing off the pilot\'s helmet.',
+    explode: [0, 4.2, 0], callout: true, anchor: [X(4.2), FR.canopyTop(4.2) + 0.005, 0],
+    desc: 'A single frameless bubble, among the largest monolithic polycarbonate parts ever formed: Lockheed Martin gives about 140 × 45 × 27 in and 360 lb. On the jet it spans about 2.85 m from its tip to its aft end, 1.14 m wide and 0.7 m deep. Its thin gold indium-tin-oxide film conducts, so radar energy reflects off the canopy instead of entering the cockpit and bouncing off the pilot\'s helmet.',
   }, can);
   {
     const g = [];
@@ -130,6 +140,7 @@ export function buildCockpit(ctx) {
       explode: [0, 3.4, 0],
       desc: 'The transparency is bonded into a low sill frame with no bow frame across the pilot\'s view. When the canopy locks, a seal inflates against the sill to hold cockpit pressure; for ejection the whole canopy and frame are jettisoned by rocket motors.',
     }, mesh(merge(g), F.canopyFrame()));
+    P = (n, i, o) => P0(n, i, o, blk);       // from here on: the cockpit block
     const a = [];
     a.push(FR.pipe([[6.62, 0.2, 0], [6.8, 0.58, 0]], 0.035, 8, 4));
     a.push(box(6.86, 0.6, 0, 0.12, 0.05, 0.26));
@@ -146,13 +157,12 @@ export function buildCockpit(ctx) {
   {
     const g = [];
     g.push(box(5.67, -0.05, 0, 2.44, 0.04, 0.9));                                     // floor, s 4.45–6.9
-    g.push(box((FR.NOSE_WELL.hump0 + FR.NOSE_WELL.hump1) / 2, 0.015, 0, FR.NOSE_WELL.hump1 - FR.NOSE_WELL.hump0, 0.06, 0.26));   // hump over the stowed nose wheel
     for (const side of [1, -1]) g.push(box(5.66, 0.17, side * 0.47, 2.3, 0.44, 0.03));   // tub side walls below the sills
     g.push(box(6.88, 0.2, 0, 0.03, 0.5, 0.9));                                         // aft wall
     P('Cockpit tub & floor', {
       system: 'Crew systems', material: 'Aluminium pressure tub', mass: 85,
       explode: [0, 0.85, 0],
-      desc: 'The pressurised single-seat cockpit between the forward and aft pressure bulkheads. The stowed nose wheel sits under a small hump in the floor; pressure and conditioned air come from the environmental control system.',
+      desc: 'The pressurised single-seat cockpit between the forward and aft pressure bulkheads, with the nose-gear well under its floor; pressure and conditioned air come from the environmental control system.',
     }, mesh(merge(g), F.panel()));
     for (const side of [1, -1]) {
       const R = side > 0 ? 'right' : 'left';

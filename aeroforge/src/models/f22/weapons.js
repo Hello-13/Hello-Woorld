@@ -12,7 +12,7 @@ import { F } from './materials.js';
 import * as FR from './frame.js';
 import { merge, slab, hinge, toothedGrid, rectTube } from './util.js';
 
-const { X, lerp } = FR;
+const { X, lerp, M } = FR;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const UP = V(0, 1, 0);
 
@@ -76,9 +76,10 @@ export function buildWeapons(ctx) {
     const prof = (s) => {
       const D = FR.bD(s);
       const zb = 0.55 + (FR.BAY_AFT.zBreak - 0.55) * FR.smooth(FR.BAY_AFT.s0, FR.BAY_AFT.s1, s);
-      return [[z, -D], [z, -0.45], [zb, -0.24], [-zb, -0.24], [-z, -0.45], [-z, -D]].map(([zz, y]) => [X(s), y, zz]);
+      const c = FR.BAY_CEIL;
+      return [[z, -D], [z, c - 0.21], [zb, c], [-zb, c], [-z, c - 0.21], [-z, -D]].map(([zz, y]) => [X(s), y, zz]);
     };
-    const st = [s0, 9.4, 10.4, FR.BAY_AFT.s0, 11.7, FR.BAY_AFT.s1, s1];
+    const st = [s0, M(9.4), M(10.4), FR.BAY_AFT.s0, M(11.7), FR.BAY_AFT.s1, s1];
     const liner = FR.gridSurface(st.map(prof), { closed: false, uv: 'n' });
     const ends = [];
     for (const s of [s0, s1]) {
@@ -89,7 +90,7 @@ export function buildWeapons(ctx) {
       ends.push(g);
     }
     const ribs = [];
-    for (const s of [9.3, 10.4, 11.4]) {
+    for (const s of [M(9.3), M(10.4), M(11.4)]) {
       const p = prof(s);
       p[0][1] += 0.006; p[p.length - 1][1] += 0.006;                 // the wall frames stop just inside the belly skin
       for (let k = 0; k < p.length - 1; k++) {
@@ -104,17 +105,17 @@ export function buildWeapons(ctx) {
     P('Main weapons bay', {
       system: 'Weapons', material: 'Aluminium / composite bay liner and ceiling frames, acoustic treatment', mass: 230,
       explode: [0, -0.75, 0],
-      desc: 'A 3.9 m bay under the inlet ducts, split along the centre line, that holds six AIM-120 missiles or two 1,000 lb GBU-32 JDAM bombs plus two AIM-120s. Carrying weapons inside keeps the outline clean; external stores would multiply the radar cross-section.',
+      desc: 'A 4.2 m bay under the inlet ducts, between the inlets and the main-gear wells, split along the centre line, that holds six AIM-120 missiles or two 1,000 lb GBU-32 JDAM bombs plus two AIM-120s. Carrying weapons inside keeps the outline clean; external stores would multiply the radar cross-section.',
     }, [mesh(merge([liner, ...ends]), F.bay()), mesh(merge(ribs), F.alu())]);
 
     // centre-line keel web between the two halves of the bay, with the door land along its lower edge
     const stK = ctx.sB.filter((s) => s >= s0 - 1e-6 && s <= s1 + 1e-6);
     const h = DIVIDER.half;
-    const web = slab([stK.map((s) => [X(s), -0.245, -h]), stK.map((s) => [X(s), -FR.bD(s) + 0.024, -h])], () => [0, 0, 2 * h]);
+    const web = slab([stK.map((s) => [X(s), FR.BAY_CEIL - 0.005, -h]), stK.map((s) => [X(s), -FR.bD(s) + 0.024, -h])], () => [0, 0, 2 * h]);
     const cap = slab(stK.map((s) => [[X(s), -FR.bD(s), -DIVIDER.cap], [X(s), -FR.bD(s), DIVIDER.cap]]), () => [0, 0.024, 0], V(0, -1, 0));
-    const top = new THREE.BoxGeometry(s1 - s0, 0.02, 0.07).translate(X((s0 + s1) / 2), -0.25, 0);
+    const top = new THREE.BoxGeometry(s1 - s0, 0.02, 0.07).translate(X((s0 + s1) / 2), FR.BAY_CEIL - 0.01, 0);
     // fore and aft ends tie into the bay end bulkheads; the aft end runs on into the engine-bay keel
-    const lugs = [s0 + 0.04, s1 - 0.04].map((s) => FR.boxS(s, -0.55, 0, 0.08, 0.6, 0.07));
+    const lugs = [s0 + 0.04, s1 - 0.04].map((s) => FR.boxS(s, (FR.BAY_CEIL - FR.bD(s)) / 2, 0, 0.08, FR.bD(s) + FR.BAY_CEIL - 0.04, 0.07));
     P('Main bay centre divider', {
       system: 'Structure', material: 'Machined titanium keel web with a composite door land', mass: 85,
       explode: [0, -1.25, 0],
@@ -152,13 +153,13 @@ export function buildWeapons(ctx) {
       // a crank, and a link from the crank to a fitting on the outer panel moves the door (the fold follows)
       const BD = FR.BAY_DRIVE, zd = side * BD.z, g = [], br = [];
       g.push(FR.cylX((BD.s0 + BD.s1) / 2, BD.y, zd, BD.s1 - BD.s0, BD.shaftR, BD.shaftR, 10));          // torque shaft
-      g.push(FR.boxS(9.65, -0.765, side * 0.825, 0.3, 0.07, 0.07));                                    // power drive unit
-      g.push(FR.cylX(9.88, -0.765, side * 0.83, 0.16, 0.03, 0.03, 12));                                // hydraulic motor
+      g.push(FR.boxS(M(9.65), FR.BAY_DRIVE.y, side * 0.825, 0.3, 0.07, 0.07));                                    // power drive unit
+      g.push(FR.cylX(M(9.88), FR.BAY_DRIVE.y, side * 0.83, 0.16, 0.03, 0.03, 12));                                // hydraulic motor
       const hp0 = V(X(s0), -FR.bD(s0), side * z), hp1 = V(X(s1), -FR.bD(s1), side * z);
       const cranks = [];
       for (const s of BD.stations) {
         g.push(FR.cylX(s, BD.y, zd, 0.12, BD.r, BD.r, 14));                                           // rotary actuator
-        br.push(FR.boxS(s + 0.075, -0.8, side * 0.815, 0.03, 0.05, 0.04));                             // mounting lug on the longeron
+        br.push(FR.boxS(s + 0.075, BD.y - 0.035, side * 0.815, 0.03, 0.05, 0.04));                             // mounting lug on the longeron
         const H = hp0.clone().lerp(hp1, (s - s0) / (s1 - s0));                                        // on the door hinge line
         const arm = V(0, BD.fit[1], side * BD.fit[0]);
         const crank = unitRod(0.012, F.steel()), link = unitRod(0.008, F.steel());
@@ -193,7 +194,7 @@ export function buildWeapons(ctx) {
         const m = mesh(geo, F.missile());
         const band = mesh(new THREE.CylinderGeometry(0.0905, 0.0905, 0.06, 20).rotateZ(Math.PI / 2).translate(0.9, 0, 0), F.missileBand(), { cast: false });
         holder.add(m, band);
-        holder.position.set(X(10.43), y, side * zz);
+        holder.position.set(X(M(10.43)), y, side * zz);
         // the missile's own fins sit at 45° (×-tail); turn it so they lie at the solved angle t
         holder.rotation.x = side > 0 ? -t - Math.PI / 4 : t - Math.PI / 4;
         ms.push(holder);
@@ -201,12 +202,12 @@ export function buildWeapons(ctx) {
         const lg = new THREE.Group();
         const top = bayCeil(zz);
         const body = mesh(merge([new THREE.BoxGeometry(2.1, 0.1, 0.11), new THREE.BoxGeometry(0.5, 0.04, 0.09).translate(0.55, 0.06, 0), FR.cylX(0, 0, 0, 0.24, 0.035, 0.035, 10).translate(-X(0) + 0.75, 0, 0)]), F.boxLight());
-        body.position.set(X(10.3), top - 0.055, side * zz);
+        body.position.set(X(M(10.3)), top - 0.055, side * zz);
         lg.add(body);
         const arms = [];
         for (const ds of [-0.6, 0.6]) {
           const arm = mesh(new THREE.CylinderGeometry(0.025, 0.025, 1, 8), F.steel());
-          arm.position.set(X(10.3 + ds), 0, side * zz);
+          arm.position.set(X(M(10.3) + ds), 0, side * zz);
           lg.add(arm);
           arms.push(arm);
         }
@@ -215,7 +216,7 @@ export function buildWeapons(ctx) {
       }
       P(`AIM-120C AMRAAM ×3 (${R} main bay)`, {
         system: 'Weapons', material: 'Steel / composite airframe, active radar seeker', mass: 456, massSource: 'USAF AIM-120 fact sheet: 152 kg (335 lb) each', count: 3,
-        explode: [0, -1.05, 0.55 * side], callout: side > 0, anchor: [X(9.5), -0.55, side * 0.4],
+        explode: [0, -1.05, 0.55 * side], callout: side > 0, anchor: [X(M(9.5)), -0.55, side * 0.4],
         desc: 'Active-radar medium-range missiles, 3.65 m long and 17.8 cm in diameter (USAF fact sheet). The C model\'s clipped wings and fins were designed so that six fit in the F-22\'s main bay, three each side of the centre web, staggered in height so their fins interleave.',
       }, ms);
       P(`LAU-142/A AVEL launchers ×3 (${R})`, {
@@ -247,7 +248,7 @@ export function buildWeapons(ctx) {
 
       // door actuator: a linear jack from the bay roof to a crank on the door just below its hinge
       {
-        const sA = 10.05;
+        const sA = M(10.05);
         const wf = FR.wallFractions(sA);
         const [hz, hy] = FR.wallB(sA, wf[4]);
         const Fx = V(X(sA), hy + 0.02, side * (hz - 0.24));
@@ -276,7 +277,7 @@ export function buildWeapons(ctx) {
       // the launch rail belongs to the LAU-141/A: it rides out on the trapeze with the missile
       const railHolder = new THREE.Group();
       railHolder.add(mesh(merge([new THREE.BoxGeometry(2.3, 0.05, 0.06).translate(0, 0.095, 0), new THREE.BoxGeometry(0.4, 0.06, 0.1).translate(-0.9, 0.13, 0), new THREE.BoxGeometry(0.16, 0.04, 0.12).translate(0.95, 0.125, 0)]), F.boxLight()));
-      const stow = V(X(10.05), -0.66, side * 1.45), out = V(X(10.05), -1.05, side * 1.88);
+      const stow = V(X(M(10.05)), -0.73, side * 1.42), out = V(X(M(10.05)), -1.13, side * 1.86);
       holder.position.copy(stow);
       railHolder.position.copy(stow);
       const arms = [];
@@ -285,7 +286,7 @@ export function buildWeapons(ctx) {
       for (const ds of [-0.7, 0.7]) {
         const arm = mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 8), F.steel());
         armG.add(arm);
-        arms.push({ arm, pivot: V(X(10.05 + ds), -0.47, side * 1.22), attach: V(ds * -1, 0.095, 0) });
+        arms.push({ arm, pivot: V(X(M(10.05) + ds), -0.54, side * 1.2), attach: V(ds * -1, 0.095, 0) });
       }
       P(`AIM-9X Sidewinder (${R} side bay)`, {
         system: 'Weapons', material: 'Aluminium airframe, imaging-infrared seeker, thrust-vectoring vanes', mass: 85,
@@ -302,9 +303,9 @@ export function buildWeapons(ctx) {
       // trapeze drive: a hydraulic actuator from a roof fitting to a lever on the aft arm
       {
         const aft = arms[1];
-        const Fx = V(X(10.6), -0.415, side * 1.12);                                   // roof fitting, under the duct floor
+        const Fx = V(X(M(10.6)), -0.485, side * 1.1);                                   // roof fitting, under the duct floor
         const bar = unitRod(0.03, F.hyd()), rodM = unitRod(0.015, F.chrome(), 8);
-        const fit = mesh(merge([FR.boxS(10.6, -0.4, side * 1.12, 0.08, 0.03, 0.08), FR.cylX(10.75, -0.47, side * 1.22, 0.1, 0.035, 0.035, 10)]), F.tiDull());
+        const fit = mesh(merge([FR.boxS(M(10.6), -0.47, side * 1.1, 0.08, 0.03, 0.08), FR.cylX(M(10.75), -0.54, side * 1.2, 0.1, 0.035, 0.035, 10)]), F.tiDull());
         const end = new THREE.Vector3(), lever = new THREE.Vector3();
         P(`LAU-141/A trapeze actuator (${R})`, {
           system: 'Weapons', material: 'Hydraulic linear actuator on the trapeze arm, 4,000 psi', mass: 6,
@@ -350,20 +351,20 @@ export function buildWeapons(ctx) {
 
   // ------------------------------------------------------------------ stores management
   {
-    const g = [FR.boxS(8.24, -0.62, 0, 0.3, 0.2, 0.26), FR.boxS(8.24, -0.505, 0, 0.26, 0.03, 0.22)];
+    const g = [FR.boxS(M(8.24), -0.720, 0, 0.3, 0.2, 0.26), FR.boxS(M(8.24), -0.605, 0, 0.26, 0.03, 0.22)];
     const w = [];
     for (const side of [1, -1]) {
       // weapon interface units at the forward corners of the bay, one per half
-      g.push(FR.boxS(8.32, -0.52, side * 0.62, 0.16, 0.12, 0.12));
-      w.push(FR.pipe([[8.3, -0.6, side * 0.13], [8.36, -0.55, side * 0.4], [8.32, -0.53, side * 0.56]], 0.01, 5));
+      g.push(FR.boxS(M(8.32), -0.620, side * 0.62, 0.16, 0.12, 0.12));
+      w.push(FR.pipe([[M(8.3), -0.6, side * 0.13], [M(8.36), -0.650, side * 0.4], [M(8.32), -0.630, side * 0.56]], 0.01, 5));
       // along the bay ceiling to the three AVELs, and down the wall to the door drive
-      w.push(FR.pipe([[8.38, -0.5, side * 0.62], [8.6, -0.27, side * 0.62], [10.0, -0.26, side * 0.6]], 0.008, 5));
-      w.push(FR.pipe([[8.6, -0.27, side * 0.6], [8.9, -0.255, side * 0.4], [9.25, -0.25, side * 0.373]], 0.007, 5));
-      w.push(FR.pipe([[8.6, -0.27, side * 0.55], [8.95, -0.255, side * 0.25], [9.25, -0.25, side * 0.213]], 0.007, 5));
-      w.push(FR.pipe([[8.38, -0.56, side * 0.68], [8.8, -0.68, side * 0.74], [9.3, -0.745, side * 0.77], [9.52, -0.76, side * 0.81]], 0.008, 5));
+      w.push(FR.pipe([[M(8.38), -0.5, side * 0.62], [M(8.6), -0.370, side * 0.62], [M(10.0), -0.360, side * 0.6]], 0.008, 5));
+      w.push(FR.pipe([[M(8.6), -0.370, side * 0.6], [M(8.9), -0.355, side * 0.4], [M(9.25), -0.350, side * 0.373]], 0.007, 5));
+      w.push(FR.pipe([[M(8.6), -0.370, side * 0.55], [M(8.95), -0.355, side * 0.25], [M(9.25), -0.350, side * 0.213]], 0.007, 5));
+      w.push(FR.pipe([[M(8.38), -0.660, side * 0.68], [M(8.8), -0.780, side * 0.74], [M(9.3), -0.845, side * 0.77], [M(9.52), -0.860, side * 0.81]], 0.008, 5));
       // out under the duct floor to the side-bay trapeze actuator and the side-bay door actuator
-      w.push(FR.pipe([[8.38, -0.5, side * 0.66], [8.55, -0.58, side * 0.83], [8.75, -0.52, side * 1.0], [9.4, -0.46, side * 1.18], [10.2, -0.43, side * 1.15], [10.56, -0.405, side * 1.12]], 0.008, 5, 30));   // under the bleed duct
-      w.push(FR.pipe([[10.2, -0.43, side * 1.15], [10.1, -0.415, side * 1.38], [10.05, -0.39, side * 1.5]], 0.007, 5, 10));
+      w.push(FR.pipe([[M(8.38), -0.5, side * 0.66], [M(8.55), -0.680, side * 0.83], [M(8.75), -0.620, side * 1.0], [M(9.4), -0.560, side * 1.18], [M(10.2), -0.530, side * 1.15], [M(10.56), -0.505, side * 1.12]], 0.008, 5, 30));   // under the bleed duct
+      w.push(FR.pipe([[M(10.2), -0.530, side * 1.15], [M(10.1), -0.515, side * 1.38], [M(10.05), -0.490, side * 1.5]], 0.007, 5, 10));
     }
     P('Stores management system', {
       system: 'Weapons', material: 'Stores-management processor and two weapon interface units, shielded wiring', mass: 22, count: 3,

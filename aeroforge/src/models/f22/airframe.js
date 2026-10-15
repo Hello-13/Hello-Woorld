@@ -9,7 +9,7 @@ import { F } from './materials.js';
 import * as FR from './frame.js';
 import { merge, dedupe, frameBand, platePoly, slab, hinge, ribPlate, sparWeb, mirror, toothedGrid } from './util.js';
 
-const { X, P3, lerp, DEG } = FR;
+const { X, P3, lerp, DEG, smooth } = FR;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
 /** Sorted station list from s0 to s1 with roughly `step` spacing that includes every `must`. */
@@ -176,8 +176,9 @@ function trimRootFromDuct(g, root, tip) {
 export function buildAirframe(ctx) {
   const { P, anim } = ctx;
 
-  // ================================================================== fuselage A (nose → s 8.4)
-  const sA = stations(0, FR.S_AB, 0.13, [0.05, 0.12, 0.22, 0.35, 0.5, 0.7, 0.95, 1.25, 1.6, 2.0, 2.55, FR.HOLE_S0, FR.HOLE_S1, FR.NOSE_WELL.s0, FR.NOSE_WELL.s1]);
+  // ================================================================== fuselage A (nose → S_AB)
+  const RS = FR.M(2.55);                       // radar bulkhead / radome joint (radome length approximate)
+  const sA = stations(0, FR.S_AB, 0.13, [0.05, 0.12, 0.22, 0.35, 0.5, 0.7, 0.95, 1.25, 1.6, 2.0, RS, FR.CANOPY_S0, FR.HOLE_S0, FR.HOLE_S1, FR.CANOPY_S1, FR.NOSE_WELL.s0, FR.NOSE_WELL.s1]);
   const ringsA = sA.map((s) => FR.ringA(s).pts);
   const HA = FR.ringA(1).half;           // points in one half (25)
   const mirA = (j) => (j < HA - 1 ? j : 2 * HA - 3 - j);
@@ -187,11 +188,11 @@ export function buildAirframe(ctx) {
     if (q >= 21 && q <= 23 && inRange(s0, s1, FR.NOSE_WELL)) return false;
     return true;
   };
-  const iR = sA.indexOf(2.55);
+  const iR = sA.indexOf(RS);
   const radome = P('Radome', {
     system: 'Skin & fairings', skin: true, material: 'Quartz / cyanate-ester composite shell with frequency-selective layers',
     mass: 95, explode: [3.4, 0.2, 0], temp: 288,
-    desc: 'A 2.5 m smooth, chined composite radome over the radar: continuously curved like the rest of the F-22 (not faceted like the F-117), with its chine edges aligned to the planform. It is a frequency-selective surface, transparent in the AN/APG-77\'s own X band and reflective outside it, so it adds almost nothing to the radar cross-section.',
+    desc: 'A smooth, chined composite radome about 2.1 m long over the radar (joint station approximate): continuously curved like the rest of the F-22 (not faceted like the F-117), with its chine edges aligned to the planform. It is a frequency-selective surface, transparent in the AN/APG-77\'s own X band and reflective outside it, so it adds almost nothing to the radar cross-section.',
   }, mesh(FR.gridSurface(ringsA.slice(0, iR + 1), { closed: true }), F.skin()));
   radome.userData.part.thermalRole = 'stagnation';
 
@@ -199,13 +200,14 @@ export function buildAirframe(ctx) {
   P('Forward fuselage skin', {
     system: 'Skin & fairings', skin: true, material: 'Composite and aluminium panels with RAM coatings',
     mass: 320, explode: [1.3, 0.75, 0],
-    desc: 'Skins the cockpit section from the radar bulkhead to the inlets. The chine along each side is a sharp edge set at the same plan-view angle as the wing leading edge, so it reflects radar into the same few directions.',
+    desc: 'Skins the cockpit section from the radar bulkhead to the inlets, and the dorsal spine behind the canopy. The chine along each side is a sharp edge set at the same plan-view angle as the wing leading edge, so it reflects radar into the same few directions.',
   }, mesh(FR.gridSurface(ringsA.slice(iR), { closed: true, keep: keepA(stF) }), F.skin()));
 
-  // ================================================================== fuselage B (s 8.4 → 17.55)
+  // ================================================================== fuselage B (S_AB → S_BE), booms and stinger
   const W = FR.MAIN_WELL;
-  const bMust = [FR.SIDE_BAY.s0, FR.SIDE_BAY.s1, FR.MAIN_BAY.s0, FR.MAIN_BAY.s1, W.s0, W.sStep, W.sStep + 0.01, W.sNotch, W.sNotch + 0.01, W.s1, 13.2, FR.CM_BAY.s0, FR.CM_BAY.s1, FR.ENGINE_DOOR.s0, FR.ENGINE_DOOR.s1];
-  const sB = stations(FR.S_AB, FR.S_B_END, 0.15, bMust);
+  const S_MA = 11.7;                           // mid / aft fuselage skin split (Boeing's aft fuselage, which houses the engines)
+  const bMust = [FR.SIDE_BAY.s0, FR.SIDE_BAY.s1, FR.MAIN_BAY.s0, FR.MAIN_BAY.s1, W.s0, W.sStep, W.sStep + 0.01, W.sNotch, W.sNotch + 0.01, W.s1, S_MA, FR.CM_BAY.s0, FR.CM_BAY.s1, FR.ENGINE_DOOR.s0, FR.ENGINE_DOOR.s1];
+  const sB = stations(FR.S_AB, FR.S_BE, 0.15, bMust);
   ctx.sB = sB;
   const ringsB = sB.map((s) => FR.ringB(s).pts);
   const HB = FR.ringB(10).half;           // 37
@@ -220,7 +222,7 @@ export function buildAirframe(ctx) {
     if (q >= FR.ENGINE_DOOR.q0 && q < FR.ENGINE_DOOR.q1 && inRange(s0, s1, FR.ENGINE_DOOR)) return false;
     return true;
   };
-  const iM = sB.indexOf(13.2);
+  const iM = sB.indexOf(S_MA);
   const stM = sB.slice(0, iM + 1), stAft = sB.slice(iM);
   const rM = ringsB.slice(0, iM + 1), rAft = ringsB.slice(iM);
   P('Mid-fuselage upper skin', {
@@ -231,20 +233,52 @@ export function buildAirframe(ctx) {
   P('Intake trunk & lower fuselage skin', {
     system: 'Skin & fairings', skin: true, material: 'Composite and titanium panels, RAM coated',
     mass: 300, explode: [0, -1.25, 0],
-    desc: 'Wraps the intake trunks and the belly. The openings for the main weapons bay, both side bays and the main-gear wells are cut here; their doors close flush with saw-toothed edges.',
+    desc: 'Wraps the intake trunks and the belly. The trunk walls lean inboard toward the flat bottom, parallel to the inlets\' walls and the canted fins. The openings for the main weapons bay, both side bays and the main-gear wells are cut here; their doors close flush with saw-toothed edges.',
   }, mesh(FR.gridSurface(rM, { closed: true, keep: keepB(stM, false) }), F.skin()));
   P('Aft fuselage upper skin', {
     system: 'Skin & fairings', skin: true, material: 'Titanium and high-temperature composite panels, engine-bay access doors',
     mass: 230, explode: [-0.6, 1.5, 0],
     desc: 'Covers the engine bays between the vertical tails, with access panels over the accessory drives and engine-bay equipment. The engines themselves come out downward, through the lower engine-change doors.',
   }, mesh(FR.gridSurface(rAft, { closed: true, keep: keepB(stAft, true) }), F.skin()));
+  // behind S_BE: a boom each side of the nozzles, cut off at 43° in plan under the stabilator, and the stinger
+  const boomRing = (s, side) => {
+    const zi = FR.boomInner(s), w = FR.bW(s), D = FR.bD(s), wb = FR.bWb(s);
+    const zTop = Math.min(zi, w - 0.01);
+    const half = [];
+    for (let k = 0; k <= 10; k++) { const z = lerp(zTop, w, k / 10); half.push([z, FR.upperB(s, z)]); }
+    // trunk wall from the chine down to the lower corner, or to where it meets the boom's inner wall
+    let yEnd = -D;
+    if (wb < zTop) { let lo = -D, hi = 0; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (FR.wallZ(s, m) < zTop) lo = m; else hi = m; } yEnd = (lo + hi) / 2; }
+    for (let k = 1; k <= 8; k++) { const y = lerp(0, yEnd, k / 8); half.push([FR.wallZ(s, y), y]); }
+    for (let k = 1; k <= 4; k++) half.push(wb > zTop ? [lerp(wb, zTop, k / 4), -D] : [zTop, yEnd]);
+    const yBot = half[half.length - 1][1], yTop = half[0][1];
+    for (let k = 1; k < 5; k++) half.push([zTop, lerp(yBot, yTop, k / 5)]);
+    return half.map(([z, y]) => [X(s), y, side * z]);
+  };
+  const sBoom = [];
+  for (let s = FR.S_BE; s < FR.BOOM.sEnd1 - 0.02; s += 0.15) sBoom.push(s);
+  sBoom.push(FR.BOOM.sEnd1 - 0.02);
+  const booms = [];
+  for (const side of [1, -1]) {
+    const rings = sBoom.map((s) => boomRing(s, side));
+    // the last ring collapses to the end point of the 43° cut
+    booms.push(FR.gridSurface(side > 0 ? rings : rings.map((r) => r.slice().reverse()), { closed: true, uv: 'n' }));
+    const endR = rings[rings.length - 1];
+    booms.push(capAft(endR));
+  }
+  const ST = FR.STINGER;
+  const stg = [];
+  for (let s = FR.S_BE; s <= ST.s1 + 1e-6; s += 0.25) {
+    const t = (s - FR.S_BE) / (ST.s1 - FR.S_BE);
+    const top = FR.mono([[FR.S_BE, FR.bHT(FR.S_BE) - 0.04], [16.0, 0.27], [16.5, 0.15], [17.0, 0.045], [ST.s1, 0.02]], s), bot = Math.max(-FR.bD(s), -FR.bD(FR.S_BE));
+    const hw = ST.half * (1 - 0.85 * smooth(0.82, 1, t)), hh = (top - bot) * (1 - 0.75 * smooth(0.82, 1, t));
+    stg.push(FR.superRing(X(s), 0, (top + bot) / 2, 2 * hw, hh, 16, 3.4));
+  }
   P('Aft fuselage lower skin', {
-    system: 'Skin & fairings', skin: true, material: 'Titanium panels (hot structure near the nozzles)',
+    system: 'Skin & fairings', skin: true, material: 'Titanium panels (hot structure beside the nozzles)',
     mass: 210, explode: [-0.6, -1.3, 0],
-    desc: 'The underside of the engine bays and the aft closure around the nozzles. Titanium is used where exhaust heat would soften aluminium or composites; the two large engine-change doors are cut into it.',
-  }, [mesh(merge([FR.gridSurface(rAft, { closed: true, keep: keepB(stAft, false) }),
-    FR.gridSurface([[17.45, -0.03, 0.44, 1.12], [17.8, -0.04, 0.4, 0.92], [18.1, -0.05, 0.3, 0.56], [18.32, -0.06, 0.14, 0.24]].map(([s, y, w, h]) => FR.superRing(X(s), 0, y, w, h, 16, 3.2)), { closed: true, uv: 'n' })]), F.skin()),
-    mesh(capAft(rAft[rAft.length - 1]), F.black())]);
+    desc: 'The underside of the engine bays, the two tail booms that run aft beside the nozzles to the stabilators, and the stinger between the nozzles that houses the arresting hook. The nozzles end inside the booms, which shield them from the side. Titanium is used where exhaust heat would soften aluminium or composites; the two large engine-change doors are cut into the underside.',
+  }, [mesh(merge([FR.gridSurface(rAft, { closed: true, keep: keepB(stAft, false) }), ...booms, FR.gridSurface(stg, { closed: true, uv: 'n' }), capAft(stg[stg.length - 1])]), F.skin())]);
 
   // lower engine-change doors: each F119 is lowered out of its bay on a trailer
   for (const side of [1, -1]) {
@@ -268,9 +302,11 @@ export function buildAirframe(ctx) {
   {
     const g = [];
     // forward cockpit pressure bulkhead: from the cockpit floor up to the panel (the nose-gear well is below)
-    g.push(platePoly(FR.HOLE_S0, clipAbove(clipBelow(zy(FR.ringA(FR.HOLE_S0).pts), 0.3), -0.075), 0.025));
-    g.push(platePoly(7.0, zy(FR.ringA(7.0).pts), 0.025));
-    for (const s of [3.1, 3.75, 5.0, 5.7, 6.4, 7.7]) {
+    g.push(platePoly(FR.HOLE_S0, clipAbove(clipBelow(zy(FR.ringA(FR.HOLE_S0).pts), 0.4), 0.025), 0.025));
+    // aft cockpit pressure bulkhead behind the seat, under the turtle deck
+    const sAft = 5.46;
+    g.push(platePoly(sAft, clipAbove(zy(FR.ringA(sAft).pts), -0.02), 0.025));
+    for (const s of [FR.M(3.1), FR.M(3.75), FR.M(5.0), FR.M(5.7), FR.M(6.4), 6.2]) {
       const ys = FR.upperA(s, FR.sillW(s)) - 0.05;
       const cut = s > FR.HOLE_S0 && s < FR.HOLE_S1;
       g.push(frameBand(s, zy(FR.ringA(s).pts), { depth: 0.07, thick: 0.03, keep: cut ? (p) => p[1] < ys || Math.abs(p[0]) > FR.sillW(s) + 0.06 : null }));
@@ -280,25 +316,28 @@ export function buildAirframe(ctx) {
       desc: 'Behind the forward avionics bay the forward and aft cockpit pressure bulkheads close the cockpit, and U-shaped frames pass under the canopy sills. Lockheed Martin built the forward fuselage at Marietta, about half aluminium and half composite.',
     }, mesh(merge(g), F.alu()));
     // radar bulkhead: a stiffened plate across the whole nose section, with the radome attach ring
-    const rb = [platePoly(2.55, zy(FR.ringA(2.55).pts), 0.03)];
-    rb.push(frameBand(2.53, zy(FR.ringA(2.53).pts), { depth: 0.05, thick: 0.03, skinGap: 0.004 }));
-    for (const zz of [-0.3, 0, 0.3]) {
-      const y0 = FR.bottomAt(2.585, zz) + 0.04, y1 = FR.topAt(2.585, Math.abs(zz)) - 0.04;
-      rb.push(FR.boxS(2.585, (y0 + y1) / 2, zz, 0.04, y1 - y0, 0.03));
+    const rb = [platePoly(RS, zy(FR.ringA(RS).pts), 0.03)];
+    rb.push(frameBand(RS - 0.02, zy(FR.ringA(RS - 0.02).pts), { depth: 0.05, thick: 0.03, skinGap: 0.004 }));
+    const sr = RS + 0.035;
+    for (const zz of [-0.36, 0, 0.36]) {
+      const y0 = FR.bottomAt(sr, zz) + 0.04, y1 = FR.topAt(sr, Math.abs(zz)) - 0.04;
+      rb.push(FR.boxS(sr, (y0 + y1) / 2, zz, 0.04, y1 - y0, 0.03));
     }
-    for (const yy of [-0.2, 0.15]) {
+    for (const yy of [-0.25, 0.18]) {
       let hw = 0;
-      for (let zz = 0; zz < FR.aW(2.585); zz += 0.01) if (FR.bottomAt(2.585, zz) < yy - 0.04 && FR.topAt(2.585, zz) > yy + 0.04) hw = zz;
-      rb.push(FR.boxS(2.585, yy, 0, 0.04, 0.03, 2 * hw));
+      for (let zz = 0; zz < FR.aW(sr); zz += 0.01) if (FR.bottomAt(sr, zz) < yy - 0.04 && FR.topAt(sr, zz) > yy + 0.04) hw = zz;
+      rb.push(FR.boxS(sr, yy, 0, 0.04, 0.03, 2 * hw));
     }
     P('Radar bulkhead', {
       system: 'Structure', material: 'Machined aluminium bulkhead with stiffeners, radome attach ring', mass: 45,
       explode: [2.3, -0.35, 0],
-      desc: 'Closes the front of the fuselage at station 2.55 m. Its face carries the mount for the 1,956-module APG-77 array (about 0.9 m across), its rim the attach ring and latches for the radome, which swings or comes off for radar maintenance.',
+      desc: `Closes the front of the fuselage about ${RS.toFixed(1)} m behind the nose tip (station approximate). Its face carries the mount for the 1,956-module APG-77 array (about 0.9 m across), its rim the attach ring and latches for the radome, which swings or comes off for radar maintenance.`,
     }, mesh(merge(rb), F.alu()));
   }
   // mid fuselage (Lockheed Martin Fort Worth; ≈ 30 % titanium, 30 % aluminium, 30 % composite): titanium
   // wing-carry-through bulkheads where the titanium front and mid spars attach, aluminium frames between
+  // (the titanium spars reach the side of the body at the stations below; the RTM spars between them)
+  const sparAt = (f) => FR.wingLE(FR.WING.bodyZ) + f * (FR.wingTE(FR.WING.bodyZ) - FR.wingLE(FR.WING.bodyZ));
   {
     // each frame stays 3 cm clear of the inlet ducts that pass through it: where a duct comes close to the skin
     // the frame is made shallower
@@ -320,48 +359,54 @@ export function buildAirframe(ctx) {
       const sideBay = s > FR.SIDE_BAY.s0 && s < FR.SIDE_BAY.s1, dep = depAt(s, 0.05);
       return frameBand(s, zy(FR.ringB(s).pts), {
         depth: 0.15, thick: 0.05, clip: clipDuct(s, 0.05), avoid: (p) => dep(p[1], p[0]) > -0.028,
-        keep: (p) => !(p[1] < -D + 0.12 && Math.abs(p[0]) < FR.MAIN_BAY.z + 0.05) && !(sideBay && p[1] < -0.38 && p[1] > -0.86 && Math.abs(p[0]) > 1.25) && dep(p[1], p[0]) < -0.015,
+        keep: (p) => !(p[1] < -D + 0.12 && Math.abs(p[0]) < FR.MAIN_BAY.z + 0.05) && !(sideBay && p[1] < FR.SIDE_BAY.y0 + 0.04 && p[1] > FR.SIDE_BAY.y1 - 0.04 && Math.abs(p[0]) > FR.wallZ(s, -0.6) - 0.4) && dep(p[1], p[0]) < -0.015,
       });
     };
+    // forward bulkhead behind the inlets, the front-spar bulkhead, and the bulkhead just ahead of the fan faces
+    // that carries the main-gear trunnions
     P('Mid-fuselage titanium bulkheads', {
       system: 'Structure', material: 'Ti-6Al-4V bulkheads machined from large forgings', mass: 620, xrayWeight: 0.5,
       explode: [0, 0.65, 0],
-      desc: 'Three heavy wing-carry-through bulkheads, where the titanium front and mid spars and the main-gear loads come in, carry wing bending across the fuselage around the inlet ducts and over the main weapons bay. Titanium is about 40 % of the F-22\'s structural weight (sources give 39–42 %), more than any earlier US fighter (assignment of bulkheads approximate).',
-    }, mesh(merge([8.6, 11.6, 12.6].map(band)), F.ti()));
+      desc: 'Heavy wing-carry-through bulkheads, where the titanium front spar and the main-gear loads come in, carry wing bending across the fuselage around the inlet ducts and over the main weapons bay. Titanium is about 40 % of the F-22\'s structural weight (sources give 39–42 %), more than any earlier US fighter (assignment of bulkheads approximate).',
+    }, mesh(merge([FR.M(8.6), sparAt(0.10), 11.25].map(band)), F.ti()));
     P('Mid-fuselage aluminium frames', {
       system: 'Structure', material: 'Machined aluminium frames', mass: 260, xrayWeight: 0.5,
       explode: [0, 0.9, 0],
       desc: 'Lighter frames between the titanium bulkheads, where the composite spars attach. The mid fuselage is built as three modules with about 5,000 structural parts and over 100,000 fasteners, and houses all or part of the fuel, hydraulic, electrical, environmental and APU systems.',
-    }, mesh(merge([9.6, 10.6].map(band)), F.alu()));
+    }, mesh(merge([8.25, sparAt(0.23)].map(band)), F.alu()));
   }
-  // engine-bay frames
+  // engine-bay frames (the mid and rear titanium spars meet the aft fuselage here)
   {
     const g = [];
-    for (const s of [13.4, 14.3, 15.2, 16.1, 17.0]) g.push(frameBand(s, zy(FR.ringB(s).pts), { depth: 0.07, thick: 0.04 }));
+    for (const s of [sparAt(0.49), 12.95, sparAt(0.75), 14.75]) g.push(frameBand(s, zy(FR.ringB(s).pts), { depth: 0.07, thick: 0.04 }));
     P('Engine-bay frames', {
       system: 'Structure', material: 'Titanium frames', mass: 420, explode: [-1.0, 0.9, 0],
-      desc: 'Hoop frames around the two engine bays tie the keel, the booms and the upper deck together and carry the vertical-tail and stabilator loads forward.',
+      desc: 'Hoop frames around the two engine bays tie the keel, the booms and the upper deck together and carry the vertical-tail and stabilator loads forward; the wing\'s titanium mid and rear spars attach to them.',
     }, mesh(merge(g), F.tiDull()));
   }
   // keel and longerons
   {
     const g = [];
     const keel = [];
-    for (let s = 12.6; s <= 17.45; s += 0.25) keel.push(s);
-    // keel web between the engines
-    const grid = [keel.map((s) => [X(s), FR.topAt(s, 0) - 0.06, 0]), keel.map((s) => [X(s), -FR.bD(s) + 0.05, 0])];
+    for (let s = 11.6; s <= FR.S_BE + 1.3; s += 0.25) keel.push(s);
+    // keel web between the engines, carried on into the stinger
+    const kTop = (s) => (s < FR.S_BE ? FR.topAt(s, 0) - 0.06 : lerp(FR.bHT(FR.S_BE) - 0.1, 0.12, (s - FR.S_BE) / 1.4));
+    const kBot = (s) => (s < FR.S_BE ? -FR.bD(s) + 0.05 : lerp(-FR.bD(FR.S_BE) + 0.06, -0.62, (s - FR.S_BE) / 1.4));
+    const grid = [keel.map((s) => [X(s), kTop(s), 0]), keel.map((s) => [X(s), kBot(s), 0])];
     g.push(slab([grid[0].map((p) => [p[0], p[1], -0.02]), grid[1].map((p) => [p[0], p[1], -0.02])], () => [0, 0, 0.04]));
     // weapons-bay longerons along the door edges and the bay ceiling
+    const yL = (s) => -FR.bD(s) + 0.045;
     for (const z of [-0.81, 0.81]) {
       // the bay-edge longerons end at the bay's aft wall, where the main-gear well begins; from that wall keel
       // longerons inboard of the wheel bays carry on into the engine bays
-      g.push(FR.pipe([[8.45, -0.84, z], [10, -0.86, z], [12.0, -0.86, z], [12.33, -0.855, z]], 0.035, 6));
-      g.push(FR.pipe([[12.36, -0.8, z * 0.4], [13.1, -0.79, z * 0.4], [13.6, -0.76, z * 0.4]], 0.035, 6));
+      const s0 = FR.MAIN_BAY.s0, s1 = FR.MAIN_BAY.s1;
+      g.push(FR.pipe([[s0, yL(s0), z], [lerp(s0, s1, 0.4), yL(lerp(s0, s1, 0.4)), z], [s1 - 0.35, yL(s1 - 0.35), z], [s1 - 0.02, yL(s1 - 0.02), z]], 0.035, 6));
+      g.push(FR.pipe([[s1 + 0.01, -0.86, z * 0.4], [s1 + 0.6, -0.86, z * 0.4], [s1 + 1.1, -0.84, z * 0.4]], 0.035, 6));
       // ceiling longeron along the break of the bay ceiling, stepping inboard under the duct floor aft; at the
       // aft wall, where the duct floor comes down to the ceiling, it sits flush in the ceiling corner
       const cz = (sv) => Math.abs(z) * 0.75 - (0.6075 - 0.4) * FR.smooth(FR.BAY_AFT.s0, FR.BAY_AFT.s1, sv);
-      const dy = (sv) => 0.035 - 0.03 * FR.smooth(12.05, 12.36, sv);
-      g.push(FR.pipe([8.3, 10.4, FR.BAY_AFT.s0, 11.7, FR.BAY_AFT.s1, 12.24, 12.36].map((sv) => [sv, FR.bayCeilAt(sv, cz(sv)) + dy(sv), Math.sign(z) * cz(sv)]), 0.03, 6, 24));
+      const dy = (sv) => 0.035 - 0.03 * FR.smooth(s1 - 0.3, s1, sv);
+      g.push(FR.pipe([s0 - 0.1, FR.M(10.4), FR.BAY_AFT.s0, FR.M(11.7), FR.BAY_AFT.s1, s1 - 0.11, s1 + 0.01].map((sv) => [sv, FR.bayCeilAt(sv, cz(sv)) + dy(sv), Math.sign(z) * cz(sv)]), 0.03, 6, 24));
     }
     P('Keel & weapons-bay longerons', {
       system: 'Structure', material: 'Titanium keel web, steel / titanium longerons', mass: 380, explode: [0, -0.45, 0],
@@ -372,16 +417,16 @@ export function buildAirframe(ctx) {
     const g = [];
     for (const side of [1, -1]) {
       const fwd = [];
-      for (let s = 2.7; s <= 7.6; s += 0.35) {
+      for (let s = FR.M(2.7); s <= FR.M(7.6); s += 0.35) {
         const z = Math.max(0.42, FR.sillW(s) + 0.07);
         fwd.push([s, FR.topAt(s, Math.min(z, FR.aW(s) - 0.05)) - 0.06, side * Math.min(z, FR.aW(s) - 0.05)]);
       }
       g.push(FR.pipe(fwd, 0.028, 6));
       const mid = [];
-      for (let s = 7.6; s <= 17.4; s += 0.5) mid.push([s, FR.topAt(s, 0.45) - 0.06, side * 0.45]);
+      for (let s = FR.M(7.6); s <= FR.S_BE - 0.1; s += 0.5) mid.push([s, FR.topAt(s, 0.45) - 0.06, side * 0.45]);
       g.push(FR.pipe(mid, 0.028, 6));
       const chine = [];
-      for (let s = 2.7; s <= 8.2; s += 0.4) chine.push([s, FR.aYC(s) - 0.02, side * (FR.aW(s) - 0.06)]);
+      for (let s = FR.M(2.7); s <= FR.S_AB - 0.2; s += 0.4) chine.push([s, FR.aYC(s) - 0.02, side * (FR.aW(s) - 0.06)]);
       g.push(FR.pipe(chine, 0.022, 6));
     }
     P('Upper longerons & canopy rails', {
@@ -389,61 +434,76 @@ export function buildAirframe(ctx) {
       desc: 'Continuous longerons along the cockpit sills (the canopy rails), the upper deck and the forward chines carry fuselage bending between the frames.',
     }, mesh(merge(g), F.tiDull()));
   }
-  // EB-welded titanium aft booms with the boom-end fairings that carry the stabilator pivots
+  // EB-welded titanium aft booms, beside the engines and nozzles, that carry the vertical tails and the stabilator pivots
   for (const side of [1, -1]) {
     const g = [];
     const rings = [];
-    // the box section tapers in depth aft, staying under the upper skin as the fuselage thins toward the nozzles
-    const boomTop = (s) => Math.min(0.3, FR.topAt(s, 1.5) - 0.025), boomBot = -0.2;
-    const ring = (s, dw = 0, dh = 0) => FR.superRing(X(s), side * 1.49, (boomTop(s) + boomBot) / 2, 0.2 + dw, boomTop(s) - boomBot + dh, 12, 6);
-    for (const s of [12.8, 13.6, 14.6, 15.6, 16.2, 16.8, 17.4]) rings.push(ring(s));
+    const BZ = 1.55;
+    // the box section tapers in depth aft, staying inside the boom skin as it thins toward the stabilator
+    const boomTop = (s) => Math.min(0.3, FR.upperB(s, BZ + 0.12) - 0.035), boomBot = (s) => Math.max(-0.2, -FR.bD(s) + 0.05);
+    const ring = (s, dw = 0, dh = 0) => FR.superRing(X(s), side * BZ, (boomTop(s) + boomBot(s)) / 2, 0.2 + dw, boomTop(s) - boomBot(s) + dh, 12, 6);
+    for (const s of [11.75, 12.6, 13.6, 14.6, 15.6, 16.6, 17.33]) rings.push(ring(s));
     g.push(FR.gridSurface(rings, { closed: true }));
     // machined forward, middle and end frames that the isogrid panels are welded to
     const frames = [];
-    for (const s of [12.8, 15.1, 17.37]) frames.push(FR.gridSurface([ring(s - 0.03, 0.025, 0.02), ring(s + 0.03, 0.025, 0.02)], { closed: true, uv: 'n' }));
-    // boom-end fairing behind the fuselage: tapers to the stabilator trailing edge
-    const fr = [];
-    const keys = [[17.35, 1.485, 0.0, 0.31, 0.62], [17.6, 1.49, 0.0, 0.29, 0.58], [18.0, 1.5, -0.03, 0.26, 0.44], [18.35, 1.51, -0.06, 0.2, 0.3], [18.62, 1.52, -0.08, 0.1, 0.12]];
-    for (const [s, z, y, w, h] of keys) fr.push(FR.superRing(X(s), side * z, y, w, h, 16, 3.4));
-    const fairing = FR.gridSurface(fr, { closed: true, uv: 'n' });
+    for (const s of [11.75, 14.6, 17.3]) frames.push(FR.gridSurface([ring(s - 0.03, 0.025, 0.02), ring(s + 0.03, 0.025, 0.02)], { closed: true, uv: 'n' }));
     P(side > 0 ? 'Aft boom (right)' : 'Aft boom (left)', {
       system: 'Structure', material: 'Ti-6Al-4V isogrid panels electron-beam welded to machined frames (90+ pieces per ship set)', mass: 310,
       explode: [-1.9, 0.25, 1.15 * side],
       desc: 'Box-section titanium booms outboard of each engine carry the vertical tail and stabilator; the aft fuselage is 55 % titanium because the booms run beside the hot nozzles. Aerojet robotically electron-beam welded integrally stiffened isogrid panels to machined forward, middle and end frames — about 3,600 in (91 m) of welds per ship set instead of fasteners.',
-    }, [mesh(merge(g), F.isogrid()), mesh(merge(frames), F.ti()), mesh(fairing, F.skin())]);
+    }, [mesh(merge(g), F.isogrid()), mesh(merge(frames), F.ti())]);
   }
 
   // ================================================================== wings
-  const wRoot = FR.wingSection(1.45), wTip = FR.wingSection(FR.WING.semi);
-  const etaOf = (z) => (z - 1.45) / (FR.WING.semi - 1.45);
+  // two trapezoids: root → the trailing-edge kink at z 5.87, then the 42° tip clip to the 1.1 m tip chord
+  const ZR = 1.45, ZK = FR.WING.kinkZ, ZT = FR.WING.semi;
+  const wRoot = FR.wingSection(ZR), wKink = FR.wingSection(ZK), wTip = FR.wingSection(ZT);
+  const PAN = [[wRoot, wKink, ZR, ZK], [wKink, wTip, ZK, ZT]];
+  /** wingPanel pieces between spans za and zb (split at the kink), chord fractions c0..c1. */
+  const wingPieces = ({ c0, c1, za, zb, stations = 2 }) => {
+    const out = [];
+    for (const [r, t, z0, z1] of PAN) {
+      const a = Math.max(za, z0), b = Math.min(zb, z1);
+      if (b - a < 1e-6) continue;
+      const eta0 = (a - z0) / (z1 - z0), eta1 = (b - z0) / (z1 - z0);
+      const n = Math.max(1, Math.round((stations * (b - a)) / (zb - za)));
+      const g = wingPanel({ root: r, tip: t, n: 22, c0, c1, eta0, eta1, stations: n });
+      out.push(eta0 === 0 && r === wRoot ? trimRootFromDuct(g, wRoot, wKink) : g);
+    }
+    return out;
+  };
+  /** Mid-thickness point on the wing at span z and chord fraction cf. */
+  const wPt = (z, cf) => { const sec = FR.wingSection(z); return V(sec.le[0] - cf * sec.chord, sec.le[1], z); };
+  const SF = FR.SURF, HF = SF.hinge;
   const naca = naca00;
   for (const side of [1, -1]) {
     const flip = (g) => (side > 0 ? g : mirrorZ(g));
     const mz = (v) => new THREE.Vector3(v.x, v.y, v.z * side);
     const R = side > 0 ? 'right' : 'left';
-    const panel = (o) => flip(o.eta0 ? wingPanel({ root: wRoot, tip: wTip, n: 22, ...o }) : trimRootFromDuct(wingPanel({ root: wRoot, tip: wTip, n: 22, ...o }), wRoot, wTip));
+    const panel = (o) => wingPieces(o).map(flip);
     const skin = [
-      panel({ c0: 0.075, c1: 0.85, eta0: 0, eta1: 0.525, stations: 6 }),
-      panel({ c0: 0.075, c1: 0.78, eta0: 0.525, eta1: 0.94, stations: 5 }),
-      panel({ c0: 0.075, c1: 1, eta0: 0.94, eta1: 1, stations: 1 }),
-      panel({ c0: 0, c1: 0.075, eta0: 0, eta1: 0.08, stations: 1 }),
-      panel({ c0: 0, c1: 0.075, eta0: 0.97, eta1: 1, stations: 1 }),
-      panel({ c0: 0.85, c1: 1, eta0: 0, eta1: 0.07, stations: 1 }),
-      panel({ c0: 0.85, c1: 1, eta0: 0.52, eta1: 0.525, stations: 1 }),
-      panel({ c0: 0.78, c1: 1, eta0: 0.525, eta1: 0.53, stations: 1 }),
+      ...panel({ c0: HF.lef, c1: HF.flaperon, za: ZR, zb: SF.aileron[0], stations: 6 }),
+      ...panel({ c0: HF.lef, c1: HF.aileron, za: SF.aileron[0], zb: ZK, stations: 3 }),
+      ...panel({ c0: HF.lef, c1: 1, za: ZK, zb: ZT, stations: 2 }),
+      ...panel({ c0: 0, c1: HF.lef, za: ZR, zb: SF.lef[0], stations: 1 }),
+      ...panel({ c0: 0, c1: HF.lef, za: SF.lef[1], zb: ZT, stations: 1 }),
+      ...panel({ c0: HF.flaperon, c1: 1, za: ZR, zb: SF.flaperon[0], stations: 1 }),
+      ...panel({ c0: HF.flaperon, c1: 1, za: SF.flaperon[1] - 0.02, zb: SF.flaperon[1], stations: 1 }),
+      ...panel({ c0: HF.aileron, c1: 1, za: SF.aileron[0], zb: SF.aileron[0] + 0.02, stations: 1 }),
+      ...panel({ c0: HF.aileron, c1: 1, za: SF.aileron[1] - 0.02, zb: ZK, stations: 1 }),
     ];
     const wing = P(`Wing skin (${R})`, {
       system: 'Skin & fairings', skin: true, material: 'Bismaleimide composite skins, RAM-treated edges', mass: 420,
       explode: [0, 0.35, 2.7 * side], callout: false,
-      desc: 'Upper and lower skins of a 42°-swept wing with a −17° trailing edge; 78.04 m² for both wings and a 13.56 m span, with 3.25° of anhedral. The real wing uses NACA 64A-series sections (5.92 % thick at the root, 4.29 % at the tip) with conical camber and twist; the model keeps the thickness but uses symmetric sections.',
+      desc: 'Upper and lower skins of a 42°-swept wing with a −17° trailing edge; 78.04 m² for both wings (reference trapezoid) and a 13.56 m span, with 3.25° of anhedral. Outboard of the ailerons the trailing edge is cut back parallel to the leading edge, so the real tip chord is only about 1.1 m. The real wing uses NACA 64A-series sections (5.92 % thick at the root, 4.29 % at the tip) with conical camber and twist; the model keeps the thickness but uses symmetric sections.',
     }, mesh(mergeGeometries(skin), F.wing()));                     // one mesh; the panels keep their chord / side attributes
     wing.userData.part.thermalRole = 'leadingEdge';
 
     // control surfaces
     const surf = (name, info, o, c, toward, testCf) => {
-      const geo = panel(o);
-      const p0 = mz(wingPoint(wRoot, wTip, o.eta0, c)), p1 = mz(wingPoint(wRoot, wTip, o.eta1, c));
-      const test = mz(wingPoint(wRoot, wTip, (o.eta0 + o.eta1) / 2, testCf));
+      const geo = mergeGeometries(panel(o));
+      const p0 = mz(wPt(o.za, c)), p1 = mz(wPt(o.zb, c));
+      const test = mz(wPt((o.za + o.zb) / 2, testCf));
       const h = hinge(mesh(geo, F.wing()), p0, p1, test, toward);
       const part = P(name, info, h.pivot);
       part.userData.part.thermalRole = info.thermal || null;
@@ -452,23 +512,23 @@ export function buildAirframe(ctx) {
     const down = V(0, -1, 0);
     anim.lef.push({ side, h: surf(`Leading-edge flap (${R})`, {
       system: 'Flight controls', material: 'Composite over titanium torque tube', mass: 95, explode: [1.0, 0.1, 2.9 * side], thermal: 'leadingEdge',
-      desc: 'Full-span flap along the leading edge, driven by rotary actuators. It droops automatically with angle of attack to keep the flow attached, extending usable lift toward the 60° angles of attack the F-22 can fly with thrust vectoring.',
-    }, { c0: 0, c1: 0.075, eta0: 0.08, eta1: 0.97, stations: 6 }, 0.075, down, 0.0) });
+      desc: 'A flap along most of the leading edge, from just outboard of the body to near the tip, driven by rotary actuators. It droops automatically with angle of attack to keep the flow attached, extending usable lift toward the 60° angles of attack the F-22 can fly with thrust vectoring.',
+    }, { c0: 0, c1: HF.lef, za: SF.lef[0], zb: SF.lef[1], stations: 6 }, HF.lef, down, 0.0) });
     anim.flaperon.push({ side, h: surf(`Flaperon (${R})`, {
       system: 'Flight controls', material: 'Composite', mass: 120, explode: [-1.4, 0.15, 2.4 * side],
-      desc: 'Inboard trailing-edge surface that works as a flap for take-off and landing and as an aileron for roll. With the ailerons and rudders it also serves as the speed brake — the F-22 has no separate airbrake panel.',
-    }, { c0: 0.85, c1: 1, eta0: 0.07, eta1: 0.52, stations: 3 }, 0.85, down, 1) });
+      desc: 'Inboard trailing-edge surface, from the body out to mid-span, that works as a flap for take-off and landing and as an aileron for roll. With the ailerons and rudders it also serves as the speed brake — the F-22 has no separate airbrake panel.',
+    }, { c0: HF.flaperon, c1: 1, za: SF.flaperon[0], zb: SF.flaperon[1] - 0.02, stations: 3 }, HF.flaperon, down, 1) });
     anim.aileron.push({ side, h: surf(`Aileron (${R})`, {
       system: 'Flight controls', material: 'Composite', mass: 60, explode: [-1.2, 0.15, 3.3 * side],
-      desc: 'Outboard trailing-edge surface for roll. The fly-by-wire system blends it with the flaperons, differential stabilators and, at low speed, the rudders.',
-    }, { c0: 0.78, c1: 1, eta0: 0.53, eta1: 0.94, stations: 3 }, 0.78, down, 1) });
+      desc: 'Outboard trailing-edge surface for roll, ending where the tip is cut back. The fly-by-wire system blends it with the flaperons, differential stabilators and, at low speed, the rudders.',
+    }, { c0: HF.aileron, c1: 1, za: SF.aileron[0] + 0.02, zb: SF.aileron[1] - 0.02, stations: 3 }, HF.aileron, down, 1) });
 
     // wing box (Boeing; the wing is almost 50 % titanium): titanium front, mid and rear spars machined
     // from forgings, resin-transfer-moulded "sine-wave" composite intermediate spars, ribs, and root
-    // fittings that bolt the spars to the mid-fuselage bulkheads at the side of the body (z ≈ 1.88)
-    const zSOB = 1.88, zEnd = 1.45 + 0.97 * (FR.WING.semi - 1.45);
+    // fittings that bolt the spars to the mid-fuselage bulkheads at the side of the body
+    const zSOB = FR.WING.bodyZ - 0.08, zEnd = 6.7;
     const TI_F = [0.10, 0.49, 0.75], RTM_F = [0.23, 0.36, 0.62];
-    const spanSecs = [zSOB, 2.5, 3.2, 3.9, 4.6, 5.3, 6.0, zEnd].map((z) => FR.wingSection(z));
+    const spanSecs = [zSOB, 2.7, 3.4, 4.1, 4.8, 5.5, ZK, 6.3, zEnd].map((z) => FR.wingSection(z));
     const ti = [], rtm = [], ribs = [], fits = [];
     for (const f of TI_F) {
       ti.push(sparWeb(spanSecs, f, f === 0.49 ? 0.018 : 0.024, 0.9, naca));
@@ -484,7 +544,7 @@ export function buildAirframe(ctx) {
       rtm.push(sparWeb(wave, f, 0.01, 0.9, naca));
       rtm.push(sparCaps(spanSecs, f, 0.06, 0.008, 0.9));
     }
-    for (const z of [zSOB, 2.45, 3.05, 3.65, 4.25, 4.85, 5.45, 6.05, zEnd]) ribs.push(ribPlate(FR.wingSection(z), 0.1, 0.75, z === zSOB ? 0.02 : 0.012, 0.88, naca));
+    for (const z of [zSOB, 2.65, 3.25, 3.85, 4.45, 5.05, 5.55, ZK, 6.3, zEnd]) ribs.push(ribPlate(FR.wingSection(z), 0.1, 0.75, z === zSOB ? 0.02 : 0.012, 0.88, naca));
     // root fittings: a lug on each spar end, bolted to the bulkhead it lines up with
     const sob = FR.wingSection(zSOB);
     for (const f of [...TI_F, ...RTM_F]) {
@@ -496,7 +556,7 @@ export function buildAirframe(ctx) {
     const sideG = (g) => (side > 0 ? g : mirror(g));
     P(`Wing titanium spars (${R})`, {
       system: 'Structure', material: 'Ti-6Al-4V spars machined from forgings, with spar caps', mass: 330,
-      explode: [0, -0.2, 2.2 * side], callout: side > 0, anchor: [X(10.44), -0.02, 3.4 * side],
+      explode: [0, -0.2, 2.2 * side], callout: side > 0, anchor: [X(FR.WM(10.44)), FR.wingY(3.4), 3.4 * side],
       desc: 'The front, mid and rear spars are machined titanium forgings. Boeing\'s wing is almost 50 % titanium, partly because an intermediate composite spar was changed to titanium wherever it was needed to tolerate battle damage (every third one, by Flight\'s account).',
     }, mesh(sideG(merge(ti)), F.tiDull()));
     P(`Wing RTM sine-wave spars (${R})`, {
@@ -512,34 +572,35 @@ export function buildAirframe(ctx) {
     P(`Wing root attach fittings (${R})`, {
       system: 'Structure', material: 'Titanium lugs and high-strength steel shear pins', mass: 110,
       explode: [0, -0.15, 1.7 * side],
-      desc: 'Each spar ends in a lug at the side of the body, pinned to the mid-fuselage bulkhead it lines up with, so wing bending passes straight into the fuselage carry-through structure (lug detail approximate).',
+      desc: 'Each spar ends in a lug at the side of the body, pinned to the fuselage bulkhead or frame it lines up with, so wing bending passes straight into the fuselage carry-through structure (lug detail approximate).',
     }, mesh(sideG(merge(fits)), F.steel()));
 
     // wing control actuators: LEF power drive unit, torque tube and rotary actuators; trailing-edge actuators
     {
       const g = [];
-      const lefA = mz(wingPoint(wRoot, wTip, 0.068, 0.1)), lefB = mz(wingPoint(wRoot, wTip, 0.93, 0.1));
+      const lefA = mz(wPt(SF.lef[0] + 0.05, 0.1)), lefB = mz(wPt(SF.lef[1] - 0.1, 0.1));
       g.push(FR.pipe([[FR.SN - lefA.x, lefA.y, lefA.z], [FR.SN - lefB.x, lefB.y, lefB.z]], 0.014, 6, 4));
-      for (const e of [0.12, 0.3, 0.48, 0.66, 0.84]) {
-        const p = mz(wingPoint(wRoot, wTip, e, 0.1));
+      for (const z of [2.7, 3.5, 4.3, 5.1, 5.9]) {
+        const p = mz(wPt(z, 0.1));
         // geared rotary actuator on the torque tube, sized to the local wing depth behind the flap hinge,
         // with its output arm forward to the flap
-        const sec = FR.wingSection(Math.abs(p.z));
+        const sec = FR.wingSection(z);
         const r = Math.min(0.05, naca(0.1, sec.t) * sec.chord * 0.5);
         g.push(new THREE.CylinderGeometry(r, r, 0.2, 12).rotateX(Math.PI / 2).translate(p.x, p.y, p.z));
         g.push(new THREE.CylinderGeometry(r * 1.15, r * 1.15, 0.05, 12).rotateX(Math.PI / 2).translate(p.x, p.y, p.z + 0.06));
         g.push(new THREE.BoxGeometry(0.16, r * 0.6, 0.03).translate(p.x + 0.08, p.y, p.z - 0.06));
       }
-      // power drive unit at the wing root, outboard of the inlet duct, geared into the inboard end of the torque tube
-      const pdu = mz(wingPoint(wRoot, wTip, 0.059, 0.1));                            // z ≈ 1.765: inside the cowl side wall
+      // power drive unit at the wing root, just outboard of the body side, geared into the inboard end of the torque tube
+      const pdu = mz(wPt(SF.lef[0] - 0.06, 0.1));
       g.push(new THREE.BoxGeometry(0.26, 0.09, 0.13).translate(pdu.x, pdu.y, pdu.z));
       P(`Leading-edge flap drive (${R})`, {
         system: 'Flight controls', material: 'Hydraulic power drive unit, titanium torque tube, rotary geared actuators', mass: 55, explode: [0.6, -0.6, 2.6 * side],
-        desc: 'A hydraulic power drive unit at the wing root turns a torque tube along the front spar, and geared rotary actuators along it move the full-span leading-edge flap. Curtiss-Wright developed these geared rotary actuators and has supplied them since the start of the programme (actuator count approximate; each is sized to the local wing depth).',
+        desc: 'A hydraulic power drive unit at the wing root turns a torque tube along the front spar, and geared rotary actuators along it move the leading-edge flap. Curtiss-Wright developed these geared rotary actuators and has supplied them since the start of the programme (actuator count approximate; each is sized to the local wing depth).',
       }, mesh(merge(g), F.hyd()));
       const t = [];
-      for (const { eta: e, c, len } of [FR.TE_ACT.flaperon, FR.TE_ACT.aileron]) {
-        const p = mz(wingPoint(wRoot, wTip, e, c));
+      for (const k of ['flaperon', 'aileron']) {
+        const { z, c, len } = FR.TE_ACT[k];
+        const p = mz(wPt(z, c));
         t.push(new THREE.CylinderGeometry(0.045, 0.04, len, 10).rotateZ(Math.PI / 2).translate(p.x + len / 2 - 0.05, p.y, p.z));
         t.push(new THREE.BoxGeometry(0.06, 0.07, 0.08).translate(p.x - 0.05, p.y, p.z));
       }
@@ -552,8 +613,8 @@ export function buildAirframe(ctx) {
     // store hardpoints inside the wing box: four in all, the inboard pair plumbed for 600 US gal ferry tanks
     {
       const g = [], f = [];
-      for (const [e, wet] of [[0.22, true], [0.5, false]]) {
-        const p = mz(wingPoint(wRoot, wTip, e, 0.42));
+      for (const [zz, wet] of [[2.75, true], [4.15, false]]) {
+        const p = mz(wPt(zz, 0.42));
         const sec = FR.wingSection(Math.abs(p.z));
         const yb = p.y - naca(0.42, sec.t) * sec.chord * 0.9;
         g.push(new THREE.BoxGeometry(0.62, 0.05, 0.12).translate(p.x, yb + 0.035, p.z));
@@ -584,39 +645,44 @@ export function buildAirframe(ctx) {
   for (const side of [1, -1]) {
     const R = side > 0 ? 'right' : 'left';
     const flip = (g) => (side > 0 ? g : mirrorZ(g));
-    const sr = FR.stabSection(FR.STAB.rootZ), sn = FR.stabSection(FR.STAB.notchZ), stp = FR.stabSection(FR.STAB.tipZ);
-    const geo = [flip(wingPanel({ root: sr, tip: sn, stations: 1, n: 20 })), flip(wingPanel({ root: sn, tip: stp, stations: 5, n: 20 }))];
+    // the outline turns at the notch (cut-back leading edge → 42° edge), the trailing-edge vertex and the tip
+    const brk = FR.STAB_BREAKS();
+    const geo = [];
+    for (let k = 0; k < brk.length - 1; k++) {
+      const a = FR.stabSection(brk[k]), b = FR.stabSection(brk[k + 1]);
+      geo.push(flip(wingPanel({ root: a, tip: b, stations: Math.max(1, Math.round((brk[k + 1] - brk[k]) / 0.4)), n: 20 })));
+    }
     const p0 = V(X(FR.STAB.pivotS), FR.STAB.y, 0), p1 = V(X(FR.STAB.pivotS), FR.STAB.y, side);
-    const testTE = V(X(18.6), FR.STAB.y, side * 2.0);
+    const testTE = V(X(18.0), FR.STAB.y, side * 2.6);
     const h = hinge(mesh(mergeGeometries(geo), F.wing()), p0, p1, testTE, V(0, -1, 0));
     const stab = P(`Stabilator (${R})`, {
       system: 'Flight controls', material: 'Composite skins on a titanium torque box', mass: 290,
       explode: [-2.3, -0.2, 1.9 * side], callout: false,
-      desc: 'All-moving horizontal tail (8.84 m span over both sides) for pitch control. Its edges repeat the wing\'s 42° and −17° sweeps; the inboard leading edge is cut back so it clears the wing root at full travel, and the two sides also move differentially to help roll at high angle of attack.',
+      desc: 'All-moving horizontal tail (8.84 m span over both sides) for pitch control. Its leading edge repeats the wing\'s 42°, and the aft-most point of the whole aircraft is the corner of its notched trailing edge. On the jet the inboard leading edge tucks under the flaperon; the model cuts it back to run just behind the wing (the real travel limits are not published). The two sides also move differentially to help roll at high angle of attack.',
     }, h.pivot);
     stab.userData.part.thermalRole = 'leadingEdge';
     anim.stab.push({ side, h });
 
     // torque box and spindle (rotates with the stabilator)
-    const notchEta = (FR.STAB.notchZ - FR.STAB.rootZ) / (FR.STAB.tipZ - FR.STAB.rootZ);
-    const secs = [0, notchEta, 0.33, 0.66, 0.95].map((e) => FR.stabSection(FR.STAB.rootZ + e * (FR.STAB.tipZ - FR.STAB.rootZ)));
+    const secs = [brk[0], brk[1], brk[2], 3.6, 4.3].map((z) => FR.stabSection(z));
     const g = [];
     for (const f of [0.15, 0.42, 0.7]) g.push(sparWeb(secs, f, 0.016, 0.88, naca00));
     for (const sec of secs) g.push(ribPlate(sec, 0.12, 0.75, 0.012, 0.86, naca00));
-    const spindle = new THREE.CylinderGeometry(0.062, 0.062, 0.9, 16).rotateX(Math.PI / 2).translate(X(FR.STAB.pivotS), FR.STAB.y, 1.6);
+    const spindle = new THREE.CylinderGeometry(0.062, 0.062, 0.7, 16).rotateX(Math.PI / 2).translate(X(FR.STAB.pivotS), FR.STAB.y, FR.STAB.rootZ - 0.2);
     g.push(spindle);
     const boxGeo = merge(g);
     const hb = hinge(mesh(side > 0 ? boxGeo : mirror(boxGeo), F.ti()), p0, p1, testTE, V(0, -1, 0));
     P(`Stabilator torque box & spindle (${R})`, {
       system: 'Structure', material: 'Titanium spindle and spars', mass: 110, explode: [-2.3, -0.2, 1.4 * side],
-      desc: 'The whole stabilator turns on a single titanium spindle carried in bearings in the aft boom; spars and ribs inside spread the load into the composite skins.',
+      desc: 'The whole stabilator turns on a single titanium spindle carried in bearings in the aft boom (pivot station approximate); spars and ribs inside spread the load into the composite skins.',
     }, hb.pivot);
     anim.stab.push({ side, h: hb });
 
     // actuator in the boom driving the spindle crank
     const act = [];
-    act.push(new THREE.CylinderGeometry(0.075, 0.065, 0.9, 12).rotateZ(Math.PI / 2 - 0.25).translate(X(16.25), -0.24, side * 1.38));
-    act.push(new THREE.BoxGeometry(0.12, 0.3, 0.1).translate(X(16.75), -0.15, side * 1.38));
+    const ps = FR.STAB.pivotS;
+    act.push(new THREE.CylinderGeometry(0.075, 0.065, 0.9, 12).rotateZ(Math.PI / 2 - 0.25).translate(X(ps - 0.5), -0.2, side * 1.62));
+    act.push(new THREE.BoxGeometry(0.12, 0.3, 0.1).translate(X(ps), -0.12, side * 1.62));
     P(`Stabilator actuator (${R})`, {
       system: 'Flight controls', material: 'Dual-tandem hydraulic actuator, 4,000 psi', mass: 55, explode: [-1.6, -0.75, 1.25 * side],
       desc: 'The stabilator\'s single actuator (the F-22 has one on each control surface) sits in the boom and drives a crank on the spindle. If its hydraulic supply fails, a compensator keeps the actuator stiff and the flight controls reconfigure to fly on the remaining surfaces (Flight International, 1997).',
@@ -709,10 +775,9 @@ export function buildAirframe(ctx) {
         return row.map(([z, y]) => [X(s), y, side * z]);
       })));
     }
-    // nose-gear well
-    // nose-gear well: up to the underside of the cockpit floor, and into the floor hump over the stowed wheel
+    // nose-gear well: between the inlets, up to the underside of the cockpit floor
     const stN = stations(FR.NOSE_WELL.s0, FR.NOSE_WELL.s1, 0.2, [FR.NOSE_WELL.hump0, FR.NOSE_WELL.hump1]);
-    const roof = (s) => (s > FR.NOSE_WELL.hump0 + 1e-6 && s < FR.NOSE_WELL.hump1 - 1e-6 ? -0.015 : -0.075);
+    const roof = () => -0.02;
     g.push(cavity(stN, (s) => [[X(s), FR.bottomAt(s, FR.NOSE_WELL.z), -FR.NOSE_WELL.z], [X(s), FR.bottomAt(s, FR.NOSE_WELL.z), FR.NOSE_WELL.z]], (s) => [0, roof(s) - FR.bottomAt(s, FR.NOSE_WELL.z), 0], 1));
     P('Side bay & gear-well liners', {
       system: 'Structure', material: 'Aluminium / composite liners', mass: 120, explode: [0, -0.35, 0],

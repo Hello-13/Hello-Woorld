@@ -15,7 +15,15 @@ import * as FR from './frame.js';
 import { naca00 } from '../../engine/geometry.js';
 import { merge } from './util.js';
 
-const { X } = FR;
+const { X, M, WM } = FR;
+/** Station of the leading-edge-flap power drive unit at the wing root (airframe.js puts it at z = SURF.lef[0] − 0.06, 10 % chord). */
+const lefPdu = () => { const z = FR.SURF.lef[0] - 0.06; return [FR.wingLE(z) + 0.1 * (FR.wingTE(z) - FR.wingLE(z)), FR.wingY(z), z]; };
+/** Route points clamped 3 cm inside the fuselage skin (the re-laid-out outer mould line). */
+const inside = (pts, m = 0.03) => pts.map((p) => FR.inBody(p, m));
+/** Out of the trunk into the wing root: up under the chine flange, where the wing joins it behind its leading edge. */
+const toWingRoot = (z) => [[8.3, -0.15, z * (FR.wallZ(8.3, -0.15) - 0.05)], [8.62, -0.05, z * 2.06], [8.78, -0.035, z * 2.17]];
+/** Point on the fin's mid-plane at height y (the fin is canted outboard from its root line). */
+const finMid = (y) => FR.FIN.rootZ + (y - FR.FIN.rootY) * Math.tan(FR.FIN.cant);
 /** Station of chord fraction f of the wing at span z. */
 const wingS = (z, f) => FR.wingLE(z) + f * (FR.wingTE(z) - FR.wingLE(z));
 
@@ -40,35 +48,38 @@ export function buildWiring(ctx) {
       // channel A (right) / B (left): from the VMS boxes down the fuselage side, under each inlet duct, then
       // round its lower outboard corner ahead of the main-gear well, aft over the well's roof (clear of the
       // stowed leg) and under the boom to the engine bay
-      const trunk = [[4.3, -0.22, z * 0.3], [4.6, -0.16, z * 0.6], [5.6, -0.16, z * 0.74], [6.8, -0.3, z * 0.82], [7.3, -0.42, z * 0.915], [8.4, -0.42, z * 0.93],
-        [10.4, -0.4, z * 0.93], [11.05, -0.405, z * 1.05], [11.15, -0.4, z * 1.16], [11.25, -0.37, z * 1.28], [11.38, -0.31, z * 1.42], [11.6, -0.2, z * 1.47], [12.55, -0.17, z * 1.47],
-        [12.76, -0.24, z * 1.47], [13.0, -0.245, z * 1.42], [13.3, -0.24, z * 1.38], [14.0, -0.235, z * 1.38], [14.6, -0.3, z * 1.32]];
-      g.push(tube(trunk));
+      const trunk = [[M(4.3), -0.22, z * 0.3], [M(4.6), -0.16, z * 0.6], [M(5.6), -0.16, z * 0.74], [M(6.8), -0.3, z * 0.82], [M(7.3), -0.42, z * 0.915], [M(8.4), -0.42, z * 0.93],
+        [M(10.4), -0.4, z * 0.93], [M(11.05), -0.405, z * 1.05], [M(11.15), -0.4, z * 1.16], [M(11.25), -0.37, z * 1.28], [M(11.38), -0.31, z * 1.42], [M(11.6), -0.2, z * 1.47], [M(12.55), -0.17, z * 1.47],
+        [M(12.76), -0.24, z * 1.47], [M(13.0), -0.245, z * 1.42], [M(13.3), -0.24, z * 1.38], [M(14.0), -0.235, z * 1.38], [M(14.6), -0.3, z * 1.32]];
+      g.push(tube(inside(trunk)));
       // to the stabilator actuator and up the boom to the rudder actuator
-      g.push(tube([[14.9, -0.29, z * 1.33], [15.6, -0.27, z * 1.38], [16.0, -0.25, z * 1.39], [16.2, -0.24, z * 1.38]]));
-      g.push(tube([[15.0, -0.28, z * 1.34], [15.4, 0.0, z * 1.35], [15.8, 0.3, z * 1.4], [15.95, 0.42, z * 1.46]]));
+      const stabAct = [FR.STAB.pivotS - 0.9, -0.21, z * 1.62];
+      g.push(tube([...inside([[M(14.9), -0.29, z * 1.33], [M(15.6), -0.27, z * 1.38], [M(16.0), -0.25, z * 1.39], [M(16.2), -0.24, z * 1.38]]), [15.0, -0.23, z * 1.45], stabAct]));
+      // up into the fin root (which sits below the deck) to the rudder actuator at 64 % of the root chord
+      const rudAct = finPoint(side, 0.1, 0.64);
+      g.push(tube([...inside([[M(15.0), -0.28, z * 1.34], [M(15.4), 0.0, z * 1.35]]), [14.6, 0.17, z * finMid(0.17)], [15.1, 0.2, z * finMid(0.2)], rudAct]));
       // leading-edge flap power drive unit, round the front of the side bay and outboard of the duct
-      g.push(tube([[8.4, -0.42, z * 0.93], [8.4, -0.6, z * 1.3], [8.42, -0.45, z * 1.66], [8.4, -0.2, z * 1.71], [8.36, -0.05, z * 1.73]]));   // ends in the LEF power drive unit
+      { const [ps, py, pz] = lefPdu(); g.push(tube([...inside([[M(8.4), -0.42, z * 0.93], [M(8.4), -0.6, z * 1.3], [M(8.42), -0.45, z * 1.66], [7.6, -0.3, z * 1.7]]), ...toWingRoot(z), [ps - 0.6, py - 0.02, z * (pz - 0.1)], [ps, py, z * (pz - 0.05)]])); }   // ends in the LEF power drive unit
       // along the rear spar to the flaperon and aileron actuators (one per surface), riding above the flaperon
       // actuator where it crosses it, ending on the aileron actuator; a stub drops into the flaperon actuator
       const fl = FR.teActuator('flaperon'), ai = FR.teActuator('aileron');
-      const lift = (zz) => { const sec = FR.wingSection(zz); return Math.min(0.055, naca00((13.38 - FR.wingLE(zz)) / sec.chord, sec.t) * sec.chord * 0.9 - 0.02); };
-      const rear = [[13.3, -0.24, z * 1.38], [13.32, -0.25, z * 1.6], [13.32, -0.12, z * 1.8], [13.38, -0.07, z * 1.95]];
-      for (const zz of [2.1, 2.5, fl.z, 3.3, 3.6, 4.4]) rear.push([13.38, FR.wingY(zz) + lift(zz), z * zz]);
-      rear.push([13.38, ai.y, z * ai.z]);
+      const lift = (zz) => { const sec = FR.wingSection(zz); return Math.min(0.055, naca00((WM(13.38) - FR.wingLE(zz)) / sec.chord, sec.t) * sec.chord * 0.9 - 0.02); };
+      const rear = inside([[M(13.3), -0.24, z * 1.38], [M(13.32), -0.25, z * 1.6], [M(13.32), -0.12, z * 1.8], [WM(13.38) - 0.4, -0.04, z * 2.05]]);
+      for (const zz of [2.3, 2.6, fl.z, 3.8, 4.1, 4.6]) rear.push([WM(13.38), FR.wingY(zz) + lift(zz), z * zz]);
+      rear.push([WM(13.38), ai.y, z * ai.z]);
       g.push(tube(rear));
-      g.push(tube([[13.38, fl.y + lift(fl.z), z * fl.z], [13.44, fl.y + 0.03, z * fl.z], [fl.s1 - 0.13, fl.y + 0.01, z * fl.z]]));
+      g.push(tube([[WM(13.38), fl.y + lift(fl.z), z * fl.z], [WM(13.44), fl.y + 0.03, z * fl.z], [fl.s1 - 0.13, fl.y + 0.01, z * fl.z]]));
       // channel C (spine): over the tanks under the upper skin, branching aft to both tails and FADECs
       const up = (sv, zz) => [sv, FR.topAt(sv, zz) - 0.045, z * zz];
-      g.push(tube([up(14.0, 0.3), up(14.4, 0.9), up(15.0, 1.3), up(15.6, 1.36), [15.9, 0.4, z * 1.44]]));
-      g.push(tube([up(15.0, 1.3), [15.2, 0.1, z * 1.36], [15.9, -0.1, z * 1.38], [16.25, -0.22, z * 1.37]]));
-      g.push(tube([up(14.4, 0.9), [14.75, 0.2, z * 1.36], [14.8, -0.2, z * 1.34], [14.78, -0.3, z * 1.3]]));
+      g.push(tube([up(M(14.0), 0.3), up(M(14.4), 0.9), up(M(15.0), 1.3), up(M(15.6), 1.36), [14.6, 0.19, z * finMid(0.19)], [15.15, 0.24, z * finMid(0.24)], finPoint(side, 0.12, 0.6)]));
+      g.push(tube([...inside([up(M(15.0), 1.3), [M(15.2), 0.1, z * 1.36], [M(15.9), -0.1, z * 1.38], [M(16.25), -0.22, z * 1.37]]), [15.0, -0.22, z * 1.47], [FR.STAB.pivotS - 0.95, -0.2, z * 1.6]]));
+      g.push(tube([up(M(14.4), 0.9), [M(14.75), 0.2, z * 1.36], [M(14.8), -0.2, z * 1.34], [M(14.78), -0.3, z * 1.3]]));
     }
-    const spine = [[4.7, -0.22, -0.36], [4.9, -0.12, -0.3], [6.9, -0.12, -0.3], [6.95, 0.3, -0.3], [7.1, FR.topAt(7.1, 0.3) - 0.04, -0.3]];
-    for (const s of [7.6, 8.4, 9.5, 11.0, 12.4, 13.2]) spine.push([s, FR.topAt(s, 0.3) - 0.035, -0.3]);
-    spine.push([13.6, FR.topAt(13.6, 0.12) - 0.045, -0.12], [14.0, FR.topAt(14.0, 0) - 0.045, 0.0]);
+    const spine = inside([[M(4.7), -0.22, -0.36], [M(4.9), -0.12, -0.3], [M(6.9), -0.12, -0.3], [M(6.95), 0.3, -0.3], [M(7.1), FR.topAt(M(7.1), 0.3) - 0.04, -0.3]]);
+    for (const s of [M(7.6), M(8.4), M(9.5), M(11.0), M(12.4), M(13.2)]) spine.push([s, FR.topAt(s, 0.3) - 0.035, -0.3]);
+    spine.push([M(13.6), FR.topAt(M(13.6), 0.12) - 0.045, -0.12], [M(14.0), FR.topAt(M(14.0), 0) - 0.045, 0.0]);
     g.push(tube(spine));
-    for (const z of [0.3, -0.3]) g.push(tube([[14.0, FR.topAt(14.0, 0) - 0.045, 0.0], [14.0, FR.topAt(14.0, 0.3) - 0.045, z]]));
+    for (const z of [0.3, -0.3]) g.push(tube([[M(14.0), FR.topAt(M(14.0), 0) - 0.045, 0.0], [M(14.0), FR.topAt(M(14.0), 0.3) - 0.045, z]]));
     P('Fly-by-wire harnesses (triplex)', {
       system: 'Flight controls', material: 'Shielded twisted-pair signal harnesses, three physically separated routes', mass: 26, xrayWeight: 0.7,
       explode: [0.0, -0.3, 0],
@@ -81,23 +92,23 @@ export function buildWiring(ctx) {
     const g = [];
     for (const side of [1, -1]) {
       const z = side;
-      g.push(tube([[3.3, 0.28, z * 0.2], [3.0, 0.3, z * 0.1], [2.75, 0.24, 0.0]], 0.007));                       // CIP → radar receiver / exciter
-      g.push(tube([[3.05, 0.0, z * 0.2], [2.85, -0.1, z * 0.1], [2.75, -0.2, 0.0]], 0.007));
-      g.push(tube([[3.2, 0.2, z * 0.2], [3.05, 0.12, z * 0.05], [2.98, 0.1, 0.0]], 0.006));                       // INS
-      g.push(tube([[3.3, -0.02, z * 0.2], [3.25, -0.08, z * 0.18], [3.22, -0.09, z * 0.16]], 0.006));              // CNI
-      g.push(tube([[3.55, 0.12, z * 0.2], [3.75, 0.12, z * 0.24], [3.78, 0.12, z * 0.25]], 0.006));                // ALR-94 receivers
-      g.push(tube([[3.55, 0.05, z * 0.2], [4.0, -0.15, z * 0.34], [4.15, -0.22, z * 0.36]], 0.006));               // VMS
+      g.push(tube([[M(3.3), 0.28, z * 0.2], [M(3.0), 0.3, z * 0.1], [M(2.75), 0.24, 0.0]], 0.007));                       // CIP → radar receiver / exciter
+      g.push(tube([[M(3.05), 0.0, z * 0.2], [M(2.85), -0.1, z * 0.1], [M(2.75), -0.2, 0.0]], 0.007));
+      g.push(tube([[M(3.2), 0.2, z * 0.2], [M(3.05), 0.12, z * 0.05], [M(2.98), 0.1, 0.0]], 0.006));                       // INS
+      g.push(tube([[M(3.3), -0.02, z * 0.2], [M(3.25), -0.08, z * 0.18], [M(3.22), -0.09, z * 0.16]], 0.006));              // CNI
+      g.push(tube([[M(3.55), 0.12, z * 0.2], [M(3.75), 0.12, z * 0.24], [M(3.78), 0.12, z * 0.25]], 0.006));                // ALR-94 receivers
+      g.push(tube([[M(3.55), 0.05, z * 0.2], [M(4.0), -0.15, z * 0.34], [M(4.15), -0.22, z * 0.36]], 0.006));               // VMS
     }
-    g.push(tube([[3.55, 0.2, 0.2], [4.2, 0.18, 0.1], [4.45, 0.2, 0.0], [4.7, 0.3, 0.0]], 0.007));                  // cockpit displays
-    g.push(tube([[3.55, 0.0, 0.2], [4.3, -0.1, 0.42], [4.7, -0.2, 0.42]], 0.007));                                  // IFDL processor
+    g.push(tube([[M(3.55), 0.2, 0.2], [M(4.2), 0.18, 0.1], [M(4.45), 0.2, 0.0], [M(4.7), 0.3, 0.0]], 0.007));                  // cockpit displays
+    g.push(tube([[M(3.55), 0.0, 0.2], [M(4.3), -0.1, 0.42], [M(4.7), -0.2, 0.42]], 0.007));                                  // IFDL processor
     // aft along the spine (right of the fly-by-wire channel C) to the CNI / IFDL apertures and aft EW antennas
-    const aft = [[4.7, -0.2, 0.42], [6.9, -0.12, 0.3], [6.95, 0.3, 0.3], [7.1, FR.topAt(7.1, 0.3) - 0.04, 0.3]];
-    for (const s of [7.6, 8.4, 9.5, 10.8, 12.4, 13.6, 15.0, 16.0]) aft.push([s, FR.topAt(s, 0.3) - 0.035, 0.3]);
-    g.push(tube(aft, 0.007));
+    const aft = [[M(4.7), -0.2, 0.42], [M(6.9), -0.12, 0.3], [M(6.95), 0.3, 0.3], [M(7.1), FR.topAt(M(7.1), 0.3) - 0.04, 0.3]];
+    for (const s of [M(7.6), M(8.4), M(9.5), M(10.8), M(12.4), M(13.6), M(15.0), M(16.0)]) aft.push([s, FR.topAt(s, 0.3) - 0.035, 0.3]);
+    g.push(tube(inside(aft, 0.04), 0.007));
     for (const side of [1, -1]) {
-      g.push(tube([[10.8, FR.topAt(10.8, 0.3) - 0.035, 0.3], [11.0, FR.topAt(11.0, 0.8) - 0.035, side * 0.8], [11.0, FR.topAt(11.0, 1.2) - 0.03, side * 1.2]], 0.006));
-      g.push(tube([[15.0, FR.topAt(15.0, 0.3) - 0.035, 0.3], [15.5, FR.topAt(15.5, 0.8) - 0.035, side * 0.8], [15.6, FR.topAt(15.6, 1.12) - 0.03, side * 1.12]], 0.006));
-      g.push(tube([[16.0, FR.topAt(16.0, 0.3) - 0.035, 0.3], [16.3, FR.topAt(16.3, 0.9) - 0.035, side * 0.9], [16.25, FR.topAt(16.25, 1.38) - 0.03, side * 1.38]], 0.006));
+      g.push(tube([[M(10.8), FR.topAt(M(10.8), 0.3) - 0.035, 0.3], [M(11.0), FR.topAt(M(11.0), 0.8) - 0.035, side * 0.8], [M(11.0), FR.topAt(M(11.0), 1.2) - 0.03, side * 1.2]], 0.006));
+      g.push(tube([[M(15.0), FR.topAt(M(15.0), 0.3) - 0.035, 0.3], [M(15.5), FR.topAt(M(15.5), 0.8) - 0.035, side * 0.8], [M(15.6), FR.topAt(M(15.6), 1.12) - 0.03, side * 1.12]], 0.006));
+      g.push(tube([[M(16.0), FR.topAt(M(16.0), 0.3) - 0.035, 0.3], [M(16.3), FR.topAt(M(16.3), 0.9) - 0.035, side * 0.9], [M(16.25), FR.topAt(M(16.25), 1.38) - 0.03, side * 1.38]], 0.006));
     }
     P('Avionics data buses', {
       system: 'Avionics', material: 'Fibre-optic high-speed data buses and IEEE 1394B copper buses', mass: 9, xrayWeight: 0.7,
@@ -112,7 +123,7 @@ export function buildWiring(ctx) {
     for (const side of [1, -1]) {
       const z = side;
       // out to the wing: round the front of the side bay, then along the front spar to the tip light
-      const front = [[8.4, -0.44, z * 0.95], [8.4, -0.62, z * 1.3], [8.43, -0.47, z * 1.65], [8.4, -0.2, z * 1.76], [8.37, -0.04, z * 1.86], [8.4, -0.03, z * 1.96]];
+      const front = [...inside([[M(8.4), -0.44, z * 0.95], [M(8.4), -0.62, z * 1.3], [M(8.43), -0.47, z * 1.65], [7.6, -0.3, z * 1.7]]), ...toWingRoot(z)];
       for (const zz of [2.4, 3.2, 4.0, 4.8, 5.6, 6.3]) front.push([wingS(zz, 0.12), FR.wingY(zz), z * zz]);
       const tipLe = FR.wingLE(FR.WING.semi), tipC = FR.wingTE(FR.WING.semi) - tipLe;
       front.push([tipLe + 0.12 * tipC, FR.wingY(6.62), z * 6.62], [tipLe + 0.15 * tipC, FR.wingY(6.74), z * 6.74]);
@@ -123,15 +134,15 @@ export function buildWiring(ctx) {
         g.push(tube([[wingS(zz, 0.12), FR.wingY(zz), z * zz], [wingS(zz, 0.04), FR.wingY(zz), z * zz]], 0.006));
       }
       // up the fin's front spar to the formation strip
-      const fin = [[15.0, -0.1, z * 1.36], [14.2, 0.2, z * 1.4], finPoint(side, 0.05, 0.14)];
+      const fin = [...inside([[M(15.0), -0.1, z * 1.36]]), [13.3, 0.16, z * finMid(0.16)], finPoint(side, 0.05, 0.14)];
       for (const e of [0.25, 0.45, 0.68]) fin.push(finPoint(side, e, 0.14));
       fin.push(finPoint(side, 0.68, 0.4));
       g.push(tube(fin, 0.008));
     }
     // strobes on the belly and the spine, and the tail light on the left boom fairing
-    g.push(tube([[13.8, -0.6, 0.1], [13.5, -0.72, 0.05], [12.85, -0.86, 0.0]], 0.008));
-    g.push(tube([[13.8, -0.6, -0.1], [14.4, -0.1, -0.03], [15.6, 0.3, -0.03], [16.8, FR.topAt(16.8, 0) - 0.04, 0.0]], 0.008));
-    g.push(tube([[16.6, -0.1, -1.38], [17.4, -0.02, -1.45], [18.2, -0.06, -1.5], [18.55, -0.08, -1.52]], 0.008));
+    g.push(tube([[M(13.8), -0.6, 0.1], [M(13.5), -0.72, 0.05], [M(12.85), -0.86, 0.0]], 0.008));
+    g.push(tube([[M(13.8), -0.6, -0.1], [M(14.4), -0.1, -0.03], [14.3, 0.3, -0.03], [14.6, FR.topAt(14.6, 0) - 0.04, 0.0]], 0.008));
+    g.push(tube([[M(16.6), -0.1, -1.38], [16.3, -0.05, -1.42], [17.0, -0.03, -1.48], [17.45, -0.04, -1.52]], 0.008));
     P('Wing & tail wiring runs', {
       system: 'Electrical', material: 'Shielded 28 V DC power and signal wiring in conduits', mass: 14, xrayWeight: 0.7,
       explode: [0, 0.45, 0],

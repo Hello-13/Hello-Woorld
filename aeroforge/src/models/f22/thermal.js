@@ -11,10 +11,10 @@ import { F } from './materials.js';
 import * as FR from './frame.js';
 import { merge, rectTube } from './util.js';
 
-const { X, smooth } = FR;
+const { X, smooth, M } = FR;
 const box = (s, y, z, ls, h, w) => FR.boxS(s, y, z, ls, h, w);
 /** Middle of the diverter slot between the forward fuselage side and the inlet cowl's inner wall. */
-const slotZ = (s) => FR.aW(s) + 0.03 * (1 - smooth(6.4, 7.5, s));
+const slotZ = (s) => FR.aW(s) + 0.03 * (1 - smooth(M(6.4), M(7.5), s));
 
 export function buildThermal(ctx) {
   const { P } = ctx;
@@ -22,12 +22,12 @@ export function buildThermal(ctx) {
   // ------------------------------------------------------------------ vapour-cycle pack
   {
     // under the cockpit floor (y ≈ −0.07): pack, compressor and valve block all stay below y −0.09
-    const g = [box(6.78, -0.26, 0.42, 0.34, 0.17, 0.26)];
-    g.push(FR.cylX(6.7, -0.14, 0.39, 0.16, 0.05, 0.05, 14));                                 // refrigerant compressor
-    g.push(box(6.86, -0.14, 0.5, 0.14, 0.07, 0.1));                                          // expansion valve block
-    const l = [FR.pipe([[6.62, -0.31, 0.42], [6.58, -0.43, 0.385], [6.55, -0.533, 0.355]], 0.016, 6, 6),         // evaporator ↔ PAO loop 1 supply line (inboard of the batteries)
+    const g = [box(M(6.78), -0.26, 0.42, 0.34, 0.17, 0.26)];
+    g.push(FR.cylX(M(6.7), -0.14, 0.39, 0.16, 0.05, 0.05, 14));                                 // refrigerant compressor
+    g.push(box(M(6.86), -0.14, 0.5, 0.14, 0.07, 0.1));                                          // expansion valve block
+    const l = [FR.pipe([[M(6.62), -0.31, 0.42], [M(6.58), -0.43, 0.385], [M(6.55), -0.533, 0.355]], 0.016, 6, 6),         // evaporator ↔ PAO loop 1 supply line (inboard of the batteries)
       // condenser ↔ fuel: outboard of the main harness and the bleed duct, under the front of F-1
-      FR.pipe([[6.94, -0.29, 0.52], [7.0, -0.33, 0.6], [7.04, -0.46, 0.63], [7.1, -0.53, 0.65]], 0.016, 6, 8)];
+      FR.pipe([[M(6.94), -0.29, 0.52], [M(7.0), -0.33, 0.6], [M(7.04), -0.46, 0.63], [M(7.1), -0.53, 0.65]], 0.016, 6, 8)];
     P('Vapour-cycle refrigeration pack', {
       system: 'Environmental control', material: 'Electric compressor, refrigerant evaporator and fuel-cooled condenser', mass: 28,
       explode: [0.3, -0.75, 0.95],
@@ -42,21 +42,21 @@ export function buildThermal(ctx) {
       system: 'Environmental control', material: 'Aluminium plate-fin core, PAO on one side, fuel on the other', mass: 22,
       explode: [0.4, -1.35, 0.55 * side],
       desc: `Loop ${k}'s heat goes into the fuel here: hot PAO on one side of the plates, cool fuel from the tanks on the other. Fuel is the F-22's main heat sink, because a stealthy jet cannot have many external cooling scoops.`,
-    }, mesh(box(7.35, -0.62, z * 0.35, 0.34, 0.2, 0.3), F.copper()));
+    }, mesh(box(M(7.35), -0.62, z * 0.35, 0.34, 0.2, 0.3), F.copper()));
     P(`PAO pump & reservoir (loop ${k})`, {
       system: 'Environmental control', material: 'Electric coolant pump, pressurised reservoir', mass: 10,
       explode: [0.6, -1.65, 0.75 * side],
       desc: `Each liquid loop has its own pump and reservoir, so one failure cannot stop all liquid cooling; the reservoir takes up the coolant's expansion as it heats.`,
-    }, mesh(merge([FR.cylX(6.8, -0.65, z * 0.32, 0.22, 0.07, 0.07, 14), new THREE.SphereGeometry(0.065, 14, 10).translate(X(6.8), -0.62, z * 0.47)]), F.boxLight()));   // under the bleed duct, forward of the bulkhead at s 7.0
+    }, mesh(merge([FR.cylX(M(6.8), -0.65, z * 0.32, 0.22, 0.07, 0.07, 14), new THREE.SphereGeometry(0.065, 14, 10).translate(X(M(6.8)), -0.62, z * 0.47)]), F.boxLight()));   // under the bleed duct, forward of the bulkhead at s 7.0
   }
   {
     // loop 1: radar array cold plates and the CIP racks (supply and return pair on the right)
     const g = [];
     for (const dz of [0, -0.06]) {
-      g.push(FR.pipe([[7.2, -0.6, 0.38 + dz], [6.95, -0.6, 0.3 + dz], [6.0, -0.45, 0.42 + dz], [4.5, -0.28, 0.42 + dz], [3.0, -0.12, 0.38 + dz], [2.62, 0.0, 0.36 + dz]], 0.018, 6, 40));
+      g.push(FR.pipe([[M(7.2), -0.6, 0.38 + dz], [M(6.95), -0.6, 0.3 + dz], [M(6.0), -0.45, 0.42 + dz], [M(4.5), -0.28, 0.42 + dz], [M(3.0), -0.12, 0.38 + dz], [M(2.62), 0.0, 0.36 + dz]], 0.018, 6, 40));
     }
-    g.push(FR.pipe([[3.05, 0.3, 0.2], [3.3, 0.36, 0.0], [3.05, 0.3, -0.2]], 0.016, 6));
-    g.push(FR.pipe([[3.4, -0.1, 0.38], [3.3, 0.1, 0.32], [3.15, 0.3, 0.2]], 0.014, 6));
+    g.push(FR.pipe([[M(3.05), 0.3, 0.2], [M(3.3), 0.36, 0.0], [M(3.05), 0.3, -0.2]], 0.016, 6));
+    g.push(FR.pipe([[M(3.4), -0.1, 0.38], [M(3.3), 0.1, 0.32], [M(3.15), 0.3, 0.2]], 0.014, 6));
     P('PAO cooling loop 1 (radar & CIPs)', {
       system: 'Environmental control', material: 'Polyalphaolefin coolant in aluminium supply and return lines', mass: 30, xrayWeight: 0.7,
       explode: [0.8, -0.25, 0.25],
@@ -67,11 +67,11 @@ export function buildThermal(ctx) {
     // loop 2: CNI and EW receivers, the IFDL processor and the vehicle-management computers (left)
     const g = [];
     for (const dz of [0, 0.06]) {
-      g.push(FR.pipe([[7.2, -0.6, -0.38 + dz], [6.95, -0.6, -0.3 + dz], [6.0, -0.45, -0.42 + dz], [4.5, -0.3, -0.44 + dz], [3.6, -0.25, -0.3 + dz], [3.22, -0.2, -0.16 + dz]], 0.018, 6, 40));
+      g.push(FR.pipe([[M(7.2), -0.6, -0.38 + dz], [M(6.95), -0.6, -0.3 + dz], [M(6.0), -0.45, -0.42 + dz], [M(4.5), -0.3, -0.44 + dz], [M(3.6), -0.25, -0.3 + dz], [M(3.22), -0.2, -0.16 + dz]], 0.018, 6, 40));
     }
-    g.push(FR.pipe([[3.6, -0.25, -0.3], [3.8, 0.0, -0.3], [3.92, 0.12, -0.25]], 0.014, 6));
-    g.push(FR.pipe([[3.7, -0.25, -0.24], [3.85, 0.0, 0.15], [3.92, 0.12, 0.25]], 0.014, 6));
-    g.push(FR.pipe([[4.5, -0.3, -0.42], [4.7, -0.3, -0.38], [4.9, -0.3, -0.42]], 0.014, 6));
+    g.push(FR.pipe([[M(3.6), -0.25, -0.3], [M(3.8), 0.0, -0.3], [M(3.92), 0.12, -0.25]], 0.014, 6));
+    g.push(FR.pipe([[M(3.7), -0.25, -0.24], [M(3.85), 0.0, 0.15], [M(3.92), 0.12, 0.25]], 0.014, 6));
+    g.push(FR.pipe([[M(4.5), -0.3, -0.42], [M(4.7), -0.3, -0.38], [M(4.9), -0.3, -0.42]], 0.014, 6));
     P('PAO cooling loop 2 (CNI & EW)', {
       system: 'Environmental control', material: 'Polyalphaolefin coolant in aluminium supply and return lines', mass: 25, xrayWeight: 0.7,
       explode: [0.8, -0.25, -0.25],
@@ -83,13 +83,13 @@ export function buildThermal(ctx) {
   for (const side of [1, -1]) {
     const R = side > 0 ? 'right' : 'left';
     const z = side;
-    const c = [box(8.2, 0.32, z * 1.16, 0.4, 0.16, 0.26)];
-    for (let k = 0; k < 6; k++) c.push(box(8.02 + k * 0.072, 0.32, z * 1.16, 0.008, 0.165, 0.265));              // core plate edges
+    const c = [box(M(8.2), 0.32, z * 1.16, 0.4, 0.16, 0.26)];
+    for (let k = 0; k < 6; k++) c.push(box(M(8.02) + k * 0.072, 0.32, z * 1.16, 0.008, 0.165, 0.265));              // core plate edges
     const d = [];
     // cooling air from the diverter slot between the fuselage and the inlet, up over the duct's inboard top
-    d.push(rectTube([[6.6, -0.12, z * slotZ(6.6)], [6.95, -0.06, z * slotZ(6.95)], [7.35, 0.05, z * 0.985], [7.7, 0.19, z * 1.03], [7.99, 0.31, z * 1.1]], 0.035, 0.12, { n: 16 }));
+    d.push(rectTube([[M(6.6), -0.12, z * slotZ(M(6.6))], [M(6.95), -0.06, z * slotZ(M(6.95))], [M(7.35), 0.05, z * 0.985], [M(7.7), 0.19, z * 1.03], [M(7.99), 0.31, z * 1.1]], 0.035, 0.12, { n: 16 }));
     // exhaust up to the upper grille
-    d.push(rectTube([[8.4, 0.34, z * 1.16], [8.44, 0.47, z * 1.16], [8.48, FR.topAt(8.48, 1.24) - 0.05, z * 1.16]], 0.14, 0.06, { n: 6 }));
+    d.push(rectTube([[M(8.4), 0.34, z * 1.16], [M(8.44), 0.47, z * 1.16], [M(8.48), FR.topAt(M(8.48), 1.24) - 0.05, z * 1.16]], 0.14, 0.06, { n: 6 }));
     P(`Fuel–ram-air cooler (${R})`, {
       system: 'Fuel', material: 'Aluminium fuel / air heat exchanger with its diverter-air inlet and exhaust ducts', mass: 18,
       explode: [0.4, 1.35, 1.65 * side],
@@ -103,16 +103,16 @@ export function buildThermal(ctx) {
     for (const side of [1, -1]) {
       const z = side;
       // cool fuel from the transfer gallery forward and down to the exchanger
-      g.push(FR.pipe([[8.6, -0.12, z * 0.26], [8.4, -0.17, z * 0.28], [8.2, -0.5, z * 0.3], [7.7, -0.62, z * 0.35], [7.52, -0.62, z * 0.35]], 0.02, 6, 16));   // over the main bay's forward wall
+      g.push(FR.pipe([[M(8.6), -0.12, z * 0.26], [M(8.4), -0.17, z * 0.28], [M(8.2), -0.5, z * 0.3], [M(7.7), -0.62, z * 0.35], [M(7.52), -0.62, z * 0.35]], 0.02, 6, 16));   // over the main bay's forward wall
       // warm fuel out of the exchanger: up to the ram-air cooler …
-      g.push(FR.pipe([[7.18, -0.66, z * 0.42], [7.3, -0.55, z * 0.85], [7.6, -0.2, z * 0.97], [7.85, 0.22, z * 1.06], [8.0, 0.32, z * 1.06]], 0.018, 6, 20));
+      g.push(FR.pipe([[M(7.18), -0.66, z * 0.42], [M(7.3), -0.55, z * 0.85], [M(7.6), -0.2, z * 0.97], [M(7.85), 0.22, z * 1.06], [M(8.0), 0.32, z * 1.06]], 0.018, 6, 20));
       // … and from the cooler back into F-1 (recirculation)
-      g.push(FR.pipe([[8.4, 0.28, z * 1.1], [8.38, 0.44, z * 0.95], [8.3, 0.46, z * 0.75]], 0.018, 6, 10));
+      g.push(FR.pipe([[M(8.4), 0.28, z * 1.1], [M(8.38), 0.44, z * 0.95], [M(8.3), 0.46, z * 0.75]], 0.018, 6, 10));
       // bypass straight back to F-1 when the fuel is cool enough
-      g.push(FR.pipe([[7.3, -0.55, z * 0.85], [7.4, -0.3, z * 0.8]], 0.016, 6, 4));
+      g.push(FR.pipe([[M(7.3), -0.55, z * 0.85], [M(7.4), -0.3, z * 0.8]], 0.016, 6, 4));
     }
     // condenser line from the vapour-cycle pack joins the right-hand return
-    g.push(FR.pipe([[7.1, -0.53, 0.65], [7.2, -0.56, 0.73], [7.3, -0.55, 0.83]], 0.014, 6, 6));
+    g.push(FR.pipe([[M(7.1), -0.53, 0.65], [M(7.2), -0.56, 0.73], [M(7.3), -0.55, 0.83]], 0.014, 6, 6));
     P('Fuel thermal-management lines', {
       system: 'Fuel', material: 'Aluminium / titanium fuel lines, temperature-controlled recirculation valves', mass: 14, xrayWeight: 0.7,
       explode: [0.3, 0.6, 0],

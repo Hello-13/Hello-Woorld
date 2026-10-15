@@ -9,7 +9,7 @@ import { F } from './materials.js';
 import * as FR from './frame.js';
 import { merge, slab, toothedGrid } from './util.js';
 
-const { X, lerp } = FR;
+const { X, lerp, M } = FR;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const range = (a, b, n) => [...Array(n + 1).keys()].map((k) => a + ((b - a) * k) / n);
 
@@ -20,7 +20,7 @@ export function buildAccess(ctx) {
   {
     const g = [];
     for (const side of [1, -1]) {
-      for (const [s0, s1] of [[2.85, 3.5], [3.6, 4.3]]) {
+      for (const [s0, s1] of [[M(2.85), M(3.5)], [M(3.6), M(4.3)]]) {
         const pt = (s, u) => {
           const zz = side * lerp(FR.aW(s) - 0.07, FR.aW(s) - 0.44, u);
           return [X(s), FR.bottomAt(s, zz) - 0.003, zz];
@@ -39,7 +39,7 @@ export function buildAccess(ctx) {
   {
     const g = [];
     for (const side of [1, -1]) {
-      for (const [s0, s1] of [[13.3, 14.2], [14.4, 15.1]]) {
+      for (const [s0, s1] of [[M(13.3), M(14.2)], [M(14.4), M(15.1)]]) {
         const pt = (s, u) => { const [zz, y] = FR.wallB(s, lerp(0.32, 0.86, u)); return [X(s), y, side * (zz + 0.003)]; };
         g.push(slab(toothedGrid(pt, range(s0, s1, 3), { width: 0.5 }), () => [0, 0.01, -side * 0.02], V(0, -0.3, side)));
       }
@@ -55,7 +55,7 @@ export function buildAccess(ctx) {
   {
     const g = [];
     for (const side of [1, -1]) {
-      for (const [s0, s1] of [[13.45, 14.35], [14.55, 15.45]]) {
+      for (const [s0, s1] of [[M(13.45), M(14.35)], [M(14.55), M(15.45)]]) {
         const pt = (s, u) => { const zz = side * lerp(0.82, 1.32, u); return [X(s), FR.topAt(s, Math.abs(zz)) + 0.003, zz]; };
         g.push(slab(toothedGrid(pt, range(s0, s1, 3), { width: 0.5 }), () => [0, -0.02, 0], V(0, 1, 0)));
       }

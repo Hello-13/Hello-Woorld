@@ -3,8 +3,8 @@
 // wing area 78.04 m², 42° / −17° edge sweeps, empty 19,700 kg, gross 29,410 kg, MTOW 38,000 kg,
 // 8,200 kg internal fuel, Mach 2.25 top speed, Mach 1.21 at sea level, Mach 1.76 supercruise,
 // 19,812 m ceiling, +9 / −3 g); Pratt & Whitney / Wikipedia F119-PW-100 (116 kN dry, 156 kN class
-// with afterburner, 38 in inlet / 48 in case diameter, ±20° pitch vectoring); canopy
-// 140 × 45 × 27 in, 360 lb; AIM-120C 3.65 m × 17.8 cm (USAF fact sheet), LAU-142/A AVEL 9 in stroke
+// with afterburner, 38 in inlet / 48 in case diameter, 196 in long, ±20° pitch vectoring); canopy
+// 140 × 45 × 27 in, 360 lb (Haisty, Lockheed Martin, 2000); AIM-120C 3.65 m × 17.8 cm (USAF fact sheet), LAU-142/A AVEL 9 in stroke
 // (Hydraulics & Pneumatics, 1998); main bay split along the centre line (Wikipedia).
 //
 // The model's geometry is checked through its three.js-free layout module, the lab's flight model
@@ -54,9 +54,15 @@ test('layout matches the published dimensions', () => {
   close(2 * L.WING.semi, 13.56, 1e-9, 'span m');
   close(L.WING.le / DEG, 42, 1e-9, 'leading-edge sweep');
   close(L.WING.te / DEG, -17, 1e-9, 'trailing-edge sweep');
-  // reference trapezoid area: centre-line chord to tip chord across both semi-spans
-  const tip = L.wingTE(L.WING.semi) - L.wingLE(L.WING.semi);
+  // reference trapezoid area: centre-line chord to tip chord across both semi-spans, the trailing edge carried
+  // straight out to the tip
+  const tip = L.wingTEref(L.WING.semi) - L.wingLE(L.WING.semi);
   close(L.WING.semi * (L.WING.c0 + tip), 78.04, 0.1, 'wing area m²');
+  // the real trailing edge follows the reference line to the kink, then the tip is cropped (never outside the
+  // reference planform), leaving a tip chord of about 1.1 m (NAWDC top view)
+  for (let z = 0; z <= L.WING.semi + 1e-9; z += 0.05) assert.ok(L.wingTE(z) <= L.wingTEref(z) + 1e-9, `trailing edge inside the reference planform at z ${z.toFixed(2)}`);
+  close(L.wingTE(L.WING.kinkZ), L.wingTEref(L.WING.kinkZ), 1e-9, 'trailing edge continuous at the kink');
+  close(L.wingTE(L.WING.semi) - L.wingLE(L.WING.semi), 1.12, 0.1, 'cropped tip chord m');
   close((4 * L.WING.semi ** 2) / 78.04, 2.36, 0.01, 'aspect ratio');
   close(L.FIN.cant / DEG, 28, 1e-9, 'vertical-tail cant');
   // fin tips set the 5.08 m height above the ground line
@@ -69,28 +75,84 @@ test('F119 envelope and the stabilator fit the airframe', () => {
   close(2 * L.F119.rInlet, 38 * IN, 0.01, 'F119 inlet diameter');
   close(2 * L.F119.rCase, 48 * IN, 0.03, 'F119 case diameter');
   assert.ok(L.F119.rMax * 2 <= 50 * IN + 0.01, 'F119 maximum diameter');
-  // the 1.22 m case (to the augmentor at s 15.6) stays inside the outer mould line all the way round
-  for (let s = L.FAN_S; s <= 15.6; s += 0.1) {
+  // the 196 in engine runs from the fan face to the nozzle exit at about s 16.5 (NAWDC top / bottom views)
+  close(L.EM(18.52) - L.FAN_S, L.F119.length, 0.02, 'fan face to nozzle exit m');
+  // the 1.22 m case (to the augmentor) and then the tapering augmentor (to the nozzle's transition section, which
+  // lies inside the external flaps) stay inside the outer mould line all the way round
+  const sEnd = L.F119_AUG[L.F119_AUG.length - 1][1];
+  const rAt = (s) => (s <= L.AUG_S ? L.F119.rCase : L.mono(L.F119_AUG.map(([r, st]) => [st, r]), s));
+  assert.ok(L.AUG_S - L.FAN_S > 2, 'full-diameter case runs at least 2 m aft of the fan face');
+  for (let s = L.FAN_S; s <= sEnd + 1e-9; s += 0.1) {
+    const r = rAt(s);
     for (let k = 0; k < 72; k++) {
-      const a = (k / 72) * 2 * Math.PI, y = L.ENG_Y + L.F119.rCase * Math.sin(a), z = L.ENG_Z + L.F119.rCase * Math.cos(a);
+      const a = (k / 72) * 2 * Math.PI, y = L.ENG_Y + r * Math.sin(a), z = L.ENG_Z + r * Math.cos(a);
       assert.ok(y < L.topAt(s, z) - 0.01 && y > L.bottomAt(s, z) + 0.01 && z < L.bW(s) - 0.25, `engine case inside the skin at s ${s.toFixed(1)}`);
     }
   }
   assert.ok(L.ENG_Z - L.F119.rCase > 0.05, 'room for the keel between the engines');
   // the inboard leading edge of the all-moving tail is cut back behind the wing's trailing edge
   for (let z = L.STAB.rootZ; z <= L.STAB.notchZ + 0.3; z += 0.05) assert.ok(L.stabLE(z) > L.wingTE(z) + 0.01, `stabilator clears the wing at z ${z.toFixed(2)}`);
+  // and stays clear through full travel: stabilator ±33° (25° pitch + 8° roll) about its spindle against the
+  // flaperon trailing edge at ±32° (20° roll + 12° flap), in every chordwise plane where they overlap
+  for (let z = L.STAB.rootZ; z <= L.STAB.notchZ + 0.6; z += 0.02) {
+    const le = L.wingLE(z), te = L.wingTE(z), yw = L.wingY(z), d0 = L.STAB.pivotS - L.stabLE(z);
+    const onFlap = z >= L.SURF.flaperon[0] && z <= L.SURF.flaperon[1], sh = le + L.SURF.hinge.flaperon * (te - le), l = te - sh;
+    for (let th = -33; th <= 33; th += 3) for (let df = onFlap ? -32 : 0; df <= (onFlap ? 32 : 0); df += 4) {
+      const T = [sh + l * Math.cos(df * DEG), yw - l * Math.sin(df * DEG)];
+      const S = [L.STAB.pivotS - d0 * Math.cos(th * DEG), L.STAB.y + d0 * Math.sin(th * DEG)];
+      assert.ok(Math.hypot(T[0] - S[0], T[1] - S[1]) > 0.04, `stabilator ${th}° clears the flaperon ${df}° at z ${z.toFixed(2)}`);
+    }
+  }
 });
 
-test('canopy is the one-piece 140 × 45 × 27 in transparency', () => {
-  close(L.CANOPY_S1 - L.CANOPY_S0, 140 * IN, 0.03, 'canopy length m');
-  let w = 0, top = -Infinity, sill = Infinity;
+test('station maps: monotone, and the engine block keeps its published length', () => {
+  // interior items keep their place in the structure: each map only ever moves stations aft in step
+  for (const [name, f, a, b] of [['M', L.M, 0, L.LENGTH], ['EM', L.EM, 13.3, 18.6], ['WM', L.WM, 8, 17]]) {
+    let prev = -Infinity;
+    for (let s = a; s <= b + 1e-9; s += 0.01) { const v = f(s); assert.ok(v > prev, `${name} monotone at ${s.toFixed(2)}`); prev = v; }
+  }
+  // the engine moves as one block: fan, compressor, combustor and turbines keep their lengths; only the augmentor
+  // and nozzle are shortened, so the whole engine comes to the published 196 in (tested above)
+  close(L.EM(13.38), L.FAN_S, 1e-9, 'fan face');
+  for (const s of [13.6, 14.0, 14.6, 15.2, 15.6]) close(L.EM(s) - L.EM(13.38), s - 13.38, 1e-9, `core length to old s ${s}`);
+  assert.ok(L.EM(18.52) > 16.4 && L.EM(18.52) < 16.6, `nozzle exit at s ${L.EM(18.52).toFixed(2)}`);
+  // in-wing items follow the wing, whose apex moved from 6.06 to 6.58
+  close(L.WING.apex, 6.58, 1e-9, 'wing apex');
+  close(L.WM(10) - 10, 0.52, 1e-9, 'wing shift');
+  // booms end behind the nozzles and the stabilator's trailing-edge vertex is the tail of the jet
+  assert.ok(L.BOOM.sEnd1 > L.EM(18.52) + 1 && L.BOOM.sEnd1 < L.LENGTH, 'booms end between the nozzle exit and the tail');
+  close(L.STAB.vertexS, L.LENGTH, 1e-9, 'stabilator vertex at the tail');
+});
+
+test('canopy: the one-piece transparency is 45 in wide and 27 in tall; 140 in is not its projected or arc length', () => {
+  // Haisty (Lockheed Martin, National Press Club, 2000): "approximately 140 inches long, 45 inches wide, 27 inches
+  // tall", without saying how the length is taken. Measured in projection (NAWDC side and top orthographic views,
+  // T.O. 00-105E-9 top view, side-on photographs) the transparency runs 2.55 → 5.40 (frame to 5.55): 2.85 m, 112 in.
+  close(L.CANOPY_S1 - L.CANOPY_S0, 2.85, 0.05, 'projected length of the transparency m');
+  // the frame's foot is one straight line in side view (NAWDC: 0.51 m at s 2.8 to 0.80 m at 5.3), so the sill edge
+  // lies in a plane; width and height are taken on that base plane, as for the part standing on its edge
+  const pts = [];
+  for (let s = 3.0; s <= 5.0 + 1e-9; s += 0.05) pts.push([s, L.upperA(s, L.sillW(s))]);
+  const n = pts.length, ms = pts.reduce((a, p) => a + p[0], 0) / n, my = pts.reduce((a, p) => a + p[1], 0) / n;
+  const k = pts.reduce((a, p) => a + (p[0] - ms) * (p[1] - my), 0) / pts.reduce((a, p) => a + (p[0] - ms) ** 2, 0);
+  const base = (s) => my + k * (s - ms);
+  for (const [s, y] of pts) assert.ok(Math.abs(y - base(s)) < 0.012, `sill on its straight line at s ${s.toFixed(2)} (${(y - base(s)).toFixed(3)} m)`);
+  assert.ok(Math.atan(k) / DEG > 5 && Math.atan(k) / DEG < 9, `sill line rises ${(Math.atan(k) / DEG).toFixed(1)}° aft`);
+  close(base(4.2), 0.67, 0.03, 'sill height beside the pilot m');
+  let w = 0, h = 0;
   for (let s = L.CANOPY_S0 + 0.01; s < L.CANOPY_S1; s += 0.01) {
     w = Math.max(w, 2 * L.sillW(s));
-    top = Math.max(top, L.canopyTop(s));
-    sill = Math.min(sill, L.upperA(s, L.sillW(s)));
+    h = Math.max(h, (L.canopyTop(s) - base(s)) * Math.cos(Math.atan(k)));
   }
   close(w, 45 * IN, 0.03, 'canopy width m');
-  close(top - sill, 27 * IN, 0.06, 'canopy depth m');
+  close(h, 27 * IN, 0.06, 'canopy height above its base plane m');
+  // over the top of the bubble the transparency measures about 3.05 m (120 in), 3.2 m (126 in) to the frame's aft
+  // end: 140 in (3.56 m) is longer than both, so it is not the length over the bubble either (most likely the
+  // formed blank before trimming; the only line on the part that long is its side edge, tip to tail)
+  const arc = (s0, s1) => { let l = 0; for (let s = s0; s < s1 - 1e-9; s += 0.005) l += Math.hypot(0.005, L.canopyTop(s + 0.005) - L.canopyTop(s)); return l; };
+  const crown = arc(L.CANOPY_S0, L.CANOPY_S1), frame = arc(L.CANOPY_S0, L.CANOPY_FRAME_S1);
+  assert.ok(crown > 2.95 && crown < 3.15, `crown arc ${crown.toFixed(3)} m`);
+  assert.ok(frame < 140 * IN - 0.25, `crown arc to the frame's aft end ${frame.toFixed(3)} m, well short of 140 in`);
   // a smooth bubble: the crown line has no kinks (second differences stay small)
   let worst = 0;
   for (let s = L.CANOPY_S0 + 0.1; s < L.CANOPY_S1 - 0.1; s += 0.02) worst = Math.max(worst, Math.abs(L.canopyTop(s + 0.02) - 2 * L.canopyTop(s) + L.canopyTop(s - 0.02)));
@@ -191,7 +253,10 @@ test('guided tour: real part names, every demo, cards that fit', () => {
 test('main bay: six AIM-120C clear the centre web, the walls, the doors and each other', () => {
   const { r: R, tip: T } = L.AMRAAM;
   const W = L.MAIN_BAY.z - 0.004, web = L.DIVIDER.half;
-  const doorInner = -0.885 + L.MAIN_DOOR.thick;               // inside face of the closed doors (belly ≈ −0.885)
+  // inside face of the closed doors, where the belly is highest along the bay
+  let belly = -Infinity;
+  for (let s = L.MAIN_BAY.s0; s <= L.MAIN_BAY.s1 + 1e-9; s += 0.05) belly = Math.max(belly, -L.bD(s));
+  const doorInner = belly + L.MAIN_DOOR.thick;
   const fins = ([z, y, t]) => [0, 1, 2, 3].map((k) => { const a = t + (k * Math.PI) / 2; return [[z + R * Math.cos(a), y + R * Math.sin(a)], [z + T * Math.cos(a), y + T * Math.sin(a)]]; });
   const segPt = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1]; const u = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy))); return Math.hypot(p[0] - a[0] - u * dx, p[1] - a[1] - u * dy); };
   const segSeg = (a, b, c, d) => {
@@ -208,7 +273,7 @@ test('main bay: six AIM-120C clear the centre web, the walls, the doors and each
       assert.ok(tip[1] > doorInner, `fin clears the closed doors (${tip[1].toFixed(3)} m)`);
       assert.ok(tip[1] < L.bayCeil(tip[0]), `fin clears the bay ceiling (${tip[1].toFixed(3)} m)`);
       // after the 9 in AVEL stroke, anything below the belly must pass inboard of the folded-open doors
-      if (tip[1] - L.AVEL_STROKE < -0.885) assert.ok(tip[0] < L.OPEN_DOOR_Z, `ejected fin clears the open door (${tip[0].toFixed(3)} m)`);
+      if (tip[1] - L.AVEL_STROKE < belly) assert.ok(tip[0] < L.OPEN_DOOR_Z, `ejected fin clears the open door (${tip[0].toFixed(3)} m)`);
     }
     assert.ok(m[0] - R > web && m[0] + R < W, 'body inside the bay half');
   }
@@ -262,9 +327,17 @@ test('inlet ducts are an open air path: bay, side bays and gear wells stay outsi
   // the duct runs from the raked lip to the fan face and ends round the F119 inlet
   const fan = L.ductSection(L.FAN_S);
   assert.ok(fan && L.ductSection(7.0) && !L.ductSection(L.FAN_S + 0.05), 'duct spans lip → fan face');
-  const cz = fan.reduce((a, p) => a + p[0], 0) / fan.length, cy = fan.reduce((a, p) => a + p[1], 0) / fan.length;
+  // area centroid of the fan-face section (its points are not evenly spaced round it)
+  let A = 0, cz = 0, cy = 0;
+  for (let i = 0; i < fan.length; i++) {
+    const [z1, y1] = fan[i], [z2, y2] = fan[(i + 1) % fan.length], c = z1 * y2 - z2 * y1;
+    A += c / 2; cz += ((z1 + z2) * c) / 6; cy += ((y1 + y2) * c) / 6;
+  }
+  cz /= A; cy /= A;
   close(cz, L.ENG_Z, 0.02, 'fan-face centre z'); close(cy, L.ENG_Y, 0.02, 'fan-face centre y');
-  assert.ok(L.ductDepth(10.4, 0.25, 0.48) > 0.25 && L.ductDepth(10.4, 0.0, 1.2) < 0, 'ductDepth is inside / outside where expected');
+  close(Math.abs(A), Math.PI * L.F119.rInlet ** 2, 0.08, 'fan-face section area m²');
+  const mid = L.ductSection(10.4), mz = mid.reduce((a, p) => a + p[0], 0) / mid.length, my = mid.reduce((a, p) => a + p[1], 0) / mid.length;
+  assert.ok(L.ductDepth(10.4, my, mz) > 0.25 && L.ductDepth(10.4, 0.0, 1.2) < 0, 'ductDepth is inside / outside where expected');
   // main-bay ceiling (with its aft taper) at least 2 cm under the duct floor
   for (let s = L.MAIN_BAY.s0; s <= L.MAIN_BAY.s1 + 1e-9; s += 0.05) {
     for (let z = 0; z <= L.MAIN_BAY.z; z += 0.01) {
@@ -334,8 +407,9 @@ test('main gear: stub axle keeps the strut out of the tyre, and the wheel stows 
     assert.ok(z > L.wellInner(s) + 0.01 && z < L.wellOuter(s) - 0.01, 'stowed wheel inside the opening in plan');
   }
   assert.ok(worst > 0.01, `stowed tyre ${(worst * 100).toFixed(1)} cm inside the well`);
-  // the wheel bay's opening is wider than the tyre's diameter, as on the jet (the door is about 0.95 m wide)
-  assert.ok(L.wellOuter(12.85) - L.wellInner(12.85) > 2 * g.r + 0.04, 'wheel bay opening wider than the wheel');
+  // the wheel bay's opening is wider than the tyre's diameter where the wheel stows, as on the jet (the door is
+  // about 0.95 m wide)
+  assert.ok(L.wellOuter(g.stow[0]) - L.wellInner(g.stow[0]) > 2 * g.r + 0.04, 'wheel bay opening wider than the wheel');
 });
 
 test('main-bay door drive clears the missiles, closed and through the open-bay ejection', () => {
@@ -370,15 +444,16 @@ test('main-bay door drive clears the missiles, closed and through the open-bay e
   // the outboard missile's ejected fins stay inboard of the drive
   for (const [z, , t] of L.AMRAAM_SLOTS) for (let f = 0; f < 4; f++) assert.ok(z + T * Math.cos(t + (f * Math.PI) / 2) < D.z - D.r - 0.01, 'fins inboard of the drive');
   // fins also clear the tapered aft ceiling, where the tail fins sit
-  for (const [z, y, t] of L.AMRAAM_SLOTS) for (let f = 0; f < 4; f++) { const a = t + (f * Math.PI) / 2; assert.ok(y + T * Math.sin(a) < L.bayCeilAt(12.25, z + T * Math.cos(a)), 'tail fin under the aft ceiling'); }
+  for (const [z, y, t] of L.AMRAAM_SLOTS) for (let f = 0; f < 4; f++) { const a = t + (f * Math.PI) / 2; assert.ok(y + T * Math.sin(a) < L.bayCeilAt(L.MAIN_BAY.s1 - 0.1, z + T * Math.cos(a)), 'tail fin under the aft ceiling'); }
 });
 
 test('one actuator per trailing-edge surface; the cockpit opening closes inside the canopy', () => {
   // Flight International (1997): two 4,000 psi systems but only one actuator on each control surface
   assert.deepEqual(Object.keys(L.TE_ACT), ['flaperon', 'aileron']);
-  for (const [k, [e0, e1]] of [['flaperon', [0.07, 0.52]], ['aileron', [0.53, 0.94]]]) {
-    const a = L.TE_ACT[k];
-    assert.ok(a.eta > e0 && a.eta < e1 && a.c > 0.7 && a.c < 0.9, `${k} actuator on its surface's span and behind the rear spar region`);
+  for (const k of ['flaperon', 'aileron']) {
+    const a = L.TE_ACT[k], [z0, z1] = L.SURF[k];
+    assert.ok(a.z > z0 + 0.1 && a.z < z1 - 0.1 && a.c > 0.7 && a.c < 0.9, `${k} actuator on its surface's span and behind the rear spar region`);
+    assert.ok(a.c < L.SURF.hinge[k], `${k} actuator ahead of its hinge line`);
   }
   // the skin opening at the aft cockpit station ends under the canopy (no slit beside its aft end)
   const r = L.ringA(L.HOLE_S1).pts;

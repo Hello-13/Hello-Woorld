@@ -15,6 +15,7 @@ import { merge } from './util.js';
 import { normalA } from './systems.js';
 
 const { X } = FR;
+const SM = FR.M;               // fuselage station map (FR.M; M is the shared materials here)
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const box = (s, y, z, ls, h, w) => FR.boxS(s, y, z, ls, h, w);
 
@@ -30,8 +31,8 @@ export function buildAvionics(ctx) {
 
   // ================================================================== avionics bay (behind the radar bulkhead)
   for (const [k, z] of [[1, 0.2], [2, -0.2]]) {
-    const g = [box(3.3, 0.12, z, 0.55, 0.3, 0.25)];
-    for (let i = 0; i < 6; i++) g.push(box(3.08 + i * 0.09, 0.28, z, 0.012, 0.03, 0.22));      // module card tops
+    const g = [box(SM(3.3), 0.12, z, 0.55, 0.3, 0.25)];
+    for (let i = 0; i < 6; i++) g.push(box(SM(3.08) + i * 0.09, 0.28, z, 0.012, 0.03, 0.22));      // module card tops
     P(`Common integrated processor (CIP ${k})`, {
       system: 'Avionics', material: 'Liquid-cooled rack of standard electronic modules', mass: 60,
       explode: [1.9, 1.2, z * 2],
@@ -41,13 +42,13 @@ export function buildAvionics(ctx) {
   {
     // liquid-cooled racks the boxes plug into: two shelves with PAO cold-plate rails, side frames and posts
     const g = [], c = [];
-    g.push(box(3.5, -0.045, 0, 1.2, 0.02, 0.72));                                          // upper shelf (CIPs, INS, ALR-94)
-    g.push(box(3.22, -0.305, 0, 0.7, 0.02, 0.6));                                          // lower shelf (CNI)
+    g.push(box(SM(3.5), -0.045, 0, 0.74, 0.02, 0.72));                                          // upper shelf (CIPs, INS, ALR-94)
+    g.push(box(SM(3.22), -0.305, 0, 0.6, 0.02, 0.6));                                          // lower shelf (CNI)
     for (const side of [1, -1]) {
-      g.push(box(3.55, 0.1, side * 0.36, 1.1, 0.28, 0.012));                                 // side frame
-      for (const s of [2.92, 3.62, 4.08]) g.push(box(s, -0.17, side * (s > 3.7 ? 0.36 : 0.3), 0.03, 0.27, 0.03));   // posts
-      for (const dz of [0.08, 0.32]) c.push(FR.cylX(3.5, -0.03, side * dz, 1.18, 0.012, 0.012, 6));   // cold-plate rails
-      c.push(FR.cylX(3.22, -0.29, side * 0.16, 0.68, 0.012, 0.012, 6));
+      g.push(box(SM(3.55), 0.1, side * 0.36, 0.7, 0.28, 0.012));                                 // side frame
+      for (const s of [SM(2.92), SM(3.62), SM(4.08)]) g.push(box(s, -0.17, side * (s > SM(3.7) ? 0.36 : 0.3), 0.03, 0.27, 0.03));   // posts
+      for (const dz of [0.08, 0.32]) c.push(FR.cylX(SM(3.5), -0.03, side * dz, 0.72, 0.012, 0.012, 6));   // cold-plate rails
+      c.push(FR.cylX(SM(3.22), -0.29, side * 0.16, 0.56, 0.012, 0.012, 6));
     }
     P('Forward avionics racks', {
       system: 'Avionics', material: 'Single-piece machined aluminium racks with liquid-cooled (PAO) cold-plate rails', mass: 45,
@@ -59,27 +60,27 @@ export function buildAvionics(ctx) {
     system: 'Avionics', material: 'Integrated comm / nav / identification modules', mass: 70,
     explode: [2.1, -0.75, 0],
     desc: 'TRW\'s integrated communication, navigation and identification suite: radios (HAVE QUICK, SINCGARS, later Link 16 receive), IFF including Mode 5, TACAN and landing aids share common modules instead of a box per radio, and its emissions are tightly controlled for stealth.',
-  }, mesh(merge([box(3.22, -0.19, 0.16, 0.6, 0.2, 0.24), box(3.22, -0.19, -0.16, 0.6, 0.2, 0.24)]), F.boxLight()));
+  }, mesh(merge([box(SM(3.22), -0.19, 0.16, 0.56, 0.2, 0.24), box(SM(3.22), -0.19, -0.16, 0.56, 0.2, 0.24)]), F.boxLight()));
   P('Intra-flight data link', {
     system: 'Avionics', material: 'Low-probability-of-intercept data-link processor', mass: 15,
     explode: [0.6, 0.6, 1.1],
     desc: 'The IFDL processor shares sensor tracks silently between F-22s in a flight using narrow, directional, hard-to-detect transmissions.',
-  }, mesh(merge([box(4.9, -0.22, 0.42, 0.4, 0.18, 0.12)]), F.box()));
+  }, mesh(merge([box(SM(4.9), -0.22, 0.42, 0.4, 0.18, 0.12)]), F.box()));
   P('Inertial navigation & GPS', {
     system: 'Avionics', material: 'Ring-laser-gyro inertial reference with embedded GPS', mass: 18,
     explode: [2.0, 1.75, 0],
     desc: 'Measures the jet\'s attitude, velocity and position, corrected by GPS, for navigation, weapons and the flight controls.',
-  }, mesh(box(2.96, 0.08, 0, 0.18, 0.18, 0.22), F.box()));
+  }, mesh(box(SM(2.96), 0.08, 0, 0.18, 0.18, 0.22), F.box()));
   P('AN/ALR-94 receiver processors', {
     system: 'Sensors', material: 'Wideband receivers and signal processors', mass: 40, count: 2,
     explode: [1.6, 0.4, 1.0],
     desc: 'Receivers behind the ALR-94\'s distributed antennas measure the frequency, timing and direction of every radar emitter they hear, so the system can identify a threat and fix its position passively (location approximate).',
-  }, mesh(merge([box(3.92, 0.12, 0.25, 0.3, 0.2, 0.18), box(3.92, 0.12, -0.25, 0.3, 0.2, 0.18)]), F.boxLight()));
+  }, mesh(merge([box(SM(3.92), 0.12, 0.25, 0.3, 0.2, 0.18), box(SM(3.92), 0.12, -0.25, 0.3, 0.2, 0.18)]), F.boxLight()));
   P('Vehicle management system computers', {
     system: 'Flight controls', material: 'Redundant flight-control processors', mass: 25, count: 3,
     explode: [2.2, 1.95, 0.6],
     desc: 'Fly-by-wire computers turn stick and throttle inputs into surface and nozzle commands many times a second; the airframe is unstable in pitch for agility, so they never stop correcting. The VMS (Lear Astronics) combines flight and propulsion control, and the F-22 was the first fighter with triplex digital flight-control computers and no electrical or mechanical back-up mode (Flight International, 1997; box positions approximate).',
-  }, mesh(merge([box(4.3, -0.22, 0.36, 0.3, 0.16, 0.12), box(4.3, -0.22, -0.36, 0.3, 0.16, 0.12), box(4.7, -0.22, -0.36, 0.3, 0.16, 0.12)]), F.boxLight()));
+  }, mesh(merge([box(SM(4.3), -0.22, 0.36, 0.3, 0.16, 0.12), box(SM(4.3), -0.22, -0.36, 0.3, 0.16, 0.12), box(SM(4.7), -0.22, -0.36, 0.3, 0.16, 0.12)]), F.boxLight()));
 
   // ================================================================== AN/APG-77 radar
   {
@@ -87,8 +88,8 @@ export function buildAvionics(ctx) {
     // forward and up, so it never squares up to a radar ahead (Wikipedia: "tilted back for stealth")
     const tilt = 20 * FR.DEG;
     const at = (s0) => X(s0);
-    const face = new THREE.CircleGeometry(1, 48).scale(0.45, 0.31, 1).rotateY(Math.PI / 2).rotateZ(tilt).translate(at(2.35), -0.03, 0);
-    const back = new THREE.CylinderGeometry(1, 1, 0.06, 48).rotateX(Math.PI / 2).scale(0.45, 0.31, 1).rotateY(Math.PI / 2).rotateZ(tilt).translate(at(2.385), -0.03, 0);
+    const face = new THREE.CircleGeometry(1, 48).scale(0.45, 0.31, 1).rotateY(Math.PI / 2).rotateZ(tilt).translate(at(SM(2.35)), -0.03, 0);
+    const back = new THREE.CylinderGeometry(1, 1, 0.06, 48).rotateX(Math.PI / 2).scale(0.45, 0.31, 1).rotateY(Math.PI / 2).rotateZ(tilt).translate(at(SM(2.385)), -0.03, 0);
     // tile rows: thin strips that read as the subarrays of transmit/receive modules
     const rows = [];
     for (let k = -6; k <= 6; k++) {
@@ -97,21 +98,21 @@ export function buildAvionics(ctx) {
       if (half < 0.05) continue;
       rows.push(new THREE.BoxGeometry(0.004, 0.006, half * 2).translate(0, yy, 0));
     }
-    const grid = merge(rows).rotateZ(tilt).translate(at(2.345), -0.03, 0);
+    const grid = merge(rows).rotateZ(tilt).translate(at(SM(2.345)), -0.03, 0);
     P('AN/APG-77 AESA array', {
       system: 'Sensors', material: 'Gallium-arsenide transmit/receive modules on a cooled backplane', mass: 220,
-      explode: [2.5, 0.35, 0], callout: true, anchor: [X(2.4), 0.2, 0.1],
+      explode: [2.5, 0.35, 0], callout: true, anchor: [X(SM(2.4)), 0.2, 0.1],
       desc: 'About 1,956 thumb-sized transmit/receive modules (the most cited figure; sources range ~1,900–2,000) steer the beam electronically in microseconds with no moving antenna. The fixed array is tilted back, face looking slightly up, so it never squares up to another radar.',
     }, [mesh(face, F.array()), mesh(back, F.alu()), mesh(grid, F.tile(), { cast: false })]);
     // mount: ring frame behind the array, struts back to the radar bulkhead (s 2.55)
     const m = [];
-    const ringC = V(at(2.42), -0.03, 0);
+    const ringC = V(at(SM(2.42)), -0.03, 0);
     m.push(new THREE.TorusGeometry(1, 0.03, 6, 48).scale(0.4, 0.27, 1).rotateY(Math.PI / 2).rotateZ(tilt).translate(ringC.x, ringC.y, ringC.z));
     for (const [yy, zz] of [[0.2, 0.25], [0.2, -0.25], [-0.22, 0.25], [-0.22, -0.25]]) {
       // a point on the tilted ring plane at local (yy, zz) → its station, then a strut aft to the bulkhead
       const lx = -yy * Math.sin(tilt), ly = yy * Math.cos(tilt);
       const p = [FR.SN - (ringC.x + lx), ringC.y + ly, zz];
-      m.push(FR.pipe([p, [2.53, p[1], zz]], 0.025, 6, 2));
+      m.push(FR.pipe([p, [SM(2.53), p[1], zz]], 0.025, 6, 2));
     }
     P('APG-77 array mount & coolant manifold', {
       system: 'Sensors', material: 'Aluminium mount, PAO manifold', mass: 40,
@@ -122,7 +123,7 @@ export function buildAvionics(ctx) {
       system: 'Sensors', material: 'Radar receiver, exciter and power-supply modules', mass: 60,
       explode: [1.6, 0.85, 0],
       desc: 'Generates the radar waveforms and digitises the returns; the signal processing itself runs in the common integrated processors.',
-    }, mesh(merge([box(2.7, 0.18, 0, 0.16, 0.12, 0.4), box(2.7, -0.22, 0, 0.16, 0.1, 0.36)]), F.boxLight()));
+    }, mesh(merge([box(SM(2.7), 0.18, 0, 0.16, 0.12, 0.4), box(SM(2.7), -0.22, 0, 0.16, 0.1, 0.36)]), F.boxLight()));
   }
 
   // ================================================================== distributed sensors
@@ -140,9 +141,9 @@ export function buildAvionics(ctx) {
         const sec = FR.wingSection(z);
         patch(V(sec.le[0] - 0.9 * sec.chord, sec.le[1] + 0.012, side * z), V(0, 1, 0), 0.08, 0.14);
       }
-      for (const s of [1.8, 2.3, 4.0]) { const z = FR.aW(s) - 0.07; patch(V(X(s), FR.upperA(s, z) + 0.003, side * z), normalA(s, side * z), 0.12, 0.04); }
-      for (const s of [16.2, 17.0]) patch(V(X(s), FR.topAt(s, 1.4) + 0.004, side * 1.4), V(0, 1, side * 0.3), 0.12, 0.05);
-      patch(V(X(17.2), -FR.bD(17.2) - 0.004, side * 1.0), V(0, -1, 0), 0.12, 0.05);
+      for (const s of [SM(1.8), SM(2.3), SM(4.0)]) { const z = FR.aW(s) - 0.07; patch(V(X(s), FR.upperA(s, z) + 0.003, side * z), normalA(s, side * z), 0.12, 0.04); }
+      for (const s of [SM(16.2), SM(17.0)]) patch(V(X(s), FR.topAt(s, 1.4) + 0.004, side * 1.4), V(0, 1, side * 0.3), 0.12, 0.05);
+      patch(V(X(SM(17.2)), -FR.bD(SM(17.2)) - 0.004, side * 1.3), V(0, -1, 0), 0.12, 0.05);
     }
     P('AN/ALR-94 EW apertures', {
       system: 'Sensors', material: 'Conformal broadband antennas', mass: 30, count: 24,
@@ -159,9 +160,9 @@ export function buildAvionics(ctx) {
       g.push(geo);
     };
     for (const side of [1, -1]) {
-      eye(V(X(3.2), FR.upperA(3.2, 0.45) + 0.004, side * 0.45), normalA(3.2, side * 0.45));
-      eye(V(X(3.4), FR.bottomAt(3.4, 0.35) - 0.004, side * 0.35), V(0, -1, side * 0.6));
-      eye(V(X(16.8), -FR.bD(16.8) * 0.6, side * (FR.bW(16.8) - 0.05)), V(0, -0.3, side));
+      eye(V(X(SM(3.2)), FR.upperA(SM(3.2), 0.45) + 0.004, side * 0.45), normalA(SM(3.2), side * 0.45));
+      eye(V(X(SM(3.4)), FR.bottomAt(SM(3.4), 0.35) - 0.004, side * 0.35), V(0, -1, side * 0.6));
+      { const s = SM(16.8), y = -FR.bD(s) * 0.6; eye(V(X(s), y, side * (FR.wallZ(s, y) + 0.004)), V(0, -0.3, side)); }
     }
     P('AN/AAR-56 missile launch detectors', {
       system: 'Sensors', material: 'Infrared sensor windows', mass: 18, count: 6,
@@ -172,7 +173,7 @@ export function buildAvionics(ctx) {
   {
     const g = [];
     for (const side of [1, -1]) {
-      for (const [s, dy] of [[2.05, -0.05], [2.5, 0.06]]) {
+      for (const [s, dy] of [[SM(2.05), -0.05], [SM(2.5), 0.06]]) {
         const z = FR.aW(s) - 0.02;
         const y = FR.aYC(s) + dy;
         g.push(FR.pipe([[s, y, side * z], [s - 0.02, y, side * (z + 0.07)]], 0.008, 6, 2));
@@ -201,26 +202,26 @@ export function buildAvionics(ctx) {
       system: 'Communications', material: 'Composite blade antennas', mass: 4, count: 2,
       explode: [0, 0.85, 0],
       desc: 'Only two small blades break the outline, on the spine and the belly, for voice and data radios (HAVE QUICK, SINCGARS); most other CNI antennas are flush with the skin.',
-    }, mesh(merge([blade(9.9, FR.topAt(9.9, 0) - 0.01, 1, 0.13, 0.26), blade(6.2, FR.bottomAt(6.2, 0) + 0.01, -1, 0.12, 0.22)]), F.wing()));
+    }, mesh(merge([blade(SM(9.9), FR.topAt(SM(9.9), 0) - 0.01, 1, 0.13, 0.26), blade(6.4, FR.bottomAt(6.4, 0) + 0.01, -1, 0.12, 0.22)]), F.wing()));
     const top = (s, z) => V(X(s), FR.topAt(s, Math.abs(z)) + 0.003, z);
     const bot = (s, z) => V(X(s), FR.bottomAt(s, z) - 0.003, z);
     P('GPS antenna', {
       system: 'Communications', material: 'Flush patch antenna', mass: 1,
       explode: [0, 1.1, 0],
       desc: 'A flush patch on the spine looking up at the GPS satellites, feeding the embedded GPS in the inertial navigation system.',
-    }, mesh(patchGeo(top(10.8, 0), V(0, 1, 0), 0.14, 0.14), F.composite()));
+    }, mesh(patchGeo(top(SM(10.8), 0), V(0, 1, 0), 0.14, 0.14), F.composite()));
     P('IFF antennas', {
       system: 'Communications', material: 'Flush conformal arrays, upper and lower', mass: 3, count: 2,
       explode: [0, 1.25, -0.4],
       desc: 'Flush arrays above and below the fuselage answer and send identification-friend-or-foe interrogations (including Mode 5); the interrogator can steer its beam so it questions only the target it means to (positions approximate).',
-    }, mesh(merge([patchGeo(top(7.0, 0.42), normalA(7.0, 0.42), 0.22, 0.06), patchGeo(bot(7.4, 0.2), V(0, -1, 0), 0.22, 0.06)]), F.composite()));
+    }, mesh(merge([patchGeo(top(SM(7.0), 0.42), normalA(SM(7.0), 0.42), 0.22, 0.06), patchGeo(bot(SM(7.4), 0.2), V(0, -1, 0), 0.22, 0.06)]), F.composite()));
     P('TACAN & landing-aid antennas', {
       system: 'Communications', material: 'Flush annular-slot and patch antennas', mass: 3, count: 3,
       explode: [0, -1.0, 0.4],
       desc: 'Flush antennas for TACAN (range and bearing to a beacon or tanker) and the instrument landing aids, upper and lower so one is always in view (positions approximate).',
-    }, mesh(merge([patchGeo(top(12.1, 0), V(0, 1, 0), 0.16, 0.16), patchGeo(bot(5.2, 0.3), V(0, -1, 0), 0.16, 0.1), patchGeo(bot(5.2, -0.3), V(0, -1, 0), 0.16, 0.1)]), F.composite()));
+    }, mesh(merge([patchGeo(top(SM(12.1), 0), V(0, 1, 0), 0.16, 0.16), patchGeo(bot(SM(5.2), 0.3), V(0, -1, 0), 0.16, 0.1), patchGeo(bot(SM(5.2), -0.3), V(0, -1, 0), 0.16, 0.1)]), F.composite()));
     const ifdl = [];
-    for (const side of [1, -1]) ifdl.push(patchGeo(top(11.0, side * 1.25), V(0, 1, side * 0.55), 0.2, 0.08), patchGeo(top(15.6, side * 1.15), V(0, 1, side * 0.4), 0.16, 0.06));
+    for (const side of [1, -1]) ifdl.push(patchGeo(top(SM(11.0), side * 1.25), V(0, 1, side * 0.55), 0.2, 0.08), patchGeo(top(SM(15.6), side * 1.15), V(0, 1, side * 0.4), 0.16, 0.06));
     P('IFDL apertures', {
       system: 'Communications', material: 'Flush directional antennas', mass: 4, count: 4,
       explode: [0, 1.4, 0.4],
@@ -236,7 +237,7 @@ export function buildAvionics(ctx) {
       (side > 0 ? green : red).push(lens);
       form.push(new THREE.BoxGeometry(0.5, 0.006, 0.05).translate(le.x - 0.55 * chord, le.y + 0.03, le.z - side * 0.15));
     }
-    for (const side of [1, -1]) { const pts = []; for (let s = 4.3; s <= 4.91; s += 0.15) { const z = FR.aW(s) - 0.07; pts.push([s, FR.upperA(s, z) + 0.004, side * z]); } form.push(FR.pipe(pts, 0.011, 6, 8)); }
+    for (const side of [1, -1]) { const pts = []; for (let s = SM(4.3); s <= SM(4.91); s += 0.15) { const z = FR.aW(s) - 0.07; pts.push([s, FR.upperA(s, z) + 0.004, side * z]); } form.push(FR.pipe(pts, 0.011, 6, 8)); }
     // strips on the outer face of each canted fin, about two-thirds of the way up
     const T = FR.FIN;
     for (const side of [1, -1]) {
@@ -247,7 +248,7 @@ export function buildAvionics(ctx) {
       const mtx = new THREE.Matrix4().makeRotationX(-Math.PI / 2 + T.cant * side).setPosition(X(T.rootS), T.rootY, side * T.rootZ);
       form.push(strip.applyMatrix4(mtx));
     }
-    white.push(new THREE.SphereGeometry(0.035, 10, 8).translate(X(18.62), -0.08, -1.52));
+    { const sT = FR.BOOM.sEnd0 + (1.52 - FR.BOOM.zIn) / ((FR.BOOM.zEnd - FR.BOOM.zIn) / (FR.BOOM.sEnd1 - FR.BOOM.sEnd0)) - 0.03; white.push(new THREE.SphereGeometry(0.035, 10, 8).translate(X(sT), (FR.upperB(sT, 1.52) - FR.bD(sT)) / 2, -1.52)); }
     // steady, modest intensities: these are small lamps, not light sources for the scene
     const lamp = (c, e, k) => new THREE.MeshStandardMaterial({ color: c, emissive: e, emissiveIntensity: k, roughness: 0.4 });
     const navG = mesh(merge(green), lamp(0x002200, 0x2bff6a, 2.2), { cast: false });
@@ -258,7 +259,7 @@ export function buildAvionics(ctx) {
     P('Position lights', {
       system: 'Electrical', material: 'LED position lights', mass: 2, count: 3,
       explode: [0, 0.6, 0],
-      desc: 'Red (left) and green (right) lights at the wing tips and a white tail light on the left boom fairing.',
+      desc: 'Red (left) and green (right) lights at the wing tips and a white tail light on the end of the left tail boom.',
     }, [navG, navR, navW]);
     P('Formation light strips', {
       system: 'Electrical', material: 'Low-intensity electroluminescent strips', mass: 3, count: 6,
@@ -266,8 +267,8 @@ export function buildAvionics(ctx) {
       desc: 'Dim green strips on the nose chines, the wing tips and the outer faces of both fins let a wingman hold position at night without the jet showing from far away.',
     }, strips);
     const stMat = M.strobe().clone();
-    const s1 = new THREE.SphereGeometry(0.04, 12, 8).scale(1.4, 0.7, 1).translate(X(16.9), FR.topAt(16.9, 0) + 0.02, 0);
-    const s2 = new THREE.SphereGeometry(0.04, 12, 8).scale(1.4, 0.7, 1).translate(X(12.8), -FR.bD(12.8) - 0.02, 0);
+    const s1 = new THREE.SphereGeometry(0.04, 12, 8).scale(1.4, 0.7, 1).translate(X(14.6), FR.topAt(14.6, 0) + 0.02, 0);
+    const s2 = new THREE.SphereGeometry(0.04, 12, 8).scale(1.4, 0.7, 1).translate(X(SM(12.8)), -FR.bD(SM(12.8)) - 0.02, 0);
     P('Anti-collision strobes', {
       system: 'Electrical', material: 'White LED strobes', mass: 2, count: 2,
       explode: [-0.4, 0.9, 0],
