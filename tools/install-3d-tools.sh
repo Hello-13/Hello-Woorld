@@ -131,7 +131,7 @@ if [ -f "$HERE/fetch-texture.py" ]; then
   cp "$HERE/fetch-texture.py" "$PREFIX/fetch-texture.py"
 else
   for ref in master claude/aerospace-3d-models-gjms7d; do
-    curl -fsSL -o "$PREFIX/fetch-texture.py" "$RAW/$ref/tools/fetch-texture.py" 2>/dev/null && break
+    curl -fsSL --retry 3 --retry-delay 2 -o "$PREFIX/fetch-texture.py" "$RAW/$ref/tools/fetch-texture.py" 2>/dev/null && break
   done
 fi
 if [ -s "$PREFIX/fetch-texture.py" ]; then
