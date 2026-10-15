@@ -468,11 +468,13 @@ export function buildGear(ctx) {
     // upper trunk side and the lower trunk side down to the corner; rows at the loft's stations along the trunk, the
     // wing part between the opening's chord lines at each span
     {
-      // (extra rows 1.2 cm inside the fore and aft edges: the saw-toothed edge band is thin, lying on the door lands
-      // over the skin and the well's end walls, and the panel is full thickness only inside the opening)
-      const EB = 0.012, edgeRows = (a) => { const o = [...a]; o.splice(1, 0, a[0] + EB); o.splice(o.length - 1, 0, a[a.length - 1] - EB); return o; };
-      const st = edgeRows(ctx.sB.filter((s) => s >= W.s0 - 1e-6 && s <= W.s1 + 1e-6));
-      const vs = st.map((s) => (s - W.s0) / (W.s1 - W.s0));
+      // rows: the saw-toothed edge, the opening's edge, 1.2 cm inside it, the loft's stations, and the same at the aft
+      // end; the toothed band and the opening's edge are thin (they lie on the door lands, over the skin and the well's
+      // end walls), the panel is full thickness only inside the opening
+      const EB = 0.012, tooth = 0.05;
+      const base = ctx.sB.filter((s) => s > W.s0 + 2 * EB && s < W.s1 - 2 * EB);
+      const rows = [{ e: 0, d: -1 }, { e: 0 }, { e: 0, in: EB }, ...base.map((s) => ({ s })), { e: 1, in: -EB }, { e: 1 }, { e: 1, d: 1 }];
+      const thin = (r) => r <= 1 || r >= rows.length - 2;
       const cs = (c, z) => FR.wingLE(z) + c * (FR.wingTE(z) - FR.wingLE(z));
       const lo = (s, z) => { const sec = FR.wingSection(z), xc = Math.min(1, Math.max(0, (s - FR.wingLE(z)) / sec.chord)); return sec.le[1] - 5 * sec.t * (0.2969 * Math.sqrt(xc) - 0.126 * xc - 0.3516 * xc * xc + 0.2843 * xc ** 3 - 0.1036 * xc ** 4) * sec.chord; };
       // columns: wing spans from the hinge in to the junction (doubled at the strips' joints), then the trunk side's
@@ -482,20 +484,22 @@ export function buildGear(ctx) {
       zs.push(2.30 + eps, 2.30 - eps, 2.21, 2.12 + eps, 2.12 - eps, 2.045);
       const wf = (s) => FR.wallFractions(s);
       const cols = [...zs.map((z) => ({ wing: z })), ...[3, 4, 5, 6, 7, 8, 9].map((i) => ({ wall: i }))];
-      const tooth = 0.05;
-      const grid = vs.map((v, r) => cols.map((col, c) => {
-        const odd = c % 2 === 1, d = r === 0 && odd ? -tooth : r === vs.length - 1 && odd ? tooth : 0;
+      const grid = rows.map((row) => cols.map((col, c) => {
+        const d = row.d && c % 2 === 1 ? row.d * tooth : 0;
+        // station of this row along the column: the opening's fore / aft edge (plus the band's inset), or the loft
+        // station (on the wing, the same fraction of the opening's chord)
+        const at = (e0, e1) => (row.s !== undefined ? lerp(e0, e1, (row.s - W.s0) / (W.s1 - W.s0)) : (row.e ? e1 : e0) + (row.in || 0));
         if (col.wing !== undefined) {
           const ch = FR.wellWingChord(col.wing);
-          const s = lerp(cs(ch[0], col.wing), cs(ch[1], col.wing), v) + d;
+          const s = at(cs(ch[0], col.wing), cs(ch[1], col.wing)) + d;
           return [X(s), lo(s, col.wing) - 0.003, side * col.wing];
         }
-        const s = st[r] + d, f = wf(st[r])[col.wall], [zz, yy] = FR.wallB(s, f);
-        return [X(s), yy - (col.wall === 9 ? 0.003 : 0), side * (zz + 0.003)];
+        const s0 = at(W.s0, W.s1), s = s0 + d, f = wf(s0)[col.wall], [zz, yy] = FR.wallB(s, f);
+        return [X(s), yy - (col.wall === 9 ? 0.003 : 0), side * (zz + (col.wall === 9 ? 0.0005 : 0.003))];     // (a 1 mm seam with the inboard door at the corner)
       }));
       // (thickness inward from the outer surface; at the lower corner straight up, so the edge meets the inboard door's)
       const door = slab(grid, (p, r, c) => {
-        const k = r === 0 || r === vs.length - 1 ? 0.2 : 1, w = cols[c].wall;
+        const k = thin(r) ? 0.2 : 1, w = cols[c].wall;
         return (cols[c].wing !== undefined || w === 9 ? [0, 0.022, 0] : [0, 0.006, -side * 0.021]).map((q) => q * k);
       });
       const hz = W.hingeZ, ch0 = FR.wellWingChord(hz), sh0 = cs(ch0[0], hz), sh1 = cs(ch0[1], hz);
@@ -521,11 +525,12 @@ export function buildGear(ctx) {
     }
     // inboard door on the belly, hinged on its inboard edge
     {
-      const st0 = ctx.sB.filter((s) => s >= W.s0 - 1e-6 && s <= W.sIn1 + 1e-6);
-      const st = [st0[0], st0[0] + 0.012, ...st0.slice(1, -1), st0[st0.length - 1] - 0.012, st0[st0.length - 1]];
-      const zAt = (s, uu) => { const zs = FR.bottomSamples(s); return lerp(zs[4], zs[0] - 0.006, uu); };
+      // (as the main door: the toothed band and the opening's edge thin, full thickness 1.2 cm inside the opening)
+      const st0 = ctx.sB.filter((s) => s > W.s0 + 0.024 && s < W.sIn1 - 0.024);
+      const st = [W.s0, W.s0, W.s0 + 0.012, ...st0, W.sIn1 - 0.012, W.sIn1, W.sIn1];
+      const zAt = (s, uu) => { const zs = FR.bottomSamples(s); return lerp(zs[4], zs[0] - 0.0005, uu); };
       const grid = toothedGrid((s, uu) => [X(s), -FR.bD(s) - 0.002, side * zAt(s, uu)], st, { width: 0.42, pitch: 0.1 });
-      const door = slab(grid, (p, r) => [0, r === 0 || r === st.length - 1 ? 0.004 : 0.02, 0], V(0, -1, 0));
+      const door = slab(grid, (p, r) => [0, r <= 1 || r >= st.length - 2 ? 0.004 : 0.02, 0], V(0, -1, 0));
       const h = hinge(mesh(door, F.door()), V(X(W.s0), -FR.bD(W.s0), side * W.zIn), V(X(W.sIn1), -FR.bD(W.sIn1), side * W.zIn), V(X(11.4), -1.0, side * 1.4), V(0, -1, 0));
       P(`Main gear inboard door (${R})`, {
         system: 'Skin & fairings', skin: true, material: 'Composite door, saw-tooth edges', mass: 10,

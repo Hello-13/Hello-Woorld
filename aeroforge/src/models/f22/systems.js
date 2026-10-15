@@ -320,8 +320,8 @@ export function buildSystems(ctx) {
     const g = [];
     for (const side of [1, -1]) {
       // (on the cell's floor aft of the main-gear well, between the 49 % spar and the 62 % spar)
-      const sec = FR.wingSection(2.3);
-      g.push(FR.cylX(FR.SN - (sec.le[0] - 0.555 * sec.chord), sec.le[1] - 0.06, side * 2.3, 0.22, 0.05, 0.05, 14));
+      const sec = FR.wingSection(2.3), yLo = sec.le[1] - naca00(0.555, sec.t) * sec.chord;     // (the lower skin)
+      g.push(FR.cylX(FR.SN - (sec.le[0] - 0.555 * sec.chord), yLo + 0.052, side * 2.3, 0.22, 0.05, 0.05, 14));
     }
     g.push(FR.cylX(FT.f2[0] + 1.6, -0.14, 0.05, 0.22, 0.05, 0.05, 14), FR.cylX(FT.f1a[0] + 0.85, -0.4, -0.12, 0.22, 0.05, 0.05, 14));   // (on F-1A's floor, behind the nose-well reserve)
     P('Fuel transfer pumps', {
@@ -537,8 +537,8 @@ export function buildSystems(ctx) {
   P('Brake & emergency accumulator', {
     system: 'Hydraulics', material: 'Nitrogen-charged steel accumulator', mass: 6,
     explode: [0.2, -1.6, 0],
-    desc: 'Holds a reserve of pressurised fluid for the wheel brakes if both pumps are lost; emergency gear extension uses air from the stored-energy system\'s bottles instead (T.O. 00-105E-9).',
-  }, mesh(merge([new THREE.CapsuleGeometry(0.06, 0.18, 4, 10).rotateZ(Math.PI / 2).translate(X(RT.brakeAcc[0]), RT.brakeAcc[1], 0), box(RT.brakeAcc[0], RT.brakeAcc[1] - 0.07, 0, 0.06, 0.08, 0.06)]), F.steel()));
+    desc: 'On a cross-beam between the keel longerons, between the main wheel wells, it holds a reserve of pressurised fluid for the wheel brakes if both pumps are lost; emergency gear extension uses air from the stored-energy system\'s bottles instead (T.O. 00-105E-9).',
+  }, mesh(merge([new THREE.CapsuleGeometry(0.06, 0.18, 4, 10).rotateZ(Math.PI / 2).translate(X(RT.brakeAcc[0]), RT.brakeAcc[1], 0), box(RT.brakeAcc[0], RT.brakeAcc[1] - 0.06, 0, 0.06, 0.04, 0.4)]), F.steel()));
   for (const side of [1, -1]) {
     const z = side, S = side > 0 ? 'A' : 'B';
     const W = RT.wellWall, g = [];
@@ -585,11 +585,11 @@ export function buildSystems(ctx) {
       g.push(FR.pipe([[FR.AMMO.s1 + 0.2, -0.66, side * 1.05], [11.42, -0.64, side * 0.97], [brg[0] + 0.04, brg[1] + 0.09, side * 1.0], [brg[0] + 0.03, brg[1] + 0.05, brg[2] - side * 0.05]], 0.01, 5, 10));
     }
     // nose gear: from system A's gallery at the front of the main bay, inboard over the bay's front bulkhead,
-    // forward under the ECS bay and along the outside of the nose well's right wall to the retraction jack's fitting
-    // under the cockpit floor
+    // forward under the ECS bay and along the outside of the nose well's right wall (turning in to it where the lower
+    // forward fuselage narrows) to the retraction jack's fitting under the cockpit floor
     {
       const NY = RT.nose.hyd, sl = RT.nose.slot, NW = FR.NOSE_WELL;
-      g.push(FR.pipe([[7.2, hy[1], hy[0]], [7.05, NY[1] + 0.02, 1.07], [sl + 0.02, NY[1], 1.0], [sl, NY[1], 0.75], [sl - 0.02, NY[1], NY[0]], [6.0, NY[1], NY[0]], [4.82, NY[1], NY[0]], [4.74, -0.63, NW.wall + 0.03], [4.68, -0.4, NW.wall + 0.03], [4.65, -0.15, NW.wall + 0.025], [N_ACT[0], -0.1, N_ACT[2] + 0.04]], 0.012, 5, 50));
+      g.push(FR.pipe([[7.2, hy[1], hy[0]], [7.05, NY[1] + 0.02, 1.07], [sl + 0.02, NY[1], 1.0], [sl, NY[1], 0.75], [sl - 0.02, NY[1], NY[0]], [6.0, NY[1], NY[0]], [4.95, NY[1], NY[0]], [4.85, -0.645, 0.40], [4.74, -0.63, NW.wall + 0.03], [4.68, -0.4, NW.wall + 0.03], [4.65, -0.15, NW.wall + 0.025], [N_ACT[0], -0.1, N_ACT[2] + 0.04]], 0.012, 5, 50));
     }
     P('Landing-gear & brake hydraulic lines', {
       system: 'Hydraulics', material: 'Titanium and steel tubing, flexible hoses across the gear pivots', mass: 18,
