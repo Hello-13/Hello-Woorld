@@ -1,6 +1,6 @@
 // F-22A maintenance access: the flush, saw-tooth-edged panels a crew chief opens most often — the
-// forward avionics-bay doors under the chines, the AMAD / FADEC panels on the lower aft fuselage
-// walls and the engine-bay panels on the upper deck. Every panel seam is a low-observable maintenance
+// forward avionics-bay doors under the chines, the AMAD bay doors in the belly, the FADEC panels on the
+// lower aft fuselage walls and the engine-bay panels on the upper deck. Every panel seam is a low-observable maintenance
 // item, so the F-22 has far fewer of them than an F-15. Positions are approximate (from photographs).
 
 import * as THREE from 'three';
@@ -35,19 +35,21 @@ export function buildAccess(ctx) {
     }, mesh(merge(g), F.door()));
   }
 
-  // AMAD and FADEC access on the lower walls of the aft fuselage
+  // AMAD bay doors on the belly under each accessory drive (T.O. 00-105E-9 bottom panel map: the AMAD screens
+  // #4223 / #4224 at ≈ 11.3–11.7, z ≈ ±0.45–0.8), and FADEC panels in the lower walls behind the main-gear wells
   {
     const g = [];
     for (const side of [1, -1]) {
-      for (const [s0, s1] of [[M(13.3), M(14.2)], [M(14.4), M(15.1)]]) {
-        const pt = (s, u) => { const [zz, y] = FR.wallB(s, lerp(0.32, 0.86, u)); return [X(s), y, side * (zz + 0.003)]; };
-        g.push(slab(toothedGrid(pt, range(s0, s1, 3), { width: 0.5 }), () => [0, 0.01, -side * 0.02], V(0, -0.3, side)));
-      }
+      const A = FR.AMAD;
+      const pa = (s, u) => [X(s), -FR.bD(s) - 0.003, side * lerp(A.z - 0.2, A.z + 0.2, u)];
+      g.push(slab(toothedGrid(pa, range(A.s0 - 0.06, A.s1 + 0.06, 3), { width: 0.4 }), () => [0, 0.012, 0], V(0, -1, 0)));
+      const pt = (s, u) => { const [zz, y] = FR.wallB(s, lerp(0.32, 0.86, u)); return [X(s), y, side * (zz + 0.003)]; };
+      g.push(slab(toothedGrid(pt, range(M(14.4), M(15.1), 3), { width: 0.5 }), () => [0, 0.01, -side * 0.02], V(0, -0.3, side)));
     }
     P('AMAD & FADEC access panels', {
       system: 'Skin & fairings', skin: true, material: 'Composite panels, saw-tooth edges', mass: 14, count: 4,
       explode: [0, -0.7, 1.75],
-      desc: 'Panels in the lower walls of the aft fuselage open onto each airframe-mounted accessory drive with its generator and hydraulic pumps, and onto the FADEC on the engine case; most F119 line-replaceable units are one deep, so none has to come off to reach another (positions approximate).',
+      desc: 'A door in the belly under each airframe-mounted accessory drive (T.O. 00-105E-9 marks the AMAD bay screens there) opens onto the drive with its generator, hydraulic pumps and air-turbine starter; panels in the lower walls further aft reach the FADEC on the engine case. Most F119 line-replaceable units are one deep, so none has to come off to reach another (positions approximate).',
     }, mesh(merge(g), F.door()));
   }
 

@@ -56,13 +56,16 @@ export function buildPropulsion(ctx) {
       perf.push(FR.gridSurface(sub(0, 4)), FR.gridSurface(sub(n - 6, n - 1)));
     }
     const bl = [];
-    // bleed plenum behind the inboard wall, and the exit duct up over the duct's roof to the grille on the upper surface
-    const sPl = SM(8.0), yPl = -0.2;
-    let zPl = 0.05; while (zPl < 1.5 && FR.ductDepth(sPl, yPl, zPl) < -0.07) zPl += 0.01;
-    zPl -= 0.065;
-    bl.push(new THREE.BoxGeometry(0.75, 0.4, 0.09).translate(X(sPl), yPl, side * zPl));
-    const sG = SM(8.42), roofG = FR.ductSpan(sG, 1.0).hi;
-    bl.push(FR.pipe([[sPl + 0.3, 0.02, side * zPl], [sPl + 0.4, roofG + 0.06, side * (zPl + 0.05)], [sG + 0.05, roofG + 0.08, side * 0.9], [sG + 0.08, FR.topAt(sG + 0.08, 1.03) - 0.04, side * 1.03]], 0.045, 8, 12));
+    // bleed plenum behind the inboard wall (between the forebody side and the duct, clear of the forward-fuselage
+    // frame at 6.2 and of the throat, whose inboard wall moves inboard behind it), with a short exit duct up into the
+    // fuel coolers' cooling-air duct from the diverter, so the bled air leaves with the coolers' air through their
+    // exhaust grille on the spine (the production bleed exit is not published; early aircraft had inlet bleed
+    // doors, which T.O. 00-105E-9 says were eliminated from aircraft 02-028 on)
+    const pl0 = 6.25, pl1 = 6.6, yPl = -0.2;
+    let zPl = 9;
+    for (const sv of [pl0, (pl0 + pl1) / 2, pl1]) { let zz = 0.05; while (zz < 1.5 && FR.ductDepth(sv, yPl, zz) < -0.07) zz += 0.01; zPl = Math.min(zPl, zz - 0.065); }
+    bl.push(new THREE.BoxGeometry(pl1 - pl0, 0.4, 0.09).translate(X((pl0 + pl1) / 2), yPl, side * zPl));
+    bl.push(FR.pipe([[6.38, yPl + 0.18, side * zPl], [6.38, yPl + 0.215, side * (zPl + 0.015)], [6.38, yPl + 0.235, side * 0.775]], 0.03, 8, 6));
     P(`Inlet throat & boundary-layer bleed (${R})`, {
       system: 'Propulsion', material: 'Composite duct, perforated titanium bleed panels', mass: 110,
       explode: [0.55, -0.35, 1.25 * side],
@@ -71,25 +74,26 @@ export function buildPropulsion(ctx) {
     P(`Inlet bleed plenum & exit duct (${R})`, {
       system: 'Propulsion', material: 'Composite plenum and duct', mass: 14,
       explode: [0.9, 0.35, 1.5 * side],
-      desc: 'The bleed air collects in a plenum behind the perforated wall and is ducted up to a fixed grille on the upper surface just aft of the inlet, where it is dumped overboard (routing approximate).',
+      desc: 'The bleed air collects in a plenum behind the perforated wall, between the forebody side and the duct, and a short duct passes it into the fuel coolers\' cooling-air duct, so it leaves with their air through the exhaust grille on the spine behind the canopy (exit arrangement not published; routing approximate).',
     }, mesh(merge(bl), F.ductDark()));
     {
-      // fixed exit grille: a frame with slats across it, flush in the upper skin
-      const s0 = SM(8.42), s1 = SM(8.95);
-      const pt = (s, u) => { const z = side * lerp(1.0, 1.32, u); return [X(s), FR.topAt(s, Math.abs(z)) + 0.003, z]; };
-      const frame = slab(toothedGrid(pt, [s0, (s0 + s1) / 2, s1], { width: 0.32 }), () => [0, -0.015, 0], new THREE.Vector3(0, 1, 0));
+      // fixed exit grilles on the spine behind the cockpit: the air-cooled fuel coolers' exhaust (T.O. 00-105E-9 top
+      // panel map, "ACFC exhaust doors" #4236 right / #4235 left), a saw-toothed frame with slats across it
+      const AC = FR.ACFC, s0 = AC.s0, s1 = AC.s1;
+      const pt = (s, u) => { const z = side * lerp(AC.z0, AC.z1, u); return [X(s), FR.topAt(s, Math.abs(z)) + 0.003, z]; };
+      const frame = slab(toothedGrid(pt, [s0, (s0 + s1) / 2, s1], { width: AC.z1 - AC.z0 }), () => [0, -0.015, 0], new THREE.Vector3(0, 1, 0));
       const slats = [];
       for (let k = 1; k < 9; k++) {
-        const s = lerp(s0 + 0.04, s1 - 0.04, k / 9);
-        const za = 1.03, zb = 1.29;
-        const ya = FR.topAt(s, za) + 0.006, yb = FR.topAt(s, zb) + 0.006;
+        const s = lerp(s0 + 0.05, s1 - 0.05, k / 9);
+        const za = AC.z0 + 0.03, zb = AC.z1 - 0.03;
+        const ya = FR.topAt(s, za) - 0.004, yb = FR.topAt(s, zb) - 0.004;
         const len = Math.hypot(zb - za, yb - ya);
-        slats.push(new THREE.BoxGeometry(0.012, 0.02, len).rotateX(Math.atan2(yb - ya, zb - za) * side).translate(X(s), (ya + yb) / 2, side * (za + zb) / 2));
+        slats.push(new THREE.BoxGeometry(0.012, 0.02, len).rotateX(Math.atan2(yb - ya, zb - za) * side).translate(X(s), (ya + yb) / 2 - 0.004, side * (za + zb) / 2));
       }
-      P(`Upper bleed exit grille (${R})`, {
+      P(`Fuel-cooler exhaust grille (${R})`, {
         system: 'Skin & fairings', skin: true, material: 'Composite grille frame with angled slats, saw-tooth edges', mass: 4,
         explode: [0.3, 1.6, 1.5 * side],
-        desc: 'Fixed grilles on the upper surface just aft of each inlet dump the inlet bleed and the diverter air that has passed through the fuel cooler. A retired P&W field-service representative recalls that roughly the first two dozen F-22s also had doors over these grilles, deleted after flight test showed they were not needed (position approximate).',
+        desc: 'Fixed grilles on the spine just behind the canopy let out the air that has passed through the air-cooled fuel coolers beneath them (T.O. 00-105E-9 calls them the ACFC exhaust doors); the model also leads the inlet bleed out here, which is an assumption. The T.O. notes that the inlet bleed doors of early aircraft were eliminated from aircraft 02-028 on.',
       }, [mesh(frame, F.door()), mesh(merge(slats), F.ductDark())]);
     }
     P(`Serpentine inlet duct (${R})`, {
@@ -98,25 +102,27 @@ export function buildPropulsion(ctx) {
       desc: 'From the caret inlet the duct climbs and swings inboard over the weapons bay, then turns back down and outboard onto the engine, about 6 m in all (Lockheed Martin gives its length as 6.35 diameters). The serpentine ducts keep the fan faces — normally the brightest radar reflectors on a jet — out of line of sight from any exterior view, and an absorbent lining soaks up energy that bounces in. The real duct shape is not published; the model\'s is solved so that no straight line from outside reaches its fan face.',
     }, mesh(FR.gridSurface(aft, { closed: true, uv: 'n' }), F.duct()));
     {
-      // bypass (spill) door on the upper aft fuselage over the end of the duct, with the short duct to it
-      const s0 = FR.FAN_S - 1.1, s1 = FR.FAN_S - 0.4, za = 1.18, zb = 1.46;
-      const pt = (s, u) => { const z = side * lerp(za, zb, u); return [X(s), FR.topAt(s, Math.abs(z)) + 0.003, z]; };
-      const door = slab(toothedGrid(pt, [s0, (s0 + s1) / 2, s1], { width: zb - za }), () => [0, -0.02, 0], new THREE.Vector3(0, 1, 0));
-      const hd = hinge(mesh(door, F.door()), new THREE.Vector3(X(s1), FR.topAt(s1, za), side * za), new THREE.Vector3(X(s1), FR.topAt(s1, zb), side * zb), new THREE.Vector3(X(s0), 0.6, side * 1.3), new THREE.Vector3(0, 1, 0));
+      // bypass (spill) doors on the upper fuselage over the ducts' crossover, either side of the refuelling receptacle:
+      // three louvre panels each side (FR.BYPASS), each over a short plenum off the duct's roof
+      const BP = FR.BYPASS, n = 3, gapZ = 0.02, wz = (BP.z1 - BP.z0 - (n - 1) * gapZ) / n;
       anim.bypass = anim.bypass || [];
-      anim.bypass.push(hd);
+      const pivots = [], plen = [];
+      for (let k = 0; k < n; k++) {
+        const za = BP.z0 + k * (wz + gapZ), zb = za + wz;
+        const pt = (s, u) => { const z = side * lerp(za, zb, u); return [X(s), FR.topAt(s, Math.abs(z)) + 0.003, z]; };
+        const door = slab(toothedGrid(pt, [BP.s0, (BP.s0 + BP.s1) / 2, BP.s1], { width: wz }), () => [0, -0.02, 0], new THREE.Vector3(0, 1, 0));
+        const hd = hinge(mesh(door, F.door()), new THREE.Vector3(X(BP.s1), FR.topAt(BP.s1, za), side * za), new THREE.Vector3(X(BP.s1), FR.topAt(BP.s1, zb), side * zb), new THREE.Vector3(X(BP.s0), 0.6, side * (za + zb) / 2), new THREE.Vector3(0, 1, 0));
+        anim.bypass.push(hd);
+        pivots.push(hd.pivot);
+      }
       P(`Inlet bypass door (${R})`, {
-        system: 'Skin & fairings', skin: true, material: 'Composite door with saw-tooth edges, hydraulically actuated', mass: 9,
+        system: 'Skin & fairings', skin: true, material: 'Composite louvre doors with saw-tooth edges, hydraulically actuated', mass: 9, count: 3,
         explode: [-0.2, 1.75, 1.2 * side],
-        desc: 'When the engine needs less air than the fixed caret inlet captures, this door opens to spill the surplus from the aft end of the duct overboard, keeping the inlet shock system stable instead of letting it buzz. It matters at the Mach 1.5-plus the F-22 cruises at on dry power (position approximate).',
-      }, hd.pivot);
-      // a collar seated on the duct's outboard roof (y follows the roof) that leads outboard to the door opening
-      const roof = (sv, zz) => FR.ductSpan(sv, zz).hi;
-      const foot = [], mouth = [];
-      // the collar sits on the duct's outboard roof: its inner and outer edges follow the duct's lateral extent
-      const zOut = (sv) => Math.max(...FR.ductSection(sv).map((q) => q[0]));
-      const zF = Math.min(zOut(s0 + 0.1), zOut(s1 - 0.1));
-      const fs = [s0 + 0.1, s1 - 0.1], fz = [zF - 0.2, zF - 0.06], ms = [s0 + 0.07, s1 - 0.07], mz = [1.2, 1.42];
+        desc: 'When the engine needs less air than the fixed caret inlet captures, these louvre doors on the upper fuselage over the duct open to spill the surplus overboard, keeping the inlet shock system stable instead of letting it buzz (T.O. 00-105E-9 shows them either side of the refuelling receptacle). It matters at the Mach 1.5-plus the F-22 cruises at on dry power.',
+      }, pivots);
+      // plenum: a collar on the duct's roof under the doors, up to the door opening
+      const roof = (sv, zz) => { const sp = FR.ductSpan(sv, zz); return sp ? sp.hi : FR.topAt(sv, zz) - 0.12; };
+      const fs = [BP.s0 + 0.08, BP.s1 - 0.08], fz = [BP.z0 + 0.06, BP.z1 - 0.12], ms = [BP.s0 + 0.05, BP.s1 - 0.05], mz = [BP.z0 + 0.03, BP.z1 - 0.03];
       const loop = (sa, za, f) => {
         const out = [];
         for (let k = 0; k < 6; k++) out.push(f(lerp(sa[0], sa[1], k / 6), za[0]));
@@ -125,14 +131,14 @@ export function buildPropulsion(ctx) {
         for (let k = 0; k < 4; k++) out.push(f(sa[0], lerp(za[1], za[0], k / 4)));
         return out;
       };
-      foot.push(...loop(fs, fz, (sv, zz) => [X(sv), roof(sv, zz) + 0.008, side * zz]));
-      mouth.push(...loop(ms, mz, (sv, zz) => [X(sv), FR.topAt(sv, zz) - 0.022, side * zz]));
-      const by = [FR.gridSurface([foot, mouth], { closed: true, uv: 'n' })];
+      const foot = loop(fs, fz, (sv, zz) => [X(sv), roof(sv, zz) + 0.008, side * zz]);
+      const mouth = loop(ms, mz, (sv, zz) => [X(sv), FR.topAt(sv, zz) - 0.024, side * zz]);
+      plen.push(FR.gridSurface([foot, mouth], { closed: true, uv: 'n' }));
       P(`Inlet bypass duct (${R})`, {
         system: 'Propulsion', material: 'Composite plenum off the top of the S-duct', mass: 10,
         explode: [-0.2, 1.25, 1.35 * side],
-        desc: 'A short plenum taps the outboard shoulder of the serpentine duct just ahead of the fan face and leads outboard to the bypass door, so spilled air never reaches the engine (position approximate).',
-      }, mesh(merge(by), F.duct()));
+        desc: 'A short plenum taps the roof of the serpentine duct where it crosses over toward the engine and leads straight up to the bypass doors, so spilled air leaves before it reaches the engine (plenum shape approximate).',
+      }, mesh(merge(plen), F.duct()));
     }
 
     // ---------------------------------------------------------------- F119 fan
@@ -140,7 +146,7 @@ export function buildPropulsion(ctx) {
     const tor = (r, t, s0, seg = 40) => new THREE.TorusGeometry(r, t, 6, seg).rotateY(Math.PI / 2).translate(X(s0), yc, zc);
     {
       const g = [];
-      g.push(latheX([[0.001, EM(13.12)], [0.09, EM(13.2)], [0.15, EM(13.32)], [0.18, EM(13.45)], [0.2, EM(13.6)], [0.21, EM(14.05)]], yc, zc, 28));
+      g.push(latheX([[0.001, EM(13.12)], [0.09, EM(13.2)], [0.15, EM(13.32)], [0.18, EM(13.45)], [0.2, EM(13.6)], [0.214, EM(13.8)], [0.226, EM(13.9)], [0.229, EM(14.05)]], yc, zc, 28));   // spinner and blisk drum: every blade root sits on it
       const rot = [[EM(13.5), 20, 0.18, 0.47, 0.16], [EM(13.72), 26, 0.2, 0.44, 0.13], [EM(13.92), 32, 0.22, 0.42, 0.11]];
       for (const [s, n, h, t, ch] of rot) g.push(bladeRow({ x: X(s), y: yc, z: zc, count: n, rHub: h, rTip: t, chord: ch, twist: 0.75, thick: 0.014 }));
       // a stator row behind each rotor
@@ -216,7 +222,7 @@ export function buildPropulsion(ctx) {
     }
     // ---------------------------------------------------------------- shafts and bearings
     {
-      const g = [FR.cylX(EM(14.55), yc, zc, 2.1, 0.05, 0.05, 12)];                          // LP shaft: fan ↔ LP turbine
+      const g = [FR.cylX(EM(14.55) - 0.06, yc, zc, 2.22, 0.05, 0.05, 12)];                  // LP shaft: fan hub ↔ LP turbine
       g.push(FR.cylX(EM(14.75), yc, zc, 1.2, 0.11, 0.115, 16, true));                         // HP spool drum
       const b = [];
       for (const [s0, r] of [[EM(13.48), 0.08], [EM(14.12), 0.09], [EM(14.86), 0.14], [EM(15.38), 0.13], [EM(15.58), 0.09]]) {
@@ -249,7 +255,8 @@ export function buildPropulsion(ctx) {
     {
       const g = [bladeRow({ x: X(EM(15.24)), y: yc, z: zc, count: 36, rHub: 0.22, rTip: 0.33, chord: 0.05, twist: -0.7, thick: 0.012 })];
       g.push(bladeRow({ x: X(EM(15.32)), y: yc, z: zc, count: 52, rHub: 0.225, rTip: 0.335, chord: 0.045, twist: 0.8, thick: 0.01 }));
-      g.push(FR.cylX(EM(15.33), yc, zc, 0.07, 0.215, 0.215, 28));
+      g.push(FR.cylX(EM(15.33), yc, zc, 0.07, 0.228, 0.228, 28));                               // rotor disc: blade roots sit on its rim
+      g.push(latheX([[0.21, EM(15.2)], [0.223, EM(15.2) + 0.015], [0.223, EM(15.24) + 0.035]], yc, zc, 28));   // vane inner shroud, carried on the combustor's inner liner
       const hpt = P(`F119 HP turbine (${R})`, {
         system: 'Propulsion', material: 'Single-crystal nickel superalloy blades, impingement cooled', mass: 170,
         explode: [-0.4, 0.6, 0.6 * side],
@@ -257,9 +264,11 @@ export function buildPropulsion(ctx) {
       }, mesh(merge(g), F.bladeHot()));
       hpt.userData.part.thermalRole = 'turbine';
       hpt.userData.part.xrayWeight = 0.4;
-      const l = [bladeRow({ x: X(EM(15.42)), y: yc, z: zc, count: 40, rHub: 0.225, rTip: 0.355, chord: 0.05, twist: -0.6, thick: 0.012 })];
+      // the vanes between the turbines hang from the turbine case (tips reach the case wall) and carry an inner shroud
+      const l = [bladeRow({ x: X(EM(15.42)), y: yc, z: zc, count: 40, rHub: 0.225, rTip: 0.381, chord: 0.05, twist: -0.6, thick: 0.012 })];
+      l.push(FR.cylX(EM(15.42), yc, zc, 0.055, 0.228, 0.228, 28, true));
       l.push(bladeRow({ x: X(EM(15.51)), y: yc, z: zc, count: 60, rHub: 0.23, rTip: 0.365, chord: 0.045, twist: -0.85, thick: 0.01 }));
-      l.push(FR.cylX(EM(15.52), yc, zc, 0.06, 0.22, 0.22, 28));
+      l.push(FR.cylX(EM(15.52), yc, zc, 0.06, 0.233, 0.233, 28));                               // rotor disc
       const lpt = P(`F119 LP turbine (${R})`, {
         system: 'Propulsion', material: 'Nickel superalloy', mass: 150,
         explode: [-0.8, 0.6, 0.6 * side],
@@ -475,7 +484,7 @@ export function buildPropulsion(ctx) {
         desc: 'A self-contained lubrication system: a tank on the upper fan case, a pump and filter, and lines to the bearing sumps; scavenge pumps return the oil through a cooler that dumps its heat into the fuel (T.O. 00-105E-9: about 6 US gal of oil per jet; position approximate).',
       }, mesh(merge(o), F.boxLight()));
       const ig = [];
-      const ex = [EM(14.5), yc - 0.5, zc + side * 0.36];
+      const ex = [EM(14.5), yc - 0.42, zc + side * 0.3];                         // on the case's lower outboard side, inside the bay's fire-loop envelope
       ig.push(new THREE.BoxGeometry(0.22, 0.1, 0.12).translate(X(ex[0]), ex[1], ex[2]));
       for (const ang of [-2.2, -1.2]) {
         const py = yc + Math.cos(ang) * 0.34, pz = zc + Math.sin(ang) * 0.34 * -side;

@@ -30,9 +30,12 @@ export function buildAvionics(ctx) {
   const { P, anim } = ctx;
 
   // ================================================================== avionics bay (behind the radar bulkhead)
-  for (const [k, z] of [[1, 0.2], [2, -0.2]]) {
-    const g = [box(SM(3.3), 0.12, z, 0.55, 0.3, 0.25)];
-    for (let i = 0; i < 6; i++) g.push(box(SM(3.08) + i * 0.09, 0.28, z, 0.012, 0.03, 0.22));      // module card tops
+  // (FR.AV_BAY: between the radar bulkhead and the forward cockpit bulkhead, two rack levels)
+  const AV = FR.AV_BAY, uTop = AV.shelfUp + 0.01, lTop = AV.shelfLo + 0.01;
+  for (const [k, z] of [[1, AV.cip.z], [2, -AV.cip.z]]) {
+    const C = AV.cip;
+    const g = [box(C.s, C.y, z, C.ls, C.h, C.w)];
+    for (let i = 0; i < 6; i++) g.push(box(C.s - 0.225 + i * 0.09, C.y + C.h / 2 + 0.015, z, 0.012, 0.03, C.w - 0.02));      // module card tops
     P(`Common integrated processor (CIP ${k})`, {
       system: 'Avionics', material: 'Liquid-cooled rack of standard electronic modules', mass: 60,
       explode: [1.9, 1.2, z * 2],
@@ -42,13 +45,15 @@ export function buildAvionics(ctx) {
   {
     // liquid-cooled racks the boxes plug into: two shelves with PAO cold-plate rails, side frames and posts
     const g = [], c = [];
-    g.push(box(SM(3.5), -0.045, 0, 0.74, 0.02, 0.72));                                          // upper shelf (CIPs, INS, ALR-94)
-    g.push(box(SM(3.22), -0.305, 0, 0.6, 0.02, 0.6));                                          // lower shelf (CNI)
+    const sm = (AV.s0 + AV.s1) / 2, L = AV.s1 - AV.s0;
+    g.push(box(sm, AV.shelfUp, 0, L, 0.02, 0.72));                                              // upper shelf (radar receiver, ALR-94, CIPs, INS)
+    g.push(box(sm, AV.shelfLo, 0, L, 0.02, 0.84));                                              // lower shelf (radar power supply, CNI, VMS)
     for (const side of [1, -1]) {
-      g.push(box(SM(3.55), 0.1, side * 0.36, 0.7, 0.28, 0.012));                                 // side frame
-      for (const s of [SM(2.92), SM(3.62), SM(4.08)]) g.push(box(s, -0.17, side * (s > SM(3.7) ? 0.36 : 0.3), 0.03, 0.27, 0.03));   // posts
-      for (const dz of [0.08, 0.32]) c.push(FR.cylX(SM(3.5), -0.03, side * dz, 0.72, 0.012, 0.012, 6));   // cold-plate rails
-      c.push(FR.cylX(SM(3.22), -0.29, side * 0.16, 0.56, 0.012, 0.012, 6));
+      g.push(box(sm, uTop + 0.14, side * 0.36, L - 0.04, 0.28, 0.012));                           // side frame
+      for (const s of AV.posts) g.push(box(s, (AV.shelfUp + AV.shelfLo) / 2, side * 0.3, 0.03, AV.shelfUp - AV.shelfLo - 0.02, 0.03));   // posts between the shelves
+      // cold-plate rails let into the shelves' top faces, under the modules
+      for (const dz of [0.06, 0.2]) c.push(FR.cylX(sm, AV.shelfUp - 0.002, side * dz, L, 0.012, 0.012, 6));
+      c.push(FR.cylX(sm, AV.shelfLo - 0.002, side * AV.cni.z, L, 0.012, 0.012, 6));
     }
     P('Forward avionics racks', {
       system: 'Avionics', material: 'Single-piece machined aluminium racks with liquid-cooled (PAO) cold-plate rails', mass: 45,
@@ -60,7 +65,7 @@ export function buildAvionics(ctx) {
     system: 'Avionics', material: 'Integrated comm / nav / identification modules', mass: 70,
     explode: [2.1, -0.75, 0],
     desc: 'TRW\'s integrated communication, navigation and identification suite: radios (HAVE QUICK, SINCGARS, later Link 16 receive), IFF including Mode 5, TACAN and landing aids share common modules instead of a box per radio, and its emissions are tightly controlled for stealth.',
-  }, mesh(merge([box(SM(3.22), -0.19, 0.16, 0.56, 0.2, 0.24), box(SM(3.22), -0.19, -0.16, 0.56, 0.2, 0.24)]), F.boxLight()));
+  }, mesh(merge([1, -1].map((side) => box(AV.cni.s, lTop + AV.cni.h / 2, side * AV.cni.z, AV.cni.ls, AV.cni.h, AV.cni.w))), F.boxLight()));
   P('Intra-flight data link', {
     system: 'Avionics', material: 'Low-probability-of-intercept data-link processor', mass: 15,
     explode: [0.6, 0.6, 1.1],
@@ -70,17 +75,17 @@ export function buildAvionics(ctx) {
     system: 'Avionics', material: 'Ring-laser-gyro inertial reference with embedded GPS', mass: 18,
     explode: [2.0, 1.75, 0],
     desc: 'Measures the jet\'s attitude, velocity and position, corrected by GPS, for navigation, weapons and the flight controls.',
-  }, mesh(box(SM(2.96), 0.08, 0, 0.18, 0.18, 0.22), F.box()));
+  }, mesh(box(AV.ins.s, uTop + AV.ins.h / 2, 0, AV.ins.ls, AV.ins.h, AV.ins.w), F.box()));
   P('AN/ALR-94 receiver processors', {
     system: 'Sensors', material: 'Wideband receivers and signal processors', mass: 40, count: 2,
     explode: [1.6, 0.4, 1.0],
     desc: 'Receivers behind the ALR-94\'s distributed antennas measure the frequency, timing and direction of every radar emitter they hear, so the system can identify a threat and fix its position passively (location approximate).',
-  }, mesh(merge([box(SM(3.92), 0.12, 0.25, 0.3, 0.2, 0.18), box(SM(3.92), 0.12, -0.25, 0.3, 0.2, 0.18)]), F.boxLight()));
+  }, mesh(merge([1, -1].map((side) => box(AV.alr.s, uTop + AV.alr.h / 2, side * AV.alr.z, AV.alr.ls, AV.alr.h, AV.alr.w))), F.boxLight()));
   P('Vehicle management system computers', {
     system: 'Flight controls', material: 'Redundant flight-control processors', mass: 25, count: 3,
     explode: [2.2, 1.95, 0.6],
     desc: 'Fly-by-wire computers turn stick and throttle inputs into surface and nozzle commands many times a second; the airframe is unstable in pitch for agility, so they never stop correcting. The VMS (Lear Astronics) combines flight and propulsion control, and the F-22 was the first fighter with triplex digital flight-control computers and no electrical or mechanical back-up mode (Flight International, 1997; box positions approximate).',
-  }, mesh(merge([box(SM(4.3), -0.22, 0.36, 0.3, 0.16, 0.12), box(SM(4.3), -0.22, -0.36, 0.3, 0.16, 0.12), box(SM(4.7), -0.22, -0.36, 0.3, 0.16, 0.12)]), F.boxLight()));
+  }, mesh(merge(AV.vms.at.map(([s, side]) => box(s, lTop + AV.vms.h / 2, side * AV.vms.z, AV.vms.ls, AV.vms.h, AV.vms.w))), F.boxLight()));
 
   // ================================================================== AN/APG-77 radar
   {
@@ -123,7 +128,7 @@ export function buildAvionics(ctx) {
       system: 'Sensors', material: 'Radar receiver, exciter and power-supply modules', mass: 60,
       explode: [1.6, 0.85, 0],
       desc: 'Generates the radar waveforms and digitises the returns; the signal processing itself runs in the common integrated processors.',
-    }, mesh(merge([box(SM(2.7), 0.18, 0, 0.16, 0.12, 0.4), box(SM(2.7), -0.22, 0, 0.16, 0.1, 0.36)]), F.boxLight()));
+    }, mesh(merge([box(AV.rex.s, uTop + AV.rex.up[1] / 2, 0, AV.rex.ls, AV.rex.up[1], AV.rex.up[2]), box(AV.rex.s, lTop + AV.rex.lo[1] / 2, 0, AV.rex.ls, AV.rex.lo[1], AV.rex.lo[2])]), F.boxLight()));
   }
 
   // ================================================================== distributed sensors
@@ -134,12 +139,12 @@ export function buildAvionics(ctx) {
       for (const eta of [0.2, 0.45, 0.7, 0.92]) {
         const z = 1.45 + eta * (FR.WING.semi - 1.45);
         const sec = FR.wingSection(z);
-        patch(V(sec.le[0] - 0.02 * sec.chord, sec.le[1] + naca00(0.02, sec.t) * sec.chord + 0.002, side * z), V(0.2, 1, 0), 0.1, 0.16);
+        patch(V(sec.le[0] - 0.02 * sec.chord, sec.le[1] + naca00(0.02, sec.t) * sec.chord + 0.004, side * z), V(0.2, 1, 0), 0.04, 0.07);      // (small, so it follows the swept nose's curvature)
       }
       for (const eta of [0.35, 0.8]) {
         const z = 1.45 + eta * (FR.WING.semi - 1.45);
         const sec = FR.wingSection(z);
-        patch(V(sec.le[0] - 0.9 * sec.chord, sec.le[1] + 0.012, side * z), V(0, 1, 0), 0.08, 0.14);
+        patch(V(sec.le[0] - 0.7 * sec.chord, sec.le[1] + naca00(0.7, sec.t) * sec.chord + 0.004, side * z), V(0, 1, 0), 0.08, 0.14);   // on the fixed wing, ahead of the flaperon / aileron
       }
       for (const s of [SM(1.8), SM(2.3), SM(4.0)]) { const z = FR.aW(s) - 0.07; patch(V(X(s), FR.upperA(s, z) + 0.003, side * z), normalA(s, side * z), 0.12, 0.04); }
       for (const s of [SM(16.2), SM(17.0)]) patch(V(X(s), FR.topAt(s, 1.4) + 0.004, side * 1.4), V(0, 1, side * 0.3), 0.12, 0.05);
@@ -173,11 +178,11 @@ export function buildAvionics(ctx) {
   {
     const g = [];
     for (const side of [1, -1]) {
-      for (const [s, dy] of [[SM(2.05), -0.05], [SM(2.5), 0.06]]) {
-        const z = FR.aW(s) - 0.02;
+      for (const [s, dy] of [[SM(2.05), -0.05], [FR.M(2.55) + 0.12, 0.0]]) {              // (the aft pair on the chine, just behind the radome joint)
         const y = FR.aYC(s) + dy;
-        g.push(FR.pipe([[s, y, side * z], [s - 0.02, y, side * (z + 0.07)]], 0.008, 6, 2));
-        g.push(FR.cylX(s - 0.1, y, side * (z + 0.07), 0.2, 0.006, 0.008, 6));
+        const z = Math.abs(FR.inBody([s, y, FR.aW(s)], 0.012)[2]);            // stalk root 1.2 cm inside the skin at that height
+        g.push(FR.pipe([[s, y, side * z], [s - 0.02, y, side * (z + 0.08)]], 0.008, 6, 2));
+        g.push(FR.cylX(s - 0.1, y, side * (z + 0.08), 0.2, 0.006, 0.008, 6));
       }
     }
     P('Air-data probes', {

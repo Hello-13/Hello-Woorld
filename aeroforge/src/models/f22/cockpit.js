@@ -108,6 +108,20 @@ function onPanel(y, z, w, h, d = 0.035, depth = 0.02) {
 }
 
 export const COCKPIT_SHIFT = { ds: -1.46, dy: 0.10 };
+/** Canopy-sill height above a block station (block coordinates: the sill's aircraft height at s − 1.46, less 0.10). */
+const sillB = (sb) => { const s = sb + COCKPIT_SHIFT.ds; return FR.upperA(s, FR.sillW(s)) - COCKPIT_SHIFT.dy; };
+/** Box whose top and bottom run straight from (s0: yb0, yt0) to (s1: yb1, yt1), centred at z, w wide (block coords). */
+function slopedBox(s0, s1, yb0, yt0, yb1, yt1, z, w) {
+  const g = new THREE.BoxGeometry(1, 1, w);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const u = p.getX(i) + 0.5, v = p.getY(i) + 0.5;                       // u: 0 fwd (s0) → 1 aft (s1)
+    const sv = s0 + (s1 - s0) * u, yb = yb0 + (yb1 - yb0) * u, yt = yt0 + (yt1 - yt0) * u;
+    p.setXYZ(i, X(sv), yb + (yt - yb) * v, p.getZ(i) + z);
+  }
+  g.computeVertexNormals();
+  return g;
+}
 
 export function buildCockpit(ctx) {
   const P0 = ctx.P;
@@ -145,7 +159,7 @@ export function buildCockpit(ctx) {
     a.push(FR.pipe([[6.62, 0.2, 0], [6.8, 0.58, 0]], 0.035, 8, 4));
     a.push(box(6.86, 0.6, 0, 0.12, 0.05, 0.26));
     for (const side of [1, -1]) a.push(FR.cylX(6.9, 0.56, side * 0.12, 0.08, 0.025, 0.025, 10));
-    for (const side of [1, -1]) a.push(new THREE.CylinderGeometry(0.03, 0.03, 0.18, 10).rotateZ(Math.PI / 2 - 0.5).translate(X(6.75), 0.45, side * 0.32));
+    for (const side of [1, -1]) a.push(new THREE.CylinderGeometry(0.03, 0.03, 0.18, 10).rotateZ(Math.PI / 2 - 0.5).translate(X(6.79), 0.44, side * 0.32));   // on the tub's aft wall
     P('Canopy actuator & jettison rockets', {
       system: 'Crew systems', material: 'Electro-mechanical actuator, aft hinge, solid-propellant jettison motors', mass: 15,
       explode: [0, 2.7, 0],
@@ -157,7 +171,8 @@ export function buildCockpit(ctx) {
   {
     const g = [];
     g.push(box(5.67, -0.05, 0, 2.44, 0.04, 0.9));                                     // floor, s 4.45–6.9
-    for (const side of [1, -1]) g.push(box(5.735, 0.17, side * 0.47, 2.15, 0.44, 0.03));   // tub side walls below the sills
+    // tub side walls from the floor up to just under the canopy sills, which rise aft with the canopy frame's foot
+    for (const side of [1, -1]) g.push(slopedBox(4.66, 6.81, -0.03, sillB(4.66) - 0.05, -0.03, sillB(6.5) - 0.05, side * 0.47, 0.03));
     g.push(box(6.88, 0.2, 0, 0.03, 0.5, 0.9));                                         // aft wall
     P('Cockpit tub & floor', {
       system: 'Crew systems', material: 'Aluminium pressure tub', mass: 85,
@@ -166,9 +181,13 @@ export function buildCockpit(ctx) {
     }, mesh(merge(g), F.panel()));
     for (const side of [1, -1]) {
       const R = side > 0 ? 'right' : 'left';
-      const c = [box(5.62, 0.12, side * 0.4, 1.2, 0.34, 0.15)];
+      // the console top runs parallel to the sill, about 0.23 m under it (its forward end, where the stick and
+      // throttles sit, stays where it was)
+      const yT = (sb) => Math.min(0.5, sillB(sb) - 0.23);
+      // (inboard of the tub's side wall, against its inner face)
+      const c = [slopedBox(5.02, 6.22, -0.03, 0.29, -0.03, yT(6.22), side * 0.39, 0.13)];      // (standing on the floor)
       const sw = [];
-      for (const [s0, l] of [[5.25, 0.22], [5.55, 0.26], [5.88, 0.3]]) sw.push(box(s0, 0.296, side * 0.4, l, 0.012, 0.12));
+      for (const [s0, l] of [[5.25, 0.22], [5.55, 0.26], [5.88, 0.3]]) { const yy = 0.29 + (yT(6.22) - 0.29) * (s0 - 5.02) / 1.2; sw.push(box(s0, yy + 0.006, side * 0.39, l, 0.012, 0.11)); }
       P(`${side > 0 ? 'Right' : 'Left'} console`, {
         system: 'Crew systems', material: 'Composite console, edge-lit control panels', mass: 18,
         explode: [0, 1.15, 0.75 * side],
@@ -189,8 +208,8 @@ export function buildCockpit(ctx) {
     }, mesh(merge(pn), F.panel()));
     const pd = [];
     for (const side of [1, -1]) {
-      pd.push(new THREE.BoxGeometry(0.04, 0.22, 0.1).rotateZ(0.35).translate(X(4.78), 0.1, side * 0.17));
-      pd.push(FR.cylX(4.7, 0.04, side * 0.17, 0.14, 0.012, 0.012, 6));
+      pd.push(new THREE.BoxGeometry(0.04, 0.22, 0.1).rotateZ(0.35).translate(X(4.78), 0.08, side * 0.17));
+      pd.push(FR.cylX(4.7, 0.02, side * 0.17, 0.14, 0.012, 0.012, 6));                                  // adjustment rail on the floor
     }
     P('Rudder pedals', {
       system: 'Crew systems', material: 'Aluminium pedals on adjustable rails, toe brakes', mass: 6,
@@ -289,8 +308,8 @@ export function buildCockpit(ctx) {
       desc: 'On the left of the main panel, below the left display. Its wheel-shaped knob can be told apart by feel; weight-on-wheels interlocks stop it raising the gear while the jet is on the ground, and a light in the grip shows when the gear disagrees with the handle (position approximate).',
     }, mesh(merge(gh), F.wheel()));
     const cj = [box(5.92, 0.3, -0.4, 0.18, 0.02, 0.1)];
-    cj.push(box(4.98, 0.2, -0.42, 0.04, 0.05, 0.02));
-    cj.push(FR.pipe([[4.97, 0.2, -0.41], [4.92, 0.24, -0.4], [4.92, 0.29, -0.4], [4.97, 0.33, -0.41]], 0.008, 5, 8));
+    cj.push(box(5.0, 0.2, -0.42, 0.04, 0.05, 0.02));                                                       // on the console's front face
+    cj.push(FR.pipe([[4.99, 0.2, -0.41], [4.94, 0.24, -0.4], [4.94, 0.29, -0.4], [4.99, 0.33, -0.41]], 0.008, 5, 8));
     P('Canopy & emergency jettison controls', {
       system: 'Crew systems', material: 'Canopy open / close switch, canopy jettison T-handle, stores-jettison button', mass: 1,
       explode: [0.4, 1.45, -0.85],
@@ -341,7 +360,7 @@ export function buildCockpit(ctx) {
   {
     const body = [box(4.84, 0.61, 0, 0.24, 0.09, 0.24), box(4.84, 0.665, 0, 0.12, 0.02, 0.2)];
     const comb = new THREE.BoxGeometry(0.01, 0.2, 0.2).rotateZ(0.5).translate(X(4.98), 0.78, 0);
-    const frame = [FR.pipe([[4.92, 0.67, -0.105], [4.99, 0.86, -0.105]], 0.008, 5, 2), FR.pipe([[4.92, 0.67, 0.105], [4.99, 0.86, 0.105]], 0.008, 5, 2)];
+    const frame = [FR.pipe([[4.89, 0.668, -0.096], [4.92, 0.69, -0.105], [4.99, 0.86, -0.105]], 0.008, 5, 4), FR.pipe([[4.89, 0.668, 0.096], [4.92, 0.69, 0.105], [4.99, 0.86, 0.105]], 0.008, 5, 4)];   // (standing on the HUD body)
     P('Head-up display', {
       system: 'Crew systems', material: 'Projector unit under a holographic combiner glass', mass: 16,
       explode: [0.7, 1.75, 0],

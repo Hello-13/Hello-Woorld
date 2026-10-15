@@ -590,16 +590,22 @@ export const DUCT = [
   // [s, z, y, width, height, roundness 0 (lip shape) … 1 (circle)]
   // A double S-bend, as the F-22's serpentine ducts keep the fan faces out of line of sight from any exterior
   // view: from the caret lip the duct climbs and swings inboard over the main weapons bay, then turns back
-  // outboard and down onto the fan face. Re-solved for the 2025 stations so that no straight line through the lip
-  // reaches the fan disc within ±40°, with the walls 3 cm or more off the bays and 5 cm inside the skin (the steep
-  // drop onto the fan face just behind the bay is still to be smoothed). Lockheed Martin gives l/D = 6.35.
-  [6.3, 1.18, -0.36, 0.76, 0.80, 0.10],
-  [7.0, 1.089, -0.052, 0.741, 0.674, 0.22],
-  [8.0, 0.778, 0.107, 0.678, 0.674, 0.40],
-  [9.0, 0.412, 0.232, 0.667, 0.719, 0.55],
-  [10.0, 0.488, 0.123, 0.721, 0.698, 0.70],
-  [10.8, 0.548, 0.105, 0.831, 0.851, 0.85],
-  [11.2, 0.618, 0.092, 0.904, 0.899, 0.95],
+  // outboard and down onto the fan face. Solved (phase-2 re-layout) so that no straight line through the lip reaches
+  // the fan disc within ±40° (1° steps), with the centre line turning at most 6.5° and the walls at most 7.5° per
+  // 0.22 m ring, the section area growing steadily from the 0.29 m² throat to the fan face, the walls 3 cm or more
+  // off the main bay, side bays, gun, receptacle and ammunition container and 6 cm under the deck; behind the bay the
+  // duct deepens downward onto the fan instead of dropping steeply. Lockheed Martin gives l/D = 6.35.
+  [6.3, 1.18, -0.36, 0.76, 0.8, 0.1],
+  [7, 1.052, -0.066, 0.732, 0.629, 0.22],
+  [7.5, 0.907, 0.096, 0.725, 0.646, 0.311],
+  [8, 0.679, 0.2, 0.674, 0.687, 0.4],
+  [8.5, 0.529, 0.255, 0.705, 0.683, 0.477],
+  [9, 0.47, 0.248, 0.726, 0.672, 0.55],
+  [9.5, 0.496, 0.22, 0.782, 0.636, 0.623],
+  [10, 0.534, 0.191, 0.88, 0.68, 0.7],
+  [10.4, 0.536, 0.141, 0.873, 0.712, 0.77],
+  [10.75, 0.55, 0.06, 0.86, 0.74, 0.85],
+  [11.15, 0.6, -0.04, 0.93, 0.86, 0.94],
   [FAN_S, ENG_Z, ENG_Y, 0.98, 0.98, 1.0],
 ];
 
@@ -753,6 +759,11 @@ export function wingSection(z) {
  * body to 4.50 and aileron 4.50 → 5.87, ending at the tip clip (NAWDC split line at 4.49 and kink at 5.87).
  */
 export const SURF = { lef: [2.4, 6.6], flaperon: [2.22, 4.5], aileron: [4.5, 5.87], hinge: { flaperon: 0.85, aileron: 0.78, lef: 0.075 } };
+/** Leading-edge flap drive line at span z: chord fraction midway between the flap's hinge line and the front titanium
+ *  spar's caps (10 % chord, 7.5 cm wide), and the half-width of that space (which sizes the rotary actuators). */
+export function lefDriveF(z) { const c = wingTE(z) - wingLE(z), a = SURF.hinge.lef * c + 0.003, b = 0.1 * c - 0.0375 - 0.003; return { f: (a + b) / 2 / c, half: (b - a) / 2 }; }
+/** LEF power drive unit at the wing root, inboard of the flap and just ahead of the front spar's caps: [s, y, z]. */
+export const lefPduAt = () => { const z = SURF.lef[0] - 0.06, le = wingLE(z), c = wingTE(z) - le; return [le + 0.1 * c - 0.0375 - 0.135, wingY(z), z]; };
 /**
  * Trailing-edge actuators, one per surface (Flight International, 1997: "only one actuator on each control
  * surface"): span z, chord fraction c of the rod end, body length (m). teActuator() gives the rod end (s1), the
@@ -871,12 +882,12 @@ export const GUN = { z: 1.72, y: 0.0, muzzle: 8.55, breech: 10.38 };
  * main weapons bay (its side view shows it there, ahead of the main wheel). [s0, s1] × [z0 (far end), z1 (gun end)] ×
  * [y0, y1].
  */
-export const AMMO = { s0: 10.77, s1: 11.0, z0: -0.705, z1: 1.40, y0: -0.972, y1: -0.735 };
+export const AMMO = { s0: 10.79, s1: 11.022, z0: -0.705, z1: 1.40, y0: -0.972, y1: -0.735 };
 /** APU in the left wing root between its upper-surface inlet and exhaust doors (T.O. top panel map: inlet door #4263
  *  ≈ 9.75–10.2, exhaust door #4289 ≈ 10.5–10.95; NAWDC top view: exhaust diamond at 10.45–10.95, z ≈ −1.45…−1.75),
  *  between the wing-carry-through frames; the SES air and fuel bottles are under the upper panel between the engines
  *  (T.O. panel #4336, ≈ 13.5–14.3). */
-export const APU = { s0: 10.3, s1: 10.92, z: -1.70, y: -0.03, inlet: [9.75, 10.2], exhaust: [10.5, 10.95] };
+export const APU = { s0: 10.3, s1: 10.92, z: -1.70, y: -0.03, inlet: [9.75, 10.2], exhaust: [10.5, 10.95], SESX: [10.98, -0.13, -1.96] };
 export const SES = { s0: 13.5, s1: 14.3 };
 /** Airframe-mounted accessory drive under the front of each engine, over the AMAD bay screens on the belly (T.O. bottom
  *  panel map: AMAD screens #4223 / #4224 ≈ 11.3–11.7, z ≈ ±0.45–0.8; air-turbine-starter exhaust screens ≈ 12.0–12.4). */
@@ -884,10 +895,86 @@ export const AMAD = { s0: 11.36, s1: 11.84, z: 0.62, y: -0.865, w: 0.27, h: 0.2 
 /**
  * Space kept free for the landing-gear wells, which the next phase re-designs: the main wheel bays (NAWDC / T.O. bottom
  * views: doors ≈ 11.0–12.3, z ≈ 1.1–2.45, outboard of the engine bays) up to y −0.25, and the nose well between the
- * inlets (doors ≈ 4.65–6.0) up to the cockpit floor. Nothing new is placed in them.
+ * inlets (doors ≈ 4.65–6.0) up to the cockpit floor (y1) and, behind the cockpit's aft bulkhead (from sF), up to the
+ * stepped floor of F-1A over the trunnion (y1Aft). Nothing new is placed in them.
  */
-export const WELL_RESERVE = { main: { s0: 10.98, s1: 12.4, z0: 1.08, z1: 2.5, y1: -0.25 }, nose: { s0: 4.45, s1: 6.15, z: 0.30, y1: -0.05 } };
+export const WELL_RESERVE = { main: { s0: 10.98, s1: 12.4, z0: 1.08, z1: 2.5, y1: -0.25 }, nose: { s0: 4.45, s1: 6.15, z: 0.30, y1: -0.05, sF: 5.6, y1Aft: -0.31 } };
 
+/** Fuel cells (T.O. 00-105E-9 A.11 drawing; stations of the model's cells): F-1A, F-1B, F-2 (right lobe ends at the
+ *  gun bay's aft end, left at the APU bay), A-3, A-1, and the wing cells' inboard and outboard span (inboard of
+ *  wingZ0 the wing roots are dry bays: the gun on the right, the APU and its exhaust on the left) and chord fractions. */
+export const FUEL = { f1a: [5.62, 6.82], f1b: [6.86, 7.6], f2: [7.66, 10.62], f2R: 10.22, f2L: 9.62, gunBay: 8.38, a3: [10.68, 11.48], a1: [12.45, 14.95], wingZ0: 2.12, wingZ1: 3.95, wingC: [0.13, 0.64] };
+/** Air-cooled fuel coolers (ACFC) under their exhaust doors on the spine behind the cockpit (T.O. top panel map:
+ *  #4236 right / #4235 left at ≈ 6.7–7.4; NAWDC top view: saw-toothed panels at 6.55–7.35, z ±0.30–0.72). */
+export const ACFC = { s0: 6.55, s1: 7.35, z0: 0.30, z1: 0.72 };
+/** Air-refuelling receptacle: the pair of doors on the spine at 9.55–10.35 (T.O. top panel map #4280 / #4281; NAWDC
+ *  top view: the slipway markings ahead of them from 8.5). */
+export const AR = { s0: 9.55, s1: 10.35, z: 0.16 };
+/** Inlet bypass doors either side of it over the ducts' crossover: three louvre panels each side (T.O. top panel map
+ *  "716120…716125" at ≈ 9.6–10.4; NAWDC top view: saw-toothed panels at 9.45–10.4, z ±0.42–1.0). */
+export const BYPASS = { s0: 9.5, s1: 10.38, z0: 0.42, z1: 1.0 };
+/** ECS bay between the inlet ducts' inner walls, aft of the nose wheel well and ahead of the main weapons bay, under
+ *  F-1A (positions of the units inside are approximate): air-cycle machine, primary / secondary heat exchangers,
+ *  OBIGGS air-separation module, PAO pumps and fuel–PAO exchangers. */
+export const ECS_BAY = { s0: 6.22, s1: 6.86, y1: -0.47, acm: [6.48, -0.66, 0], hx: [6.66, -0.62, 0.25], asm: [6.5, -0.88, 0], pao: [6.33, -0.87, 0.24], fpx: [6.69, -0.86, 0.25] };
+/**
+ * Shared routing positions for the systems that run beside one another (all [z, y] in the right half; mirrored for
+ * the left): the corridor along the main bay's outer wall, under the inlet duct and inboard of the side bay (the
+ * "sill"), the crossing under the ducts just aft of the ammunition container, and the units the runs tie into.
+ */
+export const ROUTE = {
+  sill: { hyd: [1.06, -0.60], harness: [1.02, -0.71], bleed: [1.09, -0.49], fbw: [1.13, -0.58] },
+  cross: 11.17, startZ: 0.36, startY: -0.62, bleedCross: 11.04, bleedY: -0.67,
+  pumpZ: [0.80, 0.94],
+  wellWall: { resS: 11.53, resZ: 1.0, accS: 12.22, filS: 11.95, y: -0.80 },
+  brakeAcc: [11.25, -0.86],
+  rearSpar: 14.03,
+  battery: [4.72, -0.2, -0.6],
+  aftPdc: [11.97, -0.62, 0.1],
+  fwdPdc: [4.17, -0.27, 0.42],
+  conv: [4.65, -0.32, 0.42],
+  // lanes beside the nose well ([z, y], right half), stacked so that nothing has to climb through another run:
+  //  - under F-1A's floor (−0.45) the conditioned-air and OBOGS lines run on top, from the air-cycle machine to the
+  //    risers at `rise`, in the gap between the vapour-cycle pack / aft cockpit bulkhead and F-1A's front wall;
+  //  - below them the PAO pair, the fly-by-wire trunk, the main harness and the nose-gear line run outboard of the
+  //    ECS bay's units; the through-runs turn outboard at `slot`, between the ECS bay and the main bay's front wall,
+  //    under the inlet duct to the bay sill (ROUTE.sill);
+  //  - ahead of the vapour-cycle pack they rise to `under`, below the boxes under the cockpit floor;
+  //  - the vapour-cycle lines drop down the pack's inboard side and run aft along the floor of the corridor.
+  nose: {
+    rise: 5.545, slot: 6.872, under: -0.46, descend: [4.8, 5.12],
+    air: [0.45, -0.495], obogs: [0.53, -0.495],
+    pao: [[0.37, -0.56], [0.415, -0.56]], fbw: [0.47, -0.555], harness: [0.48, -0.60], hyd: [0.47, -0.66], bleedY: -0.495,
+    vcs: [[0.32, -0.80], [0.37, -0.76]],
+  },
+};
+/**
+ * Forward avionics bay between the radar bulkhead and the forward cockpit bulkhead (HOLE_S0): two rack levels, the
+ * upper shelf carrying the radar receiver / exciter and the two ALR-94 processors at the front, the two CIPs behind
+ * them with the INS between; the lower shelf the radar power supply, the CNI suite and, outboard, the three
+ * vehicle-management computers. [s, y, z] centres and [length, height, width] (z of the right-hand unit).
+ */
+export const AV_BAY = {
+  s0: 2.205, s1: 2.965, shelfUp: -0.045, shelfLo: -0.305,
+  rex: { s: 2.295, ls: 0.16, up: [0.095, 0.26, 0.3], lo: [-0.245, 0.1, 0.36] },
+  alr: { s: 2.295, ls: 0.16, y: 0.065, h: 0.2, z: 0.26, w: 0.18 },
+  cip: { s: 2.665, ls: 0.54, y: 0.115, h: 0.3, z: 0.2, w: 0.22 },
+  ins: { s: 2.49, ls: 0.18, y: 0.055, h: 0.18, w: 0.16 },
+  cni: { s: 2.665, ls: 0.54, y: -0.195, h: 0.2, z: 0.16, w: 0.24 },
+  vms: { ls: 0.28, y: -0.215, h: 0.16, w: 0.1, z: 0.375, at: [[2.56, 1], [2.56, -1], [2.86, -1]] },
+  posts: [2.225, 2.58, 2.945],
+};
+/**
+ * Fuselage frame stations of the mid and aft fuselage: the titanium wing-carry-through bulkheads where the wing's
+ * titanium spars and the main-gear loads come in, aluminium frames at the composite spars, and the bay end frames.
+ * Every wing spar bolts to the frame at its station (sparStation): front Ti 0.10, RTM 0.23 / 0.36, mid Ti 0.49,
+ * RTM 0.62, rear Ti 0.75.
+ */
+export const FRAMES = {
+  ti: [MAIN_BAY.s0 - 0.02, sparStation(0.10), sparStation(0.36)],
+  al: [8.1, sparStation(0.23), MAIN_BAY.s1 + 0.02],
+  engine: [sparStation(0.49), sparStation(0.62), sparStation(0.75), 14.75],
+};
 /** F119 mounts: forward trunnions on the engine-bay frame at the wing's mid titanium spar (into the keel web and the
  *  titanium boom, whose inner face is at boomZ), aft link at the rear engine-bay frame, up to a fitting at aftY. */
 export const ENGINE_MOUNTS = { fwd: sparStation(0.49), aft: 14.75, boomZ: 1.45, aftY: upperB(14.75, ENG_Z + 0.3) - 0.085 };

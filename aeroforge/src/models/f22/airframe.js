@@ -344,7 +344,14 @@ export function buildAirframe(ctx) {
     // (checked at both faces of the frame, since the duct moves across it); where the duct runs right up to the
     // skin, as it does just behind the inlet, the frame stops either side of it
     // (the main-gear wells too: the bulkhead over them stops round the wheel bay)
-    const depAt = (s, th) => (y, z) => Math.max(...[s - th / 2, s, s + th / 2].map((ss) => Math.max(FR.ductDepth(ss, y, z), FR.mainWellDepth(ss, y, z))));
+    // (and round the gun in the right wing root and the APU in the left one, which sit in dry bays between frames)
+    const G = FR.GUN, A = FR.APU;
+    const gunDep = (ss, y, z) => (z > 0 && ss > G.muzzle - 0.2 && ss < G.breech + 0.35 ? 0.15 - Math.hypot(y - G.y, z - G.z) : -1);
+    const apuDep = (ss, y, z) => (z < 0 && ss > A.inlet[0] - 0.05 && ss < A.exhaust[1] + 0.05 ? 0.22 - Math.hypot((y - A.y) * 1.2, z - A.z) : -1);
+    // the air-cooled fuel coolers and their exhaust plenums up to the grilles (thermal.js: 10 cm under the skin)
+    const AC = FR.ACFC, acZ = (AC.z0 + AC.z1) / 2;
+    const acfcDep = (ss, y, z) => (ss > AC.s0 && ss < AC.s1 ? Math.min(Math.abs(z) - (acZ - 0.17), acZ + 0.17 - Math.abs(z), y - (FR.topAt(ss, acZ) - 0.24)) : -1);
+    const depAt = (s, th) => (y, z) => Math.max(...[s - th / 2, s, s + th / 2].map((ss) => Math.max(FR.ductDepth(ss, y, z), FR.mainWellDepth(ss, y, z), gunDep(ss, y, z), apuDep(ss, y, z), acfcDep(ss, y, z))));
     const clipDuct = (s, th) => {
       const dep = depAt(s, th);
       return (o, i) => {
@@ -367,18 +374,21 @@ export function buildAirframe(ctx) {
     P('Mid-fuselage titanium bulkheads', {
       system: 'Structure', material: 'Ti-6Al-4V bulkheads machined from large forgings', mass: 620, xrayWeight: 0.5,
       explode: [0, 0.65, 0],
-      desc: 'Heavy wing-carry-through bulkheads, where the titanium front spar and the main-gear loads come in, carry wing bending across the fuselage around the inlet ducts and over the main weapons bay. Titanium is about 40 % of the F-22\'s structural weight (sources give 39–42 %), more than any earlier US fighter (assignment of bulkheads approximate).',
-    }, mesh(merge([FR.M(8.6), sparAt(0.10), 11.25].map(band)), F.ti()));
+      desc: 'Heavy wing-carry-through bulkheads — at the front of the main weapons bay, at the wing\'s titanium front spar, and just ahead of the engine faces where the main-gear loads come in — carry wing bending across the fuselage around the inlet ducts and over the main weapons bay. Titanium is about 40 % of the F-22\'s structural weight (sources give 39–42 %), more than any earlier US fighter (assignment of bulkheads approximate).',
+    }, mesh(merge(FR.FRAMES.ti.map(band)), F.ti()));
     P('Mid-fuselage aluminium frames', {
       system: 'Structure', material: 'Machined aluminium frames', mass: 260, xrayWeight: 0.5,
       explode: [0, 0.9, 0],
-      desc: 'Lighter frames between the titanium bulkheads, where the composite spars attach. The mid fuselage is built as three modules with about 5,000 structural parts and over 100,000 fasteners, and houses all or part of the fuel, hydraulic, electrical, environmental and APU systems.',
-    }, mesh(merge([8.25, sparAt(0.23)].map(band)), F.alu()));
+      desc: 'Lighter frames between the titanium bulkheads, where the composite spars attach, and the frame that closes the aft end of the main weapons bay ahead of the gun\'s ammunition container. The mid fuselage is built as three modules with about 5,000 structural parts and over 100,000 fasteners, and houses all or part of the fuel, hydraulic, electrical, environmental and APU systems.',
+    }, mesh(merge(FR.FRAMES.al.map(band)), F.alu()));
   }
   // engine-bay frames (the mid and rear titanium spars meet the aft fuselage here)
   {
     const g = [];
-    for (const s of [sparAt(0.49), 12.95, sparAt(0.75), 14.75]) g.push(frameBand(s, zy(FR.ringB(s).pts), { depth: 0.07, thick: 0.04 }));
+    // (the first one is open across the belly under each accessory drive, where the air-turbine starter exhausts
+    // through the screens behind the AMAD bay)
+    const amadBay = (s) => (p) => !(Math.abs(s - FR.FRAMES.engine[0]) < 0.01 && p[1] < -0.8 && Math.abs(p[0]) > FR.AMAD.z - 0.27 && Math.abs(p[0]) < FR.AMAD.z + 0.22);
+    for (const s of FR.FRAMES.engine) g.push(frameBand(s, zy(FR.ringB(s).pts), { depth: 0.07, thick: 0.04, keep: amadBay(s) }));
     P('Engine-bay frames', {
       system: 'Structure', material: 'Titanium frames', mass: 420, explode: [-1.0, 0.9, 0],
       desc: 'Hoop frames around the two engine bays tie the keel, the booms and the upper deck together and carry the vertical-tail and stabilator loads forward; the wing\'s titanium mid and rear spars attach to them.',
@@ -396,17 +406,19 @@ export function buildAirframe(ctx) {
     g.push(slab([grid[0].map((p) => [p[0], p[1], -0.02]), grid[1].map((p) => [p[0], p[1], -0.02])], () => [0, 0, 0.04]));
     // weapons-bay longerons along the door edges and the bay ceiling
     const yL = (s) => -FR.bD(s) + 0.045;
-    for (const z of [-0.81, 0.81]) {
-      // the bay-edge longerons end at the bay's aft wall, where the main-gear well begins; from that wall keel
-      // longerons inboard of the wheel bays carry on into the engine bays
-      const s0 = FR.MAIN_BAY.s0, s1 = FR.MAIN_BAY.s1;
-      g.push(FR.pipe([[s0, yL(s0), z], [lerp(s0, s1, 0.4), yL(lerp(s0, s1, 0.4)), z], [s1 - 0.35, yL(s1 - 0.35), z], [s1 - 0.02, yL(s1 - 0.02), z]], 0.035, 6));
-      g.push(FR.pipe([[s1 + 0.01, -0.86, z * 0.4], [s1 + 0.6, -0.86, z * 0.4], [s1 + 1.1, -0.84, z * 0.4]], 0.035, 6));
-      // ceiling longeron along the break of the bay ceiling, stepping inboard under the duct floor aft; at the
-      // aft wall, where the duct floor comes down to the ceiling, it sits flush in the ceiling corner
-      const cz = (sv) => Math.abs(z) * 0.75 - (0.6075 - 0.4) * FR.smooth(FR.BAY_AFT.s0, FR.BAY_AFT.s1, sv);
-      const dy = (sv) => 0.035 - 0.03 * FR.smooth(s1 - 0.3, s1, sv);
-      g.push(FR.pipe([s0 - 0.1, FR.M(10.4), FR.BAY_AFT.s0, FR.M(11.7), FR.BAY_AFT.s1, s1 - 0.11, s1 + 0.01].map((sv) => [sv, FR.bayCeilAt(sv, cz(sv)) + dy(sv), Math.sign(z) * cz(sv)]), 0.03, 6, 24));
+    const zE = FR.MAIN_BAY.z + 0.03;
+    for (const z of [-zE, zE]) {
+      // the bay-edge longerons run from the bay's front bulkhead to its aft frame; behind the ammunition container
+      // keel longerons low inboard carry on under the inlet ducts into the engine bays
+      const s0 = FR.MAIN_BAY.s0 - 0.02, s1 = FR.MAIN_BAY.s1 + 0.02;
+      g.push(FR.pipe([[s0, yL(s0), z], [lerp(s0, s1, 0.4), yL(lerp(s0, s1, 0.4)), z], [s1 - 0.35, yL(s1 - 0.35), z], [s1, yL(s1), z]], 0.035, 6));
+      const sk = FR.FRAMES.ti[2];
+      g.push(FR.pipe([[sk, -0.92, Math.sign(z) * 0.18], [sk + 0.5, -0.92, Math.sign(z) * 0.18], [11.8, -0.9, Math.sign(z) * 0.12], [11.9, -0.88, Math.sign(z) * 0.06], [12.0, -0.87, Math.sign(z) * 0.025]], 0.035, 6, 12));
+      // ceiling longeron along the break of the bay ceiling (outside the bay, under the duct floor; flush with the
+      // ceiling toward the aft end, where the duct floor comes down to it)
+      const cz = FR.BAY_CEIL_BREAK;
+      const dy = (sv) => 0.035 - 0.03 * FR.smooth(s1 - 0.5, s1 - 0.1, sv);
+      g.push(FR.pipe(stations(s0 + 0.04, s1, 0.5).map((sv) => [sv, FR.BAY_CEIL + dy(sv), Math.sign(z) * cz]), 0.03, 6, 24));
     }
     P('Keel & weapons-bay longerons', {
       system: 'Structure', material: 'Titanium keel web, steel / titanium longerons', mass: 380, explode: [0, -0.45, 0],
@@ -423,7 +435,13 @@ export function buildAirframe(ctx) {
       }
       g.push(FR.pipe(fwd, 0.028, 6));
       const mid = [];
-      for (let s = FR.M(7.6); s <= FR.S_BE - 0.1; s += 0.5) mid.push([s, FR.topAt(s, 0.45) - 0.06, side * 0.45]);
+      // (inboard of the fuel coolers' exhaust plenums over FR.ACFC)
+      const zM = (s) => 0.45 - 0.065 * FR.smooth(FR.ACFC.s0 - 0.35, FR.ACFC.s0 - 0.1, s) * (1 - FR.smooth(FR.ACFC.s1 + 0.1, FR.ACFC.s1 + 0.35, s));
+      // (over the ducts and the weapons bays to the first engine-bay frame, where the aft fuselage's titanium booms
+      // and the keel take over)
+      const sEnd = FR.FRAMES.engine[0];
+      for (let s = FR.M(7.6); s < sEnd - 0.1; s += 0.25) mid.push([s, FR.topAt(s, zM(s)) - 0.06, side * zM(s)]);
+      mid.push([sEnd, FR.topAt(sEnd, 0.45) - 0.06, side * 0.45]);
       g.push(FR.pipe(mid, 0.028, 6));
       const chine = [];
       for (let s = FR.M(2.7); s <= FR.S_AB - 0.2; s += 0.4) chine.push([s, FR.aYC(s) - 0.02, side * (FR.aW(s) - 0.06)]);
@@ -578,20 +596,21 @@ export function buildAirframe(ctx) {
     // wing control actuators: LEF power drive unit, torque tube and rotary actuators; trailing-edge actuators
     {
       const g = [];
-      const lefA = mz(wPt(SF.lef[0] + 0.05, 0.1)), lefB = mz(wPt(SF.lef[1] - 0.1, 0.1));
+      // (along the space between the flap's hinge line and the front spar's caps, FR.lefDriveF)
+      const lefA = mz(wPt(SF.lef[0] + 0.05, FR.lefDriveF(SF.lef[0] + 0.05).f)), lefB = mz(wPt(SF.lef[1] - 0.1, FR.lefDriveF(SF.lef[1] - 0.1).f));
       g.push(FR.pipe([[FR.SN - lefA.x, lefA.y, lefA.z], [FR.SN - lefB.x, lefB.y, lefB.z]], 0.014, 6, 4));
       for (const z of [2.7, 3.5, 4.3, 5.1, 5.9]) {
-        const p = mz(wPt(z, 0.1));
+        const LD = FR.lefDriveF(z), p = mz(wPt(z, LD.f));
         // geared rotary actuator on the torque tube, sized to the local wing depth behind the flap hinge,
         // with its output arm forward to the flap
         const sec = FR.wingSection(z);
-        const r = Math.min(0.05, naca(0.1, sec.t) * sec.chord * 0.5);
+        const r = Math.min(0.05, naca(LD.f, sec.t) * sec.chord * 0.5, LD.half - 0.003);
         g.push(new THREE.CylinderGeometry(r, r, 0.2, 12).rotateX(Math.PI / 2).translate(p.x, p.y, p.z));
         g.push(new THREE.CylinderGeometry(r * 1.15, r * 1.15, 0.05, 12).rotateX(Math.PI / 2).translate(p.x, p.y, p.z + 0.06));
         g.push(new THREE.BoxGeometry(0.16, r * 0.6, 0.03).translate(p.x + 0.08, p.y, p.z - 0.06));
       }
       // power drive unit at the wing root, just outboard of the body side, geared into the inboard end of the torque tube
-      const pdu = mz(wPt(SF.lef[0] - 0.06, 0.1));
+      const [pS, pY, pZ] = FR.lefPduAt(), pdu = mz(V(FR.SN - pS, pY, pZ));
       g.push(new THREE.BoxGeometry(0.26, 0.09, 0.13).translate(pdu.x, pdu.y, pdu.z));
       P(`Leading-edge flap drive (${R})`, {
         system: 'Flight controls', material: 'Hydraulic power drive unit, titanium torque tube, rotary geared actuators', mass: 55, explode: [0.6, -0.6, 2.6 * side],

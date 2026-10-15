@@ -110,7 +110,7 @@ export function buildWeapons(ctx) {
         const [sa, za] = pts[k], [sb, zb] = pts[k + 1];
         if (Math.max(sa, sb) <= s1 + 0.01) continue;
         const sm = Math.max((sa + sb) / 2, s1 + 0.02), len = Math.hypot(sb - sa, zb - za);
-        ribs.push(new THREE.BoxGeometry(0.05, 0.02, len).rotateY(-Math.atan2(sb - sa, zb - za)).translate(X(sm), -FR.bD(sm) + 0.045, side * (za + zb) / 2));
+        ribs.push(new THREE.BoxGeometry(0.05, 0.016, len).rotateY(-Math.atan2(sb - sa, zb - za)).translate(X(sm), -FR.bD(sm) + 0.02, side * (za + zb) / 2));
       }
     }
     P('Main weapons bay', {
@@ -335,9 +335,9 @@ export function buildWeapons(ctx) {
       // trapeze drive: a hydraulic actuator from a roof fitting to a lever on the aft arm
       {
         const aft = arms[1];
-        const Fx = V(X(M(10.6)), -0.485, side * 1.1);                                   // roof fitting, under the duct floor
+        const Fx = V(X(M(10.6)), -0.475, side * 1.42);                                  // fitting in the side-bay roof
         const bar = unitRod(0.03, F.hyd()), rodM = unitRod(0.015, F.chrome(), 8);
-        const fit = mesh(merge([FR.boxS(M(10.6), -0.47, side * 1.1, 0.08, 0.03, 0.08), FR.cylX(M(10.75), -0.54, side * 1.2, 0.1, 0.035, 0.035, 10)]), F.tiDull());
+        const fit = mesh(merge([FR.boxS(M(10.6), -0.455, side * 1.42, 0.08, 0.03, 0.08), FR.cylX(M(10.75), -0.54, side * 1.2, 0.1, 0.035, 0.035, 10)]), F.tiDull());
         const end = new THREE.Vector3(), lever = new THREE.Vector3();
         P(`LAU-141/A trapeze actuator (${R})`, {
           system: 'Weapons', material: 'Hydraulic linear actuator on the trapeze arm, 4,000 psi', mass: 6,
@@ -383,20 +383,34 @@ export function buildWeapons(ctx) {
 
   // ------------------------------------------------------------------ stores management
   {
-    const g = [FR.boxS(M(8.24), -0.720, 0, 0.3, 0.2, 0.26), FR.boxS(M(8.24), -0.605, 0, 0.26, 0.03, 0.22)];
+    // processor under the ceiling at the front of the right half of the main bay, ahead of the AVELs, and a weapon
+    // interface unit at the front of each half; harness runs along the ceiling to each AVEL, down the outer wall to
+    // the door drive, and out through the ceiling's outer slope, over the bleed duct and the side-bay roof to the
+    // side-bay door and trapeze actuators
+    const C = FR.BAY_CEIL, s0 = FR.MAIN_BAY.s0, sAv = FR.AMRAAM_S - 0.13 - 1.05;          // front of the AVEL bodies
+    const sP = s0 + 0.3, sW = s0 + 0.15;
+    const g = [FR.boxS(sP, C - 0.1, 0.2, 0.3, 0.2, 0.24)];
     const w = [];
+    // processor ↔ the two interface units (the left one round the front of the centre divider)
+    w.push(FR.pipe([[sP - 0.05, C - 0.03, 0.31], [sP - 0.12, C - 0.03, 0.42], [sW, C - 0.03, 0.46]], 0.009, 5, 8));
+    w.push(FR.pipe([[sP - 0.14, C - 0.04, 0.12], [s0 + 0.06, C - 0.04, 0.05], [s0 + 0.06, C - 0.04, -0.05], [sW - 0.05, C - 0.03, -0.42], [sW, C - 0.03, -0.46]], 0.009, 5, 16));
     for (const side of [1, -1]) {
-      // weapon interface units at the forward corners of the bay, one per half
-      g.push(FR.boxS(M(8.32), -0.620, side * 0.62, 0.16, 0.12, 0.12));
-      w.push(FR.pipe([[M(8.3), -0.6, side * 0.13], [M(8.36), -0.650, side * 0.4], [M(8.32), -0.630, side * 0.56]], 0.01, 5));
-      // along the bay ceiling to the three AVELs, and down the wall to the door drive
-      w.push(FR.pipe([[M(8.38), -0.5, side * 0.62], [M(8.6), -0.370, side * 0.62], [M(10.0), -0.360, side * 0.6]], 0.008, 5));
-      w.push(FR.pipe([[M(8.6), -0.370, side * 0.6], [M(8.9), -0.355, side * 0.4], [M(9.25), -0.350, side * 0.373]], 0.007, 5));
-      w.push(FR.pipe([[M(8.6), -0.370, side * 0.55], [M(8.95), -0.355, side * 0.25], [M(9.25), -0.350, side * 0.213]], 0.007, 5));
-      w.push(FR.pipe([[M(8.38), -0.660, side * 0.68], [M(8.8), -0.780, side * 0.74], [M(9.3), -0.845, side * 0.77], [M(9.52), -0.860, side * 0.81]], 0.008, 5));
-      // out under the duct floor to the side-bay trapeze actuator and the side-bay door actuator
-      w.push(FR.pipe([[M(8.38), -0.5, side * 0.66], [M(8.55), -0.680, side * 0.83], [M(8.75), -0.620, side * 1.0], [M(9.4), -0.560, side * 1.18], [M(10.2), -0.530, side * 1.15], [M(10.56), -0.505, side * 1.12]], 0.008, 5, 30));   // under the bleed duct
-      w.push(FR.pipe([[M(10.2), -0.530, side * 1.15], [M(10.1), -0.515, side * 1.38], [M(10.05), -0.490, side * 1.5]], 0.007, 5, 10));
+      const z = side;
+      g.push(FR.boxS(sW, C - 0.06, side * 0.5, 0.16, 0.12, 0.12));
+      // along the ceiling to the front of each AVEL body (the inboard right one straight off the processor)
+      for (const [zz] of AMRAAM_SLOTS) {
+        const yA = bayCeil(zz) - 0.03;
+        if (side > 0 && zz < 0.3) w.push(FR.pipe([[sP + 0.14, C - 0.03, zz], [sAv + 0.01, C - 0.03, zz]], 0.007, 5, 4));
+        else w.push(FR.pipe([[sW + 0.07, C - 0.03, z * 0.5], [sW + 0.25, Math.max(yA, C - 0.03), z * (0.5 + (zz - 0.5) * 0.6)], [sAv + 0.01, yA, z * zz]], 0.007, 5, 10));
+      }
+      // down the inside of the outer wall to the door drive's power unit on the sill
+      const BD = FR.BAY_DRIVE, zw = FR.MAIN_BAY.z - 0.012;
+      w.push(FR.pipe([[sW + 0.07, C - 0.07, z * 0.55], [sW + 0.2, bayCeil(0.85) - 0.03, z * 0.85], [sW + 0.3, FR.BAY_CEIL_WALL - 0.03, z * zw], [BD.pdu - 0.3, BD.y + 0.03, z * zw], [BD.pdu - 0.05, BD.y + 0.01, z * zw]], 0.008, 5, 20));
+      // out through the ceiling's outer slope, over the bleed duct under the inlet floor, over the side-bay roof
+      // (between the side-bay roof and the bottom of the F-2 lobe above it, outboard of the weapons hydraulic branch)
+      const DA = M(10.05), TA = M(10.6), yR = -0.425;
+      w.push(FR.pipe([[sW + 0.07, C - 0.05, z * 0.55], [sW + 0.15, bayCeil(0.78) - 0.03, z * 0.78], [sW + 0.17, bayCeil(0.84) + 0.06, z * 0.86], [sW + 0.2, -0.43, z * 1.0], [sW + 0.25, yR, z * 1.3], [sW + 0.4, yR, z * 1.5], [DA - 0.08, yR, z * 1.5], [DA - 0.01, -0.435, z * 1.47]], 0.008, 5, 40));
+      w.push(FR.pipe([[DA - 0.08, yR, z * 1.5], [TA - 0.1, yR, z * 1.5], [TA - 0.02, -0.445, z * 1.45]], 0.007, 5, 16));
     }
     P('Stores management system', {
       system: 'Weapons', material: 'Stores-management processor and two weapon interface units, shielded wiring', mass: 22, count: 3,
