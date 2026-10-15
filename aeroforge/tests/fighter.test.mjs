@@ -359,9 +359,11 @@ test('inlet ducts are an open air path: bay, side bays and gear wells stay outsi
       for (let u = 0; u <= 1.0001; u += 0.1) assert.ok(L.ductDepth(s, p[1] + (q[1] - p[1]) * u, p[0] + (q[0] - p[0]) * u) < -0.029, `side bay clear of the duct at s ${s.toFixed(2)}`);
     }
   }
-  // main-gear well roof 2 cm under the duct floor across the well
-  for (let s = L.MAIN_WELL.cav0; s <= L.MAIN_WELL.s1 + 1e-9; s += 0.05) {
-    for (let z = L.wellInWall(s); z <= L.wellWallZ(s, -0.3); z += 0.02) { const sp = L.ductSpan(s, z); if (sp) assert.ok(L.mainWellRoof(s, z) <= sp.lo - 0.019, `well roof under the duct at s ${s.toFixed(2)}, z ${z.toFixed(2)}`); }
+  // the main wheel, in every position of its retraction, stays 3 cm clear of the duct and of the F119's envelope
+  const g = L.GEAR.main;
+  for (let q = 0; q <= 40; q++) for (const p of tyrePts(L.mainWheelPose(q / 40), g.r, g.w)) {
+    assert.ok(L.ductDepth(p[0], p[1], p[2]) < -0.03, `main tyre clear of the duct at ku ${q / 40}`);
+    if (p[0] >= L.FAN_S) assert.ok(Math.hypot(p[1] - L.ENG_Y, p[2] - L.ENG_Z) > L.F119.rMax + 0.02, `main tyre clear of the engine at ku ${q / 40}`);
   }
 });
 
@@ -390,33 +392,118 @@ test('serpentine ducts hide the fan face: no straight line through the inlet rea
   assert.equal(seen, 0, `${seen} fan-face rays escape the inlet`);
 });
 
-test('main gear: stub axle keeps the strut out of the tyre, and the wheel stows flat inside its well', () => {
-  const g = L.GEAR.main, W = L.MAIN_WELL;
-  // the strut (0.1 m outer cylinder) passes the tyre's inner face with room to spare
-  assert.ok(g.stub - g.w / 2 - 0.1 > 0.04, 'strut clear of the tyre');
-  close(g.axleZ, g.legZ + g.stub, 1e-9, 'wheel on its stub axle');
-  // the leg keeps its length: the stowed foot (straight above the flat wheel) is reachable from the trunnion
-  const T = g.trunnion, L0 = Math.hypot(g.axleS - T[0], L.GROUND + g.r - T[1], g.legZ - T[2]);
-  const dS = g.stow[0] - T[0], dY = g.stow[1] + g.stub - T[1];
-  assert.ok(L0 * L0 > dS * dS + dY * dY, 'stowed foot within reach of the leg');
-  const zc = T[2] - Math.sqrt(L0 * L0 - dS * dS - dY * dY);
-  // tyre cross-section points of the stowed wheel (lying flat, pitched nose-down by g.pitch) all in the cavity,
-  // aft of the weapons bay, inside the wheel bay's opening in plan and above the closed door
-  const tube = Math.min(g.w / 2, g.r * 0.32), sc = g.w / 2 / tube, c = Math.cos(g.pitch), sn = Math.sin(g.pitch);
-  const sW = g.stow[0] + g.stub * sn, yW = g.stow[1];
-  let worst = 9;
-  for (let i = 0; i < 48; i++) for (let j = 0; j < 12; j++) {
-    const u = (i / 48) * 2 * Math.PI, w = (j / 12) * 2 * Math.PI, rr = g.r - tube + tube * Math.cos(w);
-    const ds = rr * Math.cos(u), dz = rr * Math.sin(u), dy = tube * Math.sin(w) * sc;   // wheel frame: axle along y
-    const s = sW + ds * c - dy * sn, y = yW + dy * c + ds * sn, z = zc + dz;
-    worst = Math.min(worst, L.mainWellDepth(s, y, z));
-    assert.ok(s > L.MAIN_BAY.s1 + 0.03, 'stowed wheel aft of the weapons bay');
-    assert.ok(z > L.wellInner(s) + 0.01 && z < L.wellOuter(s) - 0.01, 'stowed wheel inside the opening in plan');
+// tyre surface points ([s, y, z]) of a wheel pose { centre, axle }: a torus of the tyre's radius and section width
+function tyrePts(P, R, W, nu = 48, nv = 12) {
+  const n = P.axle, tube = Math.min(W / 2, R * 0.32), sc = W / 2 / tube;
+  const ref = Math.abs(n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  let u0 = cr(n, ref); const l = Math.hypot(...u0); u0 = u0.map((v) => v / l);
+  const v0 = cr(n, u0), out = [];
+  for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) {
+    const a = (i / nu) * 2 * Math.PI, b = (j / nv) * 2 * Math.PI, rr = R - tube + tube * Math.cos(b), h = tube * Math.sin(b) * sc;
+    out.push([0, 1, 2].map((k) => P.centre[k] + rr * (u0[k] * Math.cos(a) + v0[k] * Math.sin(a)) + h * n[k]));
   }
-  assert.ok(worst > 0.01, `stowed tyre ${(worst * 100).toFixed(1)} cm inside the well`);
-  // the wheel bay's opening is wider than the tyre's diameter where the wheel stows, as on the jet (the door is
-  // about 0.95 m wide)
-  assert.ok(L.wellOuter(g.stow[0]) - L.wellInner(g.stow[0]) > 2 * g.r + 0.04, 'wheel bay opening wider than the wheel');
+  return out;
+}
+const segDist = (p, a, b) => { const ab = b.map((v, k) => v - a[k]), t = Math.max(0, Math.min(1, ab.reduce((m, v, k) => m + v * (p[k] - a[k]), 0) / ab.reduce((m, v) => m + v * v, 0))); return Math.hypot(...p.map((v, k) => v - a[k] - ab[k] * t)); };
+const wingChordS = (c, z) => L.wingLE(z) + c * (L.wingTE(z) - L.wingLE(z));
+const wingHalf = (s, z) => { const sec = L.wingSection(z), xc = (s - L.wingLE(z)) / sec.chord; return xc < 0 || xc > 1 ? null : [sec.le[1] - 5 * sec.t * (0.2969 * Math.sqrt(xc) - 0.126 * xc - 0.3516 * xc * xc + 0.2843 * xc ** 3 - 0.1036 * xc ** 4) * sec.chord, sec.le[1] + 5 * sec.t * (0.2969 * Math.sqrt(xc) - 0.126 * xc - 0.3516 * xc * xc + 0.2843 * xc ** 3 - 0.1036 * xc ** 4) * sec.chord]; };
+
+test('main gear: axle station, track, wheelbase and leg rake as measured on the jet', () => {
+  const g = L.GEAR.main, n = L.GEAR.nose;
+  // T.O. 00-105E-9 side view (main axle 11.39 on the 18.92 m length) and photographs (11.5–11.85): 11.42 ± 0.12
+  close(g.axleS, 11.42, 0.12, 'main axle station');
+  // T.O. front view: 3.20 m track; published 3.18 m
+  close(2 * g.axleZ, 3.18, 0.1, 'main track');
+  // wheelbase: published 6.04 m (T.O. side view 6.02)
+  close(g.axleS - n.axleS, 6.03, 0.12, 'wheelbase');
+  // the gear-down pose is the measured one: wheel centre on its axle, tyre on the ground
+  const P0 = L.mainWheelPose(0);
+  close(P0.centre[0], g.axleS, 1e-9, 'axle s'); close(P0.centre[1], L.GROUND + g.r, 1e-9, 'axle height'); close(P0.centre[2], g.axleZ, 1e-9, 'axle z');
+  close(g.axleZ, g.legZ + g.stub, 1e-9, 'wheel on its stub axle, outboard of the leg');
+  // the leg is raked forward at the top (photographs: about 15°) and keeps its length through the retraction
+  const T = g.trunnion, F = g.foot;
+  close(Math.atan2(F[0] - T[0], T[1] - F[1]) / DEG, 15, 1.5, 'leg rake in side view (deg)');
+  assert.ok(T[0] < F[0], 'trunnion ahead of the foot');
+  for (const ku of [0.25, 0.5, 0.75, 1]) close(Math.hypot(...L.gearPoint('main', F, ku).map((v, k) => v - T[k])), g.legLength, 1e-9, 'leg length');
+  // it retracts outward: the wheel ends outboard of where it stands, up in the wing root
+  const P1 = L.mainWheelPose(1);
+  assert.ok(P1.centre[2] > P0.centre[2] + 0.1 && P1.centre[1] > -0.25, 'stowed wheel outboard and up in the wing root');
+  assert.ok(P1.axle[1] > 0.99, 'stowed wheel lies almost flat');
+});
+
+test('main gear: strut clear of the tyre, wheel stows between the spars and passes only through the openings', () => {
+  const g = L.GEAR.main, W = L.MAIN_WELL, T = g.trunnion, u = g.foot.map((v, k) => (v - T[k]) / g.legLength);
+  const legAt = (t, ku) => L.gearPoint('main', T.map((v, k) => v + u[k] * t), ku);
+  let lowest = 9;
+  for (let q = 0; q <= 60; q++) {
+    const ku = q / 60, P = L.mainWheelPose(ku), pts = tyrePts(P, g.r, g.w, 40, 10);
+    const cyl = [legAt(0.2, ku), legAt(0.47, ku)], pis = [legAt(0.45, ku), legAt(g.legLength - 0.06, ku)];
+    for (const p of pts) {
+      // the strut (cylinder r 0.095, piston r 0.068) never touches the tyre, though the knuckle turns the wheel
+      assert.ok(segDist(p, ...cyl) > 0.095 + 0.02 && segDist(p, ...pis) > 0.068 + 0.02, `strut clear of the tyre at ku ${ku}`);
+      lowest = Math.min(lowest, p[1] - L.GROUND);
+      const [s, y, z] = p;
+      // inside the wing root the tyre keeps 1 cm from the 36 % and 49 % spars' webs and caps
+      const wh = z >= 2.12 ? wingHalf(s, z) : null;
+      if (wh && y > wh[0] - 0.003 && y < wh[1] + 0.003) {
+        const sk = 0.9 * (wh[1] - wh[0]) / 2, mid = (wh[0] + wh[1]) / 2, nearSkin = Math.abs(y - mid) > sk - 0.015;
+        assert.ok(s - wingChordS(0.36, z) > (nearSkin ? 0.03 : 0.005) + 0.01, `tyre clear of the 36 % spar at ku ${ku}, z ${z.toFixed(2)}`);
+        assert.ok(wingChordS(0.49, z) - s > (nearSkin ? 0.0375 : 0.009) + 0.01, `tyre clear of the 49 % spar at ku ${ku}, z ${z.toFixed(2)}`);
+      }
+      // where it crosses the skin it is inside an opening: trunk side, belly, or the wing's lower skin
+      const D = L.bD(s);
+      if (y > -D && y < W.yJunction && Math.abs(z - L.wallZ(s, y)) < 0.01) assert.ok(s > W.s0 && s < W.s1, `trunk crossing inside the main door at ku ${ku}`);
+      if (Math.abs(y + D) < 0.01 && z < L.bWb(s) && z > 0.5) assert.ok(s > W.s0 && s < W.sIn1 && z > W.zIn, `belly crossing inside the inboard door at ku ${ku}`);
+      const c = z > W.zJunction ? L.wellWingChord(z) : null;
+      if (wh === null && z > W.zJunction) { const w2 = wingHalf(s, z); if (w2 && Math.abs(y - w2[0]) < 0.01) assert.ok(c && s > wingChordS(c[0], z) && s < wingChordS(c[1], z), `wing crossing inside the main door at ku ${ku}`); }
+      if (wh && Math.abs(y - wh[0]) < 0.01) assert.ok(c && s > wingChordS(c[0], z) && s < wingChordS(c[1], z), `wing crossing inside the main door at ku ${ku}`);
+    }
+  }
+  // the tyre may dip a few millimetres below the ground mid-retraction only (it retracts in the air)
+  assert.ok(lowest > -0.006, `tyre ${(-lowest * 1000).toFixed(1)} mm below the ground`);
+  // stowed: inside the wing root and upper trunk, under the upper skins, above the closed door, outboard of the
+  // engine's envelope and inside the door's outline in plan
+  for (const p of tyrePts(L.mainWheelPose(1), g.r, g.w, 64, 16)) {
+    const [s, y, z] = p, wh = wingHalf(s, z);
+    const top = Math.max(L.topAt(s, Math.min(z, L.bW(s))), wh ? wh[1] : -9);
+    assert.ok(top - y > 0.03, 'stowed tyre 3 cm under the upper skin');
+    if (z > W.zJunction) assert.ok(wh && y - wh[0] > 0.02, 'stowed tyre above the wing\'s lower skin');
+    else assert.ok(y > W.yJunction + 0.02 || z < L.wallZ(s, y) - 0.02, 'stowed tyre inside the trunk side');
+    assert.ok(s > W.s0 + 0.02 && s < W.s1 - 0.02, 'stowed tyre within the door outline fore and aft');
+    if (s >= L.FAN_S) assert.ok(Math.hypot(y - L.ENG_Y, z - L.ENG_Z) > L.F119.rMax + 0.02, 'stowed tyre clear of the engine');
+  }
+});
+
+test('nose gear: axle station, forward retraction, and the wheel through the stepped opening into its well', () => {
+  const g = L.GEAR.nose, N = L.NOSE_WELL;
+  // measured on 18.92 m: 3-view 5.71, side photos 5.30–5.70, underside 5.3–5.5; T.O. side view 5.37
+  close(g.axleS, 5.42, 0.12, 'nose axle station');
+  // trunnion at the aft end of the well, 0.1–0.2 m behind the axle (photographs, T.O. side view)
+  const back = g.trunnion[0] - g.axleS;
+  assert.ok(back >= 0.1 - 1e-9 && back <= 0.2 + 1e-9, `trunnion ${back.toFixed(3)} m aft of the axle`);
+  const A0 = L.noseAxle(0), A1 = L.noseAxle(1);
+  close(A0[0], g.axleS, 1e-9, 'gear-down axle'); close(A0[1], L.GROUND + g.r, 1e-9, 'axle height');
+  assert.ok(A1[0] < A0[0] - 0.4 && A1[0] < g.trunnion[0], 'retracts FORWARD of the trunnion');
+  // through the retraction the tyre crosses the belly only inside the stepped opening (2 cm margin), and stowed it
+  // lies inside the well: under the cockpit floor, above the closed doors, between the side walls
+  const R = g.r;
+  for (let q = 0; q <= 80; q++) {
+    const ku = q / 80, c = L.noseAxle(ku);
+    for (let i = 0; i < 120; i++) for (const [zz, dr] of [[0, 0], [0.06, 0], [0.08, 0.02], [g.w / 2, 0.06]]) {
+      const a = (i / 120) * 2 * Math.PI, s = c[0] + (R - dr) * Math.cos(a), y = c[1] + (R - dr) * Math.sin(a), b = L.bottomAt(s, zz);
+      if (Math.abs(y - b) < 0.02) {
+        let open = 0;
+        for (const zb of N.bands) if (L.noseBandOpen(zb, s - 0.005, s + 0.005)) open = zb;
+        assert.ok(open - zz >= 0.02, `nose tyre crosses the belly outside the opening at ku ${ku}, s ${s.toFixed(3)}`);
+      }
+      if (ku === 1) {
+        const roof = s < N.sStep ? N.roof : N.roofAft;
+        assert.ok(y < roof - 0.03 && y > b + 0.03 && s > N.front + 0.02 && s < N.aft, `stowed nose tyre inside the well (s ${s.toFixed(2)}, y ${y.toFixed(2)})`);
+      }
+    }
+  }
+  assert.ok(N.wall - g.w / 2 > 0.15, 'room beside the wheel for the jack and the uplock');
 });
 
 test('main-bay door drive clears the missiles, closed and through the open-bay ejection', () => {

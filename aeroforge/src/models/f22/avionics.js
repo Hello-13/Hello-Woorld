@@ -136,11 +136,23 @@ export function buildAvionics(ctx) {
     const g = [];
     const patch = (p, n, w, h) => g.push(patchGeo(p, n, w, h));
     for (const side of [1, -1]) {
-      for (const eta of [0.2, 0.45, 0.7, 0.92]) {
+      // the four leading-edge apertures ride on the leading-edge flap: each sits on the flap's nose with a lead back
+      // to the hinge line (over the flap drive's torque tube), where it meets the wing run's stub (wiring.js) through a flexible loop, so it droops with the
+      // flap; they are a separate part parented to the flap's hinge group
+      const lef = anim.lef.find((e) => e.side === side), le = [];
+      for (const eta of [0.2, 0.45, 0.72, 0.92]) {             // (between the flap drive's rotary actuators)
         const z = 1.45 + eta * (FR.WING.semi - 1.45);
         const sec = FR.wingSection(z);
-        patch(V(sec.le[0] - 0.02 * sec.chord, sec.le[1] + naca00(0.02, sec.t) * sec.chord + 0.004, side * z), V(0.2, 1, 0), 0.04, 0.07);      // (small, so it follows the swept nose's curvature)
+        const pt = V(sec.le[0] - 0.02 * sec.chord, sec.le[1] + naca00(0.02, sec.t) * sec.chord + 0.004, side * z);
+        le.push(patchGeo(pt, V(0.2, 1, 0), 0.04, 0.07));      // (small, so it follows the swept nose's curvature)
+        const xs = (f) => FR.SN - (sec.le[0] - f * sec.chord);
+        le.push(FR.pipe([[xs(0.074), sec.le[1] + 0.022, side * z], [xs(0.06), sec.le[1] + 0.022, side * z], [xs(0.045), sec.le[1] + 0.012, side * z], [xs(0.025), pt.y - 0.03, side * z], [FR.SN - pt.x, pt.y - 0.006, side * z]], 0.006, 5, 10));
       }
+      P(`AN/ALR-94 leading-edge apertures (${side > 0 ? 'right' : 'left'})`, {
+        system: 'Sensors', material: 'Conformal broadband antennas on the leading-edge flap', mass: 3, count: 4,
+        explode: [0.6, 0.35, 2.9 * side],
+        desc: 'Four of the ALR-94\'s receive antennas sit in the nose of each leading-edge flap and droop with it; each one\'s lead crosses the flap\'s hinge line through a flexible loop to the wiring along the front spar (positions illustrative).',
+      }, mesh(merge(le), F.composite()), lef.h.pivot.children[0]);
       for (const eta of [0.35, 0.8]) {
         const z = 1.45 + eta * (FR.WING.semi - 1.45);
         const sec = FR.wingSection(z);
@@ -151,9 +163,9 @@ export function buildAvionics(ctx) {
       patch(V(X(SM(17.2)), -FR.bD(SM(17.2)) - 0.004, side * 1.3), V(0, -1, 0), 0.12, 0.05);
     }
     P('AN/ALR-94 EW apertures', {
-      system: 'Sensors', material: 'Conformal broadband antennas', mass: 30, count: 24,
+      system: 'Sensors', material: 'Conformal broadband antennas', mass: 27, count: 16,
       explode: [0, 0.3, 0],
-      desc: 'The real ALR-94 blends more than 30 antennas into the wings and fuselage for all-round radar-warning coverage and threat location, often cueing the APG-77; 24 representative apertures are modelled, at illustrative positions.',
+      desc: 'The real ALR-94 blends more than 30 antennas into the wings and fuselage for all-round radar-warning coverage and threat location, often cueing the APG-77; 24 representative apertures are modelled (these 16 on the fixed structure, eight more in the leading-edge flaps), at illustrative positions.',
     }, mesh(merge(g), F.composite()));
   }
   {

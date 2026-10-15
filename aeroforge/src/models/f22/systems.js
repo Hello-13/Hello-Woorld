@@ -33,8 +33,8 @@ const finMid = (y) => FR.FIN.rootZ + (y - FR.FIN.rootY) * Math.tan(FR.FIN.cant);
 const rudderAct = () => [FR.FIN.rootS + 0.64 * FR.FIN.rootC, FR.FIN.rootY + 0.3 * Math.cos(FR.FIN.cant), FR.FIN.rootZ + 0.3 * Math.sin(FR.FIN.cant)];
 const box = (s, y, z, ls, h, w) => FR.boxS(s, y, z, ls, h, w);
 /** Airframe ends of the gear retraction actuators (gear.js) and the side-bay actuator roof fittings (weapons.js). */
-const M_ACT = [11.80, -0.48, 1.36];
-const N_ACT = [FR.GEAR.nose.trunnion[0] + 0.09, -0.06];
+const M_ACT = FR.MAIN_FIT.jack.fit;
+const N_ACT = FR.NOSE_FIT.jack.fit;
 const SB_TRAP = FR.M(10.6), SB_DOOR = FR.M(10.05);
 const [SB_DOOR_Z, SB_DOOR_Y] = FR.wallB(SB_DOOR, FR.wallFractions(SB_DOOR)[4]);
 
@@ -177,7 +177,7 @@ function a3Outline(s) {
  * the fin stands on the boom.
  */
 function a1Section(s) {
-  const zc = FR.ENG_Z, yc = FR.ENG_Y, rE = 0.665, sk = 0.035, yb = -0.2;
+  const zc = FR.ENG_Z, yc = FR.ENG_Y, rE = 0.665, sk = 0.035, yb = -0.30;
   const zMax = FR.bW(s) - 0.12;
   const finCap = (z) => (s > FR.FIN.rootS - 0.05 && Math.abs(z - FR.FIN.rootZ) < 0.2 ? FR.FIN.rootY - 0.03 : 9);
   const yTop = (z) => Math.min(FR.topAt(s, z) - sk, finCap(z));
@@ -246,24 +246,27 @@ export function buildSystems(ctx) {
   // wheel wells aft), wrapped round the titanium boom's box section
   const st4 = range(FT.a1[0], FT.a1[1], 6);
   const t4 = lobeLoft(st4, (s) => a1Section(s), 1);
-  // wing tanks between the front and rear spars, inboard of the aileron
+  // wing tanks between the front and rear spars, inboard of the aileron; inboard of the main-gear door's hinge rib the
+  // wing root between the 36 % and 49 % spars is the wheel well (and the door actuator's dry bay), so the cell steps
+  // round it there
   const wingTank = () => {
-    const zs = range(FT.wingZ0, FT.wingZ1, 6);
-    const fs = range(FT.wingC[0], FT.wingC[1], 7);
-    const rings = zs.map((z) => {
-      const sec = FR.wingSection(z);
-      const pts = [];
-      for (const f of fs) pts.push([sec.le[0] - f * sec.chord, sec.le[1] + naca00(f, sec.t) * sec.chord * 0.84, z]);
-      for (const f of [...fs].reverse()) pts.push([sec.le[0] - f * sec.chord, sec.le[1] - naca00(f, sec.t) * sec.chord * 0.84, z]);
-      return pts;
-    });
-    let vol = 0;
-    for (let i = 0; i < zs.length - 1; i++) {
+    const piece = (z0, z1, c0, c1, nz) => {
+      const zs = range(z0, z1, nz), fs = range(c0, c1, 7);
+      const rings = zs.map((z) => {
+        const sec = FR.wingSection(z);
+        const pts = [];
+        for (const f of fs) pts.push([sec.le[0] - f * sec.chord, sec.le[1] + naca00(f, sec.t) * sec.chord * 0.84, z]);
+        for (const f of [...fs].reverse()) pts.push([sec.le[0] - f * sec.chord, sec.le[1] - naca00(f, sec.t) * sec.chord * 0.84, z]);
+        return pts;
+      });
       const area = (z) => { const sec = FR.wingSection(z); let a = 0; for (let k = 0; k < fs.length - 1; k++) a += (fs[k + 1] - fs[k]) * sec.chord * 2 * naca00((fs[k] + fs[k + 1]) / 2, sec.t) * sec.chord * 0.84; return a; };
-      vol += ((area(zs[i]) + area(zs[i + 1])) / 2) * (zs[i + 1] - zs[i]);
-    }
-    const g = FR.gridSurface(rings, { closed: true, uv: 'n' });
-    return { geo: g, vol };
+      let vol = 0;
+      for (let i = 0; i < zs.length - 1; i++) vol += ((area(zs[i]) + area(zs[i + 1])) / 2) * (zs[i + 1] - zs[i]);
+      return { geo: FR.gridSurface(rings, { closed: true, uv: 'n' }), vol };
+    };
+    const zN = FR.MAIN_WELL.hingeZ + 0.075;
+    const ps = [piece(FT.wingZ0, zN, FT.wingC[0], 0.35, 1), piece(FT.wingZ0, zN, 0.50, FT.wingC[1], 1), piece(zN, FT.wingZ1, FT.wingC[0], FT.wingC[1], 6)];
+    return { geo: merge(ps.map((p) => p.geo)), vol: ps.reduce((a, p) => a + p.vol, 0) };
   };
   const tw = wingTank();
   // T.O. capacities (US gal) and each cell's share of the published 8,200 kg
@@ -316,8 +319,9 @@ export function buildSystems(ctx) {
   {
     const g = [];
     for (const side of [1, -1]) {
-      const sec = FR.wingSection(2.15);
-      g.push(FR.cylX(FR.SN - (sec.le[0] - 0.42 * sec.chord), sec.le[1] - 0.04, side * 2.15, 0.22, 0.05, 0.05, 14));
+      // (on the cell's floor aft of the main-gear well, between the 49 % spar and the 62 % spar)
+      const sec = FR.wingSection(2.3);
+      g.push(FR.cylX(FR.SN - (sec.le[0] - 0.555 * sec.chord), sec.le[1] - 0.06, side * 2.3, 0.22, 0.05, 0.05, 14));
     }
     g.push(FR.cylX(FT.f2[0] + 1.6, -0.14, 0.05, 0.22, 0.05, 0.05, 14), FR.cylX(FT.f1a[0] + 0.85, -0.4, -0.12, 0.22, 0.05, 0.05, 14));   // (on F-1A's floor, behind the nose-well reserve)
     P('Fuel transfer pumps', {
@@ -424,8 +428,9 @@ export function buildSystems(ctx) {
     // single-point pressure-refuelling adapter on the forward wall of the right main wheel well, facing aft; its line
     // runs up inside the trunk side, aft of the gun bay, into the right A-3 cell
     const ga = [];
-    const wS = FR.WELL_RESERVE.main.s0, wZ = 1.3;
-    ga.push(new THREE.CylinderGeometry(0.05, 0.055, 0.1, 16).rotateZ(Math.PI / 2).translate(X(wS + 0.06), -0.6, wZ));
+    // (on the well's front wall, ahead of the bulkhead web and the leg's trunnion)
+    const wS = FR.MAIN_WELL.s0, wZ = 1.3;
+    ga.push(new THREE.CylinderGeometry(0.05, 0.055, 0.06, 16).rotateZ(Math.PI / 2).translate(X(wS + 0.05), -0.6, wZ));
     ga.push(new THREE.BoxGeometry(0.03, 0.14, 0.14).translate(X(wS + 0.015), -0.6, wZ));
     ga.push(FR.pipe(inside([[wS + 0.015, -0.6, wZ], [wS - 0.03, -0.45, wZ + 0.05], [wS - 0.04, -0.18, wZ + 0.12], [wS - 0.06, 0.08, wZ], [FT.a3[0] + 0.25, FR.topAt(FT.a3[0] + 0.25, 1.05) - 0.12, 1.05]], 0.04), 0.022, 6, 24));
     P('Ground refuelling adapter', {
@@ -444,7 +449,7 @@ export function buildSystems(ctx) {
     for (const side of [1, -1]) {
       probe(8.0, side * 1.55, -0.37, FR.topAt(8.0, 1.55) - 0.07);
       probe(13.2, side * 1.8, -0.17, FR.topAt(13.2, 1.8) - 0.06);
-      for (const z of [2.4, 3.3]) {
+      for (const z of [2.9, 3.5]) {
         const sec = FR.wingSection(z);
         const sx = sec.le[0] - 0.42 * sec.chord;
         const h = naca00(0.42, sec.t) * sec.chord * 0.835;                 // floor to roof of the wet wing box (wing tank: 0.84)
@@ -520,14 +525,14 @@ export function buildSystems(ctx) {
       explode: [0.1, -1.25, 0.55 * side],
       desc: `System ${S} has its own pressurised reservoir, mounted with the accumulators on the inboard wall of the ${R} main wheel well (T.O. 00-105E-9), so a leak in one system cannot drain the other. A bootstrap piston keeps the fluid under pressure so the pumps are fed at any altitude or attitude.`,
     }, mesh(merge([FR.cylX(W.resS, W.y, z * W.resZ, 0.42, 0.075, 0.075, 14), FR.cylX(W.resS + 0.25, W.y, z * W.resZ, 0.08, 0.045, 0.045, 10),
-      ...[-0.13, 0.13].map((ds) => box(W.resS + ds, W.y, z * (W.resZ + 0.07), 0.04, 0.05, 0.06))]), F.hyd()));
+      ...[-0.13, 0.13].map((ds) => box(W.resS + ds, W.y, z * (W.resZ - 0.07), 0.04, 0.05, 0.06))]), F.hyd()));
     P(`Hydraulic accumulators (system ${S})`, {
       system: 'Hydraulics', material: 'Nitrogen-charged steel accumulators on a bracket, with the pressure-filter manifold', mass: 10,
       explode: [0.2, -1.45, 0.3 * side],
       desc: `A gas-charged accumulator on system ${S} smooths pump ripple and supplies peak flow when several actuators move at once; a second one serves the flight controls, and the pressure-filter manifold beside them cleans the pump output (T.O. 00-105E-9 draws all three in the main wheel well).`,
-    }, mesh(merge([new THREE.SphereGeometry(0.075, 14, 10).translate(X(W.accS), W.y - 0.02, z * W.resZ), new THREE.SphereGeometry(0.06, 14, 10).translate(X(W.accS + 0.17), W.y - 0.02, z * W.resZ),
-      box(W.accS + 0.085, W.y - 0.02, z * (W.resZ + 0.065), 0.3, 0.04, 0.04),
-      box(W.filS, W.y + 0.1, z * W.resZ, 0.12, 0.08, 0.1)]), F.steel()));
+    }, mesh(merge([new THREE.SphereGeometry(0.075, 14, 10).translate(X(W.accS), W.accY, z * W.accZ), new THREE.SphereGeometry(0.06, 14, 10).translate(X(W.accS + 0.17), W.accY, z * W.accZ),
+      box(W.accS + 0.085, W.accY, z * (W.accZ - 0.08), 0.3, 0.05, 0.03),
+      box(W.filS, W.filY, z * W.resZ, 0.12, 0.05, 0.1)]), F.steel()));
   }
   P('Brake & emergency accumulator', {
     system: 'Hydraulics', material: 'Nitrogen-charged steel accumulator', mass: 6,
@@ -538,11 +543,11 @@ export function buildSystems(ctx) {
     const z = side, S = side > 0 ? 'A' : 'B';
     const W = RT.wellWall, g = [];
     const pumpOut = RT.pumpZ.map((pz) => [AM.s1 + 0.19, AM.y + 0.005, z * pz]);
-    const man = [W.filS, W.y + 0.1, z * W.resZ];
+    const man = [W.filS, W.filY, z * W.resZ];
     // pumps → filter manifold → reservoir and accumulators
     for (const p of pumpOut) g.push(FR.pipe([p, [p[0] + 0.05, -0.8, p[2]], [W.filS + 0.08, man[1] - 0.02, z * (W.resZ - 0.02)], [man[0] + 0.06, man[1], man[2]]], 0.014, 5, 10));
     g.push(FR.pipe([[man[0] - 0.06, man[1], man[2]], [W.resS + 0.3, W.y + 0.06, z * W.resZ], [W.resS + 0.29, W.y + 0.04, z * W.resZ]], 0.014, 5, 6));
-    g.push(FR.pipe([[man[0] + 0.02, man[1] - 0.04, man[2]], [W.accS - 0.02, W.y + 0.04, z * W.resZ], [W.accS, W.y + 0.05, z * W.resZ]], 0.014, 5, 6));
+    g.push(FR.pipe([[man[0] - 0.03, man[1] + 0.005, z * (W.resZ + 0.035)], [W.accS + 0.31, W.accY - 0.07, z * (W.accZ - 0.075)], [W.accS + 0.3, W.accY - 0.03, z * (W.accZ - 0.05)], [W.accS + 0.17, W.accY - 0.03, z * (W.accZ - 0.03)]], 0.014, 5, 8));
     // forward gallery: along the well's inboard wall, over the ammunition container, then the main-bay sill to the
     // front of the side bay, round it and up under the chine into the wing root to the LEF power drive unit
     const hy = RT.sill.hyd;
@@ -570,21 +575,26 @@ export function buildSystems(ctx) {
     const g = [];
     const hy = RT.sill.hyd;
     for (const side of [1, -1]) {
-      // main gear: off each system's gallery at the front of the well to the retraction actuator and the brake line
-      // (the gear and its wells are re-designed in the next phase; these keep today's gear connected)
-      g.push(FR.pipe([[FR.AMMO.s1 + 0.12, -0.66, side * 1.05], [11.3, -0.64, side * 1.0], [11.4, -0.5, side * 0.98], [M_ACT[0], M_ACT[1] + 0.05, side * (M_ACT[2] - 0.06)], [M_ACT[0], M_ACT[1], side * M_ACT[2]]], 0.012, 5, 16));
-      g.push(FR.pipe([[FR.AMMO.s1 + 0.2, -0.66, side * 1.05], [11.38, -0.66, side * 1.08], [11.46, -0.67, side * 1.15], [11.49, -0.7, side * 1.2]], 0.01, 5, 8));
+      // main gear: off the filter manifold at the back of the well, down behind the reservoir to the retraction
+      // jack's head at its fitting on the gear beam, and the brake line from the gallery at the front of the well to
+      // the leg's aft trunnion bearing, where a swivel joint takes it onto the strut
+      const W = RT.wellWall;
+      g.push(FR.pipe([[W.filS + 0.025, W.filY - 0.005, side * (W.resZ + 0.03)], [M_ACT[0] + 0.025, -0.74, side * 1.13], [M_ACT[0] + 0.02, -0.84, side * 1.16], [M_ACT[0] + 0.01, M_ACT[1] + 0.04, side * (M_ACT[2] - 0.04)], [M_ACT[0], M_ACT[1] + 0.03, side * (M_ACT[2] - 0.015)]], 0.012, 5, 16));
+      const bA = FR.gearRotation('main', 0, side), kk = bA.k, b1 = FR.MAIN_FIT.bearing[1];
+      const brg = [bA.T[0] + kk[0] * b1, bA.T[1] + kk[1] * b1, bA.T[2] + kk[2] * b1];
+      g.push(FR.pipe([[FR.AMMO.s1 + 0.2, -0.66, side * 1.05], [11.42, -0.64, side * 0.97], [brg[0] + 0.04, brg[1] + 0.09, side * 1.0], [brg[0] + 0.03, brg[1] + 0.05, brg[2] - side * 0.05]], 0.01, 5, 10));
     }
     // nose gear: from system A's gallery at the front of the main bay, inboard over the bay's front bulkhead,
-    // forward under the ECS bay and beside the nose well to the nose-gear actuator and steering unit
+    // forward under the ECS bay and along the outside of the nose well's right wall to the retraction jack's fitting
+    // under the cockpit floor
     {
-      const NY = RT.nose.hyd, sl = RT.nose.slot;
-      g.push(FR.pipe([[7.2, hy[1], hy[0]], [7.05, NY[1] + 0.02, 1.07], [sl + 0.02, NY[1], 1.0], [sl, NY[1], 0.75], [sl - 0.02, NY[1], NY[0]], [6.0, NY[1], NY[0]], [5.82, NY[1], 0.4], [5.76, NY[1] + 0.02, 0.24], [5.72, -0.45, 0.2], [N_ACT[0] - 0.03, -0.33, 0.08], [N_ACT[0] - 0.03, -0.3, 0.04]], 0.012, 5, 50));
+      const NY = RT.nose.hyd, sl = RT.nose.slot, NW = FR.NOSE_WELL;
+      g.push(FR.pipe([[7.2, hy[1], hy[0]], [7.05, NY[1] + 0.02, 1.07], [sl + 0.02, NY[1], 1.0], [sl, NY[1], 0.75], [sl - 0.02, NY[1], NY[0]], [6.0, NY[1], NY[0]], [4.82, NY[1], NY[0]], [4.74, -0.63, NW.wall + 0.03], [4.68, -0.4, NW.wall + 0.03], [4.65, -0.15, NW.wall + 0.025], [N_ACT[0], -0.1, N_ACT[2] + 0.04]], 0.012, 5, 50));
     }
     P('Landing-gear & brake hydraulic lines', {
       system: 'Hydraulics', material: 'Titanium and steel tubing, flexible hoses across the gear pivots', mass: 18,
       explode: [0.3, -1.55, 0],
-      desc: 'Utility lines to the gear actuators, door jacks, nose-wheel steering and wheel brakes: the main-gear lines branch off each system\'s gallery at the front of its wheel well, the nose-gear line runs from the gallery round the front of the main bay and forward beside the nose well; flexible hoses cross each trunnion (routing approximate).',
+      desc: 'Utility lines to the gear actuators, door jacks, nose-wheel steering and wheel brakes: each main-gear retraction line leaves its system\'s filter manifold at the back of the wheel well and the brake line its gallery at the front, the nose-gear line runs from the gallery round the front of the main bay and forward beside the nose well; flexible hoses cross each trunnion (routing approximate).',
     }, mesh(merge(g), F.hyd()));
   }
 
@@ -691,7 +701,8 @@ export function buildSystems(ctx) {
     // starters' exhaust screens): down inboard of the left gear well, across under the inlet ducts behind the
     // ammunition container, then aft along the inboard side of each AMAD
     const xs = RT.cross, sz = RT.startZ;
-    const sp = [FR.pipe([[A.s1 - 0.12, ay - 0.13, az + 0.02], [A.s1 + 0.02, -0.3, -1.45], [xs - 0.04, -0.56, -1.04], [xs, RT.startY, -0.7], [xs, RT.startY, -sz - 0.03]], 0.035, 8, 30)];
+    // (down ahead of the left main-gear well's front wall, then aft under the duct inboard of the well)
+    const sp = [FR.pipe([[A.s1 - 0.12, ay - 0.13, az + 0.02], [A.s1 + 0.02, -0.3, -1.45], [10.99, -0.47, -1.17], [11.0, -0.58, -0.9], [xs, RT.startY, -0.72], [xs, RT.startY, -sz - 0.03]], 0.035, 8, 30)];
     for (const side of [1, -1]) sp.push(FR.pipe([[xs, RT.startY, -sz - 0.03], ...(side > 0 ? [[xs, RT.startY, sz - 0.03]] : []), [xs + 0.08, -0.7, side * sz], [AM.s0 + 0.1, -0.86, side * sz], [AM.s1 + 0.02, -0.88, side * sz], [AM.s1 + 0.06, AM.y - 0.01, side * (AM.z - 0.13)]], 0.033, 8, 30));
     P('APU start path to AMADs', {
       system: 'Electrical', material: 'Insulated start-air ducting', mass: 10,

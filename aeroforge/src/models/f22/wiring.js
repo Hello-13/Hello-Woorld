@@ -164,9 +164,12 @@ export function buildWiring(ctx) {
       front.push([tipLe + 0.12 * tipC, FR.wingY(6.62), z * 6.62], [tipLe + 0.15 * tipC, FR.wingY(6.74), z * 6.74]);
       g.push(tube(front, 0.008));
       // stubs forward to the ALR-94 leading-edge apertures
-      for (const eta of [0.2, 0.45, 0.7, 0.92]) {
+      for (const eta of [0.2, 0.45, 0.72, 0.92]) {
         const zz = 1.45 + eta * (FR.WING.semi - 1.45);
-        g.push(tube([[wingS(zz, 0.12), FR.wingY(zz), z * zz], [wingS(zz, 0.04), FR.wingY(zz), z * zz]], 0.006));
+        // (to the flap's hinge line, where the aperture's own lead takes over through a flexible loop; over the flap
+        // drive's torque tube, which runs along the hinge line)
+        const sec = FR.wingSection(zz);
+        g.push(tube([[wingS(zz, 0.12), FR.wingY(zz), z * zz], [wingS(zz, 0.1), sec.le[1] + 0.022, z * zz], [wingS(zz, 0.077), sec.le[1] + 0.022, z * zz]], 0.006));
       }
       // up the fin's front spar to the formation strip
       // (from the spine bundle where fly-by-wire channel C branches to the tails, alongside that branch in the gap
@@ -178,7 +181,9 @@ export function buildWiring(ctx) {
       g.push(tube(fin, 0.008));
     }
     // strobes on the belly and the spine, and the tail light on the left boom fairing
-    g.push(tube([[M(13.8), -0.6, 0.1], [M(13.5), -0.72, 0.05], [M(12.85), -0.86, 0.0], [M(12.8), -FR.bD(M(12.8)) + 0.01, 0.0]], 0.008));
+    // (the belly strobe's lead passes beside the brake accumulator, which sits on the centre line just ahead of it)
+    const sL = M(12.8), bA = FR.ROUTE.brakeAcc;
+    g.push(tube([[M(13.8), -0.6, 0.1], [M(13.5), -0.72, 0.09], [bA[0] + 0.2, bA[1] + 0.02, 0.09], [sL + 0.03, -FR.bD(sL) + 0.03, 0.05], [sL, -FR.bD(sL) + 0.01, 0.0]], 0.008));
     g.push(tube([[M(13.8), -0.6, -0.1], [M(14.4), -0.1, -0.03], [14.3, 0.3, -0.03], [14.6, FR.topAt(14.6, 0) - 0.04, 0.0]], 0.008));
     // tail light: off the left fin run, aft over the A-1 cell under the skin, then down into the left titanium boom
     // (which houses the stabilator actuator) and aft inside it to the light on its fairing

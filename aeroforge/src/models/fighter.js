@@ -137,8 +137,6 @@ export function buildFighter() {
   };
   const targets = { gear: 1, bay: 0, airborne: 0 };
   const approach = (cur, tgt, rate, dt) => cur + Math.sign(tgt - cur) * Math.min(Math.abs(tgt - cur), rate * dt);
-  const qI = new THREE.Quaternion();
-  const qT = new THREE.Quaternion();
   const up = new THREE.Vector3(0, 1, 0), tmp = new THREE.Vector3(), mid = new THREE.Vector3();
   const stretch = (m, a, b) => {
     tmp.subVectors(b, a);
@@ -166,7 +164,7 @@ export function buildFighter() {
       ['Armament', 'M61A2 20 mm (480 rds), 6 × AIM-120C, 2 × AIM-9X'], ['Crew', '1'],
     ],
     heroStats: [['2.25', 'Mach', 'Top speed'], ['1.76', 'Mach', 'Supercruise'], ['2 × 156', 'kN', 'Afterburning thrust']],
-    sources: 'USAF F-22A fact sheet; Lockheed Martin F-22 product card; Pratt & Whitney F119-PW-100 fact sheet; T.O. 00-105E-9 (aircraft emergency rescue information, F-22A segment: fuel cells and capacities, APU / stored-energy system, battery, access-panel maps, ammunition container, bypass and ACFC doors); NAWDC orthographic F-22A views (outline, doors and panels); General Dynamics OTS F-22A 20 mm gun system data; Wolff, NDIA Gun & Missile Systems 2007 (F-22 linear linkless ammunition handling system); USAF AIM-120 fact sheet; FAS DoD-101 F-22 page (contractors, hardpoints) / GlobalSecurity (LAU-142/A, LAU-141/A); Hydraulics & Pneumatics, "Hydraulics efficiently operate weapon bay doors on F-22 Raptor" (Jul 1998: bifold doors, AVEL, gun drive, ammunition system); Flight International: "Building the F-22" (Jan 1996: section materials, RTM spars, booms), "Allied near to completing F-22…" (Apr 1997: APGS); SAE 981544 and 2000-01-2266 (F-22 ECS/TMS); Curtiss-Wright and Eaton releases (LEF / weapons-bay actuation, PV3-115 pumps); 75th Air Base Wing (AMAD test stand); DSIAC (canopy); SAWE paper 3026 (aft-fuselage EB welding); Virginia Tech AOE design notes (geometry); Wikipedia: Lockheed Martin F-22 Raptor (dimensions, weights, 42 % titanium / 24 % composite structure, canopy 140 × 45 × 27 in, APU in the left wing root, centre-split main bay, BRAG valve / ABOS, IEEE 1394B), Pratt & Whitney F119 (3 + 6 stages, variable IGVs, blisks, 1 + 1 counter-rotating turbines, BPR 0.30, OPR 26, vaned three-zone augmentor, ±20° nozzle, colour-coded harnesses), M61 Vulcan (M61A2 1.83 m, 92 kg), ACES II, AN/APG-77.',
+    sources: 'USAF F-22A fact sheet; Lockheed Martin F-22 product card; Pratt & Whitney F119-PW-100 fact sheet; T.O. 00-105E-9 (aircraft emergency rescue information, F-22A segment: fuel cells and capacities, APU / stored-energy system, battery, access-panel maps incl. the gear-door panels, gear stations and track, accumulators in the main wheel wells, ammunition container, bypass and ACFC doors); Michelin aircraft tire data (F-22: main 37 × 11.5 R18, nose 23.5 × 7.5 R10); GlobalSecurity F-22 flight controls and landing gear (nose gear retracts forward, main gear outward; Menasco AerMet 100 legs); NAWDC orthographic F-22A views (outline, doors and panels); General Dynamics OTS F-22A 20 mm gun system data; Wolff, NDIA Gun & Missile Systems 2007 (F-22 linear linkless ammunition handling system); USAF AIM-120 fact sheet; FAS DoD-101 F-22 page (contractors, hardpoints) / GlobalSecurity (LAU-142/A, LAU-141/A); Hydraulics & Pneumatics, "Hydraulics efficiently operate weapon bay doors on F-22 Raptor" (Jul 1998: bifold doors, AVEL, gun drive, ammunition system); Flight International: "Building the F-22" (Jan 1996: section materials, RTM spars, booms), "Allied near to completing F-22…" (Apr 1997: APGS); SAE 981544 and 2000-01-2266 (F-22 ECS/TMS); Curtiss-Wright and Eaton releases (LEF / weapons-bay actuation, PV3-115 pumps); 75th Air Base Wing (AMAD test stand); DSIAC (canopy); SAWE paper 3026 (aft-fuselage EB welding); Virginia Tech AOE design notes (geometry); Wikipedia: Lockheed Martin F-22 Raptor (dimensions, weights, 42 % titanium / 24 % composite structure, canopy 140 × 45 × 27 in, APU in the left wing root, centre-split main bay, BRAG valve / ABOS, IEEE 1394B), Pratt & Whitney F119 (3 + 6 stages, variable IGVs, blisks, 1 + 1 counter-rotating turbines, BPR 0.30, OPR 26, vaned three-zone augmentor, ±20° nozzle, colour-coded harnesses), M61 Vulcan (M61A2 1.83 m, 92 kg), ACES II, AN/APG-77.',
     fleetTag: 'Mach 2.25',
     aero: true,
     root: A.root,
@@ -219,19 +217,10 @@ export function buildFighter() {
       state.bay = approach(state.bay, targets.bay, 1.2, dt);
       state.airborne = approach(state.airborne, targets.airborne, 0.5, dt);
 
-      // landing gear: legs swing on their trunnions, main wheels turn flat, doors lead and follow
+      // landing gear: on retraction the legs swing up first (ret 0 → 0.82) and the doors close behind them
+      // (0.84 → 1); on extension the doors open first and the legs follow; the doors stay open with the gear down
       const ret = 1 - state.gear;
-      const ku = smooth(0, 1, ret);
-      for (const g of anim.gear) {
-        qT.copy(qI).slerp(g.q, ku);
-        for (const p of g.pivots) p.quaternion.copy(qT);
-        if (g.twist?.set) g.twist.set(ku);
-        else if (g.twist) g.twist.g.quaternion.setFromAxisAngle(g.twist.axis, g.twist.angle * smooth(0.15, 0.85, ret));
-      }
-      const doorOpen = smooth(0, 0.15, state.gear) * 1;
-      for (const d of anim.gearDoors) d.h.set(d.angle * doorOpen);
-      // braces fold, actuators telescope, door jacks follow their doors
-      for (const link of anim.gearLinks) link(ku);
+      anim.gearSet(smooth(0, 0.82, ret), 1 - smooth(0.84, 1, ret));
 
       // weapons bays: doors first, then the ejectors and trapeze launchers
       const b = state.bay;
