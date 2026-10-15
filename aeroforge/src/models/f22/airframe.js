@@ -417,7 +417,7 @@ export function buildAirframe(ctx) {
     const g = [];
     for (const side of [1, -1]) {
       const fwd = [];
-      for (let s = FR.M(2.7); s <= FR.M(7.6); s += 0.35) {
+      for (let s = FR.M(2.7); s <= FR.M(7.6); s += 0.15) {
         const z = Math.max(0.42, FR.sillW(s) + 0.07);
         fwd.push([s, FR.topAt(s, Math.min(z, FR.aW(s) - 0.05)) - 0.06, side * Math.min(z, FR.aW(s) - 0.05)]);
       }

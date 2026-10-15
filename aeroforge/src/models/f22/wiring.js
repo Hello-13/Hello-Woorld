@@ -76,7 +76,7 @@ export function buildWiring(ctx) {
       g.push(tube([up(M(14.4), 0.9), [M(14.75), 0.2, z * 1.36], [M(14.8), -0.2, z * 1.34], [M(14.78), -0.3, z * 1.3]]));
     }
     const spine = inside([[M(4.7), -0.22, -0.36], [M(4.9), -0.12, -0.3], [M(6.9), -0.12, -0.3], [M(6.95), 0.3, -0.3], [M(7.1), FR.topAt(M(7.1), 0.3) - 0.04, -0.3]]);
-    for (const s of [M(7.6), M(8.4), M(9.5), M(11.0), M(12.4), M(13.2)]) spine.push([s, FR.topAt(s, 0.3) - 0.035, -0.3]);
+    for (let s = M(7.1) + 0.15; s <= M(13.2) + 1e-9; s += 0.15) spine.push([s, FR.topAt(s, 0.3) - 0.035, -0.3]);      // under the skin, which falls away fast behind the canopy
     spine.push([M(13.6), FR.topAt(M(13.6), 0.12) - 0.045, -0.12], [M(14.0), FR.topAt(M(14.0), 0) - 0.045, 0.0]);
     g.push(tube(spine));
     for (const z of [0.3, -0.3]) g.push(tube([[M(14.0), FR.topAt(M(14.0), 0) - 0.045, 0.0], [M(14.0), FR.topAt(M(14.0), 0.3) - 0.045, z]]));
@@ -103,7 +103,7 @@ export function buildWiring(ctx) {
     g.push(tube([[M(3.55), 0.0, 0.2], [M(4.3), -0.1, 0.42], [M(4.7), -0.2, 0.42]], 0.007));                                  // IFDL processor
     // aft along the spine (right of the fly-by-wire channel C) to the CNI / IFDL apertures and aft EW antennas
     const aft = [[M(4.7), -0.2, 0.42], [M(6.9), -0.12, 0.3], [M(6.95), 0.3, 0.3], [M(7.1), FR.topAt(M(7.1), 0.3) - 0.04, 0.3]];
-    for (const s of [M(7.6), M(8.4), M(9.5), M(10.8), M(12.4), M(13.6), M(15.0), M(16.0)]) aft.push([s, FR.topAt(s, 0.3) - 0.035, 0.3]);
+    for (let s = M(7.1) + 0.15; s <= M(16.0) + 1e-9; s += 0.15) aft.push([s, FR.topAt(s, 0.3) - 0.035, 0.3]);
     g.push(tube(inside(aft, 0.04), 0.007));
     for (const side of [1, -1]) {
       g.push(tube([[M(10.8), FR.topAt(M(10.8), 0.3) - 0.035, 0.3], [M(11.0), FR.topAt(M(11.0), 0.8) - 0.035, side * 0.8], [M(11.0), FR.topAt(M(11.0), 1.2) - 0.03, side * 1.2]], 0.006));

@@ -109,13 +109,14 @@ export function buildSystems(ctx) {
   const st1 = [SM(7.08), SM(7.3), SM(7.5), SM(7.64), SM(7.78), SM(8.0), SM(8.2), SM(8.35)];
   const recWell = (s, z) => 0.24 * smooth(SM(7.5), SM(7.7), s) * (1 - smooth(0.15, 0.25, z));
   const t1 = tankLoft(st1, (s) => {
-    const zA = FR.aW(s) - 0.1;
+    const zA = FR.aW(s) - 0.18;          // leaves a channel along the forebody side for the fuel cooler's air
     const zs = [0, 0.08, 0.15, 0.2, 0.25, 0.32, ...range(0.4, zA, 4)];
     const half = zs.map((z) => [z, FR.topAt(s, z) - 0.07 - recWell(s, z)]);
     half.push([Math.min(zA, FR.aLowerZ(s, -0.45) - 0.05), -0.45], [0, -0.45]);
     return half;
   });
-  const st2 = range(SM(8.5), SM(12.3), 12);
+  // F-2 starts behind the dry bay that holds the fuel coolers and the bleed exit ducts under the upper grilles
+  const st2 = range(7.35, SM(12.3), 12);
   const t2 = tankLoft(st2, (s) => saddle(s, { ybot: -0.2 }));
   const st3 = range(SM(12.45), SM(13.25), 4);
   const t3 = tankLoft(st3, (s) => saddle(s, { ybot: -0.38, zo: 1.35 }));
@@ -244,7 +245,7 @@ export function buildSystems(ctx) {
     // slipway floodlights in the walls of the receptacle well, lighting it for the boom operator at night
     const lens = [], lit = [];
     for (const zz of [-0.135, 0.135]) for (const sl of [SM(7.85), SM(8.15)]) {
-      const y = FR.topAt(sl, 0) - 0.1;
+      const y = FR.topAt(sl, 0.15) - 0.06;          // below the door's edge where the spine falls away
       lens.push(new THREE.CylinderGeometry(0.03, 0.03, 0.02, 12).rotateX(Math.PI / 2).translate(X(sl), y, zz));
       lit.push(new THREE.CircleGeometry(0.024, 12).rotateY(zz > 0 ? Math.PI : 0).translate(X(sl), y, zz - Math.sign(zz) * 0.011));
     }
@@ -503,7 +504,7 @@ export function buildSystems(ctx) {
     system: 'Electrical', material: 'Main and APU-start batteries', mass: 40, count: 2,
     explode: [0.4, -0.9, -0.6],
     desc: 'Batteries power the APU start and hold essential systems for a short time if all generation is lost.',
-  }, mesh(merge([box(SM(6.5), -0.55, 0.5, 0.3, 0.16, 0.22), box(SM(6.5), -0.55, -0.5, 0.3, 0.16, 0.22)]), F.box()));
+  }, mesh(merge([box(SM(6.5), -0.47, 0.44, 0.3, 0.16, 0.22), box(SM(6.5), -0.47, -0.44, 0.3, 0.16, 0.22)]), F.box()));
   P('Aft power distribution centres', {
     system: 'Electrical', material: 'Solid-state power controllers and contactors', mass: 30, count: 2,
     explode: [-0.4, -1.05, 0],
@@ -607,18 +608,19 @@ export function buildSystems(ctx) {
     for (const z of [0.11, -0.11]) g.push(new THREE.SphereGeometry(0.08, 14, 10).translate(X(SM(13.45)), 0.36, z));
     const l = [];
     for (const side of [1, -1]) {
-      l.push(FR.pipe([[SM(13.45), 0.36, side * 0.18], [SM(13.7), 0.5, side * 0.35], [SM(14.5), 0.55, side * 0.42], [SM(16.0), 0.5, side * 0.42]], 0.01, 5));
-      l.push(FR.pipe([[SM(14.0), 0.53, side * 0.4], [SM(14.2), 0.45, side * 1.2], [SM(14.4), 0.2, side * 1.36]], 0.008, 5));
+      l.push(FR.pipe(inside([[SM(13.45), 0.36, side * 0.18], [SM(13.7), 0.5, side * 0.35], [SM(14.5), 0.55, side * 0.42], [SM(16.0), 0.5, side * 0.42]], 0.04), 0.01, 5));
+      l.push(FR.pipe(inside([[SM(14.0), 0.53, side * 0.4], [SM(14.2), 0.45, side * 1.2], [SM(14.4), 0.2, side * 1.36]], 0.04), 0.008, 5));
     }
     const dl = [];
     for (const side of [1, -1]) {
       const ez = FR.ENG_Z * side;
       const yT = (s, z) => Math.min(0.5, FR.topAt(s, Math.abs(z)) - 0.07), yB = (s) => Math.max(-0.6, -FR.bD(s) + 0.07);
+      const sL = Math.min(SM(17.05), FR.S_BE - 0.08);
       for (const dz of [0.6, -0.6]) {
-        dl.push(FR.pipe([SM(13.45), SM(14.6), SM(15.8), SM(17.05)].map((s) => [s, yT(s, ez + dz), ez + dz]), 0.006, 5, 16));
-        dl.push(FR.pipe([SM(13.45), SM(14.6), SM(15.8), SM(17.05)].map((s) => [s, yB(s), ez + dz]), 0.006, 5, 16));
+        dl.push(FR.pipe([SM(13.45), SM(14.6), SM(15.8), sL].map((s) => [s, yT(s, ez + dz), ez + dz]), 0.006, 5, 16));
+        dl.push(FR.pipe([SM(13.45), SM(14.6), SM(15.8), sL].map((s) => [s, yB(s), ez + dz]), 0.006, 5, 16));
       }
-      for (const s of [SM(13.45), SM(17.05)]) dl.push(FR.pipe([[s, yT(s, ez - 0.6), ez - 0.6], [s, yT(s, ez), ez], [s, yT(s, ez + 0.6), ez + 0.6]], 0.006, 5, 10), FR.pipe([[s, yB(s), ez - 0.6], [s, yB(s), ez], [s, yB(s), ez + 0.6]], 0.006, 5, 10));
+      for (const s of [SM(13.45), sL]) dl.push(FR.pipe([[s, yT(s, ez - 0.6), ez - 0.6], [s, yT(s, ez), ez], [s, yT(s, ez + 0.6), ez + 0.6]], 0.006, 5, 10), FR.pipe([[s, yB(s), ez - 0.6], [s, yB(s), ez], [s, yB(s), ez + 0.6]], 0.006, 5, 10));
     }
     P('Engine-bay fire detector loops', {
       system: 'Environmental control', material: 'Continuous-element fire / overheat sensing loops on clips', mass: 4, xrayWeight: 0.7,

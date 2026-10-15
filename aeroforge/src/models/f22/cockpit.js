@@ -157,7 +157,7 @@ export function buildCockpit(ctx) {
   {
     const g = [];
     g.push(box(5.67, -0.05, 0, 2.44, 0.04, 0.9));                                     // floor, s 4.45–6.9
-    for (const side of [1, -1]) g.push(box(5.66, 0.17, side * 0.47, 2.3, 0.44, 0.03));   // tub side walls below the sills
+    for (const side of [1, -1]) g.push(box(5.735, 0.17, side * 0.47, 2.15, 0.44, 0.03));   // tub side walls below the sills
     g.push(box(6.88, 0.2, 0, 0.03, 0.5, 0.9));                                         // aft wall
     P('Cockpit tub & floor', {
       system: 'Crew systems', material: 'Aluminium pressure tub', mass: 85,

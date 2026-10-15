@@ -214,7 +214,7 @@ export function buildAvionics(ctx) {
       system: 'Communications', material: 'Flush conformal arrays, upper and lower', mass: 3, count: 2,
       explode: [0, 1.25, -0.4],
       desc: 'Flush arrays above and below the fuselage answer and send identification-friend-or-foe interrogations (including Mode 5); the interrogator can steer its beam so it questions only the target it means to (positions approximate).',
-    }, mesh(merge([patchGeo(top(SM(7.0), 0.42), normalA(SM(7.0), 0.42), 0.22, 0.06), patchGeo(bot(SM(7.4), 0.2), V(0, -1, 0), 0.22, 0.06)]), F.composite()));
+    }, mesh(merge([patchGeo(top(7.5, 0.42), normalA(7.5, 0.42), 0.22, 0.06), patchGeo(bot(6.3, 0.2), V(0, -1, 0), 0.22, 0.06)]), F.composite()));
     P('TACAN & landing-aid antennas', {
       system: 'Communications', material: 'Flush annular-slot and patch antennas', mass: 3, count: 3,
       explode: [0, -1.0, 0.4],

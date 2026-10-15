@@ -454,9 +454,10 @@ export function buildGear(ctx) {
 
   // ------------------------------------------------------------------ arresting hook and its door
   {
-    const h0 = 14.0, h1 = 16.3, hy = -0.56;
-    const g = [rodV(V(X(h0), hy, 0), V(X(h1), hy, 0), 0.04, 10)];
-    g.push(new THREE.BoxGeometry(0.14, 0.08, 0.16).translate(X(h1 + 0.02), hy - 0.02, 0));
+    // the shank rises a little aft to stay inside the stinger, whose underside climbs behind the engine bays
+    const h0 = 14.0, h1 = 16.3, hy = -0.56, hy1 = Math.max(hy, -FR.bD(h1) + 0.1);
+    const g = [rodV(V(X(h0), hy, 0), V(X(h1), hy1, 0), 0.04, 10)];
+    g.push(new THREE.BoxGeometry(0.14, 0.08, 0.16).rotateZ(-Math.atan2(hy1 - hy, h1 - h0)).translate(X(h1 - 0.03), hy1 - 0.02, 0));
     g.push(new THREE.CylinderGeometry(0.05, 0.05, 0.2, 12).rotateX(Math.PI / 2).translate(X(h0), hy, 0));
     const a = [rodV(V(X(h0 + 0.2), hy + 0.05, 0), V(X(h0 + 0.7), hy + 0.1, 0), 0.035, 10), rodV(V(X(h0 - 0.08), hy + 0.08, 0), V(X(h0 + 0.2), hy + 0.05, 0), 0.02, 8)];
     P('Arresting hook', {

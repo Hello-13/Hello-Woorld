@@ -252,10 +252,10 @@ export function buildWeapons(ctx) {
         const wf = FR.wallFractions(sA);
         const [hz, hy] = FR.wallB(sA, wf[4]);
         const Fx = V(X(sA), hy + 0.02, side * (hz - 0.24));
-        const crank = V(X(sA), hy - 0.093, side * (hz - 0.078));
+        const crank = V(X(sA), hy - 0.093, side * (hz - 0.098));
         const p0 = top0.clone();
         const bar = unitRod(0.024, F.hyd()), rodM = unitRod(0.012, F.chrome(), 8);
-        const fit = mesh(merge([FR.boxS(sA, hy + 0.035, side * (hz - 0.24), 0.08, 0.04, 0.06), FR.boxS(sA, hy - 0.093, side * (hz - 0.06), 0.05, 0.05, 0.03)]), F.tiDull());
+        const fit = mesh(merge([FR.boxS(sA, hy + 0.035, side * (hz - 0.24), 0.08, 0.04, 0.06), FR.boxS(sA, hy - 0.093, side * (hz - 0.08), 0.05, 0.05, 0.03)]), F.tiDull());
         const len = 0.17;
         const cp = new THREE.Vector3();
         P(`Side bay door actuator (${R})`, {
@@ -277,16 +277,19 @@ export function buildWeapons(ctx) {
       // the launch rail belongs to the LAU-141/A: it rides out on the trapeze with the missile
       const railHolder = new THREE.Group();
       railHolder.add(mesh(merge([new THREE.BoxGeometry(2.3, 0.05, 0.06).translate(0, 0.095, 0), new THREE.BoxGeometry(0.4, 0.06, 0.1).translate(-0.9, 0.13, 0), new THREE.BoxGeometry(0.16, 0.04, 0.12).translate(0.95, 0.125, 0)]), F.boxLight()));
-      const stow = V(X(M(10.05)), -0.73, side * 1.42), out = V(X(M(10.05)), -1.13, side * 1.86);
+      // stowed in the middle of the bay, rolled with the trunk wall's 29° lean so the X of fins fits the cavity
+      const stow = V(X(M(10.05)), -0.65, side * 1.44), out = V(X(M(10.05)), -1.13, side * 1.86), roll = side * 0.5;
       holder.position.copy(stow);
       railHolder.position.copy(stow);
+      holder.rotation.x = roll;
+      railHolder.rotation.x = roll;
       const arms = [];
       const armG = new THREE.Group();
       armG.add(railHolder);
       for (const ds of [-0.7, 0.7]) {
         const arm = mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 8), F.steel());
         armG.add(arm);
-        arms.push({ arm, pivot: V(X(M(10.05) + ds), -0.54, side * 1.2), attach: V(ds * -1, 0.095, 0) });
+        arms.push({ arm, pivot: V(X(M(10.05) + ds), -0.54, side * 1.2), attach: V(ds * -1, 0.095 * Math.cos(roll), 0.095 * Math.sin(roll)) });
       }
       P(`AIM-9X Sidewinder (${R} side bay)`, {
         system: 'Weapons', material: 'Aluminium airframe, imaging-infrared seeker, thrust-vectoring vanes', mass: 85,
