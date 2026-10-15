@@ -929,7 +929,7 @@ export const ROUTE = {
   wellWall: { resS: 11.53, resZ: 1.0, accS: 12.22, filS: 11.95, y: -0.80 },
   brakeAcc: [11.25, -0.86],
   rearSpar: 14.03,
-  battery: [4.72, -0.2, -0.6],
+  battery: [4.70, -0.17, -0.56],                 // left avionics bay under the cockpit (T.O. door #4135), inside the chine wall
   aftPdc: [11.97, -0.62, 0.1],
   fwdPdc: [4.17, -0.27, 0.42],
   conv: [4.65, -0.32, 0.42],

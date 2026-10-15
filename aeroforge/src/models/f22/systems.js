@@ -703,7 +703,12 @@ export function buildSystems(ctx) {
     system: 'Electrical', material: 'Sealed lead-acid (sulphuric-acid gel) battery and charger/controller, 28 V DC', mass: 30, count: 2,
     explode: [0.4, -0.9, -0.9],
     desc: 'The battery and charger/controller system sits behind the left avionics-bay door under the cockpit, with its disconnect just aft of the battery (T.O. 00-105E-9, door #4135); it starts the APU and holds essential 28 V DC loads for a short time if all generation is lost. The T.O. lists about 10 lb of battery acid gel.',
-  }, mesh(merge([box(RT.battery[0], RT.battery[1], RT.battery[2], 0.3, 0.16, 0.2), box(RT.battery[0] + 0.24, RT.battery[1] + 0.01, RT.battery[2], 0.14, 0.12, 0.16), box(RT.battery[0] + 0.33, RT.battery[1] + 0.02, RT.battery[2] + 0.03, 0.05, 0.07, 0.07)]), F.box()));
+  }, mesh(merge(((bs, by, bz) => [
+    box(bs, by, bz, 0.3, 0.16, 0.18),                                     // battery
+    box(bs - 0.22, by + 0.01, bz, 0.14, 0.12, 0.16),                      // charger / controller ahead of it
+    box(bs + 0.175, by + 0.02, bz + 0.03, 0.05, 0.07, 0.07),              // disconnect just aft of the battery
+    box((bs - 0.29 + 4.925) / 2, by - 0.085, bz, 4.925 - (bs - 0.29), 0.01, 0.16),   // tray, bolted to the frame at 4.94
+  ])(...RT.battery)), F.box()));
   P('Aft power distribution centres', {
     system: 'Electrical', material: 'Solid-state power controllers and contactors', mass: 30, count: 2,
     explode: [-0.4, -1.05, 0],
@@ -851,16 +856,18 @@ export function buildSystems(ctx) {
     const dl = [];
     for (const side of [1, -1]) {
       const ez = FR.ENG_Z * side;
-      const sL = Math.min(SM(17.05), FR.S_BE - 0.08), s0 = 11.88;
+      const sL = Math.min(SM(17.05), FR.S_BE - 0.08), s0 = 11.88, sB0 = 12.99;
       // (kept 3 cm under the upper skin, which comes down below the bay's top aft)
-      const at = (deg, top, s = s0) => { const a = (deg * Math.PI) / 180, z = ez + side * rL * Math.sin(a); return [Math.min(EY + (top ? 1 : -1) * rL * Math.cos(a), FR.topAt(s, Math.abs(z)) - 0.03), z]; };
+      const at = (deg, top, s = s0, r = rL) => { const a = (deg * Math.PI) / 180, z = ez + side * r * Math.sin(a); return [Math.min(EY + (top ? 1 : -1) * r * Math.cos(a), FR.topAt(s, Math.abs(z)) - 0.03), z]; };
       for (const [deg, top] of [[50, true], [-50, true], [35, false], [-40, false]]) {
-        // (the bottom loops start behind the engine feed line's way into the bay)
-        dl.push(FR.pipe([top ? s0 : 12.45, 12.6, 13.6, 14.6, sL].map((s) => { const [y, z] = at(deg, top, s); return [s, y, z]; }), 0.006, 5, 16));
+        // (the bottom loops start at the 13.02 frame, behind the gearbox, its fuel pumps and the feed line's way into the bay)
+        dl.push(FR.pipe([top ? s0 : sB0, top ? 12.6 : 13.3, 13.6, 14.6, sL].map((s) => { const [y, z] = at(deg, top, s); return [s, y, z]; }), 0.006, 5, 16));
       }
-      for (const top of [true, false]) for (const s of [top ? s0 : 12.45, sL]) {
-        const lim = top ? 50 : 40;
-        dl.push(FR.pipe([-lim, -lim / 2, 0, lim / 2, lim].map((d) => { const [y, z] = at(d, top, s); return [s, y, z]; }), 0.006, 5, 10));
+      for (const top of [true, false]) for (const s of [top ? s0 : sB0, sL]) {
+        const ds = top ? [-50, -25, 0, 25, 50] : [-40, -20, 0, 17.5, 35];   // between the two longitudinal loops of that side
+        // (the front bottom loop passes between the case and the augmentor fuel line coming off the gearbox)
+        const r = !top && s === sB0 ? 0.616 : rL;
+        dl.push(FR.pipe(ds.map((d) => { const [y, z] = at(d, top, s, r); return [s, y, z]; }), 0.006, 5, 10));
       }
     }
     P('Engine-bay fire detector loops', {
