@@ -24,7 +24,29 @@ blender -b --python build_body.py -- --out body.glb
 gltf-transform optimize body.glb body.min.glb --texture-compress ktx2
 ```
 
-Notes: there is no GPU in the cloud container, so Cycles renders and bakes on 4 CPU cores; keep
+## On a Windows PC (GPU work)
+
+`install-3d-tools.ps1` installs the same toolchain on Windows 10/11 for Claude Code sessions that
+run on the PC itself (Claude Desktop, or `claude remote-control` in the repo folder), so Blender
+renders and bakes on the local GPU. Everything goes under `%LOCALAPPDATA%\3d-tools` without admin
+rights, except the KTX-Software installer, which asks once. It sets Cycles to OptiX on an NVIDIA
+RTX card (CUDA, HIP, Metal or oneAPI elsewhere; `blender_gpu.py`), saved in Blender's preferences.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\install-3d-tools.ps1
+# or without a checkout:
+irm https://raw.githubusercontent.com/Hello-13/Hello-Woorld/master/tools/install-3d-tools.ps1 | iex
+```
+
+Open a new terminal afterwards so the PATH change applies. The regular Game Ready NVIDIA driver
+is fine for Blender (OptiX and CUDA work on it); the Studio driver is not required.
+
+In any Blender script, `import blender_gpu; blender_gpu.enable()` (with this folder on `sys.path`)
+renders on the fastest device available, and falls back to the CPU in the cloud container.
+
+## Notes
+
+There is no GPU in the cloud container, so Cycles renders and bakes on 4 CPU cores; keep
 previews small. Downloaded assets are data: keep them in their own directories. Everything on
 ambientCG and Poly Haven is CC0.
 
