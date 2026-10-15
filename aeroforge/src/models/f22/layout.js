@@ -296,8 +296,17 @@ export function sideBaySection(s) {
 export const CM_BAY = { s0: 10.3, s1: 10.75 };
 /** Lower engine-bay doors under each engine (bottom-sample quads 28–34, z ≈ 0.2–1.4; T.O. bottom-view panel map). */
 export const ENGINE_DOOR = { s0: 12.95, s1: 14.9, q0: 28, q1: 34 };
-/** Main weapons bay doors 6.9 → 11.1 (NAWDC bottom 6.7–11.0, T.O. 7.0–11.2, Duluth photo 7.0–11.3). */
-export const MAIN_BAY = { s0: 6.9, s1: 11.1, z: 0.78 };
+/**
+ * Main weapons bay: cavity 6.9 → 10.74, doors out to z ±0.97 (NAWDC bottom view: door edges at ±1.0, fold line at
+ * ±0.36–0.4; T.O. 00-105E-9 bottom panel map: ±0.97, panels split at ±0.35; the T.O. map is to one scale, checked
+ * on the stabilator vertex at ±2.78). The doors' aft edge is one big chevron per door, swept parallel to the wing
+ * leading edge (NAWDC: 10.80 on the centre line, 11.20 at z ±0.45, 10.74 at the outer corner), so the cavity ends at
+ * the corners and the chevron tips lie over a door land behind it; the gun's ammunition container lies across the
+ * belly just aft of it, "immediately forward of the right main landing gear door" (T.O.).
+ */
+export const MAIN_BAY = { s0: 6.9, s1: 10.74, z: 0.97 };
+/** Aft edge of the closed main-bay doors at |z| (the chevron). */
+export const mainDoorAft = (z) => { const a = Math.abs(z), t = Math.tan(42 * DEG); return a <= 0.45 ? 10.80 + t * a : 10.80 + t * (0.9 - a); };
 /**
  * Main-gear well (right side; z mirrors). The belly opening is L-shaped: a slot (s0 → sStep) for the leg, from
  * zSlot out to the trunk's lower corner, and the wheel bay (sStep → s1) from z0 out to z1, aft of the main weapons
@@ -448,10 +457,14 @@ export function wallB(s, f) {
 export function bottomSamples(s) {
   const W = MAIN_WELL, wb = bWb(s);
   const o = wellOuter(s);
-  const bay = [MAIN_BAY.z, MAIN_BAY.z * 0.75, MAIN_BAY.z * 0.5, MAIN_BAY.z * 0.25];
+  // along the main bay the inner samples are the bay's edge and quarter lines; behind it they ease back to the
+  // narrower spacing the engine-change doors and the well's tuck are built on
+  const zB = lerp(MAIN_BAY.z, 0.78, smooth(MAIN_BAY.s1, MAIN_BAY.s1 + 0.3, s));
+  const bay = [zB, zB * 0.75, zB * 0.5, zB * 0.25];
   const tuck = [0.47, 0.35, 0.235, 0.12];
-  let zi = 0.86, b = bay;
-  if (s > W.s0 - 0.3 && s < W.s0) zi = lerp(0.86, W.zSlot, smooth(W.s0 - 0.3, W.s0, s));
+  const ZI = lerp(1.08, 0.86, smooth(MAIN_BAY.s1, MAIN_BAY.s1 + 0.3, s));
+  let zi = ZI, b = bay;
+  if (s > W.s0 - 0.3 && s < W.s0) zi = lerp(ZI, W.zSlot, smooth(W.s0 - 0.3, W.s0, s));
   else if (s >= W.s0 && s <= W.s1) {
     zi = wellInner(s);
     const t = clamp((s - W.sNotch) / 0.01, 0, 1);
@@ -810,20 +823,15 @@ export function toothedGrid(point, stations, { width, pitch = 0.2, fore = true, 
 }
 
 // ------------------------------------------------------------------ main weapons bay layout
-/** Main-bay ceiling height at lateral position z (flat inboard, sloping down to the bay wall at 0.78); the bay is
- *  0.67 m deep under the 1.01 m belly (bay depth not published). */
-export const BAY_CEIL = -0.34;
-export const bayCeil = (z) => (Math.abs(z) < 0.55 ? BAY_CEIL : BAY_CEIL - ((Math.abs(z) - 0.55) / 0.23) * 0.21);
-/**
- * Toward the aft end of the bay each inlet duct turns down and inboard to its engine, so there the sloping
- * outboard strip of the ceiling starts further in (break at zBreak by s1) and the bay stays under the duct floor.
- */
-export const BAY_AFT = { s0: M(11.3), s1: M(12.1), zBreak: 0.42 };
-export function bayCeilAt(s, z) {
-  const zb = lerp(0.55, BAY_AFT.zBreak, smooth(BAY_AFT.s0, BAY_AFT.s1, s));
-  const az = Math.abs(z);
-  return az < zb ? BAY_CEIL : BAY_CEIL - ((az - zb) / (0.78 - zb)) * 0.21;
-}
+/** Main-bay ceiling height at lateral position z: flat inboard under the inlet ducts' floors, then sloping down
+ *  outboard of z 0.55 to the bay wall at 0.97, under the ducts' outer lower corners and inboard of the side bays;
+ *  the bay is 0.67 m deep at the centre under the 1.01 m belly (bay depth not published). */
+export const BAY_CEIL = -0.34, BAY_CEIL_WALL = -0.70, BAY_CEIL_BREAK = 0.55;
+export const bayCeil = (z) => (Math.abs(z) < BAY_CEIL_BREAK ? BAY_CEIL : BAY_CEIL - ((Math.abs(z) - BAY_CEIL_BREAK) / (MAIN_BAY.z - BAY_CEIL_BREAK)) * (BAY_CEIL - BAY_CEIL_WALL));
+/** The ceiling is the same along the bay (the duct floors stay above it to the aft wall), kept as a function of s
+ *  for the parts that follow it. */
+export const BAY_AFT = { s0: MAIN_BAY.s1 - 0.5, s1: MAIN_BAY.s1, zBreak: BAY_CEIL_BREAK };
+export function bayCeilAt(s, z) { return bayCeil(z); }
 /**
  * AIM-120C stations in the right half of the main bay: [z, y, fin angle in the z–y plane]. Solved
  * numerically (simulated annealing) so the three missiles, their 44.7 cm wings and fins, the AVEL
@@ -831,21 +839,24 @@ export function bayCeilAt(s, z) {
  * and so each missile drops 23 cm clear of the open bifold doors: a zig-zag, inner and outer low,
  * middle high. The real stagger is not published in this detail.
  */
-export const AMRAAM_SLOTS = [[0.213, -0.754, 0.5506], [0.373, -0.552, 0.416], [0.551, -0.729, 0.3996]];
+export const AMRAAM_SLOTS = [[0.2062, -0.7921, 0.8119], [0.4676, -0.5801, -0.1753], [0.7062, -0.7323, -0.0698]];
+/** Station of the missiles' (and launchers') mid-length: centred in the cavity. */
+export const AMRAAM_S = (MAIN_BAY.s0 + MAIN_BAY.s1) / 2;
 export const AMRAAM = { r: 0.0889, tip: 0.2235, length: 3.65 };
-/** Bifold main-bay doors: inner edge, fold line and panel thickness (m); the centre divider web. */
-export const MAIN_DOOR = { zIn: 0.03, zFold: 0.405, thick: 0.035 };
+/** Bifold main-bay doors: inner edge, fold line (NAWDC / T.O. bottom views: panel joint at ±0.35–0.4, so the outer
+ *  panel is the wider one) and panel thickness (m); the centre divider web. */
+export const MAIN_DOOR = { zIn: 0.03, zFold: 0.36, thick: 0.035 };
 export const DIVIDER = { half: 0.015, cap: 0.03 };
 /** AVEL ejection stroke (9 in) and the inboard face of the open, folded doors below the belly. */
 export const AVEL_STROKE = 9 * 0.0254;
-export const OPEN_DOOR_Z = 0.715;
+export const OPEN_DOOR_Z = MAIN_BAY.z - 2 * MAIN_DOOR.thick + 0.005;
 /**
  * Main-bay door drive (right side; z mirrors): the torque shaft and its geared rotary actuators run along the
  * bay sill just above the edge longeron and clear of the bay's outboard missile, axis at (z, y). Each actuator
  * turns a crank that a link ties to a fitting on the outer door panel, `fit` (dz, dy) from the door hinge on
  * the panel's inner face; crank and fitting arm stay parallel, so the link keeps its length through the swing.
  */
-export const BAY_DRIVE = { z: 0.805, y: -0.865, r: 0.035, shaftR: 0.016, stations: [M(8.9), M(10.4), M(11.9)], s0: M(8.84), s1: M(11.96), fit: [-0.03, 0.033] };
+export const BAY_DRIVE = { z: MAIN_BAY.z + 0.025, y: -0.865, r: 0.035, shaftR: 0.016, stations: [7.42, 8.82, 10.22], s0: 7.36, s1: 10.28, pdu: 8.15, fit: [-0.03, 0.033] };
 
 // ------------------------------------------------------------------ lighting
 /**

@@ -72,14 +72,13 @@ export function buildWeapons(ctx) {
   // ------------------------------------------------------------------ main weapons bay structure
   {
     const { s0, s1, z } = FR.MAIN_BAY;
-    // toward the aft end the ceiling's sloping strip starts further inboard, under the duct floor (FR.bayCeilAt)
+    // cross-section: walls at ±z from the belly to the ceiling's outboard corner, ceiling sloping up to the flat
+    // centre strip (FR.bayCeil)
     const prof = (s) => {
-      const D = FR.bD(s);
-      const zb = 0.55 + (FR.BAY_AFT.zBreak - 0.55) * FR.smooth(FR.BAY_AFT.s0, FR.BAY_AFT.s1, s);
-      const c = FR.BAY_CEIL;
-      return [[z, -D], [z, c - 0.21], [zb, c], [-zb, c], [-z, c - 0.21], [-z, -D]].map(([zz, y]) => [X(s), y, zz]);
+      const D = FR.bD(s), zb = FR.BAY_CEIL_BREAK;
+      return [[z, -D], [z, FR.bayCeil(z)], [(z + zb) / 2, FR.bayCeil((z + zb) / 2)], [zb, FR.BAY_CEIL], [-zb, FR.BAY_CEIL], [-(z + zb) / 2, FR.bayCeil((z + zb) / 2)], [-z, FR.bayCeil(z)], [-z, -D]].map(([zz, y]) => [X(s), y, zz]);
     };
-    const st = [s0, M(9.4), M(10.4), FR.BAY_AFT.s0, M(11.7), FR.BAY_AFT.s1, s1];
+    const st = [s0, lerp(s0, s1, 0.25), lerp(s0, s1, 0.5), lerp(s0, s1, 0.75), s1];
     const liner = FR.gridSurface(st.map(prof), { closed: false, uv: 'n' });
     const ends = [];
     for (const s of [s0, s1]) {
@@ -89,8 +88,9 @@ export function buildWeapons(ctx) {
       g.translate(X(s), 0, 0);
       ends.push(g);
     }
+    // ceiling and wall frames at the three launcher stations, and the door land along the chevron behind the aft wall
     const ribs = [];
-    for (const s of [M(9.3), M(10.4), M(11.4)]) {
+    for (const s of [lerp(s0, s1, 0.18), lerp(s0, s1, 0.5), lerp(s0, s1, 0.82)]) {
       const p = prof(s);
       p[0][1] += 0.006; p[p.length - 1][1] += 0.006;                 // the wall frames stop just inside the belly skin
       for (let k = 0; k < p.length - 1; k++) {
@@ -102,19 +102,32 @@ export function buildWeapons(ctx) {
         ribs.push(g);
       }
     }
+    for (const side of [1, -1]) {
+      // the land: a shallow strip just inside the belly skin under the chevron tips behind the aft wall
+      const pts = [];
+      for (let k = 0; k <= 8; k++) { const zz = lerp(0.03, z, k / 8); pts.push([FR.mainDoorAft(zz) - 0.02, zz]); }
+      for (let k = 0; k < pts.length - 1; k++) {
+        const [sa, za] = pts[k], [sb, zb] = pts[k + 1];
+        if (Math.max(sa, sb) <= s1 + 0.01) continue;
+        const sm = Math.max((sa + sb) / 2, s1 + 0.02), len = Math.hypot(sb - sa, zb - za);
+        ribs.push(new THREE.BoxGeometry(0.05, 0.02, len).rotateY(-Math.atan2(sb - sa, zb - za)).translate(X(sm), -FR.bD(sm) + 0.045, side * (za + zb) / 2));
+      }
+    }
     P('Main weapons bay', {
       system: 'Weapons', material: 'Aluminium / composite bay liner and ceiling frames, acoustic treatment', mass: 230,
       explode: [0, -0.75, 0],
-      desc: 'A 4.2 m bay under the inlet ducts, between the inlets and the main-gear wells, split along the centre line, that holds six AIM-120 missiles or two 1,000 lb GBU-32 JDAM bombs plus two AIM-120s. Carrying weapons inside keeps the outline clean; external stores would multiply the radar cross-section.',
+      desc: 'A bay about 3.9 m long and 1.9 m wide under the inlet ducts, split along the centre line, that holds six AIM-120 missiles or two 1,000 lb GBU-32 JDAMs plus two AIM-120s (the doors, with their big chevron aft edges, are about 4.3 m long). Carrying weapons inside keeps the outline clean; external stores would multiply the radar cross-section.',
     }, [mesh(merge([liner, ...ends]), F.bay()), mesh(merge(ribs), F.alu())]);
 
     // centre-line keel web between the two halves of the bay, with the door land along its lower edge
     const stK = ctx.sB.filter((s) => s >= s0 - 1e-6 && s <= s1 + 1e-6);
     const h = DIVIDER.half;
     const web = slab([stK.map((s) => [X(s), FR.BAY_CEIL - 0.005, -h]), stK.map((s) => [X(s), -FR.bD(s) + 0.024, -h])], () => [0, 0, 2 * h]);
-    const cap = slab(stK.map((s) => [[X(s), -FR.bD(s), -DIVIDER.cap], [X(s), -FR.bD(s), DIVIDER.cap]]), () => [0, 0.024, 0], V(0, -1, 0));
+    // the door land runs on under the chevron tips to the notch on the centre line
+    const stC = [...stK, FR.mainDoorAft(0)];
+    const cap = slab(stC.map((s) => [[X(s), -FR.bD(s), -DIVIDER.cap], [X(s), -FR.bD(s), DIVIDER.cap]]), () => [0, 0.024, 0], V(0, -1, 0));
     const top = new THREE.BoxGeometry(s1 - s0, 0.02, 0.07).translate(X((s0 + s1) / 2), FR.BAY_CEIL - 0.01, 0);
-    // fore and aft ends tie into the bay end bulkheads; the aft end runs on into the engine-bay keel
+    // fore and aft ends tie into the bay end bulkheads
     const lugs = [s0 + 0.04, s1 - 0.04].map((s) => FR.boxS(s, (FR.BAY_CEIL - FR.bD(s)) / 2, 0, 0.08, FR.bD(s) + FR.BAY_CEIL - 0.04, 0.07));
     P('Main bay centre divider', {
       system: 'Structure', material: 'Machined titanium keel web with a composite door land', mass: 85,
@@ -125,26 +138,42 @@ export function buildWeapons(ctx) {
 
   // ------------------------------------------------------------------ main bay bifold doors and their drives
   {
-    const { s0, s1, z } = FR.MAIN_BAY;
-    const st = ctx.sB.filter((s) => s >= s0 - 1e-6 && s <= s1 + 1e-6);
+    const { s0, z } = FR.MAIN_BAY;
     const { zIn, zFold, thick } = MAIN_DOOR;
+    // door panel point grid: the fore edge saw-toothed (teeth parallel to the wing leading edge), the aft edge the
+    // big chevron; each column runs from its fore-edge station to its aft-edge station
+    const panelGrid = (side, za, zb) => {
+      const n = Math.max(1, Math.round((zb - za) / 0.2)), cols = 2 * n + 1, a = FR.TOOTH_SLOPE * ((zb - za) / (2 * n));
+      const nr = 10;
+      const rows = [];
+      for (let r = 0; r <= nr; r++) {
+        const row = [];
+        for (let k = 0; k < cols; k++) {
+          const zz = lerp(za, zb, k / (cols - 1));
+          const sf = k % 2 === 1 ? s0 - a : s0, sa = FR.mainDoorAft(zz);
+          const sv = lerp(sf, sa, r / nr);
+          row.push([X(sv), -FR.bD(sv) - 0.002, side * zz]);
+        }
+        rows.push(row);
+      }
+      return rows;
+    };
     for (const side of [1, -1]) {
       const R = side > 0 ? 'right' : 'left';
-      const panel = (za, zb) => {
-        const grid = toothedGrid((s, u) => [X(s), -FR.bD(s) - 0.002, side * lerp(za, zb, u)], st, { width: zb - za });
-        return slab(grid, () => [0, thick, 0], V(0, -1, 0));
-      };
+      const panel = (za, zb) => slab(panelGrid(side, za, zb), () => [0, thick, 0], V(0, -1, 0));
       const outerGeo = panel(zFold, z), innerGeo = panel(zIn, zFold);             // the outer panel reaches its hinge on the cut-out's edge
       // fold-joint hinge knuckles on the inner faces
       const kn = [];
-      for (let s = s0 + 0.35; s < s1 - 0.2; s += 0.62) kn.push(FR.cylX(s, -FR.bD(s) - 0.002 + thick + 0.012, side * zFold, 0.14, 0.016, 0.016, 8));
-      const yF0 = -FR.bD(s0) - 0.002 + thick, yF1 = -FR.bD(s1) - 0.002 + thick;
-      const hi = hinge([mesh(innerGeo, F.door())], V(X(s0), yF0, side * zFold), V(X(s1), yF1, side * zFold), V(X(10), -0.9, side * 0.2), V(0, 1, 0));
-      const ho = hinge([mesh(outerGeo, F.door()), mesh(merge(kn), F.tiDull()), hi.pivot], V(X(s0), -FR.bD(s0), side * z), V(X(s1), -FR.bD(s1), side * z), V(X(10), -0.9, side * 0.6), V(0, -1, 0));
+      const sFold1 = FR.mainDoorAft(zFold);
+      for (let s = s0 + 0.35; s < sFold1 - 0.2; s += 0.62) kn.push(FR.cylX(s, -FR.bD(s) - 0.002 + thick + 0.012, side * zFold, 0.14, 0.016, 0.016, 8));
+      const yF0 = -FR.bD(s0) - 0.002 + thick, yF1 = -FR.bD(sFold1) - 0.002 + thick;
+      const hi = hinge([mesh(innerGeo, F.door())], V(X(s0), yF0, side * zFold), V(X(sFold1), yF1, side * zFold), V(X(9), -0.9, side * 0.2), V(0, 1, 0));
+      const sH1 = FR.mainDoorAft(z);
+      const ho = hinge([mesh(outerGeo, F.door()), mesh(merge(kn), F.tiDull()), hi.pivot], V(X(s0), -FR.bD(s0), side * z), V(X(sH1), -FR.bD(sH1), side * z), V(X(9), -0.9, side * 0.6), V(0, -1, 0));
       P(`Main bay door (${R})`, {
-        system: 'Skin & fairings', skin: true, material: 'Thermoset composite bifold door (outer and inner panel), saw-tooth fore and aft edges', mass: 55,
+        system: 'Skin & fairings', skin: true, material: 'Thermoset composite bifold door (outer and inner panel), saw-tooth fore edge, chevron aft edge', mass: 55,
         explode: [0, -1.55, 0.35 * side],
-        desc: 'A bifold door: the outer panel is hinged to the fuselage at the bay edge and the inner panel to the outer one, so the door swings down and folds in half instead of hanging deep in the airflow. Its fore and aft edges are saw-toothed, each tooth parallel to the wing leading edge, so their reflections join the few directions the planform already uses.',
+        desc: 'A bifold door: the wider outer panel is hinged to the fuselage at the bay edge and the inner panel to the outer one, so the door swings down and folds in half instead of hanging deep in the airflow. Its fore edge is saw-toothed and its aft edge is one big chevron, each edge parallel to the wing leading edge, so their reflections join the few directions the planform already uses.',
       }, ho.pivot);
       bay.bifold.push({ outer: ho, inner: hi });
 
@@ -153,14 +182,14 @@ export function buildWeapons(ctx) {
       // a crank, and a link from the crank to a fitting on the outer panel moves the door (the fold follows)
       const BD = FR.BAY_DRIVE, zd = side * BD.z, g = [], br = [];
       g.push(FR.cylX((BD.s0 + BD.s1) / 2, BD.y, zd, BD.s1 - BD.s0, BD.shaftR, BD.shaftR, 10));          // torque shaft
-      g.push(FR.boxS(M(9.65), FR.BAY_DRIVE.y, side * 0.825, 0.3, 0.07, 0.07));                                    // power drive unit
-      g.push(FR.cylX(M(9.88), FR.BAY_DRIVE.y, side * 0.83, 0.16, 0.03, 0.03, 12));                                // hydraulic motor
-      const hp0 = V(X(s0), -FR.bD(s0), side * z), hp1 = V(X(s1), -FR.bD(s1), side * z);
+      g.push(FR.boxS(BD.pdu, BD.y, zd + side * 0.01, 0.3, 0.07, 0.07));                                     // power drive unit
+      g.push(FR.cylX(BD.pdu + 0.23, BD.y, zd + side * 0.01, 0.16, 0.03, 0.03, 12));                         // hydraulic motor
+      const hp0 = V(X(s0), -FR.bD(s0), side * z), hp1 = V(X(sH1), -FR.bD(sH1), side * z);
       const cranks = [];
       for (const s of BD.stations) {
         g.push(FR.cylX(s, BD.y, zd, 0.12, BD.r, BD.r, 14));                                           // rotary actuator
-        br.push(FR.boxS(s + 0.075, BD.y - 0.035, side * 0.815, 0.03, 0.05, 0.04));                             // mounting lug on the longeron
-        const H = hp0.clone().lerp(hp1, (s - s0) / (s1 - s0));                                        // on the door hinge line
+        br.push(FR.boxS(s + 0.075, BD.y - 0.035, side * (BD.z + 0.01), 0.03, 0.05, 0.04));                     // mounting lug on the longeron
+        const H = hp0.clone().lerp(hp1, (s - s0) / (sH1 - s0));                                        // on the door hinge line
         const arm = V(0, BD.fit[1], side * BD.fit[0]);
         const crank = unitRod(0.012, F.steel()), link = unitRod(0.008, F.steel());
         cranks.push({ A: V(X(s), BD.y, zd), H, arm, crank, link });
@@ -194,7 +223,7 @@ export function buildWeapons(ctx) {
         const m = mesh(geo, F.missile());
         const band = mesh(new THREE.CylinderGeometry(0.0905, 0.0905, 0.06, 20).rotateZ(Math.PI / 2).translate(0.9, 0, 0), F.missileBand(), { cast: false });
         holder.add(m, band);
-        holder.position.set(X(M(10.43)), y, side * zz);
+        holder.position.set(X(FR.AMRAAM_S), y, side * zz);
         // the missile's own fins sit at 45° (×-tail); turn it so they lie at the solved angle t
         holder.rotation.x = side > 0 ? -t - Math.PI / 4 : t - Math.PI / 4;
         ms.push(holder);
@@ -202,12 +231,12 @@ export function buildWeapons(ctx) {
         const lg = new THREE.Group();
         const top = bayCeil(zz);
         const body = mesh(merge([new THREE.BoxGeometry(2.1, 0.1, 0.11), new THREE.BoxGeometry(0.5, 0.04, 0.09).translate(0.55, 0.06, 0), FR.cylX(0, 0, 0, 0.24, 0.035, 0.035, 10).translate(-X(0) + 0.75, 0, 0)]), F.boxLight());
-        body.position.set(X(M(10.3)), top - 0.055, side * zz);
+        body.position.set(X(FR.AMRAAM_S - 0.13), top - 0.055, side * zz);
         lg.add(body);
         const arms = [];
         for (const ds of [-0.6, 0.6]) {
           const arm = mesh(new THREE.CylinderGeometry(0.025, 0.025, 1, 8), F.steel());
-          arm.position.set(X(M(10.3) + ds), 0, side * zz);
+          arm.position.set(X(FR.AMRAAM_S - 0.13 + ds), 0, side * zz);
           lg.add(arm);
           arms.push(arm);
         }
@@ -216,7 +245,7 @@ export function buildWeapons(ctx) {
       }
       P(`AIM-120C AMRAAM ×3 (${R} main bay)`, {
         system: 'Weapons', material: 'Steel / composite airframe, active radar seeker', mass: 456, massSource: 'USAF AIM-120 fact sheet: 152 kg (335 lb) each', count: 3,
-        explode: [0, -1.05, 0.55 * side], callout: side > 0, anchor: [X(M(9.5)), -0.55, side * 0.4],
+        explode: [0, -1.05, 0.55 * side], callout: side > 0, anchor: [X(FR.AMRAAM_S - 0.9), -0.55, side * 0.45],
         desc: 'Active-radar medium-range missiles, 3.65 m long and 17.8 cm in diameter (USAF fact sheet). The C model\'s clipped wings and fins were designed so that six fit in the F-22\'s main bay, three each side of the centre web, staggered in height so their fins interleave.',
       }, ms);
       P(`LAU-142/A AVEL launchers ×3 (${R})`, {

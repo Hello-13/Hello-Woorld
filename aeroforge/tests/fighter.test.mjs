@@ -5,7 +5,8 @@
 // 19,812 m ceiling, +9 / −3 g); Pratt & Whitney / Wikipedia F119-PW-100 (116 kN dry, 156 kN class
 // with afterburner, 38 in inlet / 48 in case diameter, 196 in long, ±20° pitch vectoring); canopy
 // 140 × 45 × 27 in, 360 lb (Haisty, Lockheed Martin, 2000); AIM-120C 3.65 m × 17.8 cm (USAF fact sheet), LAU-142/A AVEL 9 in stroke
-// (Hydraulics & Pneumatics, 1998); main bay split along the centre line (Wikipedia).
+// (Hydraulics & Pneumatics, 1998); main bay split along the centre line (Wikipedia); bay door, panel joint and chevron
+// positions from the NAWDC orthographic bottom view and the T.O. 00-105E-9 bottom panel map.
 //
 // The model's geometry is checked through its three.js-free layout module, the lab's flight model
 // through the three.js-free f22/performance.js, and the tour against the part names declared in
@@ -284,8 +285,14 @@ test('main bay: six AIM-120C clear the centre web, the walls, the doors and each
     for (const f of fins(A)) assert.ok(segPt([B[0], B[1]], f[0], f[1]) > R, `fin of ${i} clears body ${j}`);
     for (const f of fins(B)) assert.ok(segPt([A[0], A[1]], f[0], f[1]) > R, `fin of ${j} clears body ${i}`);
   }
-  // two bifold panels per door, meeting the web's door land and the bay-edge hinge
-  close(L.MAIN_DOOR.zFold - L.MAIN_DOOR.zIn, L.MAIN_BAY.z - L.MAIN_DOOR.zFold, 0.02, 'equal bifold panels');
+  // two bifold panels per door, meeting the web's door land and the bay-edge hinge: the NAWDC and T.O. 00-105E-9
+  // bottom views put the doors' outer edges at z ±0.97–1.0 and the panel joint at ±0.35–0.4
+  close(L.MAIN_BAY.z, 0.985, 0.03, 'bay door outer edge'); close(L.MAIN_DOOR.zFold, 0.375, 0.03, 'bifold panel joint');
+  // the doors' aft edge is one chevron per door, both legs parallel to the 42° wing leading edge, and the cavity ends
+  // at its outer corners
+  close((L.mainDoorAft(0.45) - L.mainDoorAft(0)) / 0.45, Math.tan(42 * DEG), 1e-9, 'inner chevron leg');
+  close((L.mainDoorAft(0.45) - L.mainDoorAft(L.MAIN_BAY.z)) / (L.MAIN_BAY.z - 0.45), Math.tan(42 * DEG), 1e-9, 'outer chevron leg');
+  assert.ok(L.mainDoorAft(L.MAIN_BAY.z) <= L.MAIN_BAY.s1 + 0.005 && L.mainDoorAft(0) > L.MAIN_BAY.s1, 'cavity ends at the chevron corners');
   close(L.AVEL_STROKE, 0.2286, 1e-4, 'AVEL stroke 9 in');
 });
 
