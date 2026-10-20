@@ -79,14 +79,15 @@ export function buildPropulsion(ctx) {
       // panel map, "ACFC exhaust doors" #4236 right / #4235 left), a saw-toothed frame with slats across it
       const AC = FR.ACFC, s0 = AC.s0, s1 = AC.s1;
       const pt = (s, u) => { const z = side * lerp(AC.z0, AC.z1, u); return [X(s), FR.topAt(s, Math.abs(z)) + 0.003, z]; };
-      const frame = slab(toothedGrid(pt, [s0, (s0 + s1) / 2, s1], { width: AC.z1 - AC.z0 }), () => [0, -0.015, 0], new THREE.Vector3(0, 1, 0));
+      const frame = slab(toothedGrid(pt, [0, 0.2, 0.4, 0.6, 0.8, 1].map((f) => lerp(s0, s1, f)), { width: AC.z1 - AC.z0 }), () => [0, -0.015, 0], new THREE.Vector3(0, 1, 0));
+      // the louvre slots: dark strips laid on the door's outer face (flush: 5–9 mm over the skin, just proud of the door face so they read as slots), following the deck's
+      // curve across the grille (the slats are set in the opening, not standing up out of the skin)
       const slats = [];
       for (let k = 1; k < 9; k++) {
         const s = lerp(s0 + 0.05, s1 - 0.05, k / 9);
         const za = AC.z0 + 0.03, zb = AC.z1 - 0.03;
-        const ya = FR.topAt(s, za) - 0.004, yb = FR.topAt(s, zb) - 0.004;
-        const len = Math.hypot(zb - za, yb - ya);
-        slats.push(new THREE.BoxGeometry(0.012, 0.02, len).rotateX(Math.atan2(yb - ya, zb - za) * side).translate(X(s), (ya + yb) / 2 - 0.004, side * (za + zb) / 2));
+        const row = (ds) => [...Array(9).keys()].map((i) => { const z = lerp(za, zb, i / 8); return [X(s + ds), FR.topAt(s + ds, z) + 0.009, side * z]; });
+        slats.push(slab([row(-0.014), row(0.014)], () => [0, -0.004, 0], new THREE.Vector3(0, 1, 0)));
       }
       P(`Fuel-cooler exhaust grille (${R})`, {
         system: 'Skin & fairings', skin: true, material: 'Composite grille frame with angled slats, saw-tooth edges', mass: 4,

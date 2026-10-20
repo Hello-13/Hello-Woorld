@@ -499,7 +499,7 @@ export function buildSystems(ctx) {
     const g = [FR.cylX(E.asm[0], E.asm[1], E.asm[2], 0.5, 0.075, 0.075, 16), FR.cylX(E.asm[0] - 0.28, E.asm[1], E.asm[2], 0.06, 0.09, 0.09, 16)];
     const l = [];
     const sp = (s, zz = -0.06) => [s, FR.topAt(s, Math.abs(zz)) - 0.035, zz];
-    l.push(FR.pipe([[E.asm[0] + 0.25, E.asm[1], E.asm[2]], [E.asm[0] + 0.3, E.asm[1] + 0.12, E.asm[2] * 0.6], [6.86, -0.42, -0.12], [6.92, -0.32, -0.08], [7.0, 0.1, -0.06], sp(7.2), sp(8.0), sp(9.0), sp(FR.AR.s0 - 0.15), sp(FR.AR.s0 - 0.08, -0.2), sp(FR.AR.s1 + 0.08, -0.2), sp(FR.AR.s1 + 0.15), sp(11.0), sp(11.8), sp(FT.a1[0] - 0.15, -0.2)], 0.014, 5, 60));
+    l.push(FR.pipe([[E.asm[0] + 0.25, E.asm[1], E.asm[2]], [E.asm[0] + 0.3, E.asm[1] + 0.12, E.asm[2] * 0.6], [6.86, -0.42, -0.12], [6.92, -0.32, -0.08], [7.0, 0.1, -0.06], sp(7.2), sp(7.45), sp(7.7), sp(8.0), sp(9.0), sp(FR.AR.s0 - 0.15), sp(FR.AR.s0 - 0.08, -0.2), sp(FR.AR.s1 + 0.08, -0.2), sp(FR.AR.s1 + 0.15), sp(11.0), sp(11.8), sp(FT.a1[0] - 0.15, -0.2)], 0.014, 5, 60));
     // drops into F-1A, F-1B, F-2, A-3 and both A-1 cells' ullage, and branches to the wing cells along the refuel branches
     for (const [s, zz] of [[6.5, -0.06], [7.3, -0.06], [8.6, -0.06], [11.0, -0.06]]) l.push(FR.pipe([sp(s, zz), [s, FR.topAt(s, 0.06) - 0.13, zz]], 0.01, 5, 2));
     for (const side of [1, -1]) {

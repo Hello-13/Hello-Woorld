@@ -11,10 +11,9 @@ import { M } from '../../engine/materials.js';
 import { naca00 } from '../../engine/geometry.js';
 import { F } from './materials.js';
 import * as FR from './frame.js';
-import { merge } from './util.js';
-import { normalA } from './systems.js';
+import { merge, slab } from './util.js';
 
-const { X } = FR;
+const { X, lerp } = FR;
 const SM = FR.M;               // fuselage station map (FR.M; M is the shared materials here)
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const box = (s, y, z, ls, h, w) => FR.boxS(s, y, z, ls, h, w);
@@ -25,6 +24,16 @@ function patchGeo(p, n, w = 0.12, h = 0.05, t = 0.008) {
   geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), n.clone().normalize()));
   return geo.translate(p.x, p.y, p.z);
 }
+
+// outward normals of the outer mould line from its station functions (x = SN − s, so ∂/∂x = −∂/∂s), for apertures laid
+// flat on a skin that slopes both along and across the jet
+const E_N = 0.01;
+/** Upward normal of the top surface y = topAt(s, |z|). */
+const topNormal = (s, z) => { const fs = (FR.topAt(s + E_N, Math.abs(z)) - FR.topAt(s - E_N, Math.abs(z))) / (2 * E_N), fz = (FR.topAt(s, Math.abs(z) + E_N) - FR.topAt(s, Math.max(0, Math.abs(z) - E_N))) / (2 * E_N) * Math.sign(z || 1); return V(fs, 1, -fz).normalize(); };
+/** Downward normal of the bottom surface y = bottomAt(s, z). */
+const botNormal = (s, z) => { const bs = (FR.bottomAt(s + E_N, z) - FR.bottomAt(s - E_N, z)) / (2 * E_N), bz = (FR.bottomAt(s, z + E_N) - FR.bottomAt(s, z - E_N)) / (2 * E_N); return V(-bs, -1, bz).normalize(); };
+/** Outward normal of the trunk side wall z = ±wallZ(s, y). */
+const wallNormal = (s, y, side) => { const ws = (FR.wallZ(s + E_N, y) - FR.wallZ(s - E_N, y)) / (2 * E_N), wy = (FR.wallZ(s, y + E_N) - FR.wallZ(s, y - E_N)) / (2 * E_N); return V(ws, -wy, 1).multiply(V(1, 1, side)).normalize(); };
 
 export function buildAvionics(ctx) {
   const { P, anim } = ctx;
@@ -158,7 +167,7 @@ export function buildAvionics(ctx) {
         const sec = FR.wingSection(z);
         patch(V(sec.le[0] - 0.7 * sec.chord, sec.le[1] + naca00(0.7, sec.t) * sec.chord + 0.004, side * z), V(0, 1, 0), 0.08, 0.14);   // on the fixed wing, ahead of the flaperon / aileron
       }
-      for (const s of [SM(1.8), SM(2.3), SM(4.0)]) { const z = FR.aW(s) - 0.07; patch(V(X(s), FR.upperA(s, z) + 0.003, side * z), normalA(s, side * z), 0.12, 0.04); }
+      for (const s of [SM(1.8), SM(2.3), SM(4.0)]) { const z = FR.aW(s) - 0.07; patch(V(X(s), FR.upperA(s, z) + 0.003, side * z), topNormal(s, side * z), 0.12, 0.04); }
       for (const s of [SM(16.2), SM(17.0)]) patch(V(X(s), FR.topAt(s, 1.4) + 0.004, side * 1.4), V(0, 1, side * 0.3), 0.12, 0.05);
       patch(V(X(SM(17.2)), -FR.bD(SM(17.2)) - 0.004, side * 1.3), V(0, -1, 0), 0.12, 0.05);
     }
@@ -170,16 +179,18 @@ export function buildAvionics(ctx) {
   }
   {
     const g = [];
+    // flush windows: a 6 mm disc laid on the skin's tangent plane (true normal along and across the jet), 2 mm proud
     const eye = (p, n) => {
-      const geo = new THREE.CylinderGeometry(0.055, 0.06, 0.02, 18);
-      geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), n.clone().normalize()));
-      geo.translate(p.x, p.y, p.z);
+      const nn = n.clone().normalize();
+      const geo = new THREE.CylinderGeometry(0.055, 0.058, 0.006, 18);
+      geo.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), nn));
+      geo.translate(p.x + nn.x * -0.001, p.y + nn.y * -0.001, p.z + nn.z * -0.001);
       g.push(geo);
     };
     for (const side of [1, -1]) {
-      eye(V(X(SM(3.2)), FR.upperA(SM(3.2), 0.45) + 0.004, side * 0.45), normalA(SM(3.2), side * 0.45));
-      eye(V(X(SM(3.4)), FR.bottomAt(SM(3.4), 0.35) - 0.004, side * 0.35), V(0, -1, side * 0.6));
-      { const s = SM(16.8), y = -FR.bD(s) * 0.6; eye(V(X(s), y, side * (FR.wallZ(s, y) + 0.004)), V(0, -0.3, side)); }
+      { const s = SM(3.2), z = side * 0.45; eye(V(X(s), FR.topAt(s, 0.45), z), topNormal(s, z)); }
+      { const s = SM(3.4), z = side * 0.35; eye(V(X(s), FR.bottomAt(s, z), z), botNormal(s, z)); }
+      { const s = SM(16.8), y = -FR.bD(s) * 0.6; eye(V(X(s), y, side * FR.wallZ(s, y)), wallNormal(s, y, side)); }
     }
     P('AN/AAR-56 missile launch detectors', {
       system: 'Sensors', material: 'Infrared sensor windows', mass: 18, count: 6,
@@ -224,12 +235,12 @@ export function buildAvionics(ctx) {
       system: 'Communications', material: 'Flush conformal arrays, upper and lower', mass: 3, count: 2,
       explode: [0, 1.25, -0.4],
       desc: 'Flush arrays above and below the fuselage answer and send identification-friend-or-foe interrogations (including Mode 5); the interrogator can steer its beam so it questions only the target it means to (positions approximate).',
-    }, mesh(merge([patchGeo(top(7.5, 0.42), normalA(7.5, 0.42), 0.22, 0.06), patchGeo(bot(6.3, 0.2), V(0, -1, 0), 0.22, 0.06)]), F.composite()));
+    }, mesh(merge([patchGeo(top(7.5, 0.42), topNormal(7.5, 0.42), 0.22, 0.06), patchGeo(bot(6.3, 0.2), botNormal(6.3, 0.2), 0.22, 0.06)]), F.composite()));
     P('TACAN & landing-aid antennas', {
       system: 'Communications', material: 'Flush annular-slot and patch antennas', mass: 3, count: 3,
       explode: [0, -1.0, 0.4],
       desc: 'Flush antennas for TACAN (range and bearing to a beacon or tanker) and the instrument landing aids, upper and lower so one is always in view (positions approximate).',
-    }, mesh(merge([patchGeo(top(SM(12.1), 0), V(0, 1, 0), 0.16, 0.16), patchGeo(bot(SM(5.2), 0.3), V(0, -1, 0), 0.16, 0.1), patchGeo(bot(SM(5.2), -0.3), V(0, -1, 0), 0.16, 0.1)]), F.composite()));
+    }, mesh(merge([patchGeo(top(SM(12.1), 0), V(0, 1, 0), 0.16, 0.16), patchGeo(bot(SM(5.2), 0.3), botNormal(SM(5.2), 0.3), 0.16, 0.1), patchGeo(bot(SM(5.2), -0.3), botNormal(SM(5.2), -0.3), 0.16, 0.1)]), F.composite()));
     const ifdl = [];
     for (const side of [1, -1]) ifdl.push(patchGeo(top(SM(11.0), side * 1.25), V(0, 1, side * 0.55), 0.2, 0.08), patchGeo(top(SM(15.6), side * 1.15), V(0, 1, side * 0.4), 0.16, 0.06));
     P('IFDL apertures', {
@@ -247,7 +258,13 @@ export function buildAvionics(ctx) {
       (side > 0 ? green : red).push(lens);
       form.push(new THREE.BoxGeometry(0.5, 0.006, 0.05).translate(le.x - 0.55 * chord, le.y + 0.03, le.z - side * 0.15));
     }
-    for (const side of [1, -1]) { const pts = []; for (let s = SM(4.3); s <= SM(4.91); s += 0.15) { const z = FR.aW(s) - 0.07; pts.push([s, FR.upperA(s, z) + 0.004, side * z]); } form.push(FR.pipe(pts, 0.011, 6, 8)); }
+    // on the forebody sides above the chine: flat electroluminescent strips laid on the skin (4 mm proud), not tubes
+    for (const side of [1, -1]) {
+      // (4 cm wide measured on the skin, which falls steeply here, so the edges are found along the section)
+      const edge = (s, k) => { const z0 = FR.aW(s) - 0.07, y0 = FR.upperA(s, z0); let dz = 0; while (Math.hypot(dz, FR.upperA(s, z0 + k * dz) - y0) < 0.02 && dz < 0.02) dz += 0.0005; return z0 + k * dz; };
+      const row = (k) => { const r = []; for (let i = 0; i <= 6; i++) { const s = lerp(SM(4.3), SM(4.91), i / 6), z = edge(s, k); r.push([X(s), FR.upperA(s, z) + 0.004, side * z]); } return r; };
+      form.push(slab([row(-1), row(1)], () => [0, -0.003, 0], V(0, 1, 0)));
+    }
     // strips on the outer face of each canted fin, about two-thirds of the way up
     const T = FR.FIN;
     for (const side of [1, -1]) {

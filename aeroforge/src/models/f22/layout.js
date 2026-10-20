@@ -104,14 +104,13 @@ const A_W = [[0, 0.012], [0.25, 0.138], [0.5, 0.25], [0.75, 0.354], [1.0, 0.44],
 const A_YC = [[0, -0.13], [1.5, -0.08], [3.0, -0.03], [4.5, 0], [6.85, 0]];
 // centre-line top: radome, the coaming / turtle deck under the canopy, then the dorsal spine behind it
 const A_HT = [[0, 0.012], [0.25, 0.113], [0.5, 0.218], [0.75, 0.29], [1.0, 0.352], [1.25, 0.395], [1.5, 0.43], [2.0, 0.50], [2.55, 0.645], [2.8, 0.665], [3.2, 0.685],
-  [3.7, 0.70], [4.2, 0.722], [4.6, 0.738], [4.9, 0.765], [5.15, 0.86], [5.4, 1.12], [5.6, 1.115], [5.8, 1.085], [6.0, 1.055], [6.2, 1.035], [6.4, 0.968], [6.6, 0.927], [6.85, 0.875]];
+  [3.7, 0.70], [4.2, 0.722], [4.6, 0.738], [4.9, 0.765], [5.15, 0.86], [5.4, 1.12], [5.6, 1.115], [5.8, 1.085], [6.0, 1.055], [6.2, 1.028], [6.4, 0.972], [6.6, 0.922], [6.85, 0.875]];
 const A_HB = [[0, 0.012], [0.25, 0.133], [0.5, 0.224], [0.75, 0.30], [1.0, 0.366], [1.25, 0.41], [1.5, 0.478], [2.0, 0.564], [2.5, 0.648], [3.0, 0.724], [3.5, 0.784],
   [4.0, 0.833], [4.5, 0.872], [4.78, 0.89], [5.5, 0.94], [6.0, 0.97], [6.85, 1.0]];
 export const aW = (s) => mono(A_W, s);
 export const aYC = (s) => mono(A_YC, s);
 export const aHT = (s) => mono(A_HT, s);
 export const aHB = (s) => mono(A_HB, s);
-const bU = (s) => smooth(5.9, S_AB, s);       // A's upper surface → B's at the hand-over
 const bL = (s) => smooth(4.5, 5.4, s);        // A's belly → the box between the inlets (its sides are the inlets' inner walls)
 /** The inlets' inner (diverter-side) walls lean inboard at the bottom about 26°, parallel to the outer walls (front view). */
 export const INNER_LEAN = Math.tan(26 * DEG);
@@ -125,8 +124,9 @@ export function aBoxCorner(s) {
 // chine (wing-root) half-width: NAWDC top view 2.0 at 6.7, 2.1 at 7.7, 2.2 at the wing root; the booms beside the
 // nozzles are about 2.0 wide at the stabilator roots (bottom view)
 const B_W = [[6.85, 2.035], [7.5, 2.078], [8.0, 2.123], [8.55, 2.20], [9.5, 2.21], [12.5, 2.21], [15.0, 2.21], [15.75, 2.19], [16.4, 2.04], [18.1, 1.97]];
-// centre-line deck height (NAWDC side view) and belly depth below the chine (side and front views)
-const B_HT = [[6.85, 0.875], [7.5, 0.765], [8.0, 0.712], [8.5, 0.672], [9.0, 0.652], [10, 0.622], [11, 0.603], [12, 0.585], [13, 0.565], [14, 0.535], [15, 0.48], [16, 0.32], [16.6, 0.22], [16.95, 0.155], [17.05, 0.07], [17.5, 0.03], [18.1, 0.0]];
+// centre-line deck height (NAWDC side view; the 7.0 key gives the deck the spine's slope at the hand-over) and belly
+// depth below the chine (side and front views)
+const B_HT = [[6.85, 0.875], [7.0, 0.8468], [7.5, 0.765], [8.0, 0.712], [8.5, 0.672], [9.0, 0.652], [10, 0.622], [11, 0.603], [12, 0.585], [13, 0.565], [14, 0.535], [15, 0.48], [16, 0.32], [16.6, 0.22], [16.95, 0.155], [17.05, 0.07], [17.5, 0.03], [18.1, 0.0]];
 const B_D = [[6.85, 1.0], [8.0, 1.01], [11, 1.01], [12, 1.0], [13, 0.965], [14, 0.885], [15, 0.79], [15.6, 0.73], [16, 0.68], [16.5, 0.49], [17.0, 0.38], [17.5, 0.255], [18.1, 0.16]];
 // lower outer corner of the inlet trunk (flat bottom's edge) and the trunk wall's top under the chine flange (the knee).
 // NAWDC front and back views: the belly's outer corner at z 1.20–1.25 and the lower trunk side on the inlet's outer-wall
@@ -163,22 +163,39 @@ const SHOULDER = [[2.75, 0.31, 0.512], [2.8, 0.36, 0.51], [3.0, 0.43, 0.53], [3.
   [4.5, 0.565, 0.71], [4.8, 0.545, 0.746], [5.05, 0.5, 0.776], [5.3, 0.5, 0.74], [5.6, 0.5, 0.68], [5.9, 0.5, 0.62]];
 const SH_Z = SHOULDER.map((r) => [r[0], r[1]]), SH_Y = SHOULDER.map((r) => [r[0], r[2]]);
 const shoulderFit = (s) => smooth(2.62, 2.8, s) * (1 - smooth(5.3, 5.8, s));
+// ------------------------------------------------------------------ the neck: inlet shoulder → hand-over
+// Behind the inlet's inner-top corner (IT, s 4.78) the steep forebody side no longer runs down to the chine: it meets the
+// cowl's upper surface along a ridge that climbs steadily aft and fades into the wing glove at the hand-over (NAWDC side
+// view: the lit cowl top's inboard edge rises from the IT corner to ≈ 0.4 m at s 6.0 and ≈ 0.45–0.5 at 6.5; front view:
+// the cowl tops slope up inboard to meet the cockpit sides). The ridge reaches B's deck at S_AB with B's own slope, so
+// the skin carries on without a fold.
+export const S_IT = 4.78;
+const zAB = () => aW(S_AB);
+const dsB = (z, h = 0.01) => (upperB(S_AB + h, z) - upperB(S_AB, z)) / h;   // ∂y/∂s of B's deck just aft of the hand-over
+/** Height of the ridge where the forebody side meets the cowl top (the inner-top edge of the inlet), at station s. */
+export function ridgeY(s) {
+  const yc = aYC(s);
+  if (s <= S_IT) return yc;
+  if (s >= S_AB) return upperB(S_AB, zAB());
+  const t = (s - S_IT) / (S_AB - S_IT), JB = upperB(S_AB, zAB());
+  return yc + (JB - yc) * (t + t * t - t * t * t) + dsB(zAB()) * (s - S_AB) * t * t;
+}
 function upperAnative(s, z) {
-  const w = aW(s), ht = aHT(s), yc = aYC(s);
+  const w = aW(s), ht = aHT(s), yc = aYC(s), rr = ridgeY(s) - yc;
   const k = cockpitShoulder(s), sp = spine(s);
   const P1 = [w * lerp(lerp(0.55, 0.66, k), 0.05, sp), ht];
   const P2 = [w * lerp(lerp(0.7, 0.82, k), 0.62, sp), lerp(lerp(Math.min(w * 0.17, ht * 0.6), ht * 0.62, k), ht * 0.3, sp)];
   const f = shoulderFit(s), zc = clamp(z, 0, w);
-  if (f <= 0) return yc + bezY([[0, ht], P1, P2, [w, 0]], zc);
+  if (f <= 0) return yc + bezY([[0, ht], P1, P2, [w, rr]], zc);
   // y at the sill is linear in P2's height for a fixed curve parameter, so solve for it; below the sill the side
   // runs straight down to the chine (about 60° from horizontal)
   const zt = Math.min(s < 5.05 ? Math.max(sillW(s), 0.3) : mono(SH_Z, s), w - 0.1), yt = mono(SH_Y, s);
   let lo = 0, hi = 1;
   for (let it = 0; it < 30; it++) { const t = (lo + hi) / 2; if (bez1(0, P1[0], P2[0], w, t) < zt) lo = t; else hi = t; }
   const t = (lo + hi) / 2, m = 1 - t, b01 = m * m * m + 3 * m * m * t, b2 = 3 * m * t * t;
-  const native = yc + bezY([[0, ht], P1, P2, [w, 0]], zc);
-  if (b2 > 0.05) P2[1] = (yt - yc - b01 * ht) / b2;
-  const fitted = zc <= zt ? yc + bezY([[0, ht], P1, P2, [w, 0]], zc) : lerp(yt, yc, (zc - zt) / (w - zt));
+  const native = yc + bezY([[0, ht], P1, P2, [w, rr]], zc);
+  if (b2 > 0.05) P2[1] = (yt - yc - b01 * ht - t * t * t * rr) / b2;
+  const fitted = zc <= zt ? yc + bezY([[0, ht], P1, P2, [w, rr]], zc) : lerp(yt, yc + rr, (zc - zt) / (w - zt));
   return lerp(native, fitted, f);
 }
 function lowerAnative(s, z) {
@@ -186,15 +203,24 @@ function lowerAnative(s, z) {
   return yc + bezY([[w, 0], [w * 0.78, -Math.min(w * 0.2, hb * 0.6)], [w * 0.45, -hb], [0, -hb]], clamp(z, 0, w));
 }
 /** Height of the fuselage top at (s, z) over the forward and centre fuselage. */
-export function upperA(s, z) {
-  const b = bU(s);
-  if (b <= 0) return upperAnative(s, z);
-  // B's section at the hand-over, lifted along the crown to A's spine height so the blend keeps the profile
-  const lift = (aHT(s) - aHT(S_AB)) * (1 - smooth(0, aW(s) * 0.85, Math.abs(z)));
-  return lerp(upperAnative(s, z), upperB(Math.max(s, S_AB), z) + lift, b);
+// From NECK_S0 (just ahead of the canopy's aft end, where the cockpit-side fades begin) to the hand-over the section is
+// interpolated between A's section at NECK_S0 and B's at S_AB in the lateral fraction u = z / aW, held to A's centre-line
+// spine (aHT, the NAWDC side profile) and to the ridge, with B's s-slope at S_AB: one smooth surface in position and slope
+// (the old blend left a valley beside the spine at s 5.6–6.0 and a fold where the cowl tops swept up into the glove).
+const NECK_S0 = 5.3, NECK_IN = 0.25;
+function upperNeck(s, z) {
+  const u = clamp(Math.abs(z) / aW(s), 0, 1), zB = u * zAB(), Wt = smooth(NECK_S0, S_AB, s), d = s - S_AB;
+  const L = (q, qB) => lerp(upperAnative(NECK_S0, q * aW(NECK_S0)), upperB(S_AB, qB) + d * dsB(qB), Wt);
+  const L0 = L(0, 0), L1 = L(1, zAB()), Lu = L(u, zB);
+  return Lu + (1 - u * u) * (aYC(s) + aHT(s) - L0) + u * u * (ridgeY(s) - L1);
 }
-/** Junction of A's upper surface with its side / the cowl top: [z, y]. */
-export const aJunction = (s) => [aW(s), lerp(aYC(s), upperB(S_AB, aW(s)), bU(s))];
+export function upperA(s, z) {
+  if (s <= NECK_S0) return upperAnative(s, z);
+  const nk = upperNeck(Math.min(s, S_AB), z);
+  return s >= NECK_S0 + NECK_IN ? nk : lerp(upperAnative(s, z), nk, smooth(NECK_S0, NECK_S0 + NECK_IN, s));
+}
+/** Junction of A's upper surface with its side / the cowl top (the ridge): [z, y]. */
+export const aJunction = (s) => [aW(s), ridgeY(s)];
 /** Top of the fuselage at any station and lateral position (for fitting internals). */
 export function topAt(s, z) {
   if (s >= S_AB) return upperB(s, Math.min(Math.abs(z), bW(s)));
@@ -281,7 +307,7 @@ export function ringA(s) {
   }
   nat[0] = [w, yc];
   const b = bL(s);
-  const lower = nat.map((p, j) => (j === 0 && bU(s) > 0 ? [jz, jy] : [lerp(p[0], box[j][0], b), lerp(p[1], box[j][1], b)]));
+  const lower = nat.map((p, j) => (j === 0 ? [jz, jy] : [lerp(p[0], box[j][0], b), lerp(p[1], box[j][1], b)]));
   const half = right.concat(lower);
   const left = half.slice(1, -1).reverse().map(([z, y]) => [-z, y]);
   const pts = half.concat(left).map(([z, y]) => [X(s), y, z]);
@@ -828,7 +854,7 @@ export const STINGER = { half: 0.14, s1: 17.5 };
 // views, T.O. side view, Duluth underside photo). The top lip runs out from IT swept 42.6°, parallel to the wing
 // leading edge; in plan the lower lip is a V (IB → OB swept back, OB → OT swept forward); in the front view the
 // aperture is a parallelogram, both side walls leaning inboard at the bottom.
-export const LIP = { IT: [0, 0, 4.78], OT: [1.90, 0.0, 5.72], OB: [1.35, -0.87, 6.10], IB: [0, -0.88, 5.35] };
+export const LIP = { IT: [0, 0, S_IT], OT: [1.90, 0.0, 5.72], OB: [1.35, -0.87, 6.10], IB: [0, -0.88, 5.35] };
 const gap = (s) => 0.035 * (1 - smooth(5.2, 6.4, s));
 const EDGE_N = { top: 8, outer: 9, bottom: 5, inner: 6 };
 /**
@@ -843,6 +869,10 @@ function cowlPoint(e, f, tau) {
     const [cz, cy] = aBoxCorner(s);
     return [cz + g, cy];
   };
+  // behind the lip the cowl top meets the fuselage along the ridge: the diverter slot is roofed over at its top (a short
+  // slanted closure over the top 5 % of the wall), so it stays open only toward the front and the bottom
+  const roof = 1 - smooth(0, 0.15, tau);
+  const innerTop = (s) => { const [jz, jy] = aJunction(s); return [jz + gap(s) * roof, jy]; };
   const outerTop = (s) => {
     const t = clamp((s - LIP.OT[2]) / (S_AB - LIP.OT[2]), 0, 1);
     return [lerp(LIP.OT[0], bW(S_AB), t), lerp(LIP.OT[1], 0, t)];
@@ -853,7 +883,7 @@ function cowlPoint(e, f, tau) {
   };
   if (e === 'top') {
     const sa = sAt(LIP.IT[2]), sb = sAt(LIP.OT[2]);
-    const a = inner(sa, true), b = outerTop(sb);
+    const a = innerTop(sa), b = outerTop(sb);
     const z = lerp(a[0], b[0], f);
     const flat = lerp(a[1], b[1], f) + 0.035 * Math.sin(Math.PI * f) * (1 - tau);
     // the shelf over the inlet sweeps up into the wing glove toward S_AB
@@ -875,8 +905,10 @@ function cowlPoint(e, f, tau) {
   }
   // inner wall (diverter side), bottom → top
   const sa = sAt(LIP.IB[2]), sb = sAt(LIP.IT[2]);
-  const a = inner(sa, false), b = inner(sb, true);
-  return [lerp(a[0], b[0], f), lerp(a[1], b[1], f), lerp(sa, sb, f)];
+  const a = inner(sa, false);
+  if (f >= 1) { const t = innerTop(sb); return [t[0], t[1], sb]; }
+  const q = lerp(f, Math.min(f * 1.14, 0.95), 1 - roof), b = inner(sb, true);
+  return [lerp(a[0], b[0], q), lerp(a[1], b[1], q), lerp(sa, sb, q)];
 }
 /** Closed cowl ring (right side) at fraction tau; corners duplicated so the lips stay sharp. */
 export function cowlRing(tau) {

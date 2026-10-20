@@ -22,8 +22,12 @@ export function stations(s0, s1, step, must = []) {
   }
   return [...out].sort((a, b) => a - b);
 }
-/** Ring stations of the forward-fuselage (A) loft, shared with the panels laid on it. */
-export const loftStationsA = () => stations(0, FR.S_AB, 0.13, [0.05, 0.12, 0.22, 0.35, 0.5, 0.7, 0.95, 1.25, 1.6, 2.0, FR.M(2.55), FR.CANOPY_S0, FR.HOLE_S0, FR.HOLE_S1, FR.CANOPY_S1, ...FR.noseWellStations()]);
+/** Forward-fuselage frame stations (U-frames round the cockpit, the frames behind it) and the aft cockpit bulkhead. */
+export const FRAMES_A = () => [FR.M(3.1), FR.M(3.75), FR.M(5.0), FR.M(5.7), FR.M(6.4), 6.2];
+export const AFT_COCKPIT_BULKHEAD = 5.46;
+/** Ring stations of the forward-fuselage (A) loft, shared with the panels laid on it (the skin also passes through
+ *  every frame ring, so no frame edge stands out of the faceted skin between rings). */
+export const loftStationsA = () => stations(0, FR.S_AB, 0.13, [0.05, 0.12, 0.22, 0.35, 0.5, 0.7, 0.95, 1.25, 1.6, 2.0, FR.M(2.55), FR.CANOPY_S0, FR.HOLE_S0, FR.HOLE_S1, FR.CANOPY_S1, ...FR.noseWellStations(), ...FRAMES_A(), AFT_COCKPIT_BULKHEAD]);
 const inRange = (s0, s1, r) => s0 >= r.s0 - 1e-6 && s1 <= r.s1 + 1e-6;
 const zy = (pts) => dedupe(pts.map((p) => [p[2], p[1]]));
 
@@ -417,9 +421,9 @@ export function buildAirframe(ctx) {
     // forward cockpit pressure bulkhead: from the cockpit floor up to the panel (the nose-gear well is below)
     g.push(platePoly(FR.HOLE_S0, clipAbove(clipBelow(zy(FR.ringA(FR.HOLE_S0).pts), 0.4), 0.025), 0.025));
     // aft cockpit pressure bulkhead behind the seat, under the turtle deck
-    const sAft = 5.46;
+    const sAft = AFT_COCKPIT_BULKHEAD;
     g.push(platePoly(sAft, clipAbove(zy(FR.ringA(sAft).pts), -0.02), 0.025));
-    for (const s of [FR.M(3.1), FR.M(3.75), FR.M(5.0), FR.M(5.7), FR.M(6.4), 6.2]) {
+    for (const s of FRAMES_A()) {
       const ys = FR.upperA(s, FR.sillW(s)) - 0.05;
       const cut = s > FR.HOLE_S0 && s < FR.HOLE_S1;
       // (a frame across the nose-gear well stops either side of it, at the well's side walls)
@@ -575,8 +579,10 @@ export function buildAirframe(ctx) {
     for (const side of [1, -1]) {
       const fwd = [];
       for (let s = FR.M(2.7); s <= FR.M(7.6); s += 0.15) {
-        const z = Math.max(0.42, FR.sillW(s) + 0.07);
-        fwd.push([s, FR.topAt(s, Math.min(z, FR.aW(s) - 0.05)) - 0.06, side * Math.min(z, FR.aW(s) - 0.05)]);
+        const z = Math.min(Math.max(0.42, FR.sillW(s) + 0.07), FR.aW(s) - 0.05);
+        // 6 cm under the skin, deeper where the side falls away steeply so the tube's flank stays covered too
+        const slope = Math.abs(FR.topAt(s, z + 0.03) - FR.topAt(s, z - 0.03)) / 0.06;
+        fwd.push([s, FR.topAt(s, z) - 0.06 - 0.028 * slope, side * z]);
       }
       g.push(FR.pipe(fwd, 0.028, 6));
       const mid = [];
@@ -589,7 +595,8 @@ export function buildAirframe(ctx) {
       mid.push([sEnd, FR.topAt(sEnd, 0.45) - 0.06, side * 0.45]);
       g.push(FR.pipe(mid, 0.028, 6));
       const chine = [];
-      for (let s = FR.M(2.7); s <= FR.S_AB - 0.2; s += 0.4) chine.push([s, FR.aYC(s) - 0.02, side * (FR.aW(s) - 0.06)]);
+      // (the forebody chine, then behind the inlet's inner-top corner the ridge where the side meets the cowl top)
+      for (let s = FR.M(2.7); s <= FR.S_AB - 0.2; s += 0.2) chine.push([s, FR.aJunction(s)[1] - 0.02 - 0.02 * FR.smooth(FR.S_IT, FR.S_IT + 0.4, s), side * (FR.aW(s) - 0.06)]);
       g.push(FR.pipe(chine, 0.022, 6));
     }
     P('Upper longerons & canopy rails', {

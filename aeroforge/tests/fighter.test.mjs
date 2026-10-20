@@ -700,3 +700,52 @@ test('one actuator per trailing-edge surface; the cockpit opening closes inside 
   const r = L.ringA(L.HOLE_S1).pts;
   for (let k = 0; k <= 5; k++) assert.ok(Math.abs(r[k][2]) <= L.sillW(L.HOLE_S1) - 0.02, `opening edge point ${k} inside the canopy sill`);
 });
+
+test('the neck behind the canopy is one smooth surface: no fold at the A → B hand-over, no valley beside the spine', () => {
+  // the forebody side meets the cowl top along a ridge that climbs steadily from the inlet's inner-top corner (NAWDC
+  // side view) to B's deck at the hand-over, where it carries B's slope
+  let prev = L.ridgeY(L.S_IT);
+  for (let s = L.S_IT + 0.05; s <= L.S_AB - 0.15; s += 0.05) { const r = L.ridgeY(s); assert.ok(r > prev, `ridge climbs at s ${s.toFixed(2)}`); prev = r; }
+  close(L.ridgeY(6.0), 0.42, 0.06, 'ridge height at s 6.0 (NAWDC ≈ 0.40)');
+  close(L.ridgeY(L.S_AB), L.upperB(L.S_AB, L.aW(L.S_AB)), 1e-6, 'ridge meets B at the hand-over');
+  const h = 0.005;
+  for (let z = 0; z <= L.aW(L.S_AB) + 1e-9; z += 0.11) {
+    const fwd = (L.topAt(L.S_AB - 1e-4, z) - L.topAt(L.S_AB - h, z)) / (h - 1e-4), aft = (L.topAt(L.S_AB + h, z) - L.topAt(L.S_AB, z)) / h;
+    close(L.topAt(L.S_AB - 1e-4, z), L.topAt(L.S_AB, z), 0.002, `deck height continuous at the hand-over, z ${z.toFixed(2)}`);
+    assert.ok(Math.abs(fwd - aft) < 0.02, `deck slope continuous at the hand-over, z ${z.toFixed(2)}: ${fwd.toFixed(3)} / ${aft.toFixed(3)}`);
+  }
+  // behind the canopy's aft end, along every line of constant z: no kink (|y''| < 2.5 /m over 0.1 m) and no valley
+  // (the surface never dips and rises again by more than 1 cm)
+  const D = 0.1;
+  for (let z = 0.05; z <= 0.85; z += 0.1) {
+    const ss = [], ys = [];
+    for (let s = 5.5; s <= 7.6; s += 0.05) {
+      const y = L.topAt(s, z), k = (L.topAt(s + D, z) - 2 * y + L.topAt(s - D, z)) / (D * D);
+      assert.ok(Math.abs(k) < 2.5, `curvature ${k.toFixed(2)} /m at s ${s.toFixed(2)} z ${z.toFixed(2)}`);
+      ss.push(s); ys.push(y);
+    }
+    // valley depth: how far a point lies below the highest points on both sides of it
+    ys.forEach((y, i) => { const d = Math.min(Math.max(...ys.slice(0, i + 1)), Math.max(...ys.slice(i))) - y; assert.ok(d < 0.01, `valley ${(d * 100).toFixed(1)} cm deep at s ${ss[i].toFixed(2)} z ${z.toFixed(2)}`); });
+  }
+  // the cowl top starts on the ridge (its inner-top edge rides the fuselage side behind the lip: no step, no open slot)
+  for (const tau of [0.3, 0.6, 0.9]) {
+    const p = L.cowlRing(tau)[0], s = L.SN - p[0], [jz, jy] = L.aJunction(s);
+    close(p[1], jy, 1e-6, `cowl top on the ridge at tau ${tau}`);
+    close(p[2], jz, 0.002, `cowl top closes onto the fuselage side at tau ${tau}`);
+  }
+});
+
+test('nothing stands proud of the skin behind the canopy: the fuel-cooler exhaust grilles are flush', { skip: !three && 'three.js is not installed for node' }, async () => {
+  const { buildFighter } = await import('../src/models/fighter.js');
+  const v = buildFighter(); v.update(0, 0); v.root.updateMatrixWorld(true);
+  const inv = new three.Matrix4().copy(v.root.matrixWorld).invert(), a = new three.Vector3();
+  for (const part of v.parts.filter((p) => /Fuel-cooler exhaust grille/.test(p.userData.part.name))) {
+    let worst = 0;
+    part.traverse((o) => {
+      if (!o.isMesh) return;
+      const M = new three.Matrix4().multiplyMatrices(inv, o.matrixWorld), pos = o.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) { a.fromBufferAttribute(pos, i).applyMatrix4(M); const s = L.SN - a.x; if (s > L.ACFC.s0 - 0.02 && s < L.ACFC.s1 + 0.02 && Math.abs(a.z) > L.ACFC.z0 && Math.abs(a.z) < L.ACFC.z1) worst = Math.max(worst, a.y - L.topAt(s, Math.abs(a.z))); }
+    });
+    assert.ok(worst < 0.012, `${part.userData.part.name}: ${(worst * 100).toFixed(1)} cm above the skin (louvres must be flush)`);
+  }
+});
