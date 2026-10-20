@@ -1,6 +1,6 @@
 # Chem Bench
 
-Interactive labs for every chapter of an introductory chemistry course (organized to match Tro, *Introductory Chemistry*, Ch 2–19), plus study tools.
+Interactive labs for every chapter of an introductory chemistry course (organized to match Tro, *Introductory Chemistry*, Ch 2–19), a six-unit Gen Chem Bridge, and study tools.
 
 Open `index.html` in any browser. No install or build step. Progress is saved in your browser.
 
@@ -14,6 +14,8 @@ Each lab has these parts:
 - **Ask Claude** (when opened as a claude.ai Artifact): a hint button that doesn't give away the answer, a step-by-step explanation of any problem, and a chat box for each chapter. Everywhere else these controls stay hidden.
 
 Study tools (top navigation):
+
+- **Review**: a daily, interleaved review across every skill you have practiced, scheduled by spaced repetition (a correct answer pushes the skill out 1, 2, 4, 8, 16, then 32 days; a miss brings it back the same day). Practice and test answers feed the same schedule.
 
 - **Table**: interactive periodic table of all 118 elements. Color by family, block, state or electronegativity; tap an element for its mass, configuration, common ions and more.
 - **Cards**: flashcard decks (polyatomic ions, element symbols, ion charges, metric and Greek prefixes, acids and bases, constants and formulas). Cards you miss come back more often.
@@ -41,6 +43,22 @@ Study tools (top navigation):
 | 18 | Organic Molecules | Hydrocarbon builder with structural formulas, functional groups | Naming hydrocarbons, formulas, alkane/alkene/alkyne, functional groups, isomers |
 | 19 | DNA to Protein | Transcription and translation with point mutations, biomolecule classes | Complementary DNA, mRNA, codons, translation, biomolecule classes, building blocks |
 
+
+### Gen Chem Bridge
+
+General chemistry topics an intro course skips or only touches, for the jump to Gen Chem I and II.
+
+| Unit | Lab | Bench | Practice |
+|------|-----|-------|----------|
+| G1 | Thermochemistry | Coffee-cup calorimeter, Hess's law workbench | Calorimetry → ΔH, Hess's law, ΔH° from formation, heat from a reaction, bond energies |
+| G2 | Weak Acids, ICE Tables & Buffers | Live ICE table with 5% check, buffer vs. water titration | Weak acid/base pH, % ionization, Ka from pH, buffer pH, buffer + strong acid/base, choosing a buffer |
+| G3 | Reaction Rates & Kinetics | Integrated rate-law plots, energy distribution with Eₐ and catalyst, collision simulation | Initial-rates orders, half-life, integrated laws, Arrhenius, relative rates |
+| G4 | Entropy & Free Energy | ΔG = ΔH − TΔS explorer with presets | Sign of ΔS, ΔG, crossover T, spontaneity cases, ΔS° from tables, ΔG° ⇄ K |
+| G5 | Batteries & Electrochemistry | Galvanic cell builder with Nernst voltage, animated electron flow | E°cell, anode, spontaneity, ΔG° from E°, Nernst, electrolysis |
+| G6 | Quantum Numbers & Advanced Bonding | Orbital explorer, formal charge and resonance viewer | Allowed quantum numbers, orbital counts, formal charge, hybridization, expanded-octet shapes, σ/π bonds |
+
+Gen chem problem types were also added to existing labs: gas density and molar mass, Graham's law and gas stoichiometry (Gas Laws); van't Hoff factor (Solutions); ICE tables for K and the common-ion effect (Equilibrium).
+
 ## Files
 
 - `index.html`: page, styles, and script includes
@@ -50,6 +68,8 @@ Study tools (top navigation):
 - `js/labs-reactions.js`: Ch 7, 8, 15, 16
 - `js/labs-states.js`: Ch 11–14, 17
 - `js/labs-life.js`: Ch 18–19
+- `js/labs-genchem.js`: Gen Chem Bridge units G1–G6, their Watch it content, and gen chem problems added to existing labs
+- `js/review.js`: Daily Review (spaced repetition across all skills)
 - `js/tools.js`: periodic table, flashcards, test mode
 - `js/story.js`: storyboard animation engine (tweened atoms, bonds that break and form, orbiting electrons, photons)
 - `js/stories.js`: the Watch it storyboards for each lab

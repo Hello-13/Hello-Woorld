@@ -186,7 +186,7 @@ registerPage('exam', {
       app.innerHTML = `<div class="lab-head"><div class="lab-title"><p class="eyebrow">Review</p><h1>Test Mode</h1><p class="lede">A mixed quiz drawn from the chapters you pick. You see right or wrong as you go, and the worked solutions at the end, like a real test.</p></div></div>
         <section class="panel-card">
           <div class="row" style="justify-content:space-between"><span class="lbl">Chapters</span><span class="btn-row"><button type="button" class="btn ghost" id="ex-all">All</button><button type="button" class="btn ghost" id="ex-none">None</button></span></div>
-          <div class="chips" id="ex-ch">${LABS.map(l => `<button type="button" class="chip fam-${l.fam}" data-id="${l.id}" aria-pressed="${chosen.has(l.id)}">Ch ${l.ch} · ${l.title}</button>`).join('')}</div>
+          <div class="chips" id="ex-ch">${LABS.map(l => `<button type="button" class="chip fam-${l.fam}" data-id="${l.id}" aria-pressed="${chosen.has(l.id)}">${chTag(l)} · ${l.title}</button>`).join('')}</div>
           <div class="row"><span class="lbl">Questions</span><div class="seg" id="ex-n">${[10, 15, 25, 40].map(n => `<button type="button" data-n="${n}" aria-pressed="${n === count}">${n}</button>`).join('')}</div></div>
           <div><button type="button" class="btn primary" id="ex-go">Start test</button> <span class="note" id="ex-msg"></span></div>
         </section>
@@ -215,12 +215,12 @@ registerPage('exam', {
       const right = qs.filter(x => x.ok).length;
       app.innerHTML = `<div class="exam-top"><span class="eyebrow">Question ${i + 1} of ${qs.length}</span><span class="note">${right} right so far</span><button type="button" class="btn ghost" id="ex-quit">End test</button></div>
         <div class="exbar"><i style="width:${i / qs.length * 100}%"></i></div>
-        <section class="panel-card exam-q"><div class="ptype">Ch ${q.lab.ch} · ${q.lab.title} · ${p.type}</div><div class="q">${p.q}</div>${input}<div class="fb" hidden></div>
+        <section class="panel-card exam-q"><div class="ptype">${chTag(q.lab)} · ${q.lab.title} · ${p.type}</div><div class="q">${p.q}</div>${input}<div class="fb" hidden></div>
           <div class="prow"><button type="button" class="btn ghost" id="ex-skip">Skip</button><button type="button" class="btn" id="ex-next" hidden>${i + 1 < qs.length ? 'Next question' : 'See results'}</button></div></section>`;
       const fb = app.querySelector('.fb'), nextB = app.querySelector('#ex-next');
       const done = (ok, given) => {
         q.ok = ok; q.given = given;
-        const ts = Store.typeStat(q.lab.id, p.type); ts.a++; if (ok) ts.c++; Store.save();
+        const ts = Store.typeStat(q.lab.id, p.type); ts.a++; if (ok) ts.c++; recordSkill(q.lab.id, p.type, ok); Store.save();
         fb.hidden = false; fb.className = 'fb ' + (ok ? 'ok' : 'no'); fb.innerHTML = `<div class="verdict">${ok ? 'Correct' : 'Incorrect'}</div>${ok ? '' : '<div class="note">The solution is in your results at the end.</div>'}`;
         app.querySelector('#ex-skip').hidden = true; nextB.hidden = false; nextB.focus();
         app.querySelectorAll('.choice, .ans input, .ans button').forEach(x => { x.disabled = true; });
@@ -231,7 +231,7 @@ registerPage('exam', {
         inp.focus();
         form.addEventListener('submit', e => { e.preventDefault(); if (q.ok !== null) return; const r = checkAnswer(p, inp.value); if (r === null) { fb.hidden = false; fb.className = 'fb no'; fb.innerHTML = `<div class="verdict">Couldn't read that</div><div>${p.kind === 'num' ? 'Enter a number. Scientific notation works as 6.02e23.' : (p.hint || 'Check the format and try again.')}</div>`; return; } done(r, U.esc(inp.value)); });
       }
-      app.querySelector('#ex-skip').addEventListener('click', () => { q.ok = false; q.given = '(skipped)'; Store.typeStat(q.lab.id, p.type).a++; Store.save(); advance(); });
+      app.querySelector('#ex-skip').addEventListener('click', () => { q.ok = false; q.given = '(skipped)'; Store.typeStat(q.lab.id, p.type).a++; recordSkill(q.lab.id, p.type, false); Store.save(); advance(); });
       nextB.addEventListener('click', advance);
       app.querySelector('#ex-quit').addEventListener('click', () => { qs = qs.slice(0, i + (q.ok !== null ? 1 : 0)); results(); });
     }
@@ -240,15 +240,15 @@ registerPage('exam', {
       if (!qs.length) { setup(); return; }
       const c = qs.filter(q => q.ok).length, byLab = {};
       qs.forEach(q => { const b = byLab[q.lab.id] || (byLab[q.lab.id] = { lab: q.lab, c: 0, n: 0 }); b.n++; if (q.ok) b.c++; });
-      hist.list.push({ t: Date.now(), n: qs.length, c, ch: Object.values(byLab).map(b => b.lab.ch).sort((a, b) => a - b).join(', ') });
+      hist.list.push({ t: Date.now(), n: qs.length, c, ch: Object.values(byLab).map(b => b.lab).sort((a, b) => a.ch - b.ch).map(l => l.code || l.ch).join(', ') });
       if (hist.list.length > 30) hist.list.shift();
       Store.save();
       const pct = Math.round(c / qs.length * 100), missed = qs.filter(q => !q.ok);
       const grade = pct >= 90 ? 'A' : pct >= 80 ? 'B' : pct >= 70 ? 'C' : pct >= 60 ? 'D' : 'F';
       app.innerHTML = `<div class="lab-head"><div class="lab-title"><p class="eyebrow">Test results</p><h1>${c} of ${qs.length} correct · ${pct}%</h1><p class="lede">${pct >= 90 ? 'Excellent. You are ready for these chapters.' : pct >= 70 ? 'Solid. Review the misses below, then drill the weakest chapter.' : 'Keep going. Work through the solutions below, then practice the chapters with the lowest bars.'}</p></div><div class="grade-badge">${grade}</div></div>
         <section class="panel-card"><h2 class="mini-h">By chapter</h2>
-          <div style="display:grid;gap:8px">${Object.values(byLab).sort((a, b) => a.c / a.n - b.c / b.n).map(b => `<a href="#${b.lab.id}" class="bar-row fam-${b.lab.fam}"><span>Ch ${b.lab.ch} · ${b.lab.title}</span><span class="meter"><i style="width:${b.c / b.n * 100}%"></i></span><span class="n">${b.c}/${b.n}</span></a>`).join('')}</div></section>
-        ${missed.length ? `<section class="panel-card"><h2 class="mini-h">Review what you missed</h2><div style="display:grid;gap:14px">${missed.map(q => `<div class="review"><div class="ptype">Ch ${q.lab.ch} · ${q.p.type}</div><div class="q">${q.p.q}</div>
+          <div style="display:grid;gap:8px">${Object.values(byLab).sort((a, b) => a.c / a.n - b.c / b.n).map(b => `<a href="#${b.lab.id}" class="bar-row fam-${b.lab.fam}"><span>${chTag(b.lab)} · ${b.lab.title}</span><span class="meter"><i style="width:${b.c / b.n * 100}%"></i></span><span class="n">${b.c}/${b.n}</span></a>`).join('')}</div></section>
+        ${missed.length ? `<section class="panel-card"><h2 class="mini-h">Review what you missed</h2><div style="display:grid;gap:14px">${missed.map(q => `<div class="review"><div class="ptype">${chTag(q.lab)} · ${q.p.type}</div><div class="q">${q.p.q}</div>
           <div>Your answer: <b>${q.given ?? '—'}</b></div><div>Correct: <b>${answerHTML(q.p)}</b></div>${q.p.explain ? `<div class="explain note">${q.p.explain}</div>` : ''}</div>`).join('')}</div></section>` : ''}
         <div class="btn-row"><button type="button" class="btn primary" id="ex-again">New test, same chapters</button><button type="button" class="btn" id="ex-setup">Change chapters</button></div>`;
       app.querySelector('#ex-again').addEventListener('click', () => { setup(); app.querySelector('#ex-go').click(); });
