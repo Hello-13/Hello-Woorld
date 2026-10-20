@@ -139,13 +139,17 @@ export function slab(grid, off, outward = null) {
       quad(inner[r][c + 1], inner[r][c], inner[r + 1][c + 1], inner[r + 1][c]);
     }
   }
+  // the edge walls get vertices of their own: shared with the faces, their normals would be averaged into the faces'
+  // rims and every door would show a dark or bright band round its edge, as if it stood off the skin
+  const own = (i) => { pos.push(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]); return pos.length / 3 - 1; };
+  const wall = (a, b, c, d) => quad(own(a), own(b), own(c), own(d));
   for (let c = 0; c < cols - 1; c++) {
-    quad(inner[0][c], inner[0][c + 1], outer[0][c], outer[0][c + 1]);
-    quad(outer[rows - 1][c], outer[rows - 1][c + 1], inner[rows - 1][c], inner[rows - 1][c + 1]);
+    wall(inner[0][c], inner[0][c + 1], outer[0][c], outer[0][c + 1]);
+    wall(outer[rows - 1][c], outer[rows - 1][c + 1], inner[rows - 1][c], inner[rows - 1][c + 1]);
   }
   for (let r = 0; r < rows - 1; r++) {
-    quad(outer[r][0], outer[r + 1][0], inner[r][0], inner[r + 1][0]);
-    quad(inner[r][cols - 1], inner[r + 1][cols - 1], outer[r][cols - 1], outer[r + 1][cols - 1]);
+    wall(outer[r][0], outer[r + 1][0], inner[r][0], inner[r + 1][0]);
+    wall(inner[r][cols - 1], inner[r + 1][cols - 1], outer[r][cols - 1], outer[r + 1][cols - 1]);
   }
   if (outward) {
     // flip the winding if the first outer face points inward

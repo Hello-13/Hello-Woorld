@@ -501,9 +501,13 @@ export class Environment {
     if (rho < 0.8) this.earthDip = rho + 0.12;              // disc's upper edge ~7° below the horizontal
   }
 
+  /** Per-vehicle lighting adjustments, { [look]: { hemi, key, rim, rim2, envIntensity, exposure } }, merged over
+   *  LOOKS by applyLook. A vehicle that sets none (null) gets the look exactly as defined above. */
+  setVehicleLighting(over) { this.vehicleLighting = over || null; }
+
   applyLook(name) {
-    const L = LOOKS[name];
-    if (!L) return;
+    if (!LOOKS[name]) return;
+    const L = { ...LOOKS[name], ...(this.vehicleLighting?.[name] || {}) };
     this.look = name;
     const st = this.stage;
     for (const [k, f] of Object.entries(this.floors)) f.visible = L.floor === k;

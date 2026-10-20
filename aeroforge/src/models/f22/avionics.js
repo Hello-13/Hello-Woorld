@@ -204,15 +204,16 @@ export function buildAvionics(ctx) {
       for (const [s, dy] of [[SM(2.05), -0.05], [FR.M(2.55) + 0.12, 0.0]]) {              // (the aft pair on the chine, just behind the radome joint)
         const y = FR.aYC(s) + dy;
         const z = Math.abs(FR.inBody([s, y, FR.aW(s)], 0.012)[2]);            // stalk root 1.2 cm inside the skin at that height
-        g.push(FR.pipe([[s, y, side * z], [s - 0.02, y, side * (z + 0.08)]], 0.008, 6, 2));
-        g.push(FR.cylX(s - 0.1, y, side * (z + 0.08), 0.2, 0.006, 0.008, 6));
+        // a stubby blade stalk and a short probe tube, painted grey like the skin
+        g.push(FR.pipe([[s, y, side * z], [s - 0.02, y, side * (z + 0.07)]], 0.013, 8, 2));
+        g.push(FR.cylX(s - 0.075, y, side * (z + 0.07), 0.15, 0.009, 0.013, 10));
       }
     }
     P('Air-data probes', {
       system: 'Sensors', material: 'Heated multi-function pitot-static probes', mass: 6, count: 4,
       explode: [1.6, 0, 0.45],
       desc: 'Small L-shaped probes on the sides of the nose measure total and static pressure and flow angle for the flight controls and air-data computers; they are electrically heated against ice (count approximate).',
-    }, mesh(merge(g), F.probe()));
+    }, mesh(merge(g), F.adProbe()));
   }
 
   // ================================================================== CNI apertures (communications)

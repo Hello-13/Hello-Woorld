@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import { Assembly } from '../engine/assembly.js';
-import { decal, tailCode, stencilText, panelOutline } from '../engine/decals.js';
+import { decal, stencilText, panelOutline } from '../engine/decals.js';
 import { decalTexture } from '../engine/surface.js';
 import { vaporConeMaterial } from '../engine/effects.js';
 import { recoveryTemperature } from '../physics/atmosphere.js';
@@ -46,6 +46,36 @@ const usafInsignia = (ink = 'rgba(36,41,46,0.9)') => decalTexture(`f22.usaf.${in
   ctx.strokeRect(cx - R * 0.82 - R * 1.15, cy - bh / 2 + R * 0.12, R * 1.15, bh);
 });
 
+/**
+ * Low-visibility tail markings, as painted on the outer face of each fin: a light grey wing code over the serial (the
+ * fiscal-year digits stacked small beside "AF", the last three digits large) and a plain shield outline where the
+ * command badge goes. The ink is a lighter grey than the fin, so it reads at low contrast as on the real jet. The badge
+ * is a generic outline, not any command's artwork; the code and serial are illustrative.
+ */
+const tailMarkings = (code, fy, serial, ink = 'rgba(176,182,188,0.92)') => decalTexture(`f22.tail.${code}.${fy}.${serial}.${ink}`, 512, 512, (ctx, w, h) => {
+  ctx.fillStyle = ink; ctx.strokeStyle = ink;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  // shield outline (badge position, upper right of the code)
+  const bx = w * 0.62, by = h * 0.08, bw = w * 0.14, bh = h * 0.15;
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(bx, by); ctx.lineTo(bx + bw, by); ctx.lineTo(bx + bw, by + bh * 0.55);
+  ctx.quadraticCurveTo(bx + bw, by + bh * 0.9, bx + bw / 2, by + bh);
+  ctx.quadraticCurveTo(bx, by + bh * 0.9, bx, by + bh * 0.55);
+  ctx.closePath(); ctx.stroke();
+  // wing code
+  ctx.font = '700 190px "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif';
+  ctx.fillText(code, w / 2, h * 0.62);
+  // serial: "AF" over the fiscal year, small, then the last digits
+  ctx.font = '700 46px "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('AF', w * 0.36, h * 0.75);
+  ctx.fillText(fy, w * 0.36, h * 0.83);
+  ctx.textAlign = 'left';
+  ctx.font = '700 104px "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif';
+  ctx.fillText(serial, w * 0.38, h * 0.84);
+});
+
 export function buildFighter() {
   const A = new Assembly();
   const attitude = new THREE.Group();
@@ -82,14 +112,14 @@ export function buildFighter() {
   };
   for (const side of [1, -1]) {
     const R = side > 0 ? 'right' : 'left';
-    // tail code on the outer face of each canted fin
+    // tail code on the outer face of each fin: the fins lean outboard by the cant, so the span runs along
+    // (0, cos c, ±sin c) and the outer face's normal is (0, −sin c, ±cos c); the projection box runs from the fin's
+    // mid-plane out past its outer skin, so it cannot reach the inner face
     const c = FR.FIN.cant;
-    const n = [0, Math.sin(c), Math.cos(c) * side];
-    const sp = 1.25;
-    const at = [X(FR.FIN.rootS + 1.25 + sp * Math.tan(FR.FIN.sweep)), FR.FIN.rootY + sp * Math.cos(c), side * (FR.FIN.rootZ + sp * Math.sin(c))].map((v, i) => v + n[i] * 0.06);
-    add(`Vertical tail (${R})`, tailCode('FF', 'AF 05-4100'), { at, dir: n, size: [1.25, 1.25, 0.12] });
-    // national insignia on the intake trunk sides
-    add(`Caret inlet cowl (${R})`, usafInsignia(), { at: [X(6.25), -0.45, side * 1.68], dir: [0, -0.15, side], size: [0.9, 0.45, 0.3] });
+    const n = [0, -Math.sin(c), Math.cos(c) * side];
+    const sp = 1.15;
+    const at = [X(FR.FIN.rootS + 1.2 + sp * Math.tan(FR.FIN.sweep)), FR.FIN.rootY + sp * Math.cos(c), side * (FR.FIN.rootZ + sp * Math.sin(c))].map((v, i) => v + n[i] * 0.07);
+    add(`Vertical tail (${R})`, tailMarkings('FF', '05', '100'), { at, dir: n, size: [1.45, 1.45, 0.14] });
     add(`Wing skin (${R})`, stencilText('NO STEP', 'rgba(30,34,38,0.85)', true), { at: [X(FR.WM(13.0)), FR.wingY(3.2) + 0.12, side * 3.2], dir: [0, 1, 0], size: [0.6, 0.15, 0.3], angle: Math.PI / 2 });
   }
   // small servicing panels too small to model as doors: single-point refuel and hydraulic / oil fill
@@ -98,8 +128,9 @@ export function buildFighter() {
     add('Intake trunk & lower fuselage skin', panelOutline('f22.service'), { at: [X(s), -FR.bD(s) - 0.01, z], dir: [0, -1, 0], size: [l, w, 0.12] });
   }
   for (const side of [1, -1]) add('Forward fuselage skin', panelOutline('f22.service'), { at: [X(6.4), FR.bottomAt(6.4, 0.32) - 0.01, side * 0.32], dir: [0, -1, 0.1 * side], size: [0.3, 0.2, 0.15] });
+  // national insignia: upper surface of the left wing and lower surface of the right wing only, as on the jet
   add('Wing skin (left)', usafInsignia(), { at: [X(FR.WM(11.6)), FR.wingY(4.4) + 0.12, -4.4], dir: [0, 1, 0], size: [1.4, 0.7, 0.3], angle: -Math.PI / 2 });
-  add('Forward fuselage skin', stencilText('U.S. AIR FORCE', 'rgba(36,40,46,0.85)'), { at: [X(3.6), FR.aYC(3.6) - 0.2, 0.74], dir: [0, -0.3, 1], size: [1.1, 0.22, 0.3] });
+  add('Wing skin (right)', usafInsignia(), { at: [X(FR.WM(11.6)), FR.wingY(4.4) - 0.12, 4.4], dir: [0, -1, 0], size: [1.4, 0.7, 0.3], angle: -Math.PI / 2 });
 
   // ------------------------------------------------------------------ vapour cone (effect)
   const vcMat = vaporConeMaterial();
@@ -119,10 +150,18 @@ export function buildFighter() {
     [/^Wing (titanium spars|RTM sine-wave spars|ribs) /, 0.5], [/^(Fin box|Stabilator torque box & spindle) /, 0.55], [/^Side bay & gear-well liners$/, 0.5], [/^Main weapons bay$/, 0.6],
     [/^Main wiring harnesses$/, 0.6], [/^Hydraulic lines /, 0.6], [/^Landing-gear & brake hydraulic lines$/, 0.65], [/^Fuel transfer lines$/, 0.7], [/^Refuelling manifold$/, 0.7],
     [/^(Forward fuselage tank|F-1B pump box|Centre fuselage tank|A-3 tank|A-1 aft feed tank|Wing tank)/, 0.6], [/^Engine bleed-air ducts$/, 0.65], [/^Inert-gas generating system/, 0.7],
-    [/^F119 (shafts & bearings|annular combustor) /, 0.55], [/^Serpentine inlet duct /, 0.6], [/^Inlet throat & boundary-layer bleed /, 0.6], [/^AIM-120C AMRAAM/, 0.75],
+    [/^F119 (shafts & bearings|annular combustor) /, 0.55], [/^Serpentine inlet duct /, 0.6], [/^Inlet throat & boundary-layer bleed /, 0.6], [/^AIM-120C AMRAAM/, 0.6],
+    // broad thin surfaces read as solid sheets in X-ray (each face adds its glow); the control surfaces, nozzle flaps
+    // and booms are drawn faint like the skins they belong to
+    [/^(Stabilator|Leading-edge flap|Flaperon|Aileron|Rudder) \(/, 0.3], [/^Nozzle (external flaps|transition duct)/, 0.35], [/^Aft boom /, 0.35],
+    [/^Main bay centre divider$/, 0.4], [/^Cockpit tub & floor$/, 0.6], [/^LAU-142\/A AVEL/, 0.6],
   ];
+  // and the big stacked volumes in the centre fuselage, which otherwise wash it out into a milky fog
+  const XRAY_LOW = [[/^(Centre fuselage tank|Wing tank A-2|F-1B pump box|Forward fuselage tank F-1A|A-1 aft feed tank)/, 0.35], [/^Side bay & gear-well liners$/, 0.3], [/^Main weapons bay$/, 0.35], [/^Keel & weapons-bay longerons$/, 0.4]];
   for (const p of A.parts) {
     const i = p.userData.part;
+    const low = XRAY_LOW.find(([re]) => re.test(i.name));
+    if (low) { i.xrayWeight = low[1]; continue; }
     if (i.xrayWeight < 1) continue;
     const hit = XRAY.find(([re]) => re.test(i.name));
     if (hit) i.xrayWeight = hit[1];
@@ -171,6 +210,14 @@ export function buildFighter() {
     attitude,
     parts: A.parts,
     view: { dir: [1.05, 0.5, 1.15], fill: 1.0 },
+    // Showroom fill for this jet: the look's hemisphere is near black below the horizon, which left every face turned
+    // down or away from the key (the sides below the chine, trunks, belly, the far fin) black. A grey bounce from the
+    // floor and a dimmer, neutral sky keep the grey paint grey all round, as in daylight photos; a slightly softer key
+    // keeps the lit tops from washing out to near white.
+    lighting: {
+      showroom: { hemi: [0x46505c, 0x7d858e, 2.3], key: { color: 0xfff8f0, intensity: 1.8 }, rim: 1.5 },
+      hangar: { hemi: [0xbfd2ff, 0x6c6a66, 0.6] },
+    },
     displaySize: 11,
     // a narrow scale centred on airframe heating: at Mach 2 the skins (≈ 370–385 K) sit mid-scale,
     // well clear of the −57 °C air (≈ 217 K, near black), while the hot section saturates above 600 K
@@ -213,9 +260,13 @@ export function buildFighter() {
       return heat(0.6);
     },
     update(dt, t) {
-      state.gear = approach(state.gear, targets.gear, 0.4, dt);
+      // The gear retracts only in flight: on the ground (the showroom and hangar looks) the jet always stands on its
+      // wheels, so it can never hang at gear-down height with the gear up. (The lab raises the gear together with
+      // "In flight", which lifts the jet off the floor into the sky look.)
+      // On landing the jet holds its height until the gear is down, so the wheels meet the floor extended.
+      state.gear = approach(state.gear, targets.airborne ? targets.gear : 1, 0.4, dt);
       state.bay = approach(state.bay, targets.bay, 1.2, dt);
-      state.airborne = approach(state.airborne, targets.airborne, 0.5, dt);
+      state.airborne = approach(state.airborne, targets.airborne ? 1 : state.gear > 0.98 ? 0 : state.airborne, 0.5, dt);
 
       // landing gear: on retraction the legs swing up first (ret 0 → 0.82) and the doors close behind them
       // (0.84 → 1); on extension the doors open first and the legs follow; the doors stay open with the gear down
@@ -276,7 +327,11 @@ export function buildFighter() {
         const isCore = i % 2 === 1;
         pm.uniforms.intensity.value = run * (isCore ? (thr > 0.04 ? 0.05 + thr * 0.35 + ab * 0.6 : 0) : ab * 1.1);
       }
-      anim.turbine.emissiveIntensity = 0.2 + run * (thr * 2.4 + ab * 2.2);
+      // the glow disc deep in each augmentor shows only with the engines running (cold, the duct is dark grey metal),
+      // and never in the exploded view, where it would float free of the parted engine
+      const glow = run * (0.25 + thr * 2.4 + ab * 2.2);
+      anim.turbine.emissiveIntensity = glow;
+      for (const g of anim.glows) g.mesh.visible = glow > 0.01 && g.part.position.distanceToSquared(g.part.userData.base) < 1e-6;
 
       // transonic vapour cone in humid air
       const m = state.mach;

@@ -22,6 +22,8 @@ export function buildPropulsion(ctx) {
   const cowlRings = FR.COWL_TAUS.map((t) => FR.cowlRing(t));
   const iSplit = D.st.findIndex((s) => s != null && s >= SM(9.4));
   anim.turbine = M.turbineGlow().clone();
+  anim.turbine.emissiveIntensity = 0;
+  anim.glows = [];
   anim.plumes = [];
 
   for (const side of [1, -1]) {
@@ -51,9 +53,12 @@ export function buildPropulsion(ctx) {
         let cz = 0, cy = 0; for (const p of r) { cz += p[2]; cy += p[1]; } cz /= r.length; cy /= r.length;
         return r.map((p) => { const dz = cz - p[2], dy = cy - p[1], L = Math.hypot(dz, dy) || 1; return [p[0], p[1] + (dy / L) * 0.004, p[2] + (dz / L) * 0.004]; });
       };
-      const sub = (j0, j1) => ringsP.map((r) => inset(r).slice(j0, j1 + 1));
+      // (the porous patches cover the aft part of the compression surfaces ahead of the throat, not the whole duct
+      // from the lip, and only the middle of each wall)
+      const k0 = Math.floor(ringsP.length * 0.5);
+      const sub = (j0, j1) => ringsP.slice(k0).map((r) => inset(r).slice(j0, j1 + 1));
       const n = ringsP[0].length;
-      perf.push(FR.gridSurface(sub(0, 4)), FR.gridSurface(sub(n - 6, n - 1)));
+      perf.push(FR.gridSurface(sub(1, 3)), FR.gridSurface(sub(n - 5, n - 2)));
     }
     const bl = [];
     // bleed plenum behind the inboard wall (between the forebody side and the duct, clear of the forward-fuselage
@@ -68,7 +73,7 @@ export function buildPropulsion(ctx) {
       system: 'Propulsion', material: 'Composite duct, perforated titanium bleed panels', mass: 110,
       explode: [0.55, -0.35, 1.25 * side],
       desc: 'From the lip back to the throat the upper and inboard compression surfaces are perforated: slow, low-energy boundary-layer air is sucked off through thousands of small holes so the engine sees uniform flow. It is fixed bleed — there are no moving ramps in a caret inlet.',
-    }, [mesh(FR.gridSurface(fwd, { closed: true, uv: 'n' }), F.duct()), mesh(merge(perf), F.perforated())]);
+    }, [mesh(FR.gridSurface(fwd, { closed: true, uv: 'n' }), F.duct(), { cast: false }), mesh(merge(perf), F.perforated(), { cast: false })]);
     P(`Inlet bleed plenum & exit duct (${R})`, {
       system: 'Propulsion', material: 'Composite plenum and duct', mass: 14,
       explode: [0.9, 0.35, 1.5 * side],
@@ -310,7 +315,9 @@ export function buildPropulsion(ctx) {
       aug.userData.part.xrayWeight = 0.45;
       const glow = mesh(new THREE.CircleGeometry(0.45, 32).rotateY(-Math.PI / 2).translate(X(EM(17.2)), yc, zc), anim.turbine, { cast: false });
       glow.userData.fx = true;
+      glow.visible = false;            // shown by update() only while the engines run
       aug.add(glow);
+      anim.glows.push({ mesh: glow, part: aug });
     }
     // ---------------------------------------------------------------- 2-D vectoring nozzle
     // the nozzle ends at s 16.5 between the tail booms (NAWDC top and bottom views: chevron trailing edges at
@@ -409,13 +416,27 @@ export function buildPropulsion(ctx) {
       ex.userData.part.thermalRole = 'nozzle';
       // nozzle actuators: two above and two below, between the convergent flaps and the external flaps,
       // each with a supply and return line from the engine
+      // Each lies in the wedge between the convergent / divergent flaps and the external flap, along the middle of
+      // that gap, so it stays under the external flap's skin (closed, the gap is 5 cm deep at the actuator's head).
       const acts = [], lines = [];
+      const extIn = (sgn, s, z) => {                       // inner face of the external flap, height above the axis
+        const yLE = sgn > 0 ? FR.upperB(S_EXT, Math.abs(z)) - 0.004 : -FR.bD(S_EXT) + 0.004, t = (s - S_EXT) / (S_EXIT - S_EXT);
+        return sgn * (lerp(yLE, yc + sgn * 0.3, t) + sgn * 0.035 * Math.sin(Math.PI * Math.min(1, t)) * t - yc) - 0.035;
+      };
+      const flapOut = (s) => (s < S_CONV ? 0.355 : s < S_THR ? lerp(0.32, 0.21, (s - S_CONV) / (S_THR - S_CONV)) + 0.035 : lerp(0.21, 0.25, (s - S_THR) / (S_EXIT - S_THR)) + 0.035);
+      const a0 = EM(17.815) - 0.135, a1 = a0 + 0.27, r1 = EM(18.0) + 0.08;
+      const up = new THREE.Vector3(0, 1, 0);
+      const between = (p, q, r0, r1b, seg) => {
+        const d = new THREE.Vector3().subVectors(q, p), L = d.length();
+        return new THREE.CylinderGeometry(r1b, r0, L, seg).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, d.normalize())).translate((p.x + q.x) / 2, (p.y + q.y) / 2, (p.z + q.z) / 2);
+      };
       for (const dz of [-0.28, 0.28]) {
-        for (const y of [0.4, -0.42]) {
-          acts.push(new THREE.CylinderGeometry(0.03, 0.026, 0.27, 10).rotateZ(Math.PI / 2).translate(sx(EM(17.815)), yc + y, zc + dz));
-          acts.push(new THREE.CylinderGeometry(0.014, 0.014, 0.16, 8).rotateZ(Math.PI / 2).translate(sx(EM(18.0)), yc + y * 0.93, zc + dz));
-          const r0 = Math.sign(y) * 0.585;
-          lines.push(FR.pipe([[EM(15.0), yc + r0 * 0.98, zc + dz * 0.6], [EM(16.4), yc + r0 * 0.94, zc + dz * 0.8], [EM(17.3), yc + Math.sign(y) * 0.5, zc + dz], [EM(17.68), yc + y + Math.sign(y) * 0.02, zc + dz]], 0.008, 5, 16));
+        for (const sgn of [1, -1]) {
+          const z = zc + dz, mid = (s) => (extIn(sgn, s, z) + flapOut(s)) / 2;
+          const yA = mid(a0), yR = mid(r1), yAt = (s) => yA + ((yR - yA) * (s - a0)) / (r1 - a0);
+          const pA = new THREE.Vector3(sx(a0), yc + sgn * yAt(a0), z), pB = new THREE.Vector3(sx(a1), yc + sgn * yAt(a1), z), pR = new THREE.Vector3(sx(r1), yc + sgn * yAt(r1), z);
+          acts.push(between(pA, pB, 0.02, 0.018, 10), between(pB, pR, 0.009, 0.009, 8));
+          lines.push(FR.pipe([[EM(15.0), yc + sgn * 0.585 * 0.98, zc + dz * 0.6], [EM(16.4), yc + sgn * 0.585 * 0.94, zc + dz * 0.8], [EM(17.3), yc + sgn * 0.5, zc + dz], [a0 - 0.02, yc + sgn * (yA + 0.005), zc + dz]], 0.008, 5, 16));
         }
       }
       P(`Nozzle actuators (${R})`, {

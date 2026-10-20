@@ -2,30 +2,56 @@
 
 import * as THREE from 'three';
 import { M, SKIN } from '../../engine/materials.js';
-import { decalTexture } from '../../engine/surface.js';
+import { decalTexture, fbm } from '../../engine/surface.js';
 
 const cache = new Map();
 const once = (k, make) => { if (!cache.has(k)) cache.set(k, make()); return cache.get(k); };
 const std = (k, p) => once(k, () => new THREE.MeshStandardMaterial(p));
 
-export const F = {
-  // F-22 low-observable coating: medium "haze" grey (FS 36170 class), fairly matte. Clones of the
-  // shared skins (same procedural maps) with less clearcoat so broad panels read as grey, not black.
-  skin: () => once('f22.skin', () => { const m = SKIN.stealth().clone(); m.color.set(0x5b6269); m.metalness = 0.18; m.clearcoat = 0.16; m.clearcoatRoughness = 0.42; return m; }),
-  // the wing reuses the fuselage skin's procedural maps, tiled at the wing's own 2.2 m panel scale, so only one
-  // set of skin textures is painted while the model builds
-  wing: () => once('f22.wing', () => {
-    const m = SKIN.stealth().clone();
-    for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'bumpMap', 'aoMap']) {
-      if (!m[k]) continue;
-      const t = m[k].clone();
-      t.repeat.set(1 / 2.2, 1 / 2.2);
-      t.needsUpdate = true;
-      m[k] = t;
+/** Faint paint maps (shared by the fuselage and wing materials): albedo tone within ±2.5 % and roughness 0.55–0.66
+ *  over metre-scale patches, so broad surfaces are not perfectly uniform; no seams, fasteners or mottling. */
+const raptorPaint = () => once('f22.paintMaps', () => {
+  const N = 256;
+  const toCanvas = (f, fn) => {
+    const c = document.createElement('canvas');
+    c.width = c.height = N;
+    const ctx = c.getContext('2d');
+    const img = ctx.createImageData(N, N);
+    for (let i = 0; i < f.length; i++) {
+      const v = Math.max(0, Math.min(255, fn(f[i]) * 255));
+      img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v;
+      img.data[i * 4 + 3] = 255;
     }
-    m.normalScale.set(0.5, 0.5); m.color.set(0x555c63); m.metalness = 0.18; m.clearcoat = 0.16; m.clearcoatRoughness = 0.42;
-    return m;
-  }),
+    ctx.putImageData(img, 0, 0);
+    return c;
+  };
+  const tex = (c, srgb) => {
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    t.anisotropy = 8;
+    return t;
+  };
+  const tone = fbm(N, { seed: 71, octaves: 3, base: 2, gain: 0.45 });
+  const sheen = fbm(N, { seed: 83, octaves: 3, base: 3, gain: 0.5 });
+  return { map: tex(toCanvas(tone, (v) => 0.95 + 0.05 * v), true), roughnessMap: tex(toCanvas(sheen, (v) => 0.55 + 0.11 * v), false) };
+});
+/** The coating: matte, a little metallic sheen from the paint's pigment, no clearcoat. */
+const paint = (color, repeat) => {
+  const set = raptorPaint();
+  const map = set.map.clone(), roughnessMap = set.roughnessMap.clone();
+  for (const t of [map, roughnessMap]) { t.repeat.set(repeat, repeat); t.needsUpdate = true; }
+  return new THREE.MeshPhysicalMaterial({ color, map, roughnessMap, roughness: 1, metalness: 0.14, clearcoat: 0, specularIntensity: 0.55, envMapIntensity: 1.0 });
+};
+
+export const F = {
+  // F-22 low-observable coating: medium "haze" grey (FS 36170 class), low-gloss matte. The jet's own map set
+  // (raptorPaint below) carries only a faint large-scale tone and sheen variation: the coating is taped and sealed
+  // smooth, so the panels that show are the modelled doors and panels themselves, not a generic repeating tile.
+  skin: () => once('f22.skin', () => paint(0x6e767d, 1 / 6.5)),
+  // the wing: the same paint, tiled on its own (its skins are a few large composite panels; the hinge lines of the
+  // leading-edge flap, flaperon and aileron and the saw-tooth access doors are modelled)
+  wing: () => once('f22.wing', () => paint(0x6b737a, 1 / 7.5)),
   /**
    * One-piece canopy: polycarbonate with a gold-tinted indium-tin-oxide film. Roughness is held
    * above ~0.1 on both lobes so the large curved bubble carries broad, steady highlights.
@@ -39,7 +65,8 @@ export const F = {
   canopyFrame: () => std('f22.canopyFrame', { color: 0x3c4147, roughness: 0.55, metalness: 0.35 }),
   duct: () => std('f22.duct', { color: 0x3a3f45, roughness: 0.8, metalness: 0.15, side: THREE.DoubleSide }),
   ductDark: () => std('f22.ductDark', { color: 0x15181b, roughness: 0.9, metalness: 0.1, side: THREE.DoubleSide }),
-  bay: () => std('f22.bay', { color: 0xc3c8cc, roughness: 0.6, metalness: 0.15, side: THREE.DoubleSide }),
+  // weapons bays and wheel wells: clean gloss white (as in photographs of the open bays)
+  bay: () => std('f22.bay', { color: 0xe2e5e8, roughness: 0.38, metalness: 0.05, side: THREE.DoubleSide }),
   doorInner: () => std('f22.doorInner', { color: 0xb8bdc2, roughness: 0.6, metalness: 0.15 }),
   ti: () => M.titanium(),
   tiDull: () => std('f22.tiDull', { color: 0x9aa1a7, roughness: 0.45, metalness: 0.9 , side: THREE.DoubleSide }),
@@ -51,7 +78,8 @@ export const F = {
   chrome: () => std('f22.chrome', { color: 0xd9dee3, roughness: 0.16, metalness: 1 }),
   gear: () => std('f22.gear', { color: 0xd6d9dc, roughness: 0.45, metalness: 0.2 }),
   tyre: () => std('f22.tyre', { color: 0x151515, roughness: 0.88, metalness: 0 }),
-  wheel: () => std('f22.wheel', { color: 0xa9afb5, roughness: 0.38, metalness: 0.85 }),
+  wheel: () => std('f22.wheel', { color: 0xc3c7cb, roughness: 0.42, metalness: 0.35 }),       // light grey painted hubs
+  wheelDark: () => std('f22.wheelDark', { color: 0x1d2024, roughness: 0.7, metalness: 0.2 }),   // shadowed openings between the spokes
   brake: () => std('f22.brake', { color: 0x24262a, roughness: 0.7, metalness: 0.3 }),
   tank: () => std('f22.tank', { color: 0x6f8aa3, roughness: 0.55, metalness: 0.25 }),
   sealant: () => std('f22.sealant', { color: 0x5d7c5a, roughness: 0.6, metalness: 0.1 }),
@@ -89,11 +117,15 @@ export const F = {
   red: () => std('f22.red', { color: 0xa8241c, roughness: 0.5, metalness: 0.2 }),
   lens: () => std('f22.lens', { color: 0x1a1d20, roughness: 0.12, metalness: 0.3 }),
   probe: () => std('f22.probe', { color: 0x9aa0a6, roughness: 0.3, metalness: 0.95 }),
+  // air-data probes: painted the skin's grey, a little more sheen than the coating
+  adProbe: () => std('f22.adProbe', { color: 0x737b82, roughness: 0.5, metalness: 0.3 }),
   nozzle: () => std('f22.nozzle', { color: 0x4b4744, roughness: 0.5, metalness: 0.7 }),
   nozzleIn: () => std('f22.nozzleIn', { color: 0x3a302c, roughness: 0.5, metalness: 0.85, side: THREE.DoubleSide }),
   // flush doors and panels sit a couple of millimetres proud of the skin they cover: a small polygon
   // offset keeps their saw-tooth edges from flickering against it
-  door: () => once('f22.door', () => { const m = F.skin().clone(); m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; return m; }),
+  // (a shade lighter than the surrounding skin: the doors' sealed, re-coated edges give the real jet its faint panel
+  // pattern, so the panel tone follows real doors rather than a generic tile)
+  door: () => once('f22.door', () => { const m = F.skin().clone(); m.color.set(0x747c83); m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; return m; }),
   doorWing: () => once('f22.doorWing', () => { const m = F.wing().clone(); m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; return m; }),
   // isogrid: integrally machined triangular stiffening on the aft-boom panels (≈ 0.1 m pockets, estimate)
   isogrid: () => once('f22.isogrid', () => {
@@ -119,12 +151,13 @@ export const F = {
   perforated: () => once('f22.perforated', () => {
     const tex = decalTexture('f22.perf', 256, 256, (c, w, h) => {
       c.fillStyle = '#4a5056'; c.fillRect(0, 0, w, h);
-      c.fillStyle = '#121416';
-      for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) { c.beginPath(); c.arc((i + 0.5 + (j % 2) * 0.5) * 16, (j + 0.5) * 16, 4, 0, Math.PI * 2); c.fill(); }
+      c.fillStyle = '#2c3034';
+      for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) { c.beginPath(); c.arc((i + 0.5 + (j % 2) * 0.5) * 16, (j + 0.5) * 16, 3, 0, Math.PI * 2); c.fill(); }
     });
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
     tex.repeat.set(4, 4);
-    return new THREE.MeshStandardMaterial({ color: 0xffffff, map: tex, roughness: 0.75, metalness: 0.3, side: THREE.DoubleSide });
+    // (low contrast: at viewing distance the holes average out to a slightly darker panel, as on the real duct)
+    return new THREE.MeshStandardMaterial({ color: 0xc8ccd0, map: tex, roughness: 0.8, metalness: 0.2, side: THREE.DoubleSide });
   }),
   // wiring: braided harness jackets, colour-coded on the engines
   harness: () => std('f22.harness', { color: 0x30322f, roughness: 0.85, metalness: 0.05 }),

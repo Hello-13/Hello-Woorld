@@ -14,6 +14,39 @@ const { X, lerp, M } = FR;
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const range = (a, b, n) => [...Array(n + 1).keys()].map((k) => a + ((b - a) * k) / n);
 
+/**
+ * Lower-surface height finder: the y where a vertical ray meets the named skin parts' outer surface from below, or
+ * `fallback` if it misses. Only the triangles inside the given box are tested, so a few hundred rays stay cheap.
+ */
+function skinProbe(ctx, names, { x0, x1, yMax, zMax }) {
+  ctx.attitude.updateMatrixWorld(true);
+  const pos = [];
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (const name of names) {
+    const part = ctx.A.parts.find((p) => p.name === name);
+    part?.traverse((o) => {
+      if (!o.isMesh) return;
+      const g = o.geometry, P = g.attributes.position, I = g.index, n = I ? I.count : P.count;
+      for (let k = 0; k < n; k += 3) {
+        const i0 = I ? I.getX(k) : k, i1 = I ? I.getX(k + 1) : k + 1, i2 = I ? I.getX(k + 2) : k + 2;
+        a.fromBufferAttribute(P, i0).applyMatrix4(o.matrixWorld); b.fromBufferAttribute(P, i1).applyMatrix4(o.matrixWorld); c.fromBufferAttribute(P, i2).applyMatrix4(o.matrixWorld);
+        if (Math.max(a.x, b.x, c.x) < x0 || Math.min(a.x, b.x, c.x) > x1 || Math.min(a.y, b.y, c.y) > yMax || Math.min(Math.abs(a.z), Math.abs(b.z), Math.abs(c.z)) > zMax) continue;
+        pos.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z);
+      }
+    });
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const target = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  const rc = new THREE.Raycaster(), up = new THREE.Vector3(0, 1, 0), o = new THREE.Vector3();
+  rc.far = 1.0;
+  return (x, z, fallback) => {
+    rc.set(o.set(x, fallback - 0.5, z), up);
+    const hit = rc.intersectObject(target, false)[0];
+    return hit && Math.abs(hit.point.y - fallback) < 0.05 ? hit.point.y : fallback;
+  };
+}
+
 export function buildAccess(ctx) {
   const { P } = ctx;
 
@@ -49,11 +82,16 @@ export function buildAccess(ctx) {
       }
       return FR.bottomAt(s, z);
     };
+    // The door is then seated a constant 4 mm outside the skin as actually built: each grid point is dropped onto
+    // the skin's triangles by a vertical ray. (Interpolating the rings in s alone leaves the triangulated skin up to a
+    // few millimetres off in places, and where the door came within 1 mm of it the two surfaces could fight for depth,
+    // which polygon offset does not cure in the ambient-occlusion pass.)
+    const onSkin = skinProbe(ctx, ['Radome', 'Forward fuselage skin'], { x0: X(D.sA + 0.1), x1: X(D.s0 - 0.1), yMax: 0.05, zMax: D.zOut + 0.1 });
     const us = range(0, 1, 8), ts = range(0, 1, 30);
     for (const side of [1, -1]) {
       const grid = ts.map((t) => us.map((u) => {
         const s = lerp(sF(u), sB(u), t), zz = side * lerp(zi(s), D.zOut, u);
-        return [X(s), lowerAt(s, zz) - 0.003, zz];
+        return [X(s), onSkin(X(s), zz, lowerAt(s, zz)) - 0.004, zz];
       }));
       g.push(slab(grid, () => [0, 0.018, -side * 0.012], V(0, -1, side * 0.5)));
     }

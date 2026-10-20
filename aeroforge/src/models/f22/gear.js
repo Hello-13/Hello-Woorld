@@ -27,12 +27,30 @@ function wheelGeos(R, W, brake) {
   const tube = Math.min(W * 0.5, R * 0.32);
   const tyre = new THREE.TorusGeometry(R - tube, tube, 14, 40);
   tyre.scale(1, 1, (W * 0.5) / tube);
-  const hub = new THREE.CylinderGeometry(R * 0.5, R * 0.5, W * 0.8, 28).rotateX(Math.PI / 2);
-  const cap = new THREE.CylinderGeometry(R * 0.16, R * 0.2, W * 0.95, 14).rotateX(Math.PI / 2);
-  const spokes = [];
-  for (let k = 0; k < 8; k++) spokes.push(new THREE.BoxGeometry(R * 0.07, R * 0.62, W * 0.84).rotateZ((k / 8) * Math.PI));
-  const out = { tyre, hub: merge([hub, ...spokes]), cap };
-  if (brake) out.brake = new THREE.CylinderGeometry(R * 0.44, R * 0.44, W * 0.6, 24).rotateX(Math.PI / 2);
+  // cast hub, both faces alike: the rim flange inside the tyre bead, a dished face recessed behind it with eight
+  // raised spokes and dark lightening openings between them, and a central boss with its bolt circle
+  const prof = [[0.001, 0.3], [0.17, 0.3], [0.19, 0.24], [0.43, 0.2], [0.46, 0.36], [0.5, 0.4], [0.53, 0.4], [0.53, 0]].map(([r, z]) => [r * R, z * W]);
+  // (ordered from the inboard face to the outboard one, so the lathe's faces point outward)
+  const half = [...prof, ...prof.slice(0, -1).reverse().map(([r, z]) => [r, -z])].reverse().map(([r, z]) => new THREE.Vector2(r, z));
+  const hub = new THREE.LatheGeometry(half, 36).rotateX(Math.PI / 2);
+  const cap = new THREE.CylinderGeometry(R * 0.08, R * 0.1, W * 0.68, 14).rotateX(Math.PI / 2);
+  const spokes = [], holes = [];
+  for (const f of [1, -1]) {
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      // spoke rib from the boss to the rim, standing 0.06 W off the dish
+      spokes.push(new THREE.BoxGeometry(R * 0.06, R * 0.27, W * 0.08).translate(0, R * 0.3, f * W * 0.24).rotateZ(a));
+      // opening between this spoke and the next, just proud of the dish
+      holes.push(new THREE.CircleGeometry(R * 0.055, 12).rotateY(f > 0 ? 0 : Math.PI).translate(0, R * 0.315, f * (W * 0.215 + 0.002)).rotateZ(a + Math.PI / 8));
+    }
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * Math.PI * 2;
+      spokes.push(new THREE.CylinderGeometry(R * 0.012, R * 0.012, W * 0.04, 6).rotateX(Math.PI / 2).translate(Math.cos(a) * R * 0.125, Math.sin(a) * R * 0.125, f * W * 0.31));
+    }
+  }
+  const out = { tyre, hub: merge([hub, ...spokes]), holes: merge(holes), cap };
+  // (the carbon heat stack inside the hub, narrower than the dished faces so it stays hidden behind them)
+  if (brake) out.brake = new THREE.CylinderGeometry(R * 0.42, R * 0.42, W * 0.36, 24).rotateX(Math.PI / 2);
   return out;
 }
 
@@ -190,7 +208,7 @@ export function buildGear(ctx) {
     const w = wheelGeos(Rn, Wn, false);
     const gW = legGroup(), slW = slideGroup(gW.inner);
     const wheel = new THREE.Group(); wheel.position.copy(at(Lg));
-    wheel.add(mesh(w.tyre, F.tyre()), mesh(w.hub, F.wheel()), mesh(w.cap, F.steel()));
+    wheel.add(mesh(w.tyre, F.tyre()), mesh(w.hub, F.wheel()), mesh(w.holes, F.wheelDark(), { cast: false }), mesh(w.cap, F.steel()));
     slW.add(wheel);
     P('Nose wheel & tyre', {
       system: 'Landing gear', material: 'Aluminium wheel, nitrogen-filled radial tyre (23.5 × 7.5 R10, 22-ply, 290 psi)', mass: 32,
@@ -364,7 +382,7 @@ export function buildGear(ctx) {
       const knC = knuckleGroup(sC.inner);
       const w = wheelGeos(Rm, Wm, true);
       const wheel = new THREE.Group(); wheel.position.copy(Fd.clone().addScaledVector(stubDir, G.stub));
-      wheel.add(mesh(w.tyre, F.tyre()), mesh(w.hub, F.wheel()), mesh(w.cap, F.steel()), mesh(w.brake, F.brake()));
+      wheel.add(mesh(w.tyre, F.tyre()), mesh(w.hub, F.wheel()), mesh(w.holes, F.wheelDark(), { cast: false }), mesh(w.cap, F.steel()), mesh(w.brake, F.brake()));
       knC.add(wheel);
       P(`Main wheel & carbon brake (${R})`, {
         system: 'Landing gear', material: 'Aluminium wheel, carbon–carbon brake stack, nitrogen-filled radial tyre (37 × 11.5 R18, 28-ply, 275 psi)', mass: 120,

@@ -861,8 +861,10 @@ export function buildAirframe(ctx) {
     const g = [];
     for (const f of [0.15, 0.42, 0.7]) g.push(sparWeb(secs, f, 0.016, 0.88, naca00));
     for (const sec of secs) g.push(ribPlate(sec, 0.12, 0.75, 0.012, 0.86, naca00));
-    const spindle = new THREE.CylinderGeometry(0.062, 0.062, 0.7, 16).rotateX(Math.PI / 2).translate(X(FR.STAB.pivotS), FR.STAB.y, FR.STAB.rootZ - 0.2);
-    g.push(spindle);
+    // the spindle: 12 cm across in its bearings inside the boom, ending at the stabilator's root rib; it carries on
+    // into the torque box as a 5 cm tube, thinner than the stabilator is thick there, so nothing shows through the skin
+    g.push(new THREE.CylinderGeometry(0.062, 0.062, 0.6, 16).rotateX(Math.PI / 2).translate(X(FR.STAB.pivotS), FR.STAB.y, FR.STAB.rootZ - 0.31));
+    g.push(new THREE.CylinderGeometry(0.025, 0.025, 0.5, 12).rotateX(Math.PI / 2).translate(X(FR.STAB.pivotS), FR.STAB.y, FR.STAB.rootZ + 0.24));
     const boxGeo = merge(g);
     const hb = hinge(mesh(side > 0 ? boxGeo : mirror(boxGeo), F.ti()), p0, p1, testTE, V(0, -1, 0));
     P(`Stabilator torque box & spindle (${R})`, {
@@ -984,7 +986,7 @@ export function buildAirframe(ctx) {
     P('Side bay & gear-well liners', {
       system: 'Structure', material: 'Aluminium / composite liners', mass: 120, explode: [0, -0.35, 0],
       desc: 'Sealed liners form the two side weapons bays and the countermeasure bays in the inlet trunks and the three landing-gear wells, keeping airflow and moisture out of the fuselage when the doors open.',
-    }, mesh(merge(g), F.bay()));
+    }, mesh(merge(g), F.bay(), { cast: false }));     // (inside the fuselage: casting would only add shadow acne on itself)
   }
 
   return { ringsA, ringsB, sA, sB };

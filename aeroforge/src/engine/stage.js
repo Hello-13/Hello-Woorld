@@ -73,6 +73,38 @@ class SceneAOPass extends GTAOPass {
     const k = Math.min(this.resScale, Math.sqrt(AO_MAX_PIXELS / Math.max(1, w * h)));
     super.setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
   }
+  /** The normal / depth pass draws each mesh with the face culling of its own material. (A single front-sided
+   *  override material culls the inner faces of double-sided ducts, wells and bays, so the AO there was computed
+   *  from whatever lay behind them and showed as dark and light smudges.) */
+  renderOverride(renderer, overrideMaterial, renderTarget, clearColor, clearAlpha) {
+    if (overrideMaterial !== this.normalMaterial) return super.renderOverride(renderer, overrideMaterial, renderTarget, clearColor, clearAlpha);
+    if (!this.sideNormals) {
+      this.sideNormals = [THREE.FrontSide, THREE.BackSide, THREE.DoubleSide].map((side) => {
+        const m = new THREE.MeshNormalMaterial({ side });
+        m.blending = THREE.NoBlending;
+        return m;
+      });
+    }
+    const swapped = [];
+    this.scene.traverseVisible((o) => {
+      if (!o.isMesh || !o.material) return;
+      const side = Array.isArray(o.material) ? o.material[0]?.side : o.material.side;
+      swapped.push(o, o.material);
+      o.material = this.sideNormals[side] || this.sideNormals[0];
+    });
+    renderer.getClearColor(this.originalClearColor);
+    const a0 = renderer.getClearAlpha(), auto = renderer.autoClear;
+    renderer.setRenderTarget(renderTarget);
+    renderer.autoClear = false;
+    renderer.setClearColor(clearColor);
+    renderer.setClearAlpha(clearAlpha || 0);
+    renderer.clear();
+    renderer.render(this.scene, this.camera);
+    renderer.autoClear = auto;
+    renderer.setClearColor(this.originalClearColor);
+    renderer.setClearAlpha(a0);
+    for (let i = 0; i < swapped.length; i += 2) swapped[i].material = swapped[i + 1];
+  }
 }
 
 /** Bloom from a frame of at most BLOOM_MAX_PIXELS, so its glow keeps the same size on screen at 4K. */

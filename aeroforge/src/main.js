@@ -556,6 +556,7 @@ async function start() {
     groundLook = null;
     app.look = app.looks[f.id] || f.looks[0];
     stage.env.setOrbitView(f.orbit || null);
+    stage.env.setVehicleLighting(v.lighting);
     stage.env.applyLook(app.look);
     v.setLook?.(app.look);
     polarLimit();
