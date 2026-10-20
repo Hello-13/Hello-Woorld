@@ -477,7 +477,10 @@ export function buildAirframe(ctx) {
     // the air-cooled fuel coolers and their exhaust plenums up to the grilles (thermal.js: 10 cm under the skin)
     const AC = FR.ACFC, acZ = (AC.z0 + AC.z1) / 2;
     const acfcDep = (ss, y, z) => (ss > AC.s0 && ss < AC.s1 ? Math.min(Math.abs(z) - (acZ - 0.17), acZ + 0.17 - Math.abs(z), y - (FR.topAt(ss, acZ) - 0.24)) : -1);
-    const depAt = (s, th) => (y, z) => Math.max(...[s - th / 2, s, s + th / 2].map((ss) => Math.max(FR.ductDepth(ss, y, z), FR.mainWellDepth(ss, y, z), gunDep(ss, y, z), apuDep(ss, y, z), acfcDep(ss, y, z))));
+    // (and the inlet-bypass plenums that stand on the ducts' roofs under the louvre doors)
+    const BP = FR.BYPASS;
+    const bypDep = (ss, y, z) => { const az = Math.abs(z); if (!(ss > BP.s0 - 0.03 && ss < BP.s1 + 0.03 && az > BP.z0 - 0.03 && az < BP.z1 + 0.03)) return -1; const sp = FR.ductSpan(ss, az); return sp && y > sp.hi - 0.02 ? 0.1 : -1; };
+    const depAt = (s, th) => (y, z) => Math.max(...[s - th / 2, s, s + th / 2].map((ss) => Math.max(FR.ductDepth(ss, y, z), FR.mainWellDepth(ss, y, z), gunDep(ss, y, z), apuDep(ss, y, z), acfcDep(ss, y, z), bypDep(ss, y, z))));
     const clipDuct = (s, th) => {
       const dep = depAt(s, th);
       return (o, i) => {
@@ -516,7 +519,16 @@ export function buildAirframe(ctx) {
     const amadBay = (s) => (p) => !(Math.abs(s - FR.FRAMES.engine[0]) < 0.01 && p[1] < -0.8 && Math.abs(p[0]) > FR.AMAD.z - 0.27 && Math.abs(p[0]) < FR.AMAD.z + 0.22);
     for (const s of FR.FRAMES.engine) {
       const wk = wellKeep(s), sweep = (p) => Math.max(FR.mainWellDepth(s - 0.02, p[1], p[0]), FR.mainWellDepth(s + 0.02, p[1], p[0])) < -0.015;
-      g.push(frameBand(s, zy(FR.ringB(s).pts), { depth: 0.07, thick: 0.04, keep: (p) => amadBay(s)(p) && wk(p) && sweep(p) && !inWell(s, p) }));
+      // (made shallow where the deck comes close over the engine: 1.5 cm off the F119's case, accessories included)
+      const rE = (s <= FR.AUG_S ? FR.F119.rMax : FR.mono(FR.F119_AUG.map(([r, st]) => [st, r]), s)) + 0.015;
+      const engDep = (y, z) => rE - Math.hypot(y - FR.ENG_Y, Math.abs(z) - FR.ENG_Z);
+      const clipEng = (o, i) => {
+        if (engDep(i[1], i[0]) < 0) return i;
+        let lo = 0, hi = 1;
+        for (let k = 0; k < 14; k++) { const m = (lo + hi) / 2; if (engDep(lerp(o[1], i[1], m), lerp(o[0], i[0], m)) < 0) lo = m; else hi = m; }
+        return [lerp(o[0], i[0], lo), lerp(o[1], i[1], lo)];
+      };
+      g.push(frameBand(s, zy(FR.ringB(s).pts), { depth: 0.07, thick: 0.04, clip: clipEng, keep: (p) => amadBay(s)(p) && wk(p) && sweep(p) && !inWell(s, p) && engDep(p[1], p[0]) < -0.005 }));
     }
     P('Engine-bay frames', {
       system: 'Structure', material: 'Titanium frames', mass: 420, explode: [-1.0, 0.9, 0],
@@ -547,7 +559,11 @@ export function buildAirframe(ctx) {
       // ceiling toward the aft end, where the duct floor comes down to it)
       const cz = FR.BAY_CEIL_BREAK;
       const dy = (sv) => 0.035 - 0.03 * FR.smooth(s1 - 0.5, s1 - 0.1, sv);
-      g.push(FR.pipe(stations(s0 + 0.04, s1, 0.5).map((sv) => [sv, FR.BAY_CEIL + dy(sv), Math.sign(z) * cz]), 0.03, 6, 24));
+      // (stepped inboard along the ceiling where the duct's floor comes down outboard of it, behind the bay's front)
+      const zL = (sv) => { let zz = cz; while (zz > 0.25 && [-0.03, 0, 0.03].some((d) => FR.ductDepth(sv, FR.BAY_CEIL + dy(sv) + d, zz) > -0.055)) zz -= 0.01; return zz; };
+      const stL = stations(s0 + 0.04, s1, 0.1);
+      const zs = stL.map(zL), zsm = zs.map((_, k) => Math.min(...zs.slice(Math.max(0, k - 3), k + 4)));
+      g.push(FR.pipe(stL.map((sv, k) => [sv, FR.BAY_CEIL + dy(sv), Math.sign(z) * zsm[k]]), 0.03, 6, 80));
     }
     P('Keel & weapons-bay longerons', {
       system: 'Structure', material: 'Titanium keel web, steel / titanium longerons', mass: 380, explode: [0, -0.45, 0],

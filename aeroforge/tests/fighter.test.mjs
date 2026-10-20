@@ -370,6 +370,66 @@ test('inlet ducts are an open air path: bay, side bays and gear wells stay outsi
   }
 });
 
+// nothing but the duct's own surfaces (liner, lip, throat bleed) and the engine face may sit in the engine's air path
+const OWN_DUCT = /^(Serpentine inlet duct|Inlet throat|Caret inlet cowl|F119 )/;
+// the lip is raked (s 4.8 → 6.1): ahead of the lip at a given (z, y) a point is in front of the inlet, on the
+// forebody's compression surfaces, not inside the duct
+const LIP = L.ductRings().inner.map((p) => [L.SN - p[0], p[2], p[1]]);
+const behindLip = (s, y, z) => { const az = Math.abs(z); let best = Infinity, sl = 0; for (const [ls, lz, ly] of LIP) { const d = (lz - az) ** 2 + (ly - y) ** 2; if (d < best) { best = d; sl = ls; } } return s > sl; };
+function airPathIntrusions(tris, step = 0.02) {
+  // samples over each triangle (x = 9.46 − s); returns the deepest sample inside either duct, in metres
+  let worst = 0;
+  for (let o = 0; o + 9 <= tris.length; o += 9) {
+    const L1 = Math.hypot(tris[o + 3] - tris[o], tris[o + 4] - tris[o + 1], tris[o + 5] - tris[o + 2]), L2 = Math.hypot(tris[o + 6] - tris[o], tris[o + 7] - tris[o + 1], tris[o + 8] - tris[o + 2]);
+    const k = Math.min(30, Math.max(1, Math.ceil(Math.max(L1, L2) / step)));
+    for (let u = 0; u <= k; u++) for (let w = 0; w <= k - u; w++) {
+      const a = u / k, b = w / k, q = 1 - a - b;
+      const s = L.SN - (q * tris[o] + a * tris[o + 3] + b * tris[o + 6]);
+      if (s < 4.7 || s > L.FAN_S - 0.02) continue;
+      const y = q * tris[o + 1] + a * tris[o + 4] + b * tris[o + 7], z = q * tris[o + 2] + a * tris[o + 5] + b * tris[o + 8];
+      const d = L.ductDepth(s, y, z);
+      if (d > worst && (s > 6.15 || behindLip(s, y, z))) worst = d;
+    }
+  }
+  return worst;
+}
+
+test('the F-2 → A-3 transfer lines run between the ducts, out of both air paths', () => {
+  const [z, y] = L.FUEL.f2a3, r = 0.022;
+  for (let s = L.FUEL.f2[1] - 0.15; s <= L.FUEL.a3[0] + 0.15 + 1e-9; s += 0.02) for (const side of [1, -1]) {
+    for (let a = 0; a < 2 * Math.PI; a += Math.PI / 4) assert.ok(L.ductDepth(s, y + r * Math.sin(a), side * z + r * Math.cos(a)) < -0.02, `transfer line clear of the duct at s ${s.toFixed(2)}`);
+  }
+});
+
+let three = null;
+try { three = await import('three'); } catch { /* three.js comes from the CDN import map in the browser */ }
+test('no part but the duct itself sits in either inlet duct\'s air path (whole model)', { skip: !three && 'three.js is not installed for node' }, async () => {
+  const stub = new Proxy({}, { get: (t, k) => (k === 'getImageData' || k === 'createImageData' ? (x, y, w, h) => ({ data: new Uint8ClampedArray((w || x) * (h || y) * 4) }) : k === 'measureText' ? () => ({ width: 10 }) : k.startsWith?.('create') ? () => ({ addColorStop() {} }) : () => {}), set: () => true });
+  globalThis.document ??= { createElement: () => ({ width: 0, height: 0, getContext: () => stub, style: {} }) };
+  globalThis.window ??= globalThis;
+  const { buildFighter } = await import('../src/models/fighter.js');
+  for (const gear of [1, 0]) {
+    const v = buildFighter();
+    v.state.gear = v.targets.gear = gear; v.state.bay = v.targets.bay = 0; v.update(0, 0); v.root.updateMatrixWorld(true);
+    const inv = new three.Matrix4().copy(v.root.matrixWorld).invert(), a = new three.Vector3();
+    for (const part of v.parts) {
+      const name = part.userData.part.name;
+      if (OWN_DUCT.test(name)) continue;
+      const tris = [];
+      part.traverse((o) => {
+        if (!o.isMesh || o.userData.fx) return;
+        let q = o; while (q && !q.userData.part) q = q.parent;
+        if (q !== part) return;
+        const M = new three.Matrix4().multiplyMatrices(inv, o.matrixWorld), pos = o.geometry.attributes.position, idx = o.geometry.index;
+        const n = idx ? idx.count : pos.count;
+        for (let i = 0; i < n; i++) { a.fromBufferAttribute(pos, idx ? idx.getX(i) : i).applyMatrix4(M); tris.push(a.x, a.y, a.z); }
+      });
+      const d = airPathIntrusions(tris);
+      assert.ok(d < 0.003, `${name} reaches ${(d * 100).toFixed(1)} cm into the air path (gear ${gear ? 'down' : 'up'})`);
+    }
+  }
+});
+
 test('serpentine ducts hide the fan face: no straight line through the inlet reaches it within ±30°', () => {
   // rays from points on the fan disc, every 5° of yaw and pitch, must leave the duct before reaching the lip
   const secs = [];

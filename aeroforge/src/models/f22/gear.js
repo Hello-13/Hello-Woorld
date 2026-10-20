@@ -501,7 +501,7 @@ export function buildGear(ctx) {
         desc: 'The large outer door over the main wheel well: one panel bent along the wing junction, over the wing root\'s underside and the bulged trunk side down to the crease where the inboard door meets it, about 1.05 m from its hinge far outboard on the wing to that edge and 1.37 m fore and aft over its saw teeth (0.71 m along the hinge; NAWDC bottom view and photographs of the open door). Open, it hangs about 11° off vertical outboard of the wheel, its lower edge about 0.1 m below the tyre top. Its edges run at 42°, parallel to the wing\'s leading edge.',
       }, h.pivot);
       anim.gearDoorsMain = anim.gearDoorsMain || [];
-      anim.gearDoorsMain.push({ h, angle: FR.MAIN_DOORS.open.main * FR.DEG });
+      anim.gearDoorsMain.push({ h, angle: FR.MAIN_DOORS.open.main * FR.DEG, transit: FR.MAIN_DOORS.open.transit * FR.DEG });
       // rotary actuator at the aft end of the hinge line, inside the wing, bracketed to the 49 % spar
       const ax = p1.clone().sub(p0).normalize(), a0 = p1.clone().addScaledVector(ax, 0.012).add(V(0, 0.045, 0)), a1 = a0.clone().addScaledVector(ax, 0.13);
       const sp = FR.wingLE(hz) + 0.49 * (FR.wingTEline(hz) - FR.wingLE(hz));
@@ -540,7 +540,11 @@ export function buildGear(ctx) {
       // each door runs from the centre line, where the pair meet, out to its hinge; pointed fore and aft
       const grid = st.map((s) => [0, 0.25, 0.5, 0.75, 1].map((uu) => { const zz = side * uu * FR.noseDoorHalf(s); return [X(s), FR.bottomAt(s, Math.abs(zz)) - 0.002, zz]; }));
       const door = slab(grid, () => [0, 0.025, 0]);
-      const h = hinge(mesh(door, F.door()), V(X(hs0), FR.bottomAt(hs0, NW.z), side * NW.z), V(X(hs1), FR.bottomAt(hs1, NW.z), side * NW.z), V(X((NW.s0 + NW.s1) / 2), -0.95, side * 0.05), V(0, -1, 0));
+      // the hinge edge follows the belly, which sags up to 4.3 cm below the straight line between its ends; the axis
+      // (that straight line) sits 4.5 cm inboard of the edge, so the strip outboard of it swings up into the well
+      // opening instead of into the skin beside it as the door opens
+      const zA = NW.z - 0.045;
+      const h = hinge(mesh(door, F.door()), V(X(hs0), FR.bottomAt(hs0, NW.z), side * zA), V(X(hs1), FR.bottomAt(hs1, NW.z), side * zA), V(X((NW.s0 + NW.s1) / 2), -0.95, side * 0.05), V(0, -1, 0));
       pivots.push(h.pivot);
       hs.push({ h, side });
     }
@@ -574,7 +578,11 @@ export function buildGear(ctx) {
 
   anim.gearSet = (ku, kd) => {
     for (const f of legSet) f(ku);
-    for (const d of anim.gearDoorsMain) d.h.set(d.angle * kd);
+    // (the main door swings wider while the wheel passes it in mid-travel, FR.MAIN_DOORS.open.transit)
+    const wide = smooth(FR.MAIN_DOORS.transitKu[0], FR.MAIN_DOORS.transitKu[1], ku) * (1 - smooth(FR.MAIN_DOORS.transitKu[2], FR.MAIN_DOORS.transitKu[3], ku));
+    // (on closing the inboard door leads and the main door follows onto its edge at the crease: sqrt keeps the main
+    // door further open over the last part of the travel)
+    for (const d of anim.gearDoorsMain) d.h.set((d.angle + (d.transit || 0) * wide) * (d.transit ? Math.sqrt(kd) : kd));
     for (const d of anim.gearDoorsNose) d.h.set(d.angle * kd);
     for (const f of anim.gearLinks) f(ku, kd);
   };

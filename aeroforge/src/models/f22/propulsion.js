@@ -100,7 +100,16 @@ export function buildPropulsion(ctx) {
       system: 'Propulsion', material: 'Composite duct with radar-absorbent lining', mass: 160,
       explode: [0, -0.15, 1.0 * side], callout: side > 0, anchor: [X(SM(10.6)), FR.ductSpan(SM(10.6), 0.6).hi, 0.6 * side],
       desc: 'From the caret inlet the duct climbs and swings inboard over the weapons bay, then turns back down and outboard onto the engine, about 6 m in all (Lockheed Martin gives its length as 6.35 diameters). The serpentine ducts keep the fan faces — normally the brightest radar reflectors on a jet — out of line of sight from any exterior view, and an absorbent lining soaks up energy that bounces in. The real duct shape is not published; the model\'s is solved so that no straight line from outside reaches its fan face.',
-    }, mesh(FR.gridSurface(aft, { closed: true, uv: 'n' }), F.duct()));
+    }, mesh(FR.gridSurface(aft, {
+      closed: true, uv: 'n',
+      // open in the roof under the inlet-bypass plenum's foot, so the spilled air has a way out of the duct
+      keep: (i, j) => {
+        const n = aft[0].length, q = [aft[i][j % n], aft[i][(j + 1) % n], aft[i + 1][j % n], aft[i + 1][(j + 1) % n]];
+        const sv = FR.SN - q.reduce((a, p) => a + p[0], 0) / 4, yv = q.reduce((a, p) => a + p[1], 0) / 4, zv = Math.abs(q.reduce((a, p) => a + p[2], 0) / 4);
+        const BP = FR.BYPASS, sp = FR.ductSpan(sv, zv);
+        return !(sv > BP.s0 + 0.08 && sv < BP.s1 - 0.08 && zv > BP.z0 + 0.06 && zv < BP.z1 - 0.12 && sp && yv > (sp.lo + sp.hi) / 2);
+      },
+    }), F.duct()));
     {
       // bypass (spill) doors on the upper fuselage over the ducts' crossover, either side of the refuelling receptacle:
       // three louvre panels each side (FR.BYPASS), each over a short plenum off the duct's roof
@@ -312,7 +321,8 @@ export function buildPropulsion(ctx) {
       const S_EXIT = EM(18.52), S_THR = EM(17.96), S_CONV = EM(17.72), S_EXT = FR.S_BE;
       // fixed: transition duct (round → rectangular) and sidewalls
       const tr = [];
-      for (const [s, k, w, h] of [[EM(17.22), 2, 0.99, 0.99], [EM(17.4), 2.6, 0.99, 0.94], [EM(17.55), 3.6, 0.98, 0.8], [S_CONV, 6, 0.96, 0.66]]) tr.push(FR.superRing(sx(s), zc, yc, w, h, 28, k));
+      // (its top kept 2 cm under the aft deck, which slopes down over the nozzles)
+      for (const [s, k, w, h] of [[EM(17.22), 2, 0.99, 0.99], [EM(17.4), 2.6, 0.99, 0.94], [EM(17.55), 3.6, 0.98, 0.8], [S_CONV, 6, 0.96, 0.66]]) tr.push(FR.superRing(sx(s), zc, yc, w, h, 28, k).map(([x, y, z]) => [x, Math.min(y, FR.topAt(FR.SN - x, Math.abs(z)) - 0.02), z]));
       const trans = FR.gridSurface(tr, { closed: true, uv: 'n' });
       const walls = [];
       const w0 = EM(17.5), w1 = EM(18.45);
@@ -320,7 +330,7 @@ export function buildPropulsion(ctx) {
         const grid = [];
         for (const s of [w0, lerp(w0, w1, 0.33), lerp(w0, w1, 0.66), w1]) {
           const t = (s - w0) / (w1 - w0);
-          const top = yc + lerp(0.58, 0.32, t), bot = yc + lerp(-0.58, -0.31, t);
+          const top = Math.min(yc + lerp(0.58, 0.32, t), FR.topAt(s, Math.abs(zc + dz)) - 0.02), bot = yc + lerp(-0.58, -0.31, t);
           grid.push([[sx(s), top, zc + dz], [sx(s), bot, zc + dz]]);
         }
         walls.push(slab(grid, () => [0, 0, dz > 0 ? -0.04 : 0.04], new THREE.Vector3(0, 0, Math.sign(dz))));
@@ -473,11 +483,12 @@ export function buildPropulsion(ctx) {
         desc: 'A separate pump on the back of the engine gearbox supplies the afterburner, whose demand is several times the dry flow. Fuel goes to three zones lit in sequence as the throttle moves through the afterburner range, feeding the injectors inside the curved augmentor vanes.',
       }, mesh(merge(a), F.pipe()));
       const o = [];
-      const oy = yc + 0.58, oz = zc - side * 0.33;
-      o.push(new THREE.CapsuleGeometry(0.065, 0.28, 4, 12).rotateZ(Math.PI / 2).translate(X(EM(13.95)), oy, oz));
+      // (the tank sits just behind the fan face, ahead of the wiring runs that cross over the engine at s 12.15–12.3)
+      const oy = yc + 0.58, oz = zc - side * 0.33, sT = EM(13.95) - 0.23;
+      o.push(new THREE.CapsuleGeometry(0.065, 0.28, 4, 12).rotateZ(Math.PI / 2).translate(X(sT), oy, oz));
       o.push(new THREE.BoxGeometry(0.12, 0.08, 0.1).translate(X(EM(13.62)), oy - 0.06, oz + side * 0.04));      // lube pump / filter
       o.push(FR.pipe([[EM(13.7), oy - 0.04, oz], [EM(13.55), yc + 0.32, zc - side * 0.18], [EM(13.5), yc + 0.12, zc - side * 0.07]], 0.012, 5));
-      o.push(FR.pipe([[EM(14.1), oy - 0.04, oz], [EM(14.6), yc + 0.5, zc - side * 0.3], [EM(15.2), yc + 0.44, zc - side * 0.2], [EM(15.38), yc + 0.2, zc - side * 0.08]], 0.012, 5));
+      o.push(FR.pipe([[sT + 0.12, oy - 0.04, oz], [EM(14.6), yc + 0.5, zc - side * 0.3], [EM(15.2), yc + 0.44, zc - side * 0.2], [EM(15.38), yc + 0.2, zc - side * 0.08]], 0.012, 5));
       P(`Oil tank & lube system (${R})`, {
         system: 'Propulsion', material: 'Aluminium oil tank, lube and scavenge pumps, fuel-cooled oil cooler', mass: 25,
         explode: [0.4, 1.25, -0.5 * side],

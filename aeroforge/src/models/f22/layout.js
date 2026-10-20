@@ -472,7 +472,7 @@ export function wowCentre(g) {
  * `pocket` deep lies under the skin.
  */
 export const MAIN_WELL = {
-  s0: 10.98, s1: 12.365, sIn1: 12.365, sAft: 12.04, zIn: 1.10, hingeZ: 2.46, zJunction: 1.97, zSob: 2.12, pocket: 0.05,
+  s0: 10.98, s1: 12.365, sIn1: 12.365, sAft: 12.075, zIn: 1.10, hingeZ: 2.46, zJunction: 1.97, zSob: 2.12, pocket: 0.05,
   wing: [[1.97, 0.34, 0.54], [2.46, 0.34, 0.54]],
   yJunction: -0.255, yCrease: -0.613,
 };
@@ -489,7 +489,10 @@ export const MAIN_DOORS = {
   splitZ: 1.54,
   // opening angles (deg) with the gear down: the main door hangs from its hinge about 11° off vertical, outboard of the
   // wheel (photographs; T.O. 00-105E-9 front view), the inboard door almost straight down inboard of the leg
-  open: { main: 80, inboard: 140 },
+  // (the wheel swings out to z 2.5 in mid-travel, past the bend in the hanging door, so the main door swings a further
+  // `transit` degrees open while the leg moves through transitKu, then settles back; sequence estimated)
+  open: { main: 80, inboard: 140, transit: 28 },
+  transitKu: [0.12, 0.32, 0.88, 0.97],
   main: {
     fore: [[2.46, 11.197], [2.23, 10.99], [2.1475, 11.064], [2.065, 10.99], [1.9825, 11.064], [1.90, 10.99], [1.54, 11.314]],
     aft: [[2.46, 11.91], [1.97, 12.35], [1.84, 12.233], [1.70, 12.359], [1.54, 12.215]],
@@ -904,25 +907,30 @@ export const F119 = { rInlet: 0.4826, rCase: 0.6, rAug: 0.575, rMax: 0.635, leng
 export const AUG_S = EM(15.64);
 export const F119_AUG = [[F119.rAug, AUG_S], [0.57, EM(16.0)], [0.53, EM(16.5)], [0.495, EM(16.9)], [0.49, EM(17.25)]];
 export const DUCT = [
-  // [s, z, y, width, height, roundness 0 (lip shape) … 1 (circle)]
+  // [s, z, y, width, height, roundness 0 (lip shape) … 1 (superellipse), superellipse exponent (2 = ellipse),
+  //  chamfers of the lower-outboard / upper-outboard / lower-inboard corners in half-size units (9 = none)]
   // A double S-bend, as the F-22's serpentine ducts keep the fan faces out of line of sight from any exterior
   // view: from the caret lip the duct climbs and swings inboard over the main weapons bay, then turns back
-  // outboard and down onto the fan face. Solved (phase-2 re-layout) so that no straight line through the lip reaches
-  // the fan disc within ±40° (1° steps), with the centre line turning at most 6.5° and the walls at most 7.5° per
-  // 0.22 m ring, the section area growing steadily from the 0.29 m² throat to the fan face, the walls 3 cm or more
-  // off the main bay, side bays, gun, receptacle and ammunition container and 6 cm under the deck; behind the bay the
-  // duct deepens downward onto the fan instead of dropping steeply. Lockheed Martin gives l/D = 6.35.
-  [6.3, 1.18, -0.36, 0.76, 0.8, 0.1],
-  [7, 1.052, -0.066, 0.732, 0.629, 0.22],
-  [7.5, 0.907, 0.096, 0.725, 0.646, 0.311],
-  [8, 0.679, 0.2, 0.674, 0.687, 0.4],
-  [8.5, 0.529, 0.255, 0.705, 0.683, 0.477],
-  [9, 0.47, 0.248, 0.726, 0.672, 0.55],
-  [9.5, 0.496, 0.22, 0.782, 0.636, 0.623],
-  [10, 0.534, 0.191, 0.88, 0.68, 0.7],
-  [10.4, 0.536, 0.141, 0.873, 0.712, 0.77],
-  [10.75, 0.55, 0.06, 0.86, 0.74, 0.85],
-  [11.15, 0.6, -0.04, 0.93, 0.86, 0.94],
+  // outboard and down onto the fan face. Re-solved (polish 3) for a throat that can pass an F119-class airflow: the
+  // F119's mass flow is not published, so the model assumes the 110–125 kg/s of an F100 / F110-class engine; the
+  // throat is 0.52 m² (fan face 0.73 m², a fan-to-throat area ratio of 1.4), where that flow runs at about Mach 0.6–0.75
+  // static and well below choking in flight. Also solved: no straight line through the lip reaches the fan disc within
+  // ±50° (the fan-face disc, 1° steps; the last 0.3 % of one ray bundle near 7° yaw / 4° pitch is stopped by the
+  // inlet's bleed plates), the area grows from the throat to the fan face, the walls stay 2.5–3 cm off the main bay,
+  // side bays, gun, receptacle, ammunition container and fuel coolers and 4.5 cm or more under the deck, and the lip
+  // runs into the first ring along a smooth cubic (≤ 14° between neighbouring wall segments, centre line ≤ 9.3°
+  // per 0.22 m). Lockheed Martin gives l/D = 6.35.
+  [6.3, 1.239, -0.391, 1.033, 0.835, 0.274, 2.003, 1.67, 1.854, 1.582],
+  [7, 1.096, -0.104, 1.096, 0.772, 0.345, 2.133, 0.912, 1.563, 1.521],
+  [7.5, 0.842, 0.055, 1.159, 0.707, 0.659, 3.068, 0.803, 1.543, 1.499],
+  [8, 0.681, 0.129, 1.188, 0.753, 0.691, 3.3, 0.622, 1.473, 1.31],
+  [8.5, 0.642, 0.175, 1.121, 0.793, 0.774, 3.074, 0.6, 1.284, 1.486],
+  [9, 0.638, 0.115, 1.053, 0.803, 0.916, 3.467, 0.6, 1.368, 1.525],
+  [9.5, 0.686, 0.095, 1.023, 0.777, 0.877, 3.849, 0.713, 1.47, 1.52],
+  [10, 0.695, 0.102, 0.943, 0.74, 1, 3.069, 1.104, 1.525, 1.668],
+  [10.4, 0.672, 0.126, 0.974, 0.703, 0.845, 3.422, 1.339, 1.668, 1.699],
+  [10.75, 0.636, 0.085, 0.941, 0.741, 0.951, 3.015, 1.611, 1.644, 1.874],
+  [11.15, 0.611, -0.014, 0.93, 0.924, 0.99, 2.488, 1.591, 1.662, 1.68],
   [FAN_S, ENG_Z, ENG_Y, 0.98, 0.98, 1.0],
 ];
 
@@ -953,17 +961,26 @@ export function ductRings() {
   const ang = rel.map(([dz, dy]) => Math.atan2(dy, dz));
   const w0 = Math.max(...rel.map((r) => r[0])) - Math.min(...rel.map((r) => r[0]));
   const h0 = Math.max(...rel.map((r) => r[1])) - Math.min(...rel.map((r) => r[1]));
-  const cols = [1, 2, 3, 4, 5].map((c) => DUCT.map((row) => [row[0], row[c]]));
+  const DEF = [0, 0, 0, 0, 0, 0, 2, 9, 9, 9];
+  const cols = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((c) => DUCT.map((row) => [row[0], row[c] ?? DEF[c]]));
   const st = [];
   for (let s = DUCT[0][0]; s < FAN_S - 0.01; s += 0.22) st.push(s);
   st.push(FAN_S);
+  const pw = (c, q) => Math.sign(c) * Math.abs(c) ** (2 / q);
   const sduct = st.map((s) => {
-    const [zc, yc, w, h, r] = cols.map((k) => mono(k, s));
+    const [zc, yc, w, h, r, q, c1, c2, c3] = cols.map((k) => mono(k, s));
     return rel.map(([dz, dy], j) => {
       const a = ang[j];
-      const e = [Math.cos(a) * w / 2, Math.sin(a) * h / 2];
+      // a blend from the lip's shape toward a superellipse of exponent q, then (in half-size units u, v) the
+      // lower-outboard (u − v > c1), upper-outboard (u + v > c2) and lower-inboard (−u − v > c3) corners cut back
+      // along straight chamfers
+      const e = [pw(Math.cos(a), q) * w / 2, pw(Math.sin(a), q) * h / 2];
       const l = [(dz * w) / w0, (dy * h) / h0];
-      return [X(s), yc + lerp(l[1], e[1], r), zc + lerp(l[0], e[0], r)];
+      let u = lerp(l[0], e[0], r) / (w / 2), v = lerp(l[1], e[1], r) / (h / 2), k = 1;
+      if (u - v > c1) k = Math.min(k, c1 / (u - v));
+      if (u + v > c2) k = Math.min(k, c2 / (u + v));
+      if (-u - v > c3) k = Math.min(k, c3 / (-u - v));
+      return [X(s), yc + v * k * h / 2, zc + u * k * w / 2];
     });
   });
   // transition: per lip point a cubic Hermite in station from the lip (tangent along the straight line to the first
@@ -1260,12 +1277,12 @@ export const AMAD = { s0: 11.36, s1: 11.84, z: 0.62, y: -0.865, w: 0.27, h: 0.2 
  * trunnion (y1Aft). Other systems stay out of them; the hydraulic reservoirs, filter manifold and the ground refuelling
  * adapter sit on the main wells' walls (T.O. 00-105E-9).
  */
-export const WELL_RESERVE = { main: { s0: 10.98, s1: 12.04, z0: 0.93, z1: 2.46, y1: 0.16 }, nose: { s0: 4.45, s1: 6.15, z: 0.30, y1: -0.05, sF: 5.6, y1Aft: -0.31 } };
+export const WELL_RESERVE = { main: { s0: 10.98, s1: 12.075, z0: 0.93, z1: 2.46, y1: 0.16 }, nose: { s0: 4.45, s1: 6.15, z: 0.30, y1: -0.05, sF: 5.6, y1Aft: -0.31 } };
 
 /** Fuel cells (T.O. 00-105E-9 A.11 drawing; stations of the model's cells): F-1A, F-1B, F-2 (right lobe ends at the
  *  gun bay's aft end, left at the APU bay), A-3, A-1, and the wing cells' inboard and outboard span (inboard of
  *  wingZ0 the wing roots are dry bays: the gun on the right, the APU and its exhaust on the left) and chord fractions. */
-export const FUEL = { f1a: [5.62, 6.82], f1b: [6.86, 7.6], f2: [7.66, 10.62], f2R: 10.22, f2L: 9.62, gunBay: 8.38, a3: [10.68, 11.48], a1: [12.45, 14.95], wingZ0: 2.12, wingZ1: 3.95, wingC: [0.13, 0.64] };
+export const FUEL = { f1a: [5.62, 6.82], f1b: [6.86, 7.6], f2: [7.66, 10.62], f2R: 10.22, f2L: 9.62, gunBay: 8.38, a3: [10.68, 11.48], a1: [12.45, 15.2], a1Floor: -0.45, f2a3: [0.065, 0.15], wingZ0: 2.12, wingZ1: 6.1, wingC: [0.13, 0.60], wingK: 0.66 };
 /** Air-cooled fuel coolers (ACFC) under their exhaust doors on the spine behind the cockpit (T.O. top panel map:
  *  #4236 right / #4235 left at ≈ 6.7–7.4; NAWDC top view: saw-toothed panels at 6.55–7.35, z ±0.30–0.72). */
 export const ACFC = { s0: 6.55, s1: 7.35, z0: 0.30, z1: 0.72 };
