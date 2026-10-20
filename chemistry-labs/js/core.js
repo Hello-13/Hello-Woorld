@@ -2,7 +2,7 @@
 /* Chem Bench core: element data, chemistry helpers, formatting, practice engine, router. */
 
 /* ---------- Element data (symbol, name, standard atomic mass) ---------- */
-const ELEMENT_DATA = 'H,Hydrogen,1.008 He,Helium,4.003 Li,Lithium,6.94 Be,Beryllium,9.012 B,Boron,10.81 C,Carbon,12.011 N,Nitrogen,14.007 O,Oxygen,15.999 F,Fluorine,18.998 Ne,Neon,20.180 Na,Sodium,22.990 Mg,Magnesium,24.305 Al,Aluminum,26.982 Si,Silicon,28.086 P,Phosphorus,30.974 S,Sulfur,32.06 Cl,Chlorine,35.45 Ar,Argon,39.948 K,Potassium,39.098 Ca,Calcium,40.078 Sc,Scandium,44.956 Ti,Titanium,47.867 V,Vanadium,50.942 Cr,Chromium,51.996 Mn,Manganese,54.938 Fe,Iron,55.845 Co,Cobalt,58.933 Ni,Nickel,58.693 Cu,Copper,63.546 Zn,Zinc,65.38 Ga,Gallium,69.723 Ge,Germanium,72.630 As,Arsenic,74.922 Se,Selenium,78.971 Br,Bromine,79.904 Kr,Krypton,83.798 Rb,Rubidium,85.468 Sr,Strontium,87.62 Y,Yttrium,88.906 Zr,Zirconium,91.224 Nb,Niobium,92.906 Mo,Molybdenum,95.95 Tc,Technetium,98 Ru,Ruthenium,101.07 Rh,Rhodium,102.91 Pd,Palladium,106.42 Ag,Silver,107.87 Cd,Cadmium,112.41 In,Indium,114.82 Sn,Tin,118.71 Sb,Antimony,121.76 Te,Tellurium,127.60 I,Iodine,126.90 Xe,Xenon,131.29 Cs,Cesium,132.91 Ba,Barium,137.33 La,Lanthanum,138.91 Ce,Cerium,140.12 Pr,Praseodymium,140.91 Nd,Neodymium,144.24 Pm,Promethium,145 Sm,Samarium,150.36 Eu,Europium,151.96 Gd,Gadolinium,157.25 Tb,Terbium,158.93 Dy,Dysprosium,162.50 Ho,Holmium,164.93 Er,Erbium,167.26 Tm,Thulium,168.93 Yb,Ytterbium,173.05 Lu,Lutetium,174.97 Hf,Hafnium,178.49 Ta,Tantalum,180.95 W,Tungsten,183.84 Re,Rhenium,186.21 Os,Osmium,190.23 Ir,Iridium,192.22 Pt,Platinum,195.08 Au,Gold,196.97 Hg,Mercury,200.59 Tl,Thallium,204.38 Pb,Lead,207.2 Bi,Bismuth,208.98 Po,Polonium,209 At,Astatine,210 Rn,Radon,222 Fr,Francium,223 Ra,Radium,226 Ac,Actinium,227 Th,Thorium,232.04 Pa,Protactinium,231.04 U,Uranium,238.03 Np,Neptunium,237 Pu,Plutonium,244';
+const ELEMENT_DATA = 'H,Hydrogen,1.008 He,Helium,4.003 Li,Lithium,6.94 Be,Beryllium,9.012 B,Boron,10.81 C,Carbon,12.011 N,Nitrogen,14.007 O,Oxygen,15.999 F,Fluorine,18.998 Ne,Neon,20.180 Na,Sodium,22.990 Mg,Magnesium,24.305 Al,Aluminum,26.982 Si,Silicon,28.086 P,Phosphorus,30.974 S,Sulfur,32.06 Cl,Chlorine,35.45 Ar,Argon,39.948 K,Potassium,39.098 Ca,Calcium,40.078 Sc,Scandium,44.956 Ti,Titanium,47.867 V,Vanadium,50.942 Cr,Chromium,51.996 Mn,Manganese,54.938 Fe,Iron,55.845 Co,Cobalt,58.933 Ni,Nickel,58.693 Cu,Copper,63.546 Zn,Zinc,65.38 Ga,Gallium,69.723 Ge,Germanium,72.630 As,Arsenic,74.922 Se,Selenium,78.971 Br,Bromine,79.904 Kr,Krypton,83.798 Rb,Rubidium,85.468 Sr,Strontium,87.62 Y,Yttrium,88.906 Zr,Zirconium,91.224 Nb,Niobium,92.906 Mo,Molybdenum,95.95 Tc,Technetium,98 Ru,Ruthenium,101.07 Rh,Rhodium,102.91 Pd,Palladium,106.42 Ag,Silver,107.87 Cd,Cadmium,112.41 In,Indium,114.82 Sn,Tin,118.71 Sb,Antimony,121.76 Te,Tellurium,127.60 I,Iodine,126.90 Xe,Xenon,131.29 Cs,Cesium,132.91 Ba,Barium,137.33 La,Lanthanum,138.91 Ce,Cerium,140.12 Pr,Praseodymium,140.91 Nd,Neodymium,144.24 Pm,Promethium,145 Sm,Samarium,150.36 Eu,Europium,151.96 Gd,Gadolinium,157.25 Tb,Terbium,158.93 Dy,Dysprosium,162.50 Ho,Holmium,164.93 Er,Erbium,167.26 Tm,Thulium,168.93 Yb,Ytterbium,173.05 Lu,Lutetium,174.97 Hf,Hafnium,178.49 Ta,Tantalum,180.95 W,Tungsten,183.84 Re,Rhenium,186.21 Os,Osmium,190.23 Ir,Iridium,192.22 Pt,Platinum,195.08 Au,Gold,196.97 Hg,Mercury,200.59 Tl,Thallium,204.38 Pb,Lead,207.2 Bi,Bismuth,208.98 Po,Polonium,209 At,Astatine,210 Rn,Radon,222 Fr,Francium,223 Ra,Radium,226 Ac,Actinium,227 Th,Thorium,232.04 Pa,Protactinium,231.04 U,Uranium,238.03 Np,Neptunium,237 Pu,Plutonium,244 Am,Americium,243 Cm,Curium,247 Bk,Berkelium,247 Cf,Californium,251 Es,Einsteinium,252 Fm,Fermium,257 Md,Mendelevium,258 No,Nobelium,259 Lr,Lawrencium,266 Rf,Rutherfordium,267 Db,Dubnium,268 Sg,Seaborgium,269 Bh,Bohrium,270 Hs,Hassium,277 Mt,Meitnerium,278 Ds,Darmstadtium,281 Rg,Roentgenium,282 Cn,Copernicium,285 Nh,Nihonium,286 Fl,Flerovium,289 Mc,Moscovium,290 Lv,Livermorium,293 Ts,Tennessine,294 Og,Oganesson,294';
 
 const EL = {}, ELZ = [null];
 ELEMENT_DATA.split(' ').forEach((t, i) => {
@@ -262,6 +262,9 @@ const Store = {
   key: 'chembench.v1', d: {},
   load() { try { this.d = JSON.parse(localStorage.getItem(this.key)) || {}; } catch (e) { this.d = {}; } },
   get(id) { return this.d[id] || (this.d[id] = { c: 0, a: 0, s: 0, b: 0 }); },
+  /* reserved keys start with "_" so they never collide with lab ids */
+  bag(name) { return this.d['_' + name] || (this.d['_' + name] = {}); },
+  typeStat(labId, type) { const t = this.bag('types'), k = labId + '|' + type; return t[k] || (t[k] = { c: 0, a: 0 }); },
   save() { try { localStorage.setItem(this.key, JSON.stringify(this.d)); } catch (e) { /* storage unavailable */ } },
 };
 const MASTER = 10;
@@ -309,7 +312,7 @@ const UI = {
 /* ---------- Lab registry ---------- */
 const LABS = [];
 const FAMILIES = {
-  found: 'Foundations', atom: 'Atoms & compounds', rx: 'Reactions', state: 'States & solutions', nuc: 'Nuclear',
+  found: 'Foundations', atom: 'Atoms & compounds', rx: 'Reactions', state: 'States & solutions', nuc: 'Nuclear', life: 'Organic & biochem',
 };
 function registerLab(def) { LABS.push(def); }
 
@@ -340,11 +343,14 @@ function meterHTML(c) {
   return `<span class="meter" role="img" aria-label="${Math.min(c, MASTER)} of ${MASTER} toward mastery"><i style="width:${pct}%"></i></span>`;
 }
 
+/* Set by "practice this skill" links: the next lab view opens on that problem type */
+let PRESET_TYPE = null;
 function mountPractice(root, lab) {
   const st = Store.get(lab.id);
-  let filter = -1, cur = null, graded = false, done = false;
+  let filter = -1, cur = null, graded = false, done = false, attempts = [];
+  if (PRESET_TYPE) { const k = lab.problems.findIndex(p => p.name === PRESET_TYPE); if (k >= 0) filter = k; PRESET_TYPE = null; }
   const types = [{ name: 'Mixed' }, ...lab.problems];
-  root.innerHTML = `<div class="chips" role="group" aria-label="Problem type">${types.map((t, i) => `<button type="button" class="chip" data-i="${i - 1}" aria-pressed="${i === 0}">${t.name}</button>`).join('')}</div>
+  root.innerHTML = `<div class="chips" role="group" aria-label="Problem type">${types.map((t, i) => `<button type="button" class="chip" data-i="${i - 1}" aria-pressed="${i - 1 === filter}">${t.name}</button>`).join('')}</div>
     <div class="score" aria-live="polite"></div><div class="prob"></div>`;
   const chips = root.querySelector('.chips'), probEl = root.querySelector('.prob');
   chips.addEventListener('click', e => {
@@ -361,7 +367,7 @@ function mountPractice(root, lab) {
     const gen = filter < 0 ? U.pick(lab.problems) : lab.problems[filter];
     for (let tries = 0; tries < 5; tries++) { try { cur = gen.gen(); break; } catch (err) { console.error(err); cur = null; } }
     if (!cur) { probEl.innerHTML = '<p>That problem type failed to load. Pick another type.</p>'; return; }
-    cur.type = gen.name; graded = false; done = false;
+    cur.type = gen.name; graded = false; done = false; attempts = [];
     render();
   }
   function render() {
@@ -373,7 +379,9 @@ function mountPractice(root, lab) {
       input = `<form class="ans" novalidate><input id="ans-${lab.id}" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${U.esc(ph)}" inputmode="${cur.kind === 'num' ? 'decimal' : 'text'}" aria-label="Your answer">${cur.unit ? `<span class="unit">${cur.unit}</span>` : ''}<button class="btn primary" type="submit">Check</button></form>`;
     }
     probEl.innerHTML = `<div class="ptype">${cur.type}</div><div class="q">${cur.q}</div>${input}<div class="fb" hidden></div>
+      <div class="tutor-slot"></div>
       <div class="prow"><button type="button" class="btn ghost reveal">Show solution</button><button type="button" class="btn next">Next problem</button></div>`;
+    if (typeof Tutor !== 'undefined') Tutor.attach(probEl.querySelector('.tutor-slot'), lab, cur, () => ({ attempts, done }));
     const fb = probEl.querySelector('.fb');
     const finish = (ok, revealed) => {
       done = true;
@@ -384,7 +392,7 @@ function mountPractice(root, lab) {
     };
     const grade = (ok) => {
       if (ok === null) { fb.hidden = false; fb.className = 'fb no'; fb.innerHTML = `<div class="verdict">Couldn't read that</div><div>${cur.kind === 'num' ? 'Enter a number. Scientific notation works as 6.02e23.' : (cur.hint || 'Check the format and try again.')}</div>`; return; }
-      if (!graded) { graded = true; st.a++; if (ok) { st.c++; st.s++; st.b = Math.max(st.b, st.s); } else st.s = 0; Store.save(); score(); }
+      if (!graded) { graded = true; st.a++; const ts = Store.typeStat(lab.id, cur.type); ts.a++; if (ok) { st.c++; st.s++; ts.c++; st.b = Math.max(st.b, st.s); } else st.s = 0; Store.save(); score(); }
       if (ok) finish(true, false);
       else { fb.hidden = false; fb.className = 'fb no'; fb.innerHTML = `<div class="verdict">Not quite</div><div>Try again, or show the solution.${cur.hint ? ' ' + cur.hint : ''}</div>`; }
     };
@@ -392,15 +400,16 @@ function mountPractice(root, lab) {
       probEl.querySelector('.choices').addEventListener('click', e => {
         const b = e.target.closest('.choice'); if (!b || done) return;
         const ok = +b.dataset.i === cur.answer;
+        attempts.push(b.textContent.trim());
         b.classList.add(ok ? 'right' : 'wrong');
         grade(ok);
       });
     } else {
       const form = probEl.querySelector('form'), inp = form.querySelector('input');
-      form.addEventListener('submit', e => { e.preventDefault(); if (done) { next(); return; } grade(checkAnswer(cur, inp.value)); });
+      form.addEventListener('submit', e => { e.preventDefault(); if (done) { next(); return; } if (inp.value.trim()) attempts.push(inp.value.trim()); grade(checkAnswer(cur, inp.value)); });
     }
     probEl.querySelector('.reveal').addEventListener('click', () => {
-      if (!graded) { graded = true; st.a++; st.s = 0; Store.save(); score(); }
+      if (!graded) { graded = true; st.a++; Store.typeStat(lab.id, cur.type).a++; st.s = 0; Store.save(); score(); }
       if (cur.kind === 'choice') probEl.querySelectorAll('.choice')[cur.answer].classList.add('right');
       finish(false, true);
     });
@@ -417,6 +426,18 @@ function mc(correct, wrongs) {
 
 /* ---------- Router & views ---------- */
 let cleanup = null;
+/* Non-lab pages (periodic table, flashcards, test): id -> {title, render(app) -> cleanup?} */
+const PAGES = {};
+function registerPage(id, def) { PAGES[id] = def; }
+/* Skills answered at least 4 times and under 80% right, weakest first */
+function weakSpots(n = 4) {
+  const t = Store.bag('types');
+  return Object.entries(t).filter(([, v]) => v.a >= 4).map(([k, v]) => { const [lab, type] = k.split('|'); return { lab: LABS.find(l => l.id === lab), type, pct: v.c / v.a, ...v }; })
+    .filter(x => x.lab && x.lab.problems.some(p => p.name === x.type) && x.pct < 0.8).sort((a, b) => a.pct - b.pct).slice(0, n);
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-preset]'); if (a) PRESET_TYPE = a.dataset.preset;
+});
 function tileHTML(lab, big) {
   const st = Store.get(lab.id);
   return `<a class="tile fam-${lab.fam}${big ? ' big' : ''}" href="#${lab.id}">
@@ -429,14 +450,17 @@ function renderHome(app) {
   app.innerHTML = `
   <section class="hero">
     <div class="hero-text">
-      <p class="eyebrow">Introductory Chemistry · Chapters 2–17</p>
+      <p class="eyebrow">Introductory Chemistry · Chapters 2–19</p>
       <h1>Chem Bench</h1>
       <p class="lede">One hands-on lab for every chapter of your course. Build atoms, balance equations, squeeze gases and titrate acids, then practice with fresh problems until each topic sticks.</p>
     </div>
-    <div class="hero-stats">
-      <div><b>${LABS.length}</b><span>labs</span></div>
-      <div><b>${solved}</b><span>problems solved</span></div>
-      <div><b>${mastered}</b><span>mastered</span></div>
+    <div class="hero-side">
+      <figure class="hero-visual"><div id="hero-vis"></div><figcaption>CH<sub>4</sub> + 2 O<sub>2</sub> → CO<sub>2</sub> + 2 H<sub>2</sub>O, atom by atom</figcaption></figure>
+      <div class="hero-stats">
+        <div><b>${LABS.length}</b><span>labs</span></div>
+        <div><b>${solved}</b><span>problems solved</span></div>
+        <div><b>${mastered}</b><span>mastered</span></div>
+      </div>
     </div>
   </section>
   <section aria-label="Labs by chapter">
@@ -444,11 +468,19 @@ function renderHome(app) {
     <div class="grid">${LABS.map(l => tileHTML(l)).join('')}</div>
     <p class="hint">Each tile is one chapter: the big number is the chapter, the meter fills as you answer ${MASTER} problems correctly. Progress is saved in this browser.</p>
   </section>
+  ${(() => { const w = weakSpots(); return w.length ? `<section class="weak" aria-labelledby="weak-h"><h2 id="weak-h">Your weak spots</h2><p class="note">The skills you miss most often. Tap one to drill it.</p>
+    <div class="weak-list">${w.map(x => `<a class="weak-item fam-${x.lab.fam}" href="#${x.lab.id}" data-preset="${U.esc(x.type)}"><span class="wl">Ch ${x.lab.ch} · ${x.lab.title}</span><b>${x.type}</b><span class="wp">${Math.round(x.pct * 100)}% right of ${x.a}</span></a>`).join('')}</div></section>` : ''; })()}
+  <section class="tools" aria-label="Study tools">
+    <a class="tool" href="#table"><span class="ti">Pt</span><b>Periodic table</b><span>All 118 elements. Color by family or electronegativity, tap one for its details.</span></a>
+    <a class="tool" href="#cards"><span class="ti">Fc</span><b>Flashcards</b><span>Polyatomic ions, element symbols, charges and prefixes. Missed cards come back sooner.</span></a>
+    <a class="tool" href="#exam"><span class="ti">Tx</span><b>Test mode</b><span>Pick chapters and take a mixed quiz. See your score by chapter and review what you missed.</span></a>
+  </section>
   <section class="howto">
     <div><h2>Bench</h2><p>Interactive models you can poke at. Change a value and watch what the chemistry does.</p></div>
     <div><h2>Key ideas</h2><p>The rules and formulas for the chapter, written short enough to review in a minute.</p></div>
     <div><h2>Practice</h2><p>Endless randomized problems with worked solutions. Filter by problem type to drill one skill.</p></div>
   </section>`;
+  if (typeof Storyboard !== 'undefined') { try { cleanup = Storyboard(document.getElementById('hero-vis'), reactionFrames(), { compact: true, loop: true, hold: 1700, tween: 1300 }); } catch (err) { console.error(err); } }
 }
 function renderLab(app, lab) {
   const i = LABS.indexOf(lab), prev = LABS[i - 1], nextL = LABS[i + 1];
@@ -461,11 +493,13 @@ function renderLab(app, lab) {
       <p class="lede">${lab.blurb}</p>
     </div>
   </div>
+  ${typeof STORIES !== 'undefined' && STORIES[lab.id] ? `<section class="watch" id="watch" aria-labelledby="watch-h"><h2 id="watch-h">Watch it <span class="story-title"></span></h2><div class="story-body"></div></section>` : ''}
   <div class="lab-grid">
     <section class="bench" aria-labelledby="bench-h"><h2 id="bench-h">Bench</h2><div id="bench"></div></section>
     <div class="rail">
       <section class="ideas" aria-labelledby="ideas-h"><h2 id="ideas-h">Key ideas</h2><ul>${lab.ideas.map(x => `<li>${x}</li>`).join('')}</ul></section>
       <section class="practice" aria-labelledby="prac-h"><h2 id="prac-h">Practice</h2><div id="practice"></div></section>
+      <section class="ask" id="ask" aria-labelledby="ask-h" hidden><h2 id="ask-h">Ask Claude</h2><div id="ask-body"></div></section>
     </div>
   </div>
   <nav class="pager" aria-label="Other labs">
@@ -473,18 +507,25 @@ function renderLab(app, lab) {
     ${nextL ? `<a href="#${nextL.id}" class="nx"><span>Ch ${nextL.ch} →</span>${nextL.title}</a>` : '<span></span>'}
   </nav>`;
   const benchEl = document.getElementById('bench');
-  try { cleanup = lab.bench(benchEl) || null; } catch (err) { console.error(err); benchEl.innerHTML = '<p>The bench failed to load.</p>'; }
+  let benchStop = null, storyStop = null;
+  try { benchStop = lab.bench(benchEl) || null; } catch (err) { console.error(err); benchEl.innerHTML = '<p>The bench failed to load.</p>'; }
+  if (typeof mountStory !== 'undefined') storyStop = mountStory(document.getElementById('watch'), lab.id);
+  cleanup = () => { benchStop && benchStop(); storyStop && storyStop(); };
   mountPractice(document.getElementById('practice'), lab);
+  if (typeof Tutor !== 'undefined') Tutor.chat(document.getElementById('ask'), lab);
 }
 function route() {
   if (cleanup) { try { cleanup(); } catch (e) { /* ignore */ } cleanup = null; }
   const id = location.hash.slice(1);
-  const lab = LABS.find(l => l.id === id);
+  const lab = LABS.find(l => l.id === id), page = PAGES[id];
   const app = document.getElementById('app');
-  document.body.classList.toggle('in-lab', !!lab);
+  document.body.classList.toggle('in-lab', !!(lab || page));
+  document.querySelectorAll('.topnav a').forEach(a => { if (a.getAttribute('href') === '#' + (lab ? '' : id)) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   if (lab) { renderLab(app, lab); document.title = `${lab.title} · Chem Bench`; }
+  else if (page) { try { cleanup = page.render(app) || null; } catch (err) { console.error(err); app.innerHTML = '<p>This page failed to load.</p>'; } document.title = `${page.title} · Chem Bench`; }
   else { renderHome(app); document.title = 'Chem Bench'; }
   window.scrollTo(0, 0);
+  app.classList.remove('route-in'); void app.offsetWidth; app.classList.add('route-in');
 }
 function start() {
   Store.load();
