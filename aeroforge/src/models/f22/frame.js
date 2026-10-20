@@ -2,7 +2,7 @@
 // modules share.
 
 import * as THREE from 'three';
-import { X } from './layout.js';
+import { X, SN, wingWarpS } from './layout.js';
 
 export * from './layout.js';
 
@@ -64,6 +64,17 @@ export function cylX(s, y, z, len, r0, r1 = r0, seg = 24, open = false) {
 export function pipe(points, r = 0.02, seg = 6, tubular = null) {
   const curve = new THREE.CatmullRomCurve3(points.map(([s, y, z]) => new THREE.Vector3(X(s), y, z)), false, 'catmullrom', 0.2);
   return new THREE.TubeGeometry(curve, tubular || Math.max(8, points.length * 6), r, seg, false);
+}
+
+/** Squeeze wing geometry built on the structural chord (wingSection) onto the real trailing edge, in place
+ *  (layout.wingWarpS: nothing ahead of the flaperon hinge line moves). Returns the geometry. */
+export function warpWing(g) {
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) p.setX(i, SN - wingWarpS(SN - p.getX(i), p.getZ(i)));
+  p.needsUpdate = true;
+  if (g.attributes.normal) g.computeVertexNormals();
+  g.computeBoundingBox(); g.computeBoundingSphere();
+  return g;
 }
 
 /** Merge geometries: indexed if every input is indexed, otherwise all made non-indexed first. */

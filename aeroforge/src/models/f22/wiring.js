@@ -25,7 +25,7 @@ const toWingRoot = (z, ds = 0.06) => [[8.3 + ds, -0.15, z * (FR.wallZ(8.3 + ds, 
 /** Point on the fin's mid-plane at height y (the fin is canted outboard from its root line). */
 const finMid = (y) => FR.FIN.rootZ + (y - FR.FIN.rootY) * Math.tan(FR.FIN.cant);
 /** Station of chord fraction f of the wing at span z. */
-const wingS = (z, f) => FR.wingLE(z) + f * (FR.wingTE(z) - FR.wingLE(z));
+const wingS = (z, f) => FR.wingLE(z) + f * (FR.wingTEline(z) - FR.wingLE(z));
 
 /** Point on a fin in station space: fin-local chord fraction f at span fraction e, offset d off the mid-plane. */
 function finPoint(side, e, f, d = 0) {

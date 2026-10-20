@@ -126,7 +126,7 @@ function ductOuterAt(s, y) {
  * skin and the chine flange to the trunk wall, down to y0. zIn: the lobe's inboard limit over the duct's crown (it
  * meets the saddle there); zCap: outboard limit (a dry bay — the gun's or the APU's — beyond it).
  */
-function lobe(s, { y0 = -0.4, zIn = 0.9, zCap = 9, gap = 0.035, skin = 0.035 }) {
+function lobe(s, { y0 = -0.30, zIn = 0.9, zCap = 9, gap = 0.035, skin = 0.035 }) {
   const N = 9, out = [];
   // a corridor along the chine and the trunk wall stays free for the lines and wiring that run out into the wing root
   const zMax = Math.min(zCap, FR.bW(s) - 0.25);
@@ -229,7 +229,7 @@ export function buildSystems(ctx) {
   // and the inlet-bypass plenums, which stand on the ducts' roofs under the louvre doors: F-2 stops short of them
   const BPs = (s) => s > FR.BYPASS.s0 - 0.06 && s < FR.BYPASS.s1 + 0.06;
   const sad = (s, ybot) => saddle(s, { ybot, recess: (z) => recWell(s, z) + acfc(s, z), zo: BPs(s) ? FR.BYPASS.z0 - 0.03 : 1.45 });
-  const lobeOpts = (s, side) => ({ y0: -0.4, zIn: Math.max(BPs(s) ? FR.BYPASS.z1 + 0.03 : 0, Math.min(1.45, ductAt(s).zc + ductAt(s).w / 2 - 0.12)), zCap: s > FT.gunBay ? 1.45 : 9 });
+  const lobeOpts = (s, side) => ({ y0: -0.30, zIn: Math.max(BPs(s) ? FR.BYPASS.z1 + 0.03 : 0, Math.min(1.45, ductAt(s).zc + ductAt(s).w / 2 - 0.12)), zCap: s > FT.gunBay ? 1.45 : 9 });
   const st1b = range(FT.f1b[0], FT.f1b[1], 7), st2 = range(FT.f2[0], FT.f2[1], 26);
   const t1b = tankLoft(st1b, (s) => sad(s, -0.3)), t2 = tankLoft(st2, (s) => sad(s, -0.2));
   const lobes = [];
@@ -353,7 +353,7 @@ export function buildSystems(ctx) {
       // wing cell into A-1 at the wing root, and forward into F-2's lobe (under the gun on the right)
       const sec = FR.wingSection(2.15);
       g.push(FR.pipe([[FT.a1[0] + 0.15, -0.06, z * 2.13], [FT.a1[0] + 0.3, -0.08, z * 1.95]], 0.025, 6, 2));
-      g.push(FR.pipe([[9.35, -0.1, z * 2.13], [9.3, -0.2, z * 1.9], [9.25, -0.22, z * 1.45], [9.22, -0.2, z * 1.3]], 0.025, 6, 10));
+      g.push(FR.pipe([[9.35, -0.1, z * 2.13], [9.33, -0.14, z * 1.97], [9.3, -0.19, z * 1.78], [9.25, -0.22, z * 1.45], [9.22, -0.2, z * 1.3]], 0.025, 6, 12));
     }
     P('Fuel transfer lines', {
       system: 'Fuel', material: 'Aluminium / titanium tubing', mass: 45,
@@ -552,7 +552,7 @@ export function buildSystems(ctx) {
     // front of the side bay, round it and up under the chine into the wing root to the LEF power drive unit
     const hy = RT.sill.hyd;
     const fwd = [[man[0] - 0.02, man[1] + 0.02, man[2]], [W.resS - 0.05, -0.66, z * 1.05], [FR.AMMO.s1 + 0.05, -0.66, z * 1.05], [FR.MAIN_BAY.s1, hy[1], z * hy[0]], [8.6, hy[1], z * hy[0]], [7.05, hy[1], z * hy[0]], [6.94, -0.5, z * 1.25], [6.935, -0.42, z * 1.62], [7.4, -0.24, z * (FR.wallZ(7.4, -0.24) - 0.05)]];
-    g.push(FR.pipe([...inside(fwd), ...toWingRoot(z), [lefPdu()[0] - 0.6, lefPdu()[1] - 0.03, z * (lefPdu()[2] - 0.1)], [lefPdu()[0] - 0.05, lefPdu()[1], z * (lefPdu()[2] - 0.08)]], 0.016, 5, 90));
+    g.push(FR.pipe([...inside(fwd), ...toWingRoot(z), [lefPdu()[0] - 0.48, lefPdu()[1] - 0.03, z * (lefPdu()[2] - 0.1)], [lefPdu()[0] - 0.05, lefPdu()[1], z * (lefPdu()[2] - 0.08)]], 0.016, 5, 90));
     // aft gallery under the engine bay's outboard side, up into the boom to the stabilator actuator and into the fin
     // root to the rudder actuator (behind the A-1 tank)
     const aft = [[man[0] + 0.05, man[1] - 0.02, man[2]], [12.5, -0.76, z * 1.06], [13.2, -0.68, z * 1.14], [14.2, -0.56, z * 1.27], [14.95, -0.45, z * 1.34], [15.25, -0.3, z * 1.42]];
@@ -613,9 +613,9 @@ export function buildSystems(ctx) {
       for (const [zz] of FR.AMRAAM_SLOTS) g.push(FR.pipe([[sH, FR.bayCeil(zz) + 0.022, z * zz], [sH, FR.bayCeil(zz) - 0.012, z * zz]], 0.006, 5, 2));
       // to the side bay: up inboard of the bleed duct, over it and out over the side-bay roof (under the F-2 lobe)
       // to the trapeze actuator's and the door actuator's roof fittings
-      const yS = -0.43;
-      g.push(FR.pipe([[SB_TRAP + 0.06, hy[1], z * hy[0]], [SB_TRAP + 0.11, -0.52, z * 1.02], [SB_TRAP + 0.11, yS, z * 1.05], [SB_TRAP + 0.08, yS, z * 1.3], [SB_TRAP + 0.05, yS, z * 1.39], [SB_TRAP + 0.02, -0.45, z * 1.4]], 0.008, 5, 16));
-      g.push(FR.pipe([[SB_TRAP + 0.05, yS, z * 1.39], [SB_DOOR + 0.1, yS, z * 1.4], [SB_DOOR + 0.02, -0.445, z * 1.43]], 0.007, 5, 12));
+      const yS = -0.33, roofY = (sv, zz) => { const [a, aIn] = FR.sideBaySection(sv); return FR.lerp(aIn[1], a[1], (zz - aIn[0]) / (a[0] - aIn[0])); };
+      g.push(FR.pipe([[SB_TRAP + 0.06, hy[1], z * hy[0]], [SB_TRAP + 0.11, -0.52, z * 1.02], [SB_TRAP + 0.11, -0.42, z * 1.05], [SB_TRAP + 0.1, yS, z * 1.12], [SB_TRAP + 0.08, yS, z * 1.3], [SB_TRAP + 0.05, yS, z * 1.39], [SB_TRAP + 0.02, roofY(SB_TRAP, 1.4) - 0.005, z * 1.4]], 0.008, 5, 16));
+      g.push(FR.pipe([[SB_TRAP + 0.05, yS, z * 1.39], [SB_DOOR + 0.1, yS, z * 1.4], [SB_DOOR + 0.02, roofY(SB_DOOR, 1.43) - 0.005, z * 1.43]], 0.007, 5, 12));
     }
     // gun drive, from system A's gallery behind the side bay up the outboard side of the right duct
     g.push(FR.pipe([[10.45, hy[1], hy[0]], [10.5, -0.45, 1.25], [10.5, -0.2, 1.52], [10.52, 0.0, 1.6], [10.55, 0.04, 1.6]], 0.008, 5, 24));

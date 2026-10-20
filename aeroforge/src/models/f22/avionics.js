@@ -206,22 +206,15 @@ export function buildAvionics(ctx) {
 
   // ================================================================== CNI apertures (communications)
   {
-    const blade = (s, y, up, h, c) => {
-      const sh = new THREE.Shape();
-      sh.moveTo(0, 0); sh.lineTo(c, 0); sh.lineTo(c * 0.62, h); sh.lineTo(c * 0.3, h); sh.closePath();
-      const g = new THREE.ExtrudeGeometry(sh, { depth: 0.016, bevelEnabled: false });
-      g.translate(-c / 2, 0, -0.008);
-      g.rotateY(Math.PI);
-      if (up < 0) g.rotateX(Math.PI);
-      return g.translate(X(s), y, 0);
-    };
-    P('UHF/VHF blade antennas', {
-      system: 'Communications', material: 'Composite blade antennas', mass: 4, count: 2,
-      explode: [0, 0.85, 0],
-      desc: 'Only two small blades break the outline, on the spine and the belly, for voice and data radios (HAVE QUICK, SINCGARS); most other CNI antennas are flush with the skin.',
-    }, mesh(merge([blade(SM(9.9), FR.topAt(SM(9.9), 0) - 0.01, 1, 0.13, 0.26), blade(6.4, FR.bottomAt(6.4, 0) + 0.01, -1, 0.12, 0.22)]), F.wing()));
     const top = (s, z) => V(X(s), FR.topAt(s, Math.abs(z)) + 0.003, z);
     const bot = (s, z) => V(X(s), FR.bottomAt(s, z) - 0.003, z);
+    // side photographs of the spine and of the belly under the nose show no blade antennas, so the UHF/VHF
+    // apertures are drawn as flush conformal panels (positions and sizes approximate)
+    P('UHF/VHF antennas', {
+      system: 'Communications', material: 'Flush conformal antenna panels', mass: 4, count: 2,
+      explode: [0, 0.85, 0],
+      desc: 'Two flush apertures, one on the spine and one on the belly ahead of the main bay, for the voice and data radios (HAVE QUICK, SINCGARS). Photographs show no blade antennas on the spine or belly: like the rest of the CNI suite these sit flush with the skin (positions approximate).',
+    }, mesh(merge([patchGeo(top(SM(9.9), 0), V(0, 1, 0), 0.3, 0.1), patchGeo(bot(6.6, 0), V(0, -1, 0), 0.26, 0.1)]), F.composite()));
     P('GPS antenna', {
       system: 'Communications', material: 'Flush patch antenna', mass: 1,
       explode: [0, 1.1, 0],

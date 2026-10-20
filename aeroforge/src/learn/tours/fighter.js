@@ -64,7 +64,7 @@ export default [
   {
     title: 'Thrust vectoring',
     body: 'The two-dimensional nozzles swing the exhaust 20° up or down. When the jet is too slow or too nose-high for the stabilators to bite, thrust supplies the pitching moment, keeping the F-22 controllable beyond 60° angle of attack.',
-    key: 'Moment = T·sinδ·arm: 20° on two 156 kN engines gives ≈ 107 kN at 7.5 m, ≈ 800 kN·m.',
+    key: 'Moment = T·sinδ·arm: 20° on two 156 kN engines gives ≈ 107 kN about 5 m behind the centre of gravity, ≈ 530 kN·m.',
     focus: [...NOZZLE.flatMap(BOTH), ...BOTH('Nozzle actuators'), ...BOTH('Stabilator')],
     view: { dir: [-1, 0.25, 0.7] }, demo: 'tvc',
   },

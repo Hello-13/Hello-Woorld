@@ -137,7 +137,7 @@ export function buildGear(ctx) {
     const sl1 = slideGroup(s1.inner);
     sl1.add(mesh(merge(yoke), F.gear()), mesh(merge(pis), F.chrome()));
     P('Nose gear shock strut', {
-      system: 'Landing gear', material: 'AerMet 100 steel oleo-pneumatic strut (Menasco), chromed piston, forged fork', mass: 85,
+      system: 'Landing gear', material: 'Steel oleo-pneumatic strut (AerMet 100 per GlobalSecurity), chromed piston, forged fork', mass: 85,
       explode: [0.4, -0.85, 0],
       desc: 'A single-wheel oleo-pneumatic strut: nitrogen and hydraulic oil inside it absorb the landing and taxi loads. A forged fork carries the wheel on an axle across its arms, as photographs show. The trunnion is at the aft end of the well, 0.2 m behind the axle, so the leg rakes forward; it retracts FORWARD into the well under the cockpit floor (T.O. 00-105E-9 side view, photographs), and the oleo is drawn 0.2 m shorter on the way up so the wheel fits the 1.6 m well (shortening estimated).',
     }, s1.pivot);
@@ -292,8 +292,8 @@ export function buildGear(ctx) {
     // bearings), the yoke down to the outer cylinder, chromed piston, axle fork at the foot holding the knuckle pin
     const sA = legGroup();
     const sg = [rodV(T.clone().addScaledVector(kAx, MF.bearing[0] - 0.01), T.clone().addScaledVector(kAx, MF.bearing[1] + 0.02), 0.05, 14)];
-    sg.push(boxAlong(T.clone().addScaledVector(u, 0.09).addScaledVector(kPerp, 0.09), u, kPerp, w3, 0.26, 0.22, 0.12));
-    sg.push(rodV(at(0.20), at(0.47), 0.095, 18));
+    sg.push(boxAlong(T.clone().addScaledVector(u, 0.08).addScaledVector(kPerp, 0.07), u, kPerp, w3, 0.22, 0.17, 0.10));
+    sg.push(rodV(at(0.20), at(0.47), 0.075, 18));
     // lugs: side brace (toward its fitting), retraction jack (toward the gear beam)
     const braceFit = S3(MF.brace.fit, side), jackFit = S3(MF.jack.fit, side);
     // a lug points between the directions of its fitting as seen from the leg gear down and stowed, so the brace or
@@ -307,7 +307,7 @@ export function buildGear(ctx) {
     const bLug = at(MF.brace.at).addScaledVector(lugDir(braceFit, MF.brace.at), 0.11), jLug = at(MF.jack.at).addScaledVector(lugDir(jackFit, MF.jack.at), 0.11);
     sg.push(rodV(at(MF.brace.at), bLug, 0.03, 10), rodV(at(MF.jack.at), jLug, 0.032, 10));
     sg.push(boxAlong(at(Lg - 0.02), u, qAx, new THREE.Vector3().crossVectors(u, qAx).normalize(), 0.1, 0.17, 0.1));
-    const ch = [rodV(at(0.45), at(Lg - 0.06), 0.068, 16)];
+    const ch = [rodV(at(0.45), at(Lg - 0.06), 0.055, 16)];
     sA.inner.add(mesh(merge(sg), F.gear()), mesh(merge(ch), F.chrome()));
     // brake line down the aft side of the leg into the knuckle
     sA.inner.add(mesh(rodV(at(0.22, 0.1), at(Lg - 0.08, 0.075), 0.011, 6), F.hyd()));
@@ -318,9 +318,9 @@ export function buildGear(ctx) {
     // uplock roller on the end of the stub axle
     kn.add(mesh(rodV(Fd.clone().addScaledVector(stubDir, G.stub + Wm * 0.5), Fd.clone().addScaledVector(stubDir, G.stub + Wm * 0.5 + 0.04), MF.uplock.roller, 10), F.steel()));
     P(`Main gear shock strut (${R})`, {
-      system: 'Landing gear', material: 'AerMet 100 steel (Menasco), chromed oleo piston', mass: 200,
+      system: 'Landing gear', material: 'Steel (AerMet 100 per GlobalSecurity), chromed oleo piston; Goodrich, Haltom City', mass: 200,
       explode: [0, -0.95, 0.45 * side], callout: side > 0, anchor: [X(11.45), -1.25, side * 1.4],
-      desc: 'Oleo-pneumatic shock strut on a trunnion just behind the titanium bulkhead at the wing\'s 36 % spar, raked forward at the top about 15° and splayed out at the foot, as photographs and the T.O. 00-105E-9 drawings show. Its wheel rides on a stub axle outboard of the leg. To stow, the leg swings OUTWARD and up about a trunnion axis skewed in plan, out through the trunk side, while a knuckle at the foot turns the stub axle about 30°, so the wheel ends lying almost flat in the wing root between the 36 % and 49 % spars (GlobalSecurity: the main gear retracts outward; retraction geometry estimated). GlobalSecurity says the gear assemblies are AerMet 100 steel, chosen for strength and corrosion protection, made by Menasco (its landing-gear business is now Collins Aerospace, which DLA notices name as the F-22 gear\'s maker), and calls the main strut a dual-piston design.',
+      desc: 'Oleo-pneumatic shock strut on a trunnion just behind the titanium bulkhead at the wing\'s 36 % spar, raked forward at the top about 15° and splayed out at the foot, as photographs and the T.O. 00-105E-9 drawings show. Its wheel rides on a stub axle outboard of the leg. To stow, the leg swings OUTWARD and up about a trunnion axis skewed in plan, out through the trunk side, while a knuckle at the foot turns the stub axle about 26°, so the wheel ends lying almost flat in the wing root between the 36 % and 49 % spars (GlobalSecurity: the main gear retracts outward; retraction geometry estimated). The model stands as the NAWDC side view and the T.O. side drawing are drawn, with the fin tips at the published 5.08 m; the T.O.\'s labelled heights for a fully serviced jet (canopy 10 ft 6 in, lower fuselage 3 ft 2 in, fin 16 ft 7 in) put it about 0.1 m lower and 1° nose-down, the oleos compressed further by a full fuel load. DLA procurement notices name Goodrich Corporation (CAGE 6K4C8, Haltom City, Texas; Menasco passed to Goodrich in 1999, and Goodrich is now part of Collins Aerospace) as the F-22 gear\'s maker. Only GlobalSecurity (now paywalled, not checked again here) says the legs are AerMet 100 steel, chosen for strength and corrosion protection, and that the main strut is a dual-piston design.',
     }, sA.pivot);
     // torque links on the aft side of the leg
     const sT = legGroup();
@@ -453,7 +453,7 @@ export function buildGear(ctx) {
     // service panel in the left well: APU shutdown switch, external battery switch and the portable maintenance aid's
     // ports, on the well's front wall by the door frame
     if (side < 0) {
-      const sP = W.s0 + 0.015, yP = -0.56, zP = -1.52, g = [FR.boxS(sP, yP, zP, 0.03, 0.16, 0.22)], k = [];
+      const sP = W.s0 + 0.015, yP = -0.56, zP = -1.40, g = [FR.boxS(sP, yP, zP, 0.03, 0.16, 0.22)], k = [];
       for (const dz of [-0.06, 0, 0.06]) k.push(new THREE.CylinderGeometry(0.008, 0.008, 0.03, 8).rotateZ(Math.PI / 2).translate(X(sP + 0.03), yP + 0.04, zP + dz));
       for (const dz of [-0.045, 0.045]) k.push(new THREE.CylinderGeometry(0.02, 0.02, 0.025, 12).rotateZ(Math.PI / 2).translate(X(sP + 0.025), yP - 0.035, zP + dz));
       P('Left main-well service panel', {
@@ -464,80 +464,69 @@ export function buildGear(ctx) {
     }
 
     // ---------------------------------------------------------------- main door and inboard door
-    // the main door: one bent panel hinged far outboard on the wing's underside, over the wing opening, the bulged
-    // upper trunk side and the lower trunk side down to the corner; rows at the loft's stations along the trunk, the
-    // wing part between the opening's chord lines at each span
+    // Both doors follow the outer mould line closed (3 mm proud), inside their saw-toothed outlines (FR.MAIN_DOORS), and
+    // meet with a 1 mm seam on the crease. Columns run across a door from its hinge to the crease, rows from its fore edge
+    // to its aft edge at each column's plan position.
+    const junc = (s) => [W.zJunction, FR.junctionY(s)], crease = (s) => FR.wallB(s, FR.wallFractions(s)[5]);
+    const lo = (s, z) => FR.wingSurfaces(s, z)[0];
+    const nIn = (s, z) => { const e = 0.004, a = FR.wellSkin(s, z - e), b = FR.wellSkin(s, z + e), L = Math.hypot(b[0] - a[0], b[1] - a[1]); return [-(b[1] - a[1]) / L, (b[0] - a[0]) / L]; };
+    const doorGrid = (cols, rowsT) => {
+      const pts = rowsT.map((t) => cols.map((c) => { const s = lerp(FR.doorFore(c.z), FR.doorAft(c.z), t), [zz, yy] = c.at(s); return [X(s), yy, side * zz]; }));
+      const offs = rowsT.map((t) => cols.map((c) => { const s = lerp(FR.doorFore(c.z), FR.doorAft(c.z), t), [dz, dy] = c.off(s); return [0, dy, side * dz]; }));
+      return slab(pts, (p, r, c) => offs[r][c]);
+    };
+    const TH = 0.02, PROUD = 0.003, TR = [0, 0.04, 0.12, 0.25, 0.4, 0.55, 0.7, 0.85, 0.94, 1];
+    // a bend column: the point moved PROUD outward along the bisector of the two faces' normals, the door's thickness kept
+    const bend = (z, nA, nB) => ({ z, at: (s) => { const [zz, yy] = FR.wellSkin(s, z), a = nA(s), b = nB(s), n = [a[0] + b[0], a[1] + b[1]], L = Math.hypot(...n); return [zz - (n[0] / L) * PROUD, yy - (n[1] / L) * PROUD]; },
+      off: (s) => { const a = nA(s), b = nB(s), n = [a[0] + b[0], a[1] + b[1]], L = Math.hypot(...n), c = (n[0] * a[0] + n[1] * a[1]) / L; return [(n[0] / L) * TH / c, (n[1] / L) * TH / c]; } });
+    const facetN = (s) => { const J = junc(s), C = crease(s), L = Math.hypot(J[0] - C[0], J[1] - C[1]); return [-(J[1] - C[1]) / L, (J[0] - C[0]) / L]; };
+    const lowerN = (s) => { const C = crease(s), k = FR.bWb(s), D = FR.bD(s), L = Math.hypot(C[0] - k, C[1] + D); return [-(C[1] + D) / L, (C[0] - k) / L]; };
+    // the facet's points by fraction of the way from the junction to the crease (which moves a few mm along the trunk)
+    const onFacet = (z, endGap = 0) => ({ z, at: (s) => { const J = junc(s), C = crease(s), f = Math.min(1 - endGap / Math.hypot(J[0] - C[0], J[1] - C[1]), (W.zJunction - z) / (W.zJunction - C[0])), n = facetN(s); return [lerp(J[0], C[0], f) - n[0] * PROUD, lerp(J[1], C[1], f) - n[1] * PROUD]; }, off: (s) => facetN(s).map((v) => v * TH) });
+    const onLower = (z, endGap = 0, toCrease = false) => ({ z, at: (s) => { const C = crease(s), k = FR.bWb(s), D = FR.bD(s), L = Math.hypot(C[0] - k, C[1] + D), f = toCrease ? 1 - endGap / L : Math.min(1 - endGap / L, (z - k) / (C[0] - k)), n = lowerN(s); return [lerp(k, C[0], f) - n[0] * PROUD, lerp(-D, C[1], f) - n[1] * PROUD]; }, off: (s) => lowerN(s).map((v) => v * TH) });
     {
-      // rows: the saw-toothed edge, the opening's edge, 1.2 cm inside it, the loft's stations, and the same at the aft
-      // end; the toothed band and the opening's edge are thin (they lie on the door lands, over the skin and the well's
-      // end walls), the panel is full thickness only inside the opening
-      const EB = 0.012, tooth = 0.05;
-      const base = ctx.sB.filter((s) => s > W.s0 + 2 * EB && s < W.s1 - 2 * EB);
-      const rows = [{ e: 0, d: -1 }, { e: 0 }, { e: 0, in: EB }, ...base.map((s) => ({ s })), { e: 1, in: -EB }, { e: 1 }, { e: 1, d: 1 }];
-      const thin = (r) => r <= 1 || r >= rows.length - 2;
-      const cs = (c, z) => FR.wingLE(z) + c * (FR.wingTE(z) - FR.wingLE(z));
-      const lo = (s, z) => { const sec = FR.wingSection(z), xc = Math.min(1, Math.max(0, (s - FR.wingLE(z)) / sec.chord)); return sec.le[1] - 5 * sec.t * (0.2969 * Math.sqrt(xc) - 0.126 * xc - 0.3516 * xc * xc + 0.2843 * xc ** 3 - 0.1036 * xc ** 4) * sec.chord; };
-      // columns: wing spans from the hinge in to the junction (doubled at the strips' joints), then the trunk side's
-      // loft samples from the junction to the lower corner
-      const eps = 0.002, zs = [];
-      for (const z of [W.hingeZ, 2.40, 2.33]) zs.push(z);
-      zs.push(2.30 + eps, 2.30 - eps, 2.21, 2.12 + eps, 2.12 - eps, 2.045);
-      const wf = (s) => FR.wallFractions(s);
-      const cols = [...zs.map((z) => ({ wing: z })), ...[3, 4, 5, 6, 7, 8, 9].map((i) => ({ wall: i }))];
-      const grid = rows.map((row) => cols.map((col, c) => {
-        const d = row.d && c % 2 === 1 ? row.d * tooth : 0;
-        // station of this row along the column: the opening's fore / aft edge (plus the band's inset), or the loft
-        // station (on the wing, the same fraction of the opening's chord)
-        const at = (e0, e1) => (row.s !== undefined ? lerp(e0, e1, (row.s - W.s0) / (W.s1 - W.s0)) : (row.e ? e1 : e0) + (row.in || 0));
-        if (col.wing !== undefined) {
-          const ch = FR.wellWingChord(col.wing);
-          const s = at(cs(ch[0], col.wing), cs(ch[1], col.wing)) + d;
-          return [X(s), lo(s, col.wing) - 0.003, side * col.wing];
-        }
-        const s0 = at(W.s0, W.s1), s = s0 + d, f = wf(s0)[col.wall], [zz, yy] = FR.wallB(s, f);
-        return [X(s), yy - (col.wall === 9 ? 0.003 : 0), side * (zz + (col.wall === 9 ? 0.0005 : 0.003))];     // (a 1 mm seam with the inboard door at the corner)
-      }));
-      // (thickness inward from the outer surface; at the lower corner straight up, so the edge meets the inboard door's)
-      const door = slab(grid, (p, r, c) => {
-        const k = thin(r) ? 0.2 : 1, w = cols[c].wall;
-        return (cols[c].wing !== undefined || w === 9 ? [0, 0.022, 0] : [0, 0.006, -side * 0.021]).map((q) => q * k);
-      });
-      const hz = W.hingeZ, ch0 = FR.wellWingChord(hz), sh0 = cs(ch0[0], hz), sh1 = cs(ch0[1], hz);
-      const p0 = V(X(sh0), lo(sh0, hz), side * hz), p1 = V(X(sh1), lo(sh1, hz), side * hz);
-      const test = V(X((W.s0 + W.s1) / 2), -0.8, side * 1.6);
+      // the main door: hinge 5 mm inside the outline's outer edge, the wing part to the junction (a bend there), the
+      // bulged facet to the crease; three small teeth by the hinge on its forward edge, a large and a small one aft
+      const hz = W.hingeZ - 0.005, D = FR.MAIN_DOORS.splitZ;
+      const wingCols = [hz, 2.40, 2.33, 2.23, 2.1475, 2.065, 2.02, 1.9825].map((z) => ({ z, at: (s) => [z, lo(s, z) - PROUD], off: () => [0, TH] }));
+      const cols = [...wingCols, bend(W.zJunction, () => [0, 1], facetN), ...[1.94, 1.90, 1.84, 1.77, 1.70, 1.62].map((z) => onFacet(z)), onFacet(D, 0.0005)];
+      const door = doorGrid(cols, TR);
+      const sh0 = FR.doorFore(W.hingeZ), sh1 = FR.doorAft(W.hingeZ);
+      const p0 = V(X(sh0), lo(sh0, hz) + TH / 2 - PROUD, side * hz), p1 = V(X(sh1), lo(sh1, hz) + TH / 2 - PROUD, side * hz);
+      const test = V(X(11.8), -0.45, side * 1.75);
       const h = hinge(mesh(door, F.door()), p0, p1, test, V(0, -1, 0));
       P(`Main gear door (${R})`, {
         system: 'Skin & fairings', skin: true, material: 'Composite door with saw-tooth edges', mass: 34,
         explode: [0, -1.65, 1.6 * side],
-        desc: 'The large door over the main wheel well, about 1.1 m fore and aft: one bent panel over the wing root\'s underside and the trunk side, hinged far outboard on the wing (NAWDC bottom view outline; T.O. 00-105E-9 puts the APU exhaust "above the main landing gear doors" in the wing root). Open, it hangs outboard of the wheel with its lower edge about level with the tyre top, as photographs of the jet show. Like every door its fore and aft edges are saw-toothed.',
+        desc: 'The large outer door over the main wheel well: one panel bent along the wing junction, over the wing root\'s underside and the bulged trunk side down to the crease where the inboard door meets it, about 1.05 m from its hinge far outboard on the wing to that edge and 1.37 m fore and aft over its saw teeth (0.71 m along the hinge; NAWDC bottom view and photographs of the open door). Open, it hangs about 11° off vertical outboard of the wheel, its lower edge about 0.1 m below the tyre top. Its edges run at 42°, parallel to the wing\'s leading edge.',
       }, h.pivot);
       anim.gearDoorsMain = anim.gearDoorsMain || [];
-      anim.gearDoorsMain.push({ h, angle: 98 * FR.DEG });
+      anim.gearDoorsMain.push({ h, angle: FR.MAIN_DOORS.open.main * FR.DEG });
       // rotary actuator at the aft end of the hinge line, inside the wing, bracketed to the 49 % spar
       const ax = p1.clone().sub(p0).normalize(), a0 = p1.clone().addScaledVector(ax, 0.012).add(V(0, 0.045, 0)), a1 = a0.clone().addScaledVector(ax, 0.13);
-      const sp = cs(0.49, hz);
-      const ra = [rodV(a0, a1, 0.035, 14), new THREE.BoxGeometry(Math.abs(X(sp) - a1.x) + 0.02, 0.05, 0.06).translate((X(sp) + a1.x) / 2, a1.y, a1.z), rodV(p1.clone().add(V(0, 0.0, 0)), a0, 0.012, 6)];
+      const sp = FR.wingLE(hz) + 0.49 * (FR.wingTEline(hz) - FR.wingLE(hz));
+      const ra = [rodV(a0, a1, 0.035, 14), new THREE.BoxGeometry(Math.abs(X(sp) - a1.x) + 0.02, 0.05, 0.06).translate((X(sp) + a1.x) / 2, a1.y, a1.z), rodV(p1.clone(), a0, 0.012, 6)];
       P(`Main gear door actuator (${R})`, {
         system: 'Landing gear', material: 'Hydraulic rotary actuator', mass: 6,
         explode: [-0.3, -0.8, 1.2 * side],
         desc: 'A hydraulic rotary actuator at the aft end of the main door\'s hinge line, inside the wing root and bracketed to the 49 % spar, swings the door open ahead of the leg and closes it behind it; the sequence valve keeps door and leg from colliding (arrangement estimated).',
       }, mesh(merge(ra), F.hyd()));
     }
-    // inboard door on the belly, hinged on its inboard edge
+    // inboard door on the belly, hinged on its inboard edge: over the belly to the trunk's lower corner and up the lower
+    // trunk side to the crease; open, it hangs almost straight down inboard of the leg
     {
-      // (as the main door: the toothed band and the opening's edge thin, full thickness 1.2 cm inside the opening)
-      const st0 = ctx.sB.filter((s) => s > W.s0 + 0.024 && s < W.sIn1 - 0.024);
-      const st = [W.s0, W.s0, W.s0 + 0.012, ...st0, W.sIn1 - 0.012, W.sIn1, W.sIn1];
-      const zAt = (s, uu) => { const zs = FR.bottomSamples(s); return lerp(zs[4], zs[0] - 0.0005, uu); };
-      const grid = toothedGrid((s, uu) => [X(s), -FR.bD(s) - 0.002, side * zAt(s, uu)], st, { width: 0.42, pitch: 0.1 });
-      const door = slab(grid, (p, r) => [0, r <= 1 || r >= st.length - 2 ? 0.004 : 0.02, 0], V(0, -1, 0));
-      const h = hinge(mesh(door, F.door()), V(X(W.s0), -FR.bD(W.s0), side * W.zIn), V(X(W.sIn1), -FR.bD(W.sIn1), side * W.zIn), V(X(11.4), -1.0, side * 1.4), V(0, -1, 0));
+      const D = FR.MAIN_DOORS.splitZ, zk = FR.bWb(11.6);
+      const belly = (z) => ({ z, at: (s) => [z, -FR.bD(s) - PROUD], off: () => [0, TH] });
+      const cols = [belly(W.zIn + 0.003), belly(1.15), belly(1.195), bend(zk, () => [0, 1], lowerN), ...[1.30, 1.38, 1.46].map((z) => onLower(z)), onLower(D, 0.0005, true)];
+      const door = doorGrid(cols, TR);
+      const sh0 = FR.doorFore(W.zIn), sh1 = FR.doorAft(W.zIn);
+      const h = hinge(mesh(door, F.door()), V(X(sh0), -FR.bD(sh0) + TH / 2 - PROUD, side * W.zIn), V(X(sh1), -FR.bD(sh1) + TH / 2 - PROUD, side * W.zIn), V(X(11.6), -0.9, side * 1.35), V(0, -1, 0));
       P(`Main gear inboard door (${R})`, {
-        system: 'Skin & fairings', skin: true, material: 'Composite door, saw-tooth edges', mass: 10,
+        system: 'Skin & fairings', skin: true, material: 'Composite door, saw-tooth edges', mass: 12,
         explode: [0.2, -1.6, 0.7 * side],
-        desc: 'Closes the belly between the trunk\'s lower corner and the inboard door hinge, where the leg leaves the fuselage (the inner panel of the NAWDC outline). It opens with the main door and stays open, hanging inboard of the leg, while the gear is down.',
+        desc: 'The inner door of the main wheel well, hinged on the belly about 1.1 m out from the centre line: it covers the belly out to the trunk\'s lower corner and the lower trunk side up to the crease, where the leg leaves the fuselage (the inner panel of the NAWDC outline; T.O. panel 8210 / 8211). It opens with the main door and stays open, hanging almost straight down inboard of the leg, while the gear is down.',
       }, h.pivot);
-      anim.gearDoorsMain.push({ h, angle: 100 * FR.DEG });
+      anim.gearDoorsMain.push({ h, angle: FR.MAIN_DOORS.open.inboard * FR.DEG });
     }
   }
 

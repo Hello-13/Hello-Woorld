@@ -75,7 +75,7 @@ export function cavity(st, edge, inward, depth) {
 }
 
 /** Cavity liner from rows of any equal length (opening edge, round the back, opening edge), ear-clipped end caps. */
-export function cavityRows(grid) {
+export function cavityRows(grid, caps = true) {
   const pos = [], idx = [];
   const m = grid.length, k = grid[0].length;
   for (const row of grid) for (const p of row) pos.push(...p);
@@ -85,7 +85,7 @@ export function cavityRows(grid) {
       idx.push(a, cc, b, b, cc, d);
     }
   }
-  for (const r of [0, m - 1]) {
+  if (caps) for (const r of [0, m - 1]) {
     const contour = grid[r].map((p) => new THREE.Vector2(p[2], p[1]));
     for (const f of THREE.ShapeUtils.triangulateShape(contour, [])) idx.push(r * k + f[0], r * k + f[1], r * k + f[2]);
   }
@@ -113,6 +113,56 @@ export function cavityGrid(grid) {
   g.setIndex(idx);
   g.computeVertexNormals();
   return g;
+}
+
+/**
+ * Surface through columns of points (each column the same length, columns side by side), wound so its normals point
+ * along out(p) (a THREE.Vector3 for a point [x, y, z]). Extra per-vertex attributes: attrs(p) → { name: value }.
+ */
+export function columnsMesh(cols, out, attrs = null, uvf = null) {
+  const pos = [], idx = [], ex = {}, uv = [];
+  const n = cols[0].length;
+  for (const c of cols) for (const p of c) { pos.push(...p); uv.push(...(uvf ? uvf(p) : [0, 0])); if (attrs) for (const [k, v] of Object.entries(attrs(p))) (ex[k] = ex[k] || []).push(v); }
+  for (let i = 0; i < cols.length - 1; i++) for (let j = 0; j < n - 1; j++) { const a = i * n + j, b = a + 1, c = a + n, d = c + 1; idx.push(a, c, b, b, c, d); }
+  // wind every triangle the same way, checked on the largest one against the outward direction there
+  let best = -1, bi = 0;
+  const v = (k) => new THREE.Vector3(pos[3 * k], pos[3 * k + 1], pos[3 * k + 2]);
+  for (let t = 0; t < idx.length; t += 3) { const ar = v(idx[t + 1]).sub(v(idx[t])).cross(v(idx[t + 2]).sub(v(idx[t]))).length(); if (ar > best) { best = ar; bi = t; } }
+  const A = v(idx[bi]), nrm = v(idx[bi + 1]).sub(A).cross(v(idx[bi + 2]).sub(A));
+  if (nrm.dot(out([A.x, A.y, A.z])) < 0) for (let t = 0; t < idx.length; t += 3) { const q = idx[t + 1]; idx[t + 1] = idx[t + 2]; idx[t + 2] = q; }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  for (const [k, a] of Object.entries(ex)) g.setAttribute(k, new THREE.Float32BufferAttribute(a, 1));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Cavity liner through rows of equal length (as cavityRows), its two end walls closed along `closure(r)` (extra [x, y, z]
+ *  points from the row's last point back to its first, e.g. along the skin) instead of a straight line. */
+export function cavityRowsClosed(grid, closure) {
+  const g = cavityRows(grid, false);
+  const pos = [...g.attributes.position.array], idx = [...g.index.array];
+  for (const r of [0, grid.length - 1]) {
+    const loop = dedupe3([...grid[r], ...closure(r)]);
+    if (loop.length < 3) continue;
+    const base = pos.length / 3;
+    for (const p of loop) pos.push(...p);
+    for (const f of THREE.ShapeUtils.triangulateShape(loop.map((p) => new THREE.Vector2(p[2], p[1])), [])) idx.push(base + f[0], base + f[1], base + f[2]);
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  out.setIndex(idx);
+  out.computeVertexNormals();
+  return out;
+}
+/** Drop consecutive duplicate points (and a closing duplicate) from a 3-D loop. */
+function dedupe3(pts, eps = 1e-5) {
+  const out = [];
+  for (const p of pts) { const q = out[out.length - 1]; if (!q || Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) > eps) out.push(p); }
+  while (out.length > 2 && Math.hypot(out[0][0] - out[out.length - 1][0], out[0][1] - out[out.length - 1][1], out[0][2] - out[out.length - 1][2]) < eps) out.pop();
+  return out;
 }
 
 /** Spar caps: flat flanges along the upper and lower skins at chord fraction f. */
@@ -255,11 +305,49 @@ export function buildAirframe(ctx) {
     mass: 260, explode: [0, 1.5, 0],
     desc: 'The broad upper deck over the inlet ducts and fuselage tanks, blending into the wing glove. Thermoset composites make up about a quarter of the F-22\'s structural weight.',
   }, mesh(FR.gridSurface(rM, { closed: true, keep: keepB(stM, true) }), F.skin()));
+  // round the main-gear doors' outline the skin's rectangular cut-out is filled by a patch on the outer mould line, so the
+  // opening is the doors' saw-toothed outline exactly: on the trunk side and belly (fore and aft of the outline, from the
+  // inboard door's hinge up to the wing junction) and on the wing root's underside (between the cut-out's chord lines)
+  const wellPatch = (() => {
+    const zsAt = (a, b, must) => { const out = new Set(must.filter((z) => z >= a - 1e-9 && z <= b + 1e-9)); for (let z = a; z < b - 1e-9; z += 0.02) out.add(+z.toFixed(4)); out.add(b); return [...out].sort((p, q) => p - q); };
+    const vz = [...FR.MAIN_DOORS.main.fore, ...FR.MAIN_DOORS.main.aft, ...FR.MAIN_DOORS.inboard.fore, ...FR.MAIN_DOORS.inboard.aft].map((v) => v[0]);
+    const zT = zsAt(W.zIn, W.zJunction, [...vz, FR.bWb(11.6), 1.5435]), zW = zsAt(W.zJunction, W.hingeZ, vz);
+    const T = [0, 1 / 3, 2 / 3, 1];
+    const trunkPt = (s, z) => { const [zz, y] = FR.wellSkin(s, z); return [X(s), y, zz]; };
+    const outT = (p) => { const s = FR.SN - p[0], z = p[2], a = FR.wellSkin(s, z - 0.004), b = FR.wellSkin(s, z + 0.004); return new THREE.Vector3(0, -(b[0] - a[0]), b[1] - a[1]); };
+    // (texture coordinates as the loft lays them: u = −x, v = arc length round the ring from the top centre line)
+    const arcAt = (s, z) => {
+      const r = FR.ringB(s).pts; let a = 0;
+      for (let j = 1; j < 37; j++) {
+        const p = r[j - 1], q = r[j], L = Math.hypot(p[1] - q[1], p[2] - q[2]);
+        if (j > 20 && q[2] <= z + 1e-9 && p[2] >= z - 1e-9 && L > 1e-9) return a + Math.hypot(p[1] - q[1], p[2] - q[2]) * ((p[2] - z) / Math.max(1e-9, p[2] - q[2]));
+        a += L;
+      }
+      return a;
+    };
+    const uvT = (p) => { const s = FR.SN - p[0]; return [-p[0], arcAt(s, p[2])]; };
+    const geo = [];
+    for (const [sa, sb] of [[() => W.s0, FR.doorFore], [FR.doorAft, () => W.s1]]) {
+      const cols = zT.map((z) => T.map((t) => trunkPt(lerp(sa(z), sb(z), t), z)));
+      geo.push(columnsMesh(cols, outT, null, uvT));
+    }
+    const wingG = [];
+    const cs = (c, z) => FR.wingLE(z) + c * (FR.wingTEline(z) - FR.wingLE(z)), [c0, c1] = FR.wellWingChord(W.hingeZ);
+    const wingPt = (s, z) => [X(s), FR.wingSurfaces(s, z)[0], z];
+    const wAttr = (p) => { const s = FR.SN - p[0], z = p[2]; return { chord: (s - FR.wingLE(z)) / (FR.wingTE(z) - FR.wingLE(z)), side: -1 }; };
+    for (const [sa, sb] of [[(z) => cs(c0, z), FR.doorFore], [FR.doorAft, (z) => cs(c1, z)]]) {
+      const cols = zW.map((z) => T.map((t) => wingPt(lerp(sa(z), sb(z), t), z)));
+      wingG.push(columnsMesh(cols, () => new THREE.Vector3(0, -1, 0), wAttr, (p) => [p[2] - 1.45, FR.SN - p[0]]));
+    }
+    const both = (list) => [...list, ...list.map(mirror)];
+    return { trunk: merge(both(geo)), wing: (side) => mergeGeometries(side > 0 ? wingG : wingG.map(mirror)) };
+  })();
+  ctx.wellPatch = wellPatch;
   P('Intake trunk & lower fuselage skin', {
     system: 'Skin & fairings', skin: true, material: 'Composite and titanium panels, RAM coated',
     mass: 300, explode: [0, -1.25, 0],
-    desc: 'Wraps the intake trunks and the belly. The trunk walls lean inboard toward the flat bottom, parallel to the inlets\' walls and the canted fins. The openings for the main weapons bay, both side bays and the main-gear wells are cut here; their doors close flush with saw-toothed edges.',
-  }, mesh(FR.gridSurface(rM, { closed: true, keep: keepB(stM, false) }), F.skin()));
+    desc: 'Wraps the intake trunks and the belly. Below the wing roots the trunk sides lean inboard about 39° from the vertical down to the flat bottom, whose outer corners are only about 2.5 m apart (NAWDC front and back views), on the line of the inlets\' outer walls; over the main wheel wells the upper side bulges out to meet the wing root. The openings for the main weapons bay, both side bays and the main-gear wells are cut here; their doors close flush with saw-toothed edges.',
+  }, [mesh(FR.gridSurface(rM, { closed: true, keep: keepB(stM, false) }), F.skin()), mesh(wellPatch.trunk, F.skin())]);
   P('Aft fuselage upper skin', {
     system: 'Skin & fairings', skin: true, material: 'Titanium and high-temperature composite panels, engine-bay access doors',
     mass: 230, explode: [-0.6, 1.5, 0],
@@ -365,14 +453,14 @@ export function buildAirframe(ctx) {
   // mid fuselage (Lockheed Martin Fort Worth; ≈ 30 % titanium, 30 % aluminium, 30 % composite): titanium
   // wing-carry-through bulkheads where the titanium front and mid spars attach, aluminium frames between
   // (the titanium spars reach the side of the body at the stations below; the RTM spars between them)
-  const sparAt = (f) => FR.wingLE(FR.WING.bodyZ) + f * (FR.wingTE(FR.WING.bodyZ) - FR.wingLE(FR.WING.bodyZ));
+  const sparAt = (f) => FR.sparStation(f);
   // a frame that crosses a main-gear well opening is interrupted there: its band stops at the opening's edges (the
   // wing junction above, the inboard door's hinge line on the belly, or the lower corner aft of the inboard door)
-  const wellKeep = (s, D) => {
+  const wellKeep = (s) => {
     const MW = FR.MAIN_WELL;
-    if (s < MW.s0 || s > MW.s1) return () => true;
-    const belly = s <= MW.sIn1;
-    return (p) => !(p[1] < MW.yJunction + 0.01 && Math.abs(p[0]) > (belly ? MW.zIn - 0.02 : 1.2) && (belly || p[1] > -D + 0.06));
+    if (s < MW.s0 - 0.03 || s > MW.s1 + 0.03) return () => true;
+    // (a ring point just inside the skin, under the doors' outline at either face of the frame)
+    return (p) => { const z = Math.abs(p[0]); return p[1] > FR.junctionY(s) + 0.02 || ![-0.025, 0, 0.025].some((ds) => [-0.02, 0, 0.02].some((dz) => FR.wellOpen(s + ds, z + dz))); };
   };
   // (and inside the well cavity, at either face of the frame, it stops at the well's liner)
   const inWell = (s, p) => [-0.025, 0, 0.025].some((ds) => FR.inMainWell(s + ds, p[1], p[0], -0.01));
@@ -404,7 +492,7 @@ export function buildAirframe(ctx) {
       const sideBay = s > FR.SIDE_BAY.s0 && s < FR.SIDE_BAY.s1, dep = depAt(s, 0.05);
       return frameBand(s, zy(FR.ringB(s).pts), {
         depth: 0.15, thick: 0.05, clip: clipDuct(s, 0.05), avoid: (p) => dep(p[1], p[0]) > -0.028,
-        keep: (p) => !(p[1] < -D + 0.12 && Math.abs(p[0]) < FR.MAIN_BAY.z + 0.05) && !(sideBay && p[1] < FR.SIDE_BAY.y0 + 0.04 && p[1] > FR.SIDE_BAY.y1 - 0.04 && Math.abs(p[0]) > FR.wallZ(s, -0.6) - 0.4) && wellKeep(s, D)(p) && !inWell(s, p) && dep(p[1], p[0]) < -0.015,
+        keep: (p) => !(p[1] < -D + 0.12 && Math.abs(p[0]) < FR.MAIN_BAY.z + 0.05) && !(sideBay && p[1] < FR.SIDE_BAY.y0 + 0.04 && p[1] > FR.SIDE_BAY.y1 - 0.04 && Math.abs(p[0]) > FR.wallZ(s, -0.6) - 0.4) && wellKeep(s)(p) && !inWell(s, p) && dep(p[1], p[0]) < -0.015,
       });
     };
     // forward bulkhead behind the inlets, the front-spar bulkhead, and the bulkhead just ahead of the fan faces
@@ -427,7 +515,7 @@ export function buildAirframe(ctx) {
     // through the screens behind the AMAD bay)
     const amadBay = (s) => (p) => !(Math.abs(s - FR.FRAMES.engine[0]) < 0.01 && p[1] < -0.8 && Math.abs(p[0]) > FR.AMAD.z - 0.27 && Math.abs(p[0]) < FR.AMAD.z + 0.22);
     for (const s of FR.FRAMES.engine) {
-      const wk = wellKeep(s, FR.bD(s)), sweep = (p) => Math.max(FR.mainWellDepth(s - 0.02, p[1], p[0]), FR.mainWellDepth(s + 0.02, p[1], p[0])) < -0.015;
+      const wk = wellKeep(s), sweep = (p) => Math.max(FR.mainWellDepth(s - 0.02, p[1], p[0]), FR.mainWellDepth(s + 0.02, p[1], p[0])) < -0.015;
       g.push(frameBand(s, zy(FR.ringB(s).pts), { depth: 0.07, thick: 0.04, keep: (p) => amadBay(s)(p) && wk(p) && sweep(p) && !inWell(s, p) }));
     }
     P('Engine-bay frames', {
@@ -514,7 +602,8 @@ export function buildAirframe(ctx) {
   }
 
   // ================================================================== wings
-  // two trapezoids: root → the trailing-edge kink at z 5.87, then the 42° tip clip to the 1.1 m tip chord
+  // two trapezoids: root → the trailing-edge kink at z 5.87, then the 42° tip clip to the ≈ 1.0 m tip chord; built on
+  // the structural chord and squeezed onto the real trailing edge (FR.warpWing)
   const ZR = 1.45, ZK = FR.WING.kinkZ, ZT = FR.WING.semi;
   const wRoot = FR.wingSection(ZR), wKink = FR.wingSection(ZK), wTip = FR.wingSection(ZT);
   const PAN = [[wRoot, wKink, ZR, ZK], [wKink, wTip, ZK, ZT]];
@@ -527,7 +616,7 @@ export function buildAirframe(ctx) {
       const eta0 = (a - z0) / (z1 - z0), eta1 = (b - z0) / (z1 - z0);
       const n = Math.max(1, Math.round((stations * (b - a)) / (zb - za)));
       const g = wingPanel({ root: r, tip: t, n: 22, c0, c1, eta0, eta1, stations: n });
-      out.push(eta0 === 0 && r === wRoot ? trimRootFromDuct(g, wRoot, wKink) : g);
+      out.push(FR.warpWing(eta0 === 0 && r === wRoot ? trimRootFromDuct(g, wRoot, wKink) : g));
     }
     return out;
   };
@@ -540,9 +629,10 @@ export function buildAirframe(ctx) {
     const mz = (v) => new THREE.Vector3(v.x, v.y, v.z * side);
     const R = side > 0 ? 'right' : 'left';
     const panel = (o) => wingPieces(o).map(flip);
-    // over the main-gear well the lower skin is open between the hole's chord lines from the root out to the door's
-    // hinge (FR.MAIN_WELL.wing, three strips); the pieces either side keep their closing walls on those chord lines,
-    // the middle piece keeps only its upper skin, and no span-end caps are left inside the wing at the strip joints
+    // over the main-gear well the lower skin is cut out between the chord lines of FR.MAIN_WELL.wing from the root out to
+    // the door's hinge (the buried root strip inside the fuselage, then the wing root's underside, where the fuselage's
+    // patch fills the cut-out round the door's outline); the pieces either side keep their closing walls on those chord
+    // lines, the middle piece keeps only its upper skin, and no span-end caps are left inside the wing at the strip joint
     const wellSkin = [];
     let zw = ZR;
     for (const [zz, ca, cb] of FR.MAIN_WELL.wing) {
@@ -567,8 +657,8 @@ export function buildAirframe(ctx) {
     const wing = P(`Wing skin (${R})`, {
       system: 'Skin & fairings', skin: true, material: 'Bismaleimide composite skins, RAM-treated edges', mass: 420,
       explode: [0, 0.35, 2.7 * side], callout: false,
-      desc: 'Upper and lower skins of a 42°-swept wing with a −17° trailing edge; 78.04 m² for both wings (reference trapezoid) and a 13.56 m span, with 3.25° of anhedral. Outboard of the ailerons the trailing edge is cut back parallel to the leading edge, so the real tip chord is only about 1.1 m. The real wing uses NACA 64A-series sections (5.92 % thick at the root, 4.29 % at the tip) with conical camber and twist; the model keeps the thickness but uses symmetric sections.',
-    }, mesh(mergeGeometries(skin), F.wing()));                     // one mesh; the panels keep their chord / side attributes
+      desc: 'Upper and lower skins of a 42°-swept wing with a −17° trailing edge; 78.04 m² for both wings (reference trapezoid) and a 13.56 m span, with 3.25° of anhedral. The trailing edge itself runs 0.145 m ahead of the trapezoid\'s (NAWDC and T.O. plan views), and outboard of the ailerons it is cut back parallel to the leading edge, so the real tip chord is only about 1 m. The real wing uses NACA 64A-series sections (5.92 % thick at the root, 4.29 % at the tip) with conical camber and twist; the model keeps the thickness but uses symmetric sections.',
+    }, [mesh(mergeGeometries(skin), F.wing()), mesh(ctx.wellPatch.wing(side), F.wing())]);   // the panels keep their chord / side attributes
     wing.userData.part.thermalRole = 'leadingEdge';
 
     // control surfaces
@@ -637,17 +727,17 @@ export function buildAirframe(ctx) {
       system: 'Structure', material: 'Ti-6Al-4V spars machined from forgings, with spar caps', mass: 330,
       explode: [0, -0.2, 2.2 * side], callout: side > 0, anchor: [X(FR.WM(10.44)), FR.wingY(3.4), 3.4 * side],
       desc: 'The front, mid and rear spars are machined titanium forgings. Boeing\'s wing is almost 50 % titanium, partly because an intermediate composite spar was changed to titanium wherever it was needed to tolerate battle damage (every third one, by Flight\'s account).',
-    }, mesh(sideG(merge(ti)), F.tiDull()));
+    }, mesh(sideG(FR.warpWing(merge(ti))), F.tiDull()));
     P(`Wing RTM sine-wave spars (${R})`, {
       system: 'Structure', material: 'Resin-transfer-moulded composite spars with corrugated (sine-wave) webs', mass: 120,
       explode: [0, -0.5, 2.35 * side],
       desc: 'Intermediate spars made by resin transfer moulding: dry fibre preforms are injected with resin in a closed mould, and the wavy web stays stiff without heavy stiffeners. Dow-UT delivered these RTM spars — 44 per ship set — among the first production RTM primary structure.',
-    }, mesh(sideG(merge(rtm)), F.composite()));
+    }, mesh(sideG(FR.warpWing(merge(rtm))), F.composite()));
     P(`Wing ribs (${R})`, {
       system: 'Structure', material: 'Machined aluminium / titanium and composite ribs', mass: 230,
       explode: [0, 0.15, 2.5 * side],
       desc: 'Ribs across the spars hold the airfoil shape, carry the skin loads into the spars and divide the integral wing tank into bays (rib count approximate). The root rib closes the wing at the side of the body.',
-    }, mesh(sideG(merge(ribs)), F.alu()));
+    }, mesh(sideG(FR.warpWing(merge(ribs))), F.alu()));
     P(`Wing root attach fittings (${R})`, {
       system: 'Structure', material: 'Titanium lugs and high-strength steel shear pins', mass: 110,
       explode: [0, -0.15, 1.7 * side],
@@ -838,33 +928,24 @@ export function buildAirframe(ctx) {
       };
       g.push(cavity(stC, edgeC, () => [0, 0.05, -side * 1], 0.12));
     }
-    // main-gear wells: from the openings (the belly inboard of the lower corner, the trunk side and the wing root's
-    // underside) round the inboard wall, which stays clear of the fan case and the engine-bay harness above the gear
-    // beam, under a roof below the upper deck and the wing's upper skin, out to the wing opening's outer edge; the
-    // bulkhead web and the gear beam stand inside it
+    // main-gear wells (FR.wellRow): the deep well from the belly inboard of the opening round its inboard wall, which
+    // stays clear of the fan case and the engine-bay harness above the gear beam, under a roof below the upper deck and
+    // the wing's upper skin, out to the door's hinge, between the 36 % and 49 % spars in the wing root; the shallow
+    // pockets under the skin where the doors' outline reaches past it (the forward teeth, and aft of the engine-bay frame
+    // at sAft). Its end walls close along the skin; the bulkhead web and the gear beam stand inside it.
     const MW = FR.MAIN_WELL;
-    const stW = [...new Set([...ctx.sB.filter((s) => s >= MW.s0 - 1e-6 && s <= MW.s1 + 1e-6), MW.sIn1 + 0.002, MW.sAft, MW.sAft + 0.002, ...stations(MW.s0, MW.s1, 0.06)])].sort((p, q) => p - q);
-    const zInb = FR.mainWellInboard, roofY = FR.mainWellRoof, wingAt = FR.wingSurfaces;
+    const vs = [...FR.MAIN_DOORS.main.fore, ...FR.MAIN_DOORS.main.aft, ...FR.MAIN_DOORS.inboard.fore, ...FR.MAIN_DOORS.inboard.aft].map((v) => v[1]);
+    const sparS = (f, z) => FR.wingLE(z) + f * (FR.wingTEline(z) - FR.wingLE(z));
+    const must = [...vs, ...[0.36, 0.49].flatMap((f) => [sparS(f, MW.zSob), sparS(f, MW.hingeZ)])];
+    const sEnd = Math.max(...vs) - 0.001;
+    const deepSt = stations(MW.s0, MW.sAft, 0.03, must), pocketSt = stations(MW.sAft + 0.003, sEnd, 0.02, must);
     for (const side of [1, -1]) {
-      g.push(cavityRows(stW.map((s) => {
-        const D = FR.bD(s), belly = s <= MW.sIn1 + 1e-6, zo = FR.wellWingOut(s), row = [];
-        if (s <= MW.sAft + 1e-6) {
-          // the full well: belly edge (or the corner), floor, inboard wall, roof, the wing opening's outer edge
-          row.push(belly ? [MW.zIn, -D] : [FR.bWb(s) - 0.004, -D + 0.004], [belly ? MW.zIn - 0.03 : FR.bWb(s) - 0.06, -D + 0.02]);
-          for (const y of [-D + 0.03, -0.78, -0.62, -0.5, -0.36, 0.0]) row.push([zInb(y), Math.min(y, roofY(s, zInb(y)))]);
-          for (let k = 0; k <= 7; k++) { const z = lerp(1.305, zo, k / 7); row.push([z, roofY(s, z)]); }
-        } else {
-          // behind the frame at the 49 % spar: a shallow pocket inside the trunk side and the wing root's opening
-          row.push([FR.bWb(s) - 0.004, -D + 0.004], [FR.bWb(s) - 0.06, -D + 0.03]);
-          for (const y of [-D + 0.06, -0.8, -0.6, -0.4, MW.yJunction + 0.02]) row.push([FR.wallZ(s, y) - MW.pocket, y]);
-          row.push([MW.zJunction - MW.pocketUp, MW.yJunction + 0.035]);
-          for (let k = 0; k <= 7; k++) { const z = lerp(MW.zJunction - MW.pocketUp, zo, k / 7); row.push([z, k === 0 ? -0.12 : roofY(s, z)]); }
-        }
-        const yLo = wingAt(s, zo)[0];
-        for (const f of [0.35, 0.7, 0.92]) row.push([zo, lerp(roofY(s, zo), yLo, f)]);
-        row.push([zo, yLo - 0.002]);
-        return row.map(([z, y]) => [X(s), y, side * z]);
-      })));
+      for (const [st, po] of [[deepSt, false], [pocketSt, true]]) {
+        const rows = st.map((s) => FR.wellRow(s, po && s <= MW.sAft + 0.0031));
+        const grid = rows.map((r, i) => r.pts.map(([z, y]) => [X(st[i]), y, side * z]));
+        const close = (i) => FR.wellRowClosure(st[i], rows[i]).map(([z, y]) => [X(st[i]), y, side * z]);
+        g.push(cavityRowsClosed(grid, (r) => close(r)));
+      }
     }
     // nose-gear well: between the inlets, from the stepped opening up its side walls to the underside of the cockpit
     // floor, and behind the cockpit's aft bulkhead to F-1A's stepped floor over the trunnion

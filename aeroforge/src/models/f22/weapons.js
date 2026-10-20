@@ -267,7 +267,7 @@ export function buildWeapons(ctx) {
       const grid = toothedGrid(wallPt, st, { width: 0.43 });
       const door = slab(grid, () => [0, 0.01, -side * 0.035], V(0, 0, side));
       const top0 = V(...wallPt(s0, 0)), top1 = V(...wallPt(s1, 0));
-      const h = hinge(mesh(door, F.door()), top0, top1, V(X(10), -0.8, side * 1.6), V(0, 0.3, side));
+      const h = hinge(mesh(door, F.door()), top0, top1, V(...wallPt(8.6, 0.8)), V(0, 0.3, side));
       P(`Side bay door (${R})`, {
         system: 'Skin & fairings', skin: true, material: 'Composite door, saw-tooth fore and aft edges', mass: 30,
         explode: [0, -0.3, 1.25 * side],
@@ -275,16 +275,19 @@ export function buildWeapons(ctx) {
       }, h.pivot);
       bay.doors.push({ h, angle: 1.9, side: true });
 
-      // door actuator: a linear jack from the bay roof to a crank on the door just below its hinge
+      // door actuator: a linear jack from a fitting under the bay roof to a crank on the door just below its hinge
       {
         const sA = M(10.05);
-        const wf = FR.wallFractions(sA);
-        const [hz, hy] = FR.wallB(sA, wf[4]);
-        const Fx = V(X(sA), hy + 0.02, side * (hz - 0.24));
-        const crank = V(X(sA), hy - 0.093, side * (hz - 0.098));
+        const [a, aIn, , b] = FR.sideBaySection(sA), [hz, hy] = a;
+        const dl = Math.hypot(b[0] - a[0], b[1] - a[1]), dn = [(b[0] - a[0]) / dl, (b[1] - a[1]) / dl], nI = [dn[1], -dn[0]];   // down the door, and inward
+        const roofAt = (z) => lerp(aIn[1], a[1], (z - aIn[0]) / (a[0] - aIn[0]));
+        const zF = hz - 0.24, yF = roofAt(zF) - 0.03;
+        const Fx = V(X(sA), yF, side * zF);
+        const cz = hz + 0.09 * dn[0] + 0.045 * nI[0], cy = hy + 0.09 * dn[1] + 0.045 * nI[1];
+        const crank = V(X(sA), cy, side * cz);
         const p0 = top0.clone();
         const bar = unitRod(0.024, F.hyd()), rodM = unitRod(0.012, F.chrome(), 8);
-        const fit = mesh(merge([FR.boxS(sA, hy + 0.035, side * (hz - 0.24), 0.08, 0.04, 0.06), FR.boxS(sA, hy - 0.093, side * (hz - 0.08), 0.05, 0.05, 0.03)]), F.tiDull());
+        const fit = mesh(merge([FR.boxS(sA, yF + 0.014, side * zF, 0.08, 0.025, 0.06), FR.boxS(sA, cy, side * (cz - 0.005), 0.05, 0.05, 0.03)]), F.tiDull());
         const len = 0.17;
         const cp = new THREE.Vector3();
         P(`Side bay door actuator (${R})`, {
@@ -306,8 +309,10 @@ export function buildWeapons(ctx) {
       // the launch rail belongs to the LAU-141/A: it rides out on the trapeze with the missile
       const railHolder = new THREE.Group();
       railHolder.add(mesh(merge([new THREE.BoxGeometry(2.3, 0.05, 0.06).translate(0, 0.095, 0), new THREE.BoxGeometry(0.4, 0.06, 0.1).translate(-0.9, 0.13, 0), new THREE.BoxGeometry(0.16, 0.04, 0.12).translate(0.95, 0.125, 0)]), F.boxLight()));
-      // stowed in the middle of the bay, rolled with the trunk wall's 29° lean so the X of fins fits the cavity
-      const stow = V(X(M(10.05)), -0.65, side * 1.44), out = V(X(M(10.05)), -1.13, side * 1.86), roll = side * 0.5;
+      // stowed in the middle of the bay, rolled 26° so the X of its fins fits the cavity behind the leaning door
+      // (solved for the most clearance: 1.5 cm at the tail fins); the trapeze carries it 0.64 m out and down
+      const SB = FR.SIDE_BAY.stow;
+      const stow = V(X(M(10.05)), SB[1], side * SB[0]), out = V(X(M(10.05)), SB[1] - 0.48, side * (SB[0] + 0.42)), roll = side * SB[2];
       holder.position.copy(stow);
       railHolder.position.copy(stow);
       holder.rotation.x = roll;
@@ -335,9 +340,10 @@ export function buildWeapons(ctx) {
       // trapeze drive: a hydraulic actuator from a roof fitting to a lever on the aft arm
       {
         const aft = arms[1];
-        const Fx = V(X(M(10.6)), -0.475, side * 1.42);                                  // fitting in the side-bay roof
+        const [a, aIn] = FR.sideBaySection(M(10.6)), yRoof = lerp(aIn[1], a[1], (1.42 - aIn[0]) / (a[0] - aIn[0]));
+        const Fx = V(X(M(10.6)), yRoof - 0.04, side * 1.42);                            // fitting under the side-bay roof
         const bar = unitRod(0.03, F.hyd()), rodM = unitRod(0.015, F.chrome(), 8);
-        const fit = mesh(merge([FR.boxS(M(10.6), -0.455, side * 1.42, 0.08, 0.03, 0.08), FR.cylX(M(10.75), -0.54, side * 1.2, 0.1, 0.035, 0.035, 10)]), F.tiDull());
+        const fit = mesh(merge([FR.boxS(M(10.6), yRoof - 0.017, side * 1.42, 0.08, 0.03, 0.08), FR.cylX(M(10.75), -0.54, side * 1.2, 0.1, 0.035, 0.035, 10)]), F.tiDull());
         const end = new THREE.Vector3(), lever = new THREE.Vector3();
         P(`LAU-141/A trapeze actuator (${R})`, {
           system: 'Weapons', material: 'Hydraulic linear actuator on the trapeze arm, 4,000 psi', mass: 6,
@@ -372,7 +378,9 @@ export function buildWeapons(ctx) {
       }
       const cells = [];
       for (const ds of [-0.1, 0.1]) for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) cells.push(new THREE.CylinderGeometry(0.012, 0.012, 0.004, 6).rotateX(Math.PI / 2).translate(X(sm + ds - 0.06 + i * 0.04), ym - 0.03 + j * 0.03, side * (zm - 0.033)));
-      mg.push(FR.pipe([[sm, ym + 0.06, side * (zm - 0.08)], [sm - 0.3, ym + 0.15, side * (zm - 0.15)], [sm - 0.9, ym + 0.2, side * (zm - 0.2)]], 0.008, 5));
+      // (its lead climbs behind the side bay's aft wall and runs forward over the side-bay roof, in the stores-management
+      // lane, toward the sequencer)
+      mg.push(FR.pipe([[sm, ym + 0.06, side * (zm - 0.08)], [sm - 0.12, ym + 0.2, side * (zm - 0.12)], [FR.SIDE_BAY.s1 + 0.04, -0.36, side * 1.40], [FR.SIDE_BAY.s1 - 0.25, -0.33, side * 1.42], [FR.SIDE_BAY.s1 - 0.65, -0.33, side * 1.42]], 0.008, 5, 24));
       P(`Countermeasure dispenser (${R})`, {
         system: 'Weapons', material: 'Dispenser magazines of MJU-39/40 flare cartridges, sequencer', mass: 25, count: 2,
         explode: [0, -0.3, 0.95 * side],
@@ -408,9 +416,11 @@ export function buildWeapons(ctx) {
       w.push(FR.pipe([[sW + 0.07, C - 0.07, z * 0.55], [sW + 0.2, bayCeil(0.85) - 0.03, z * 0.85], [sW + 0.3, FR.BAY_CEIL_WALL - 0.03, z * zw], [BD.pdu - 0.3, BD.y + 0.03, z * zw], [BD.pdu - 0.05, BD.y + 0.01, z * zw]], 0.008, 5, 20));
       // out through the ceiling's outer slope, over the bleed duct under the inlet floor, over the side-bay roof
       // (between the side-bay roof and the bottom of the F-2 lobe above it, outboard of the weapons hydraulic branch)
-      const DA = M(10.05), TA = M(10.6), yR = -0.425;
-      w.push(FR.pipe([[sW + 0.07, C - 0.05, z * 0.55], [sW + 0.15, bayCeil(0.78) - 0.03, z * 0.78], [sW + 0.17, bayCeil(0.84) + 0.06, z * 0.86], [sW + 0.2, -0.43, z * 1.0], [sW + 0.25, yR, z * 1.3], [sW + 0.4, yR, z * 1.5], [DA - 0.08, yR, z * 1.5], [DA - 0.01, -0.435, z * 1.47]], 0.008, 5, 40));
-      w.push(FR.pipe([[DA - 0.08, yR, z * 1.5], [TA - 0.1, yR, z * 1.5], [TA - 0.02, -0.445, z * 1.45]], 0.007, 5, 16));
+      const DA = M(10.05), TA = M(10.6), yR = -0.33;
+      const roofY = (sv, zz) => { const [a, aIn] = FR.sideBaySection(sv); return lerp(aIn[1], a[1], (zz - aIn[0]) / (a[0] - aIn[0])); };
+      const zDA = FR.sideBaySection(DA)[0][0] - 0.24;
+      w.push(FR.pipe([[sW + 0.07, C - 0.05, z * 0.55], [sW + 0.15, bayCeil(0.78) - 0.03, z * 0.78], [sW + 0.17, bayCeil(0.84) + 0.06, z * 0.86], [sW + 0.2, -0.43, z * 1.0], [sW + 0.23, -0.34, z * 1.15], [sW + 0.27, yR, z * 1.3], [sW + 0.4, yR, z * 1.5], [DA - 0.08, yR, z * 1.5], [DA - 0.01, roofY(DA, zDA) - 0.005, z * zDA]], 0.008, 5, 40));
+      w.push(FR.pipe([[DA - 0.08, yR, z * 1.5], [TA - 0.1, yR, z * 1.5], [TA - 0.02, roofY(TA, 1.45) - 0.005, z * 1.45]], 0.007, 5, 16));
     }
     P('Stores management system', {
       system: 'Weapons', material: 'Stores-management processor and two weapon interface units, shielded wiring', mass: 22, count: 3,
@@ -465,7 +475,7 @@ export function buildWeapons(ctx) {
       P('Linear linkless ammunition system', {
         system: 'Weapons', material: 'Glass / carbon-epoxy container panels on aluminium honeycomb, PEEK conveyor elements, semi-flexible recoil track, transfer unit', mass: 187,
         explode: [0.2, -1.45, 0.6],
-        desc: 'Holds 480 rounds on one continuous conveyor of 473 composite elements that loops through a 2.3 m container laid across the belly behind the main weapons bay, just forward of the right main-gear well (T.O. 00-105E-9; GD-OTS). A semi-flexible recoil track carries the rounds up to the transfer unit on the gun and lets the belt move with the recoiling gun, and the fired cases ride back into the container instead of being thrown overboard. GD-OTS gives 178 lb (81 kg) for the feed system and 288 lb (131 kg) for a full load of ammunition.',
+        desc: 'Holds 480 rounds on one continuous conveyor of 473 composite elements that loops through a 1.9 m container laid across the belly behind the main weapons bay, just forward of the right main-gear well (T.O. 00-105E-9; GD-OTS). A semi-flexible recoil track carries the rounds up to the transfer unit on the gun and lets the belt move with the recoiling gun, and the fired cases ride back into the container instead of being thrown overboard. GD-OTS gives 178 lb (81 kg) for the feed system and 288 lb (131 kg) for a full load of ammunition.',
       }, [mesh(merge(a), F.boxLight()), mesh(merge(ends), F.alu()), mesh(merge(ch), F.box()), mesh(merge(tu), F.gun())]);
       // the gun drive's flexible container drive shaft runs down beside the recoil track to the container's drive end
       const f = [FR.pipe([[10.6, -0.02, 1.66], [10.68, -0.2, 1.6], [10.82, -0.42, A.z1 + 0.1], [A.s0 + 0.15, -0.64, A.z1 + 0.02], [A.s0 + 0.16, A.y1 - 0.01, A.z1 - 0.05]], 0.014, 6, 24)];

@@ -59,11 +59,14 @@ test('layout matches the published dimensions', () => {
   // straight out to the tip
   const tip = L.wingTEref(L.WING.semi) - L.wingLE(L.WING.semi);
   close(L.WING.semi * (L.WING.c0 + tip), 78.04, 0.1, 'wing area m²');
-  // the real trailing edge follows the reference line to the kink, then the tip is cropped (never outside the
-  // reference planform), leaving a tip chord of about 1.1 m (NAWDC top view)
+  // the real trailing edge runs parallel to the reference line, on the measured line (NAWDC top / bottom views and
+  // T.O. plan views: 15.60 at the root, z 2.2, and 14.49 at the kink), never outside the reference planform; the tip
+  // is cropped from the kink, leaving a tip chord of about 1.05 m (NAWDC / T.O. tip trailing edge ≈ 13.75)
   for (let z = 0; z <= L.WING.semi + 1e-9; z += 0.05) assert.ok(L.wingTE(z) <= L.wingTEref(z) + 1e-9, `trailing edge inside the reference planform at z ${z.toFixed(2)}`);
-  close(L.wingTE(L.WING.kinkZ), L.wingTEref(L.WING.kinkZ), 1e-9, 'trailing edge continuous at the kink');
-  close(L.wingTE(L.WING.semi) - L.wingLE(L.WING.semi), 1.12, 0.1, 'cropped tip chord m');
+  close(L.wingTE(L.WING.kinkZ - 1e-7), L.wingTE(L.WING.kinkZ + 1e-7), 1e-5, 'trailing edge continuous at the kink');
+  close(L.wingTE(L.WING.bodyZ), 15.60, 0.05, 'root trailing edge (z 2.2)');
+  close(L.wingTE(L.WING.kinkZ), 14.49, 0.05, 'trailing edge at the kink');
+  close(L.wingTE(L.WING.semi) - L.wingLE(L.WING.semi), 1.05, 0.1, 'cropped tip chord m');
   close((4 * L.WING.semi ** 2) / 78.04, 2.36, 0.01, 'aspect ratio');
   close(L.FIN.cant / DEG, 28, 1e-9, 'vertical-tail cant');
   // fin tips set the 5.08 m height above the ground line
@@ -406,7 +409,8 @@ function tyrePts(P, R, W, nu = 48, nv = 12) {
   return out;
 }
 const segDist = (p, a, b) => { const ab = b.map((v, k) => v - a[k]), t = Math.max(0, Math.min(1, ab.reduce((m, v, k) => m + v * (p[k] - a[k]), 0) / ab.reduce((m, v) => m + v * v, 0))); return Math.hypot(...p.map((v, k) => v - a[k] - ab[k] * t)); };
-const wingChordS = (c, z) => L.wingLE(z) + c * (L.wingTE(z) - L.wingLE(z));
+// station of structural-chord fraction c (spars and wells are laid out on the chord to the reference trailing-edge line)
+const wingChordS = (c, z) => L.wingLE(z) + c * (L.wingTEline(z) - L.wingLE(z));
 const wingHalf = (s, z) => { const sec = L.wingSection(z), xc = (s - L.wingLE(z)) / sec.chord; return xc < 0 || xc > 1 ? null : [sec.le[1] - 5 * sec.t * (0.2969 * Math.sqrt(xc) - 0.126 * xc - 0.3516 * xc * xc + 0.2843 * xc ** 3 - 0.1036 * xc ** 4) * sec.chord, sec.le[1] + 5 * sec.t * (0.2969 * Math.sqrt(xc) - 0.126 * xc - 0.3516 * xc * xc + 0.2843 * xc ** 3 - 0.1036 * xc ** 4) * sec.chord]; };
 
 test('main gear: axle station, track, wheelbase and leg rake as measured on the jet', () => {
@@ -435,13 +439,24 @@ test('main gear: axle station, track, wheelbase and leg rake as measured on the 
 test('main gear: strut clear of the tyre, wheel stows between the spars and passes only through the openings', () => {
   const g = L.GEAR.main, W = L.MAIN_WELL, T = g.trunnion, u = g.foot.map((v, k) => (v - T[k]) / g.legLength);
   const legAt = (t, ku) => L.gearPoint('main', T.map((v, k) => v + u[k] * t), ku);
+  // the doors' outline in plan, with a 1 cm margin all round (FR.MAIN_DOORS; NAWDC bottom view, photographs)
+  const inOutline = (s, z) => [[0, 0], [-0.01, 0], [0.01, 0], [0, -0.01], [0, 0.01]].every(([ds, dz]) => L.wellOpen(s + ds, z + dz));
+  // a surface point on the outer mould line over the well (belly, lower trunk side, bulged facet, wing root underside)
+  const onSkin = (p) => {
+    const [s, y, z] = p, D = L.bD(s);
+    if (s < W.s0 - 0.3 || s > W.s1 + 0.3 || z < 0.9 || z > W.hingeZ + 0.3) return false;
+    if (z > W.zJunction) { const wh = wingHalf(s, z); return !!wh && Math.abs(y - wh[0]) < 0.008; }
+    if (z <= L.bWb(s)) return Math.abs(y + D) < 0.008;
+    return y > -D && y < L.junctionY(s) && Math.abs(z - L.wallZ(s, y)) < 0.008;
+  };
   let lowest = 9;
   for (let q = 0; q <= 60; q++) {
     const ku = q / 60, P = L.mainWheelPose(ku), pts = tyrePts(P, g.r, g.w, 40, 10);
+    // the strut (cylinder r 0.075 to 0.47 m below the trunnion, chromed piston r 0.055; photographs: about 0.15 m and
+    // 0.11 m across) never touches the tyre, though the knuckle turns the wheel
     const cyl = [legAt(0.2, ku), legAt(0.47, ku)], pis = [legAt(0.45, ku), legAt(g.legLength - 0.06, ku)];
     for (const p of pts) {
-      // the strut (cylinder r 0.095, piston r 0.068) never touches the tyre, though the knuckle turns the wheel
-      assert.ok(segDist(p, ...cyl) > 0.095 + 0.02 && segDist(p, ...pis) > 0.068 + 0.02, `strut clear of the tyre at ku ${ku}`);
+      assert.ok(segDist(p, ...cyl) > 0.075 + 0.02 && segDist(p, ...pis) > 0.055 + 0.02, `strut clear of the tyre at ku ${ku}`);
       lowest = Math.min(lowest, p[1] - L.GROUND);
       const [s, y, z] = p;
       // inside the wing root the tyre keeps 1 cm from the 36 % and 49 % spars' webs and caps
@@ -451,27 +466,99 @@ test('main gear: strut clear of the tyre, wheel stows between the spars and pass
         assert.ok(s - wingChordS(0.36, z) > (nearSkin ? 0.03 : 0.005) + 0.01, `tyre clear of the 36 % spar at ku ${ku}, z ${z.toFixed(2)}`);
         assert.ok(wingChordS(0.49, z) - s > (nearSkin ? 0.0375 : 0.009) + 0.01, `tyre clear of the 49 % spar at ku ${ku}, z ${z.toFixed(2)}`);
       }
-      // where it crosses the skin it is inside an opening: trunk side, belly, or the wing's lower skin
-      const D = L.bD(s);
-      if (y > -D && y < W.yJunction && Math.abs(z - L.wallZ(s, y)) < 0.01) assert.ok(s > W.s0 && s < W.s1, `trunk crossing inside the main door at ku ${ku}`);
-      if (Math.abs(y + D) < 0.01 && z < L.bWb(s) && z > 0.5) assert.ok(s > W.s0 && s < W.sIn1 && z > W.zIn, `belly crossing inside the inboard door at ku ${ku}`);
-      const c = z > W.zJunction ? L.wellWingChord(z) : null;
-      if (wh === null && z > W.zJunction) { const w2 = wingHalf(s, z); if (w2 && Math.abs(y - w2[0]) < 0.01) assert.ok(c && s > wingChordS(c[0], z) && s < wingChordS(c[1], z), `wing crossing inside the main door at ku ${ku}`); }
-      if (wh && Math.abs(y - wh[0]) < 0.01) assert.ok(c && s > wingChordS(c[0], z) && s < wingChordS(c[1], z), `wing crossing inside the main door at ku ${ku}`);
+      // where it crosses the skin it is inside the doors' outline (trunk side, belly or the wing root's underside)
+      if (onSkin(p)) assert.ok(inOutline(s, z), `tyre crosses the skin outside the doors' outline at ku ${ku} (s ${s.toFixed(3)}, z ${z.toFixed(3)})`);
+    }
+    // and so does the strut: its surface, all round the cylinder and the piston
+    const ax = pis[1].map((v, k) => v - cyl[0][k]), al = Math.hypot(...ax), e = ax.map((v) => v / al);
+    const p1 = Math.abs(e[1]) < 0.9 ? [e[2], 0, -e[0]] : [0, e[2], -e[1]], l1 = Math.hypot(...p1), n1 = p1.map((v) => v / l1);
+    const n2 = [e[1] * n1[2] - e[2] * n1[1], e[2] * n1[0] - e[0] * n1[2], e[0] * n1[1] - e[1] * n1[0]];
+    for (let t = 0.2; t <= g.legLength - 0.06; t += 0.01) {
+      const c = legAt(t, ku), r = t < 0.47 ? 0.075 : 0.055;
+      for (let k = 0; k < 24; k++) {
+        const a = (k / 24) * 2 * Math.PI, p = c.map((v, i) => v + r * (Math.cos(a) * n1[i] + Math.sin(a) * n2[i]));
+        if (onSkin(p)) assert.ok(inOutline(p[0], p[2]), `strut crosses the skin outside the doors' outline at ku ${ku} (s ${p[0].toFixed(3)}, z ${p[2].toFixed(3)})`);
+      }
     }
   }
   // the tyre may dip a few millimetres below the ground mid-retraction only (it retracts in the air)
   assert.ok(lowest > -0.006, `tyre ${(-lowest * 1000).toFixed(1)} mm below the ground`);
   // stowed: inside the wing root and upper trunk, under the upper skins, above the closed door, outboard of the
-  // engine's envelope and inside the door's outline in plan
+  // engine's envelope and inside the deep well, between its front wall and the engine-bay frame at the 49 % spar
   for (const p of tyrePts(L.mainWheelPose(1), g.r, g.w, 64, 16)) {
     const [s, y, z] = p, wh = wingHalf(s, z);
     const top = Math.max(L.topAt(s, Math.min(z, L.bW(s))), wh ? wh[1] : -9);
     assert.ok(top - y > 0.03, 'stowed tyre 3 cm under the upper skin');
     if (z > W.zJunction) assert.ok(wh && y - wh[0] > 0.02, 'stowed tyre above the wing\'s lower skin');
-    else assert.ok(y > W.yJunction + 0.02 || z < L.wallZ(s, y) - 0.02, 'stowed tyre inside the trunk side');
-    assert.ok(s > W.s0 + 0.02 && s < W.s1 - 0.02, 'stowed tyre within the door outline fore and aft');
+    else assert.ok(y > L.junctionY(s) + 0.02 || z < L.wallZ(s, y) - 0.02, 'stowed tyre inside the trunk side');
+    assert.ok(s > W.s0 + 0.02 && s < W.sAft - 0.004, 'stowed tyre inside the deep well fore and aft');
     if (s >= L.FAN_S) assert.ok(Math.hypot(y - L.ENG_Y, z - L.ENG_Z) > L.F119.rMax + 0.02, 'stowed tyre clear of the engine');
+  }
+  // the stowed strut stays 3 cm inside the lower trunk side, clear of the closed inboard door
+  for (let t = 0.2; t <= g.legLength - 0.06; t += 0.01) {
+    const [s, y, z] = legAt(t, 1), r = t < 0.47 ? 0.075 : 0.055;
+    if (y < -L.bD(s) || y > L.MAIN_WELL.yCrease) continue;
+    const zw = L.wallZ(s, y), lean = Math.atan2(L.wallZ(s, y + 0.01) - L.wallZ(s, y - 0.01), 0.02);
+    assert.ok((zw - z) * Math.cos(lean) - r > 0.03, `stowed strut ${(((zw - z) * Math.cos(lean) - r) * 100).toFixed(1)} cm inside the trunk side at y ${y.toFixed(2)}`);
+  }
+});
+
+test('main-gear doors: drawn to the NAWDC outline and the photographs, hanging near-vertical outboard of the wheel', () => {
+  const W = L.MAIN_WELL, D = L.MAIN_DOORS, T42 = Math.tan(42 * DEG);
+  // every edge of both outlines at 42° to the centre line (parallel to the wing's leading edge)
+  for (const door of [D.main, D.inboard]) for (const edge of [door.fore, door.aft]) for (let k = 0; k < edge.length - 1; k++) {
+    const [z0, s0] = edge[k], [z1, s1] = edge[k + 1];
+    close(Math.abs((s1 - s0) / (z1 - z0)), T42, 0.01, 'door edge at 42°');
+  }
+  // straight hinge (constant z) and a straight free edge on the crease; the outer door's hinge 0.71 m, its free edge
+  // 0.90 m (photographs of the open door, scaled on the 37 in tyre: about 0.68 and 0.88 m), three teeth forward and
+  // two aft, at 0.165–0.3 m pitch
+  close(D.main.fore[0][0], W.hingeZ, 1e-9, 'fore edge starts on the hinge'); close(D.main.aft[0][0], W.hingeZ, 1e-9, 'aft edge starts on the hinge');
+  close(D.main.aft[0][1] - D.main.fore[0][1], 0.70, 0.03, 'hinge length');
+  close(D.main.aft.at(-1)[1] - D.main.fore.at(-1)[1], 0.89, 0.03, 'free-edge length');
+  const tips = (edge, sgn) => edge.filter((v, k) => k > 0 && k < edge.length - 1 && sgn * (v[1] - edge[k - 1][1]) > 0 && sgn * (v[1] - edge[k + 1][1]) > 0).length;
+  assert.equal(tips(D.main.fore, -1), 3, 'three teeth on the outer door\'s forward edge');
+  assert.equal(tips(D.main.aft, 1), 2, 'two teeth on its aft edge');
+  // NAWDC bottom view: the outline from z 1.10 to 2.44–2.46, split at z 1.53 ± 0.03 (on the crease), 11.04–12.36
+  close(D.splitZ, 1.53, 0.03, 'split between the doors');
+  close(L.wallB(11.6, L.wallFractions(11.6)[5])[0], D.splitZ, 0.01, 'split on the crease');
+  assert.ok(Math.min(...D.main.fore.map((v) => v[1])) > 10.98 && Math.max(...D.main.aft.map((v) => v[1])) < 12.4, 'outline 11.0 → 12.36');
+  // open: the outer door's chord (hinge → free edge, over the bend) hangs within 15° of vertical outboard of the wheel,
+  // its lower edge within 0.15 m of the tyre top; the inboard door hangs inboard of the strut
+  const s = 11.6, rot = (p, c, a) => [c[0] + (p[0] - c[0]) * Math.cos(a) - (p[1] - c[1]) * Math.sin(a), c[1] + (p[0] - c[0]) * Math.sin(a) + (p[1] - c[1]) * Math.cos(a)];
+  const hz = W.hingeZ - 0.005, H = [hz, L.wingSurfaces(s, hz)[0]], C = L.wallB(s, L.wallFractions(s)[5]);
+  const E = rot(C, H, D.open.main * DEG), tilt = Math.atan2(E[0] - H[0], H[1] - E[1]) / DEG;
+  const g = L.GEAR.main, tyreTop = L.GROUND + 2 * g.r;
+  assert.ok(tilt > 0 && tilt < 15, `main door hangs ${tilt.toFixed(1)}° off vertical, bottom outboard`);
+  assert.ok(Math.abs(E[1] - tyreTop) < 0.15, `door's lower edge ${(E[1] - tyreTop).toFixed(2)} m from the tyre top`);
+  assert.ok(Math.min(H[0], E[0], rot([W.zJunction, L.junctionY(s)], H, D.open.main * DEG)[0]) > g.axleZ + g.w / 2 + 0.3, 'open door 0.3 m outboard of the tyre');
+  const Hi = [W.zIn, -L.bD(s)], Ci = rot(C, Hi, -D.open.inboard * DEG), Ki = rot([L.bWb(s), -L.bD(s)], Hi, -D.open.inboard * DEG);
+  for (let t = 0.3; t <= g.legLength - 0.06; t += 0.05) {
+    const p = L.gearPoint('main', g.trunnion.map((v, k) => v + ((g.foot[k] - v) * t) / g.legLength), 0);
+    if (p[1] < Math.min(Ci[1], Ki[1]) || p[1] > -L.bD(s)) continue;
+    assert.ok(p[2] - 0.075 > Math.max(Ci[0], Ki[0]) + 0.05, 'open inboard door 5 cm inboard of the strut');
+  }
+});
+
+test('lower trunk: belly corner and leaning sides on the NAWDC front silhouette', () => {
+  // NAWDC front orthographic view (DVIDS 9081638, aligned on the canopy top): lowest point of the silhouette at span z
+  const NAWDC = [[1.20, -1.016], [1.25, -1.002], [1.30, -0.963], [1.35, -0.893], [1.40, -0.820], [1.45, -0.747], [1.50, -0.670], [1.55, -0.596]];
+  const lowAt = (z) => {
+    let lo = 9;
+    for (let s = L.S_AB; s <= L.S_BE; s += 0.05) {
+      const h = L.ringB(s).pts.slice(17, 37).map((p) => [p[2], p[1]]);
+      for (let k = 0; k < h.length - 1; k++) { const [z1, y1] = h[k], [z2, y2] = h[k + 1]; if ((z1 - z) * (z2 - z) <= 0 && z1 !== z2) lo = Math.min(lo, y1 + ((z - z1) / (z2 - z1)) * (y2 - y1)); }
+    }
+    return lo;
+  };
+  for (const [z, y] of NAWDC) { const m = lowAt(z); assert.ok(m > y - 0.04 && m < y + 0.06, `trunk silhouette at z ${z}: ${m.toFixed(3)} against NAWDC ${y}`); }
+  // the belly's outer corner at z 1.20–1.27 and the lower side leaning 32–42° from the vertical along the trunk (32° at the
+  // inlets' hand-over, the inlets' outer walls' lean; about 38° along the bays and wheel wells)
+  for (let s = 7.0; s <= 12.4; s += 0.1) {
+    const zc = L.bWb(s), D = L.bD(s);
+    assert.ok(zc > 1.2 && zc < 1.27, `belly corner z ${zc.toFixed(3)} at s ${s.toFixed(1)}`);
+    const lean = Math.atan2(L.wallZ(s, -D * 0.6) - L.wallZ(s, -D * 0.95), D * 0.35) / DEG;
+    assert.ok(lean > 32 && lean < 42, `lower trunk side leans ${lean.toFixed(1)}° at s ${s.toFixed(1)}`);
   }
 });
 
