@@ -311,7 +311,8 @@ export function buildWeapons(ctx) {
       railHolder.add(mesh(merge([new THREE.BoxGeometry(2.3, 0.05, 0.06).translate(0, 0.095, 0), new THREE.BoxGeometry(0.4, 0.06, 0.1).translate(-0.9, 0.13, 0), new THREE.BoxGeometry(0.16, 0.04, 0.12).translate(0.95, 0.125, 0)]), F.boxLight()));
       // stowed in the middle of the bay, rolled 26° so the X of its fins fits the cavity behind the leaning door
       // (solved for the most clearance: 1.5 cm at the tail fins); the trapeze carries it 0.64 m out and down
-      const SB = FR.SIDE_BAY.stow;
+      // (the arms pivot under the bay roof above the rail, SIDE_BAY.pivot, so they stay clear of the missile)
+      const SB = FR.SIDE_BAY.stow, SBP = FR.SIDE_BAY.pivot;
       const stow = V(X(M(10.05)), SB[1], side * SB[0]), out = V(X(M(10.05)), SB[1] - 0.48, side * (SB[0] + 0.42)), roll = side * SB[2];
       holder.position.copy(stow);
       railHolder.position.copy(stow);
@@ -323,7 +324,7 @@ export function buildWeapons(ctx) {
       for (const ds of [-0.7, 0.7]) {
         const arm = mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 8), F.steel());
         armG.add(arm);
-        arms.push({ arm, pivot: V(X(M(10.05) + ds), -0.54, side * 1.2), attach: V(ds * -1, 0.095 * Math.cos(roll), 0.095 * Math.sin(roll)) });
+        arms.push({ arm, pivot: V(X(M(10.05) + ds), SBP[1], side * SBP[0]), attach: V(ds * -1, 0.095 * Math.cos(roll), 0.095 * Math.sin(roll)) });
       }
       P(`AIM-9X Sidewinder (${R} side bay)`, {
         system: 'Weapons', material: 'Aluminium airframe, imaging-infrared seeker, thrust-vectoring vanes', mass: 85,
@@ -343,7 +344,7 @@ export function buildWeapons(ctx) {
         const [a, aIn] = FR.sideBaySection(M(10.6)), yRoof = lerp(aIn[1], a[1], (1.42 - aIn[0]) / (a[0] - aIn[0]));
         const Fx = V(X(M(10.6)), yRoof - 0.04, side * 1.42);                            // fitting under the side-bay roof
         const bar = unitRod(0.03, F.hyd()), rodM = unitRod(0.015, F.chrome(), 8);
-        const fit = mesh(merge([FR.boxS(M(10.6), yRoof - 0.017, side * 1.42, 0.08, 0.03, 0.08), FR.cylX(M(10.75), -0.54, side * 1.2, 0.1, 0.035, 0.035, 10)]), F.tiDull());
+        const fit = mesh(merge([FR.boxS(M(10.6), yRoof - 0.017, side * 1.42, 0.08, 0.03, 0.08), FR.cylX(M(10.75), SBP[1], side * SBP[0], 0.1, 0.035, 0.035, 10)]), F.tiDull());
         const end = new THREE.Vector3(), lever = new THREE.Vector3();
         P(`LAU-141/A trapeze actuator (${R})`, {
           system: 'Weapons', material: 'Hydraulic linear actuator on the trapeze arm, 4,000 psi', mass: 6,

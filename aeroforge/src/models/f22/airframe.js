@@ -952,7 +952,7 @@ export function buildAirframe(ctx) {
     const MW = FR.MAIN_WELL;
     const vs = [...FR.MAIN_DOORS.main.fore, ...FR.MAIN_DOORS.main.aft, ...FR.MAIN_DOORS.inboard.fore, ...FR.MAIN_DOORS.inboard.aft].map((v) => v[1]);
     const sparS = (f, z) => FR.wingLE(z) + f * (FR.wingTEline(z) - FR.wingLE(z));
-    const must = [...vs, ...[0.36, 0.49].flatMap((f) => [sparS(f, MW.zSob), sparS(f, MW.hingeZ)])];
+    const must = [...vs, ...[0.36, 0.49].flatMap((f) => [sparS(f, MW.zSob), sparS(f, MW.hingeZ)]), FR.AMMO.s1 + MW.ammoNotch - 0.0005, FR.AMMO.s1 + MW.ammoNotch + 0.0005];
     const sEnd = Math.max(...vs) - 0.001;
     const deepSt = stations(MW.s0, MW.sAft, 0.03, must), pocketSt = stations(MW.sAft + 0.003, sEnd, 0.02, must);
     for (const side of [1, -1]) {

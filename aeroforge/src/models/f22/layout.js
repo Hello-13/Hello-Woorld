@@ -294,9 +294,9 @@ const B_UP = [0, 0.08, 0.16, 0.24, 0.32, 0.40, 0.48, 0.55, 0.62, 0.69, 0.75, 0.8
  * hinged at their top edge y0 and reaching down to y1 on the leaning trunk wall (NAWDC bottom view: the door outline at
  * z 1.30–1.74). Behind the door the cavity reaches in under the inlet duct and the F-2 cell's outboard lobe to a back wall
  * from `back` (top) to `floor` (bottom) [z, y], outboard of the runs along the main bay's sill and the bay-door drive;
- * the AIM-9X stows at `stow` [z, y, roll].
+ * the AIM-9X stows at `stow` [z, y, roll], and the LAU-141/A's arms pivot at `pivot` [z, y] under the roof.
  */
-export const SIDE_BAY = { s0: 7.0, s1: 10.25, y0: -0.40, y1: -0.92, back: [1.24, -0.36], floor: [1.07, -0.89], stow: [1.335, -0.54, 0.45] };
+export const SIDE_BAY = { s0: 7.0, s1: 10.25, y0: -0.40, y1: -0.92, back: [1.24, -0.36], floor: [1.07, -0.89], stow: [1.335, -0.54, 0.45], pivot: [1.40, -0.415] };
 /**
  * Side-bay cavity (right side) at station s as four [z, y] points: the door opening's top and bottom edges on the trunk
  * wall and the back wall's top and bottom. Near the front of the bay the inlet duct's floor dips low, so there the roof
@@ -472,7 +472,7 @@ export function wowCentre(g) {
  * `pocket` deep lies under the skin.
  */
 export const MAIN_WELL = {
-  s0: 10.98, s1: 12.365, sIn1: 12.365, sAft: 12.075, zIn: 1.10, hingeZ: 2.46, zJunction: 1.97, zSob: 2.12, pocket: 0.05,
+  s0: 10.98, s1: 12.365, sIn1: 12.365, sAft: 12.075, zIn: 1.10, hingeZ: 2.46, zJunction: 1.97, zSob: 2.12, pocket: 0.05, ammoNotch: 0.012,
   wing: [[1.97, 0.34, 0.54], [2.46, 0.34, 0.54]],
   yJunction: -0.255, yCrease: -0.613,
 };
@@ -602,7 +602,10 @@ export function wellRow(s, pocketOnly = false) {
     else {
       if (trunk) {
         pts.push([W.zIn - 0.03, -D + 0.02]);
-        for (const y of [-D + 0.03, -0.78, -0.62, -0.5, -0.36, 0.0]) { const z = mainWellInboard(y); pts.push([z, Math.min(y, mainWellRoof(s, z))]); }
+        // (just aft of the ammunition container's gun end, which reaches 4 cm past the well's front wall, the inboard wall
+        // steps out round it, MAIN_WELL.ammoNotch)
+        const notch = s < AMMO.s1 + W.ammoNotch;
+        for (const y of [-D + 0.03, notch ? AMMO.y1 + W.ammoNotch : -0.78, -0.62, -0.5, -0.36, 0.0]) { const z = notch && y < AMMO.y1 + W.ammoNotch + 1e-9 ? Math.max(mainWellInboard(y), AMMO.z1 + W.ammoNotch) : mainWellInboard(y); pts.push([z, Math.min(y, mainWellRoof(s, z))]); }
       } else pts.push(...lin(fl(pz0), roof(pz0), 7));
       const zr0 = trunk ? mainWellInboard(0) : pz0;
       for (let k = 0; k < 8; k++) pts.push(roof(lerp(zr0, pz1, k / 7)));
@@ -911,20 +914,20 @@ export const DUCT = [
   //  chamfers of the lower-outboard / upper-outboard / lower-inboard corners in half-size units (9 = none)]
   // A double S-bend, as the F-22's serpentine ducts keep the fan faces out of line of sight from any exterior
   // view: from the caret lip the duct climbs and swings inboard over the main weapons bay, then turns back
-  // outboard and down onto the fan face. Re-solved (polish 3) for a throat that can pass an F119-class airflow: the
-  // F119's mass flow is not published, so the model assumes the 110–125 kg/s of an F100 / F110-class engine; the
-  // throat is 0.52 m² (fan face 0.73 m², a fan-to-throat area ratio of 1.4), where that flow runs at about Mach 0.6–0.75
-  // static and well below choking in flight. Also solved: no straight line through the lip reaches the fan disc within
-  // ±50° (the fan-face disc, 1° steps; the last 0.3 % of one ray bundle near 7° yaw / 4° pitch is stopped by the
-  // inlet's bleed plates), the area grows from the throat to the fan face, the walls stay 2.5–3 cm off the main bay,
-  // side bays, gun, receptacle, ammunition container and fuel coolers and 4.5 cm or more under the deck, and the lip
-  // runs into the first ring along a smooth cubic (≤ 14° between neighbouring wall segments, centre line ≤ 9.3°
-  // per 0.22 m). Lockheed Martin gives l/D = 6.35.
+  // outboard and down onto the fan face. Re-solved for a throat that can pass an F119-class airflow: the F119's mass
+  // flow is not published, so the model assumes the 110–125 kg/s of an F100 / F110-class engine; the throat is about
+  // 0.50 m² at s 8.5 (fan face 0.73 m², a fan-to-throat area ratio of 1.45), where that flow runs at about Mach 0.6–0.75
+  // static and well below choking in flight. Also solved: no straight line from outside reaches the fan disc within
+  // ±60° (whole model, 2° steps; duct alone ±50°, 1° steps; the lower-outboard chamfer over s 8–8.5 stops the last
+  // bundle, near 7° yaw / 4° pitch), the area grows from the throat to the fan face, the walls stay 2.5–3 cm off the
+  // main bay, side bays, gun, receptacle, ammunition container and fuel coolers and 3.5 cm or more under the deck, and
+  // the lip runs into the first ring along a smooth cubic (≤ 16.5° between neighbouring wall segments, centre line
+  // ≤ 9.7° per 0.22 m). Lockheed Martin gives l/D = 6.35.
   [6.3, 1.239, -0.391, 1.033, 0.835, 0.274, 2.003, 1.67, 1.854, 1.582],
   [7, 1.096, -0.104, 1.096, 0.772, 0.345, 2.133, 0.912, 1.563, 1.521],
   [7.5, 0.842, 0.055, 1.159, 0.707, 0.659, 3.068, 0.803, 1.543, 1.499],
-  [8, 0.681, 0.129, 1.188, 0.753, 0.691, 3.3, 0.622, 1.473, 1.31],
-  [8.5, 0.642, 0.175, 1.121, 0.793, 0.774, 3.074, 0.6, 1.284, 1.486],
+  [8, 0.696, 0.129, 1.24, 0.753, 0.691, 3.3, 0.49, 1.473, 1.31],
+  [8.5, 0.657, 0.175, 1.17, 0.793, 0.774, 3.074, 0.47, 1.284, 1.486],
   [9, 0.638, 0.115, 1.053, 0.803, 0.916, 3.467, 0.6, 1.368, 1.525],
   [9.5, 0.686, 0.095, 1.023, 0.777, 0.877, 3.849, 0.713, 1.47, 1.52],
   [10, 0.695, 0.102, 0.943, 0.74, 1, 3.069, 1.104, 1.525, 1.668],
@@ -1265,7 +1268,7 @@ export const AMMO = { s0: 10.79, s1: 11.022, z0: -0.705, z1: 1.24, y0: -0.972, y
  *  ≈ 9.75–10.2, exhaust door #4289 ≈ 10.5–10.95; NAWDC top view: exhaust diamond at 10.45–10.95, z ≈ −1.45…−1.75),
  *  between the wing-carry-through frames; the SES air and fuel bottles are under the upper panel between the engines
  *  (T.O. panel #4336, ≈ 13.5–14.3). */
-export const APU = { s0: 10.3, s1: 10.92, z: -1.70, y: -0.03, inlet: [9.75, 10.2], exhaust: [10.5, 10.95], SESX: [10.98, -0.13, -1.96] };
+export const APU = { s0: 10.3, s1: 10.92, z: -1.70, y: -0.03, inlet: [9.75, 10.2], exhaust: [10.5, 10.95], SESX: [10.92, -0.225, -2.0] };
 export const SES = { s0: 13.5, s1: 14.3 };
 /** Airframe-mounted accessory drive under the front of each engine, over the AMAD bay screens on the belly (T.O. bottom
  *  panel map: AMAD screens #4223 / #4224 ≈ 11.3–11.7, z ≈ ±0.45–0.8; air-turbine-starter exhaust screens ≈ 12.0–12.4). */
@@ -1282,10 +1285,20 @@ export const WELL_RESERVE = { main: { s0: 10.98, s1: 12.075, z0: 0.93, z1: 2.46,
 /** Fuel cells (T.O. 00-105E-9 A.11 drawing; stations of the model's cells): F-1A, F-1B, F-2 (right lobe ends at the
  *  gun bay's aft end, left at the APU bay), A-3, A-1, and the wing cells' inboard and outboard span (inboard of
  *  wingZ0 the wing roots are dry bays: the gun on the right, the APU and its exhaust on the left) and chord fractions. */
-export const FUEL = { f1a: [5.62, 6.82], f1b: [6.86, 7.6], f2: [7.66, 10.62], f2R: 10.22, f2L: 9.62, gunBay: 8.38, a3: [10.68, 11.48], a1: [12.45, 15.2], a1Floor: -0.45, f2a3: [0.065, 0.15], wingZ0: 2.12, wingZ1: 6.1, wingC: [0.13, 0.60], wingK: 0.66 };
+export const FUEL = { f1a: [5.62, 6.82], f1b: [6.86, 7.6], f2: [7.66, 10.62], f2R: 10.22, f2L: 9.62, gunBay: 8.38, a3: [10.68, 11.48], a1: [12.45, 14.95], a1Floor: -0.30, f2a3: [0.065, 0.15], wingZ0: 2.12, wingZ1: 6.1, wingC: [0.13, 0.60], wingK: 0.66 };
 /** Air-cooled fuel coolers (ACFC) under their exhaust doors on the spine behind the cockpit (T.O. top panel map:
  *  #4236 right / #4235 left at ≈ 6.7–7.4; NAWDC top view: saw-toothed panels at 6.55–7.35, z ±0.30–0.72). */
 export const ACFC = { s0: 6.55, s1: 7.35, z0: 0.30, z1: 0.72 };
+/** Inlet boundary-layer bleed plenum behind each duct's inboard wall (right side): stations, centre height, height and
+ *  width; bleedPlenumZ() is its centre z, 6.5 cm in from where the duct comes within 7 cm at that height. */
+export const BLEED = { s0: 6.25, s1: 6.6, y: -0.2, h: 0.4, w: 0.09 };
+let bleedZ = null;
+export function bleedPlenumZ() {
+  if (bleedZ !== null) return bleedZ;
+  bleedZ = 9;
+  for (const sv of [BLEED.s0, (BLEED.s0 + BLEED.s1) / 2, BLEED.s1]) { let zz = 0.05; while (zz < 1.5 && ductDepth(sv, BLEED.y, zz) < -0.07) zz += 0.01; bleedZ = Math.min(bleedZ, zz - 0.065); }
+  return bleedZ;
+}
 /** Air-refuelling receptacle: the pair of doors on the spine at 9.55–10.35 (T.O. top panel map #4280 / #4281; NAWDC
  *  top view: the slipway markings ahead of them from 8.5). */
 export const AR = { s0: 9.55, s1: 10.35, z: 0.16 };
@@ -1305,7 +1318,7 @@ export const ROUTE = {
   sill: { hyd: [1.06, -0.60], harness: [1.02, -0.71], bleed: [1.09, -0.49], fbw: [1.13, -0.58] },
   cross: 11.17, startZ: 0.36, startY: -0.62, bleedCross: 11.04, bleedY: -0.67,
   pumpZ: [0.74, 0.86],
-  wellWall: { resS: 11.83, resZ: 1.01, accS: 11.66, accY: -0.62, accZ: 1.16, filS: 12.0, filY: -0.70, y: -0.80 },
+  wellWall: { resS: 11.78, resZ: 1.01, accS: 11.66, accY: -0.62, accZ: 1.16, filS: 12.0, filY: -0.70, y: -0.80 },
   brakeAcc: [11.25, -0.86],
   rearSpar: 14.03,
   battery: [4.70, -0.17, -0.56],                 // left avionics bay under the cockpit (T.O. door #4135), inside the chine wall
@@ -1321,7 +1334,9 @@ export const ROUTE = {
   //  - ahead of the vapour-cycle pack they rise to `under`, below the boxes under the cockpit floor;
   //  - the vapour-cycle lines drop down the pack's inboard side and run aft along the floor of the corridor.
   nose: {
-    rise: 5.545, slot: 6.872, under: -0.46, descend: [4.8, 5.12],
+    // (at the slot the through-runs drop `slotDrop` below their nose lanes, all together, to pass under the duct's floor,
+    // which comes down behind the inlet)
+    rise: 5.545, slot: 6.872, slotDrop: -0.115, under: -0.46, descend: [4.8, 5.12],
     air: [0.45, -0.495], obogs: [0.53, -0.495],
     pao: [[0.37, -0.56], [0.415, -0.56]], fbw: [0.47, -0.555], harness: [0.48, -0.60], hyd: [0.47, -0.66], bleedY: -0.495,
     vcs: [[0.32, -0.80], [0.37, -0.76]],
@@ -1356,7 +1371,7 @@ export const FRAMES = {
 };
 /** F119 mounts: forward trunnions on the engine-bay frame at the wing's mid titanium spar (into the keel web and the
  *  titanium boom, whose inner face is at boomZ), aft link at the rear engine-bay frame, up to a fitting at aftY. */
-export const ENGINE_MOUNTS = { fwd: sparStation(0.49), aft: 14.75, boomZ: 1.45, aftY: upperB(14.75, ENG_Z + 0.3) - 0.085 };
+export const ENGINE_MOUNTS = { fwd: Math.max(sparStation(0.49), MAIN_WELL.sAft + 0.04), aft: 14.75, boomZ: 1.45, aftY: upperB(14.75, ENG_Z + 0.3) - 0.085 };
 
 // ------------------------------------------------------------------ landing-gear structure and linkage fittings
 /**
@@ -1375,7 +1390,7 @@ export const MAIN_FIT = {
   beam: { s0: 11.174, s1: 12.064, z0: 0.95, z1: 1.05, y0: -0.99, y1: -0.89 },
   bearing: [-0.09, 0.27],
   brace: { fit: [11.26, -0.44, 1.35], at: 0.26, alpha: 0.4, bend: [1, -1, 1] },
-  jack: { fit: [12.0, -0.92, 1.17], at: 0.40 },
+  jack: { fit: [11.9, -0.92, 1.17], at: 0.40 },
   uplock: { roller: 0.03, box: [0.12, 0.05, 0.07] },
   doorJack: { fit: [11.65, -0.15, 2.78], horn: 0.08 },
 };

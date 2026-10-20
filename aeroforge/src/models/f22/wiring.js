@@ -51,7 +51,7 @@ export function buildWiring(ctx) {
       // ahead of the main-gear well, aft over the well's roof and under the boom to the engine bay
       const RT = FR.ROUTE, fb = RT.sill.fbw, NR = RT.nose, VM = FR.AV_BAY.vms, vs = VM.at[0][0] + VM.ls / 2, vy = FR.AV_BAY.shelfLo + 0.01 + VM.h / 2;
       const trunk = [[vs - 0.02, vy, z * VM.z], [vs + 0.04, vy - 0.03, z * 0.43], [3.0, -0.33, z * 0.47], [3.3, -0.37, z * 0.5], [3.8, NR.under - 0.01, z * 0.47], [NR.descend[0], NR.under - 0.01, z * 0.46], [NR.descend[1], NR.fbw[1], z * 0.46],
-        [NR.rise, NR.fbw[1], z * NR.fbw[0]], [NR.slot - 0.05, NR.fbw[1], z * NR.fbw[0]], [NR.slot, NR.fbw[1], z * 0.75], [NR.slot + 0.02, NR.fbw[1] + 0.01, z * 0.98], [7.1, fb[1], z * fb[0]], [9.0, fb[1], z * fb[0]],
+        [NR.rise, NR.fbw[1], z * NR.fbw[0]], [NR.slot - 0.05, NR.fbw[1], z * NR.fbw[0]], [NR.slot, NR.fbw[1] + NR.slotDrop, z * 0.75], [NR.slot + 0.02, NR.fbw[1] + 0.01 + NR.slotDrop, z * 0.98], [7.1, fb[1], z * fb[0]], [9.0, fb[1], z * fb[0]],
         [FR.MAIN_BAY.s1, fb[1], z * fb[0]], [FR.AMMO.s1 + 0.04, -0.62, z * 1.04], [12.0, -0.66, z * 1.04], [12.35, -0.7, z * 1.06], [12.6, -0.7, z * 1.12], [13.0, -0.68, z * 1.12], [13.4, -0.58, z * 1.12], [14.2, -0.48, z * 1.22], [14.95, -0.37, z * 1.3]];   // (inside the main-well reserve's inboard edge, under the engine feed line)
       g.push(tube(trunk));
       // to the FADEC on the engine case

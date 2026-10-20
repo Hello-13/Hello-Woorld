@@ -214,7 +214,7 @@ export function buildAvionics(ctx) {
       system: 'Communications', material: 'Flush conformal antenna panels', mass: 4, count: 2,
       explode: [0, 0.85, 0],
       desc: 'Two flush apertures, one on the spine and one on the belly ahead of the main bay, for the voice and data radios (HAVE QUICK, SINCGARS). Photographs show no blade antennas on the spine or belly: like the rest of the CNI suite these sit flush with the skin (positions approximate).',
-    }, mesh(merge([patchGeo(top(SM(9.9), 0), V(0, 1, 0), 0.3, 0.1), patchGeo(bot(6.6, 0), V(0, -1, 0), 0.26, 0.1)]), F.composite()));
+    }, mesh(merge([patchGeo(top(SM(9.9), 0), V((FR.topAt(SM(9.9) + 0.1, 0) - FR.topAt(SM(9.9) - 0.1, 0)) / 0.2, 1, 0), 0.3, 0.1), patchGeo(bot(6.6, 0), V(-(FR.bottomAt(6.7, 0) - FR.bottomAt(6.5, 0)) / 0.2, -1, 0), 0.26, 0.1)]), F.composite()));   // (each laid along the skin's slope)
     P('GPS antenna', {
       system: 'Communications', material: 'Flush patch antenna', mass: 1,
       explode: [0, 1.1, 0],

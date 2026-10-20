@@ -154,10 +154,12 @@ function saddle(s, { ybot, zo = 1.45, gapTop = 0.07, recess = null }) {
   const zi = Math.max(0.08, zc - w / 2 - 0.05);
   let zO = Math.min(zo, zc + w / 2 - 0.12, FR.bW(Math.max(s, FR.S_AB)) - 0.45);
   const top = (z) => FR.topAt(s, z) - gapTop;
-  const topR = (z) => top(z) - (recess ? recess(z) : 0);
   // the underside follows the duct's real roof (highest wall point within ±5 cm), at least 3.5 cm above it
   const roof = (z) => { let h = ductTop(s, z); for (let dz = -0.05; dz <= 0.0501; dz += 0.025) { const sp = FR.ductSpan(s, z + dz); if (sp) h = Math.max(h, sp.hi); } return h; };
   const over = (z) => Math.max(roof(z) + 0.035, Math.min(roof(z) + 0.05, top(z) - 0.03));
+  // (a recess in the top — the receptacle's well, the fuel coolers — never takes it down onto the duct: where the duct
+  // climbs under the coolers' outboard edge the cell thins to 1 cm over its underside)
+  const topR = (z) => Math.max(top(z) - (recess ? recess(z) : 0), Math.min(top(z), over(z) + 0.01));
   // only as far out over the duct as 3 cm of fuel depth remains (near the fan face the duct roof nears the deck)
   for (let z = zi; z <= zO; z += 0.01) if (top(z) - over(z) < 0.03) { zO = Math.max(zi + 0.01, z - 0.01); break; }
   const half = [];
@@ -180,8 +182,9 @@ function a3Outline(s) {
  * the fin stands on the boom.
  */
 function a1Section(s) {
-  // (0.665 round the case and its external accessories; 4.5 cm off the narrower augmentor behind them)
-  const zc = FR.ENG_Z, yc = FR.ENG_Y, rE = lerp(0.665, FR.F119.rAug + 0.045, smooth(FR.AUG_S - 0.1, FR.AUG_S + 0.2, s)), sk = 0.035, yb = FR.FUEL.a1Floor;
+  // (0.665 round the case and its external accessories; 6.5 cm off the narrower augmentor behind them, outside the fire
+  // detector loops)
+  const zc = FR.ENG_Z, yc = FR.ENG_Y, rE = lerp(0.665, FR.F119.rAug + 0.065, smooth(FR.AUG_S - 0.1, FR.AUG_S + 0.2, s)), sk = 0.035, yb = FR.FUEL.a1Floor;
   const zMax = FR.bW(s) - 0.12;
   const finCap = (z) => (s > FR.FIN.rootS - 0.05 && Math.abs(z - FR.FIN.rootZ) < 0.2 ? FR.FIN.rootY - 0.03 : 9);
   const yTop = (z) => Math.min(FR.topAt(s, z) - sk, finCap(z));
@@ -219,7 +222,9 @@ export function buildSystems(ctx) {
   const NW = FR.WELL_RESERVE.nose;
   const st1 = [...range(FT.f1a[0], NW.s1, 5), ...range(NW.s1 + 0.1, FT.f1a[1], 5)];
   const t1 = tankLoft(st1, (s) => {
-    const zA = FR.aW(s) - 0.18;          // leaves a channel along the forebody side for the coolers' air
+    // (leaves a channel along the forebody side for the coolers' air, and stays 2 cm inboard of the inlet bleed plenum)
+    const BL = FR.BLEED, nearBleed = smooth(BL.s0 - 0.12, BL.s0 - 0.02, s) * (1 - smooth(BL.s1 + 0.02, BL.s1 + 0.12, s));
+    const zA = Math.min(FR.aW(s) - 0.18, lerp(9, FR.bleedPlenumZ() - BL.w / 2 - 0.02, nearBleed));
     const zs = [0, 0.08, 0.15, 0.2, 0.25, 0.32, ...range(0.4, zA, 4)];
     const half = zs.map((z) => [z, FR.topAt(s, z) - 0.07 - acfc(s, z)]);
     const step = (NW.y1Aft + 0.01 + 0.45) * (1 - smooth(NW.s1, NW.s1 + 0.1, s));
@@ -233,9 +238,9 @@ export function buildSystems(ctx) {
   // and the inlet-bypass plenums, which stand on the ducts' roofs under the louvre doors: F-2 stops short of them
   const BPs = (s) => s > FR.BYPASS.s0 - 0.06 && s < FR.BYPASS.s1 + 0.06;
   const sad = (s, ybot) => saddle(s, { ybot, recess: (z) => recWell(s, z) + acfc(s, z), zo: BPs(s) ? FR.BYPASS.z0 - 0.03 : 1.45 });
-  const lobeOpts = (s, side) => ({ y0: -0.335, zIn: Math.max(BPs(s) ? FR.BYPASS.z1 + 0.03 : 0, Math.min(1.45, ductAt(s).zc + ductAt(s).w / 2 - 0.12)), zCap: s > FT.gunBay ? 1.45 : 9 });
+  const lobeOpts = (s, side) => ({ y0: -0.30, zIn: Math.max(BPs(s) ? FR.BYPASS.z1 + 0.03 : 0, Math.min(1.45, ductAt(s).zc + ductAt(s).w / 2 - 0.12)), zCap: s > FT.gunBay ? 1.45 : 9 });
   const st1b = range(FT.f1b[0], FT.f1b[1], 7), st2 = range(FT.f2[0], FT.f2[1], 26);
-  const t1b = tankLoft(st1b, (s) => sad(s, -0.3)), t2 = tankLoft(st2, (s) => sad(s, -0.3));
+  const t1b = tankLoft(st1b, (s) => sad(s, -0.27)), t2 = tankLoft(st2, (s) => sad(s, -0.27));   // (floors 3 cm over the runs along the bay ceiling)
   const lobes = [];
   for (const side of [1, -1]) {
     const L1 = lobeLoft(range(FT.f1b[0], FT.f1b[1] - 0.04, 7), (s) => lobe(s, lobeOpts(s, side)), side);
@@ -253,7 +258,7 @@ export function buildSystems(ctx) {
   // wing tanks between the front and rear spars out to about 90 % of the semi-span (T.O. A.10 / A.11), a band inset from
   // the skins (FUEL.wingK of the local thickness) sized to the T.O.'s 375.3 US gal; inboard of the main-gear door's hinge rib the
   // wing root between the 36 % and 49 % spars is the wheel well (and the door actuator's dry bay), so the cell steps
-  // round it there
+  // round it there (and stays clear of the shallow pocket under the doors' forward teeth, ahead of the 36 % spar)
   const wingTank = () => {
     const piece = (z0, z1, c0, c1, nz) => {
       const zs = range(z0, z1, nz), fs = range(c0, c1, 7);
@@ -269,8 +274,8 @@ export function buildSystems(ctx) {
       for (let i = 0; i < zs.length - 1; i++) vol += ((area(zs[i]) + area(zs[i + 1])) / 2) * (zs[i + 1] - zs[i]);
       return { geo: FR.gridSurface(rings, { closed: true, uv: 'n' }), vol };
     };
-    const zN = FR.MAIN_WELL.hingeZ + 0.075;
-    const ps = [piece(FT.wingZ0, zN, FT.wingC[0], 0.35, 1), piece(FT.wingZ0, zN, 0.50, FT.wingC[1], 1), piece(zN, FR.WING.kinkZ, FT.wingC[0], FT.wingC[1], 10), piece(FR.WING.kinkZ, FT.wingZ1, FT.wingC[0], FT.wingC[1], 2)];
+    const zN = FR.MAIN_WELL.hingeZ + 0.1;     // (the hinge rib and the door actuator's dry bay outboard of the hinge)
+    const ps = [piece(FT.wingZ0, zN, FT.wingC[0], 0.325, 1), piece(FT.wingZ0, zN, 0.50, FT.wingC[1], 1), piece(zN, FR.WING.kinkZ, FT.wingC[0], FT.wingC[1], 10), piece(FR.WING.kinkZ, FT.wingZ1, FT.wingC[0], FT.wingC[1], 2)];
     return { geo: merge(ps.map((p) => p.geo)), vol: ps.reduce((a, p) => a + p.vol, 0) };
   };
   const tw = wingTank();
@@ -286,7 +291,7 @@ export function buildSystems(ctx) {
   const fuelMat = F.tank();
   // (the T.O.'s capacities add up to 3,082 US gal, ≈ 9,300 kg of JP-8, more than the published 18,000 lb / 8,200 kg
   // usable internal fuel; the cells are drawn toward the T.O.'s capacities)
-  const tdesc = (gal, where, role, m3, note = '') => `${where} ${role} T.O. 00-105E-9 gives ${gal} US gal (${lit(gal).toLocaleString('en-US')} L, ${(gal * 0.00378541).toFixed(2)} m³); the cell's outline is not published, and the model's cell, drawn where the T.O. puts it, holds ≈ ${m3.toFixed(2)} m³${note}. Its mass is that volume of JP-8 at 0.80 kg/L. (The T.O.'s capacities add up to about 9,300 kg of JP-8, more than the published 18,000 lb / 8,200 kg of usable internal fuel.)`;
+  const tdesc = (gal, where, role, m3, note = '') => `${where} ${role} T.O. 00-105E-9 gives ${gal} US gal (${lit(gal).toLocaleString('en-US')} L, ${(gal * 0.00378541).toFixed(2)} m³); the cell's outline is not published, and the model's cell, drawn where the T.O. puts it, holds ≈ ${m3.toFixed(2)} m³ (${Math.round((m3 / (gal * 0.00378541)) * 100)} % of it)${note}. Its mass is that volume of JP-8 at 0.80 kg/L. (The T.O.'s capacities add up to about 9,300 kg of JP-8, more than the published 18,000 lb / 8,200 kg of usable internal fuel.)`;
   tanks.push(P('Forward fuselage tank F-1A', {
     system: 'Fuel', material: 'Integral tank in the fuselage structure, nitrogen-enriched-air inerted', mass: kgV(vols.f1a),
     explode: [0.6, 1.9, 0],
@@ -295,24 +300,24 @@ export function buildSystems(ctx) {
   tanks.push(P('F-1B pump box (forward feed cell)', {
     system: 'Fuel', material: 'Integral tank over the ducts and the front of the main weapons bay, with boost pumps', mass: kgV(vols.f1b),
     explode: [0.3, 2.05, 0],
-    desc: tdesc(CAP.f1b, 'The aft part of F-1, saddled over the inlet ducts and out over the side bays:', 'one of the three feed cells (with A-1 left and right) whose boost pumps keep the engines fed in any attitude.', volF1b),
+    desc: tdesc(CAP.f1b, 'The aft part of F-1, saddled over the inlet ducts and out over the side bays:', 'one of the three feed cells (with A-1 left and right) whose boost pumps keep the engines fed in any attitude.', volF1b, ': the model\'s ducts, sized for the engine\'s airflow, take part of the space it wraps round'),
   }, mesh(merge([t1b.geo, ...lobes.map((l) => l.L1.geo)]), fuelMat)));
   tanks.push(P('Centre fuselage tank (F-2)', {
     system: 'Fuel', material: 'Integral tank wrapped over the inlet ducts and the main weapons bay', mass: kgV(vols.f2),
     explode: [0, 2.15, 0], callout: false,
-    desc: tdesc(CAP.f2, 'The largest cell, saddled over both inlet ducts and the main weapons bay and out over the side bays, with the air-refuelling receptacle in a well in its top:', 'a transfer cell; fuel is also the jet\'s main heat sink.', volF2),
+    desc: tdesc(CAP.f2, 'The largest cell, saddled over both inlet ducts and the main weapons bay and out over the side bays, with the air-refuelling receptacle in a well in its top:', 'a transfer cell; fuel is also the jet\'s main heat sink.', volF2, ': the model\'s ducts, sized for the engine\'s airflow, take part of the space it wraps round'),
   }, mesh(merge([t2.geo, ...lobes.map((l) => l.L2.geo)]), fuelMat)));
   for (const side of [1, -1]) {
     const R = side > 0 ? 'right' : 'left';
     tanks.push(P(`A-3 tank (${R})`, {
       system: 'Fuel', material: 'Integral tank over the inlet duct', mass: kgV(vols.a3),
       explode: [-0.3, 2.0, 0.45 * side],
-      desc: tdesc(CAP.a3, 'A small cell over the last metre of the inlet duct, where it drops to the engine face:', 'a transfer cell.', t3.vol),
+      desc: tdesc(CAP.a3, 'A small cell over the last metre of the inlet duct, where it drops to the engine face:', 'a transfer cell.', t3.vol, ': the model\'s ducts, sized for the engine\'s airflow, the bleed-air ducts and the APU start lines fill the space it would take between and over them (the real duct and cell shapes are not published)'),
     }, mesh(side > 0 ? t3.geo : mirror(t3.geo), fuelMat)));
     tanks.push(P(`A-1 aft feed tank (${R})`, {
       system: 'Fuel', material: 'Integral tank beside the engine bay, round the titanium boom, with a boost pump', mass: kgV(vols.a1),
       explode: [-0.6, 1.2, 1.1 * side],
-      desc: tdesc(CAP.a1, 'Beside the engine bay, from behind the main wheel well aft:', `the ${R} aft feed cell, whose boost pump feeds the ${R} engine.`, t4.vol, ' — about two thirds of the T.O. figure: the rest of the space the T.O. draws beside the engine is taken by the lines, harnesses and engine accessories the model routes there'),
+      desc: tdesc(CAP.a1, 'Beside the engine bay, from behind the main wheel well aft:', `the ${R} aft feed cell, whose boost pump feeds the ${R} engine.`, t4.vol, ': the rest of the space the T.O. draws beside the engine is taken by the lines, harnesses and engine accessories the model routes there'),
     }, mesh(side > 0 ? t4.geo : mirror(t4.geo), fuelMat)));
     tanks.push(P(`Wing tank A-2 (${R})`, {
       system: 'Fuel', material: 'Integral (wet) wing box, sealed', mass: kgV(vols.a2),
@@ -453,14 +458,14 @@ export function buildSystems(ctx) {
     const probe = (s, z, y0, y1) => { if (y1 - y0 > 0.06) g.push(new THREE.CylinderGeometry(0.012, 0.012, y1 - y0, 6).translate(X(s), (y0 + y1) / 2, z)); };
     probe(6.4, 0.35, -0.452, FR.topAt(6.4, 0.35) - 0.1);
     probe(7.42, -0.1, -0.305, FR.topAt(7.42, 0.1) - 0.1);
-    for (const [sv, zz] of [[8.4, 0.09], [9.0, -0.09], [10.1, 0.09]]) probe(sv, zz, -0.205, FR.topAt(sv, Math.abs(zz)) - 0.1 - (sv > FR.AR.s0 - 0.1 && sv < FR.AR.s1 + 0.1 ? 0.26 : 0));
+    for (const [sv, zz] of [[8.4, 0.09], [9.0, -0.09], [10.1, 0.09]]) probe(sv, zz, -0.262, FR.topAt(sv, Math.abs(zz)) - 0.1 - (sv > FR.AR.s0 - 0.1 && sv < FR.AR.s1 + 0.1 ? 0.26 : 0));
     for (const side of [1, -1]) {
       probe(8.0, side * 1.55, -0.37, FR.topAt(8.0, 1.55) - 0.07);
       probe(13.2, side * 1.8, -0.17, FR.topAt(13.2, 1.8) - 0.06);
       for (const z of [2.9, 3.5]) {
         const sec = FR.wingSection(z);
         const sx = sec.le[0] - 0.42 * sec.chord;
-        const h = naca00(0.42, sec.t) * sec.chord * 0.835;                 // floor to roof of the wet wing box (wing tank: 0.84)
+        const h = naca00(0.42, sec.t) * sec.chord * (FR.FUEL.wingK + 0.01);   // floor to roof of the wing cell (FUEL.wingK)
         g.push(new THREE.CylinderGeometry(0.01, 0.01, 2 * h, 6).translate(sx, sec.le[1], side * z));
       }
     }
@@ -597,7 +602,7 @@ export function buildSystems(ctx) {
     // forward fuselage narrows) to the retraction jack's fitting under the cockpit floor
     {
       const NY = RT.nose.hyd, sl = RT.nose.slot, NW = FR.NOSE_WELL;
-      g.push(FR.pipe([[7.2, hy[1], hy[0]], [7.05, NY[1] + 0.02, 1.07], [sl + 0.02, NY[1], 1.0], [sl, NY[1], 0.75], [sl - 0.02, NY[1], NY[0]], [6.0, NY[1], NY[0]], [4.95, NY[1], NY[0]], [4.85, -0.645, 0.40], [4.74, -0.63, NW.wall + 0.03], [4.68, -0.4, NW.wall + 0.03], [4.65, -0.15, NW.wall + 0.025], [N_ACT[0], -0.1, N_ACT[2] + 0.04]], 0.012, 5, 50));
+      g.push(FR.pipe([[7.2, hy[1], hy[0]], [7.05, NY[1] + 0.02, 1.07], [sl + 0.02, NY[1] + RT.nose.slotDrop, 1.0], [sl, NY[1] + RT.nose.slotDrop, 0.75], [sl - 0.02, NY[1], NY[0]], [6.0, NY[1], NY[0]], [4.95, NY[1], NY[0]], [4.85, -0.645, 0.40], [4.74, -0.63, NW.wall + 0.03], [4.68, -0.4, NW.wall + 0.03], [4.65, -0.15, NW.wall + 0.025], [N_ACT[0], -0.1, N_ACT[2] + 0.04]], 0.012, 5, 50));
     }
     P('Landing-gear & brake hydraulic lines', {
       system: 'Hydraulics', material: 'Titanium and steel tubing, flexible hoses across the gear pivots', mass: 18,
@@ -710,7 +715,7 @@ export function buildSystems(ctx) {
     // ammunition container, then aft along the inboard side of each AMAD
     const xs = RT.cross, sz = RT.startZ;
     // (down ahead of the left main-gear well's front wall, then aft under the duct inboard of the well)
-    const sp = [FR.pipe([[A.s1 - 0.12, ay - 0.13, az + 0.02], [A.s1 + 0.02, -0.3, -1.45], [10.99, -0.47, -1.17], [11.0, -0.58, -0.9], [xs, RT.startY, -0.72], [xs, RT.startY, -sz - 0.03]], 0.035, 8, 30)];
+    const sp = [FR.pipe([[A.s1 - 0.12, ay - 0.13, az + 0.02], [A.s1 + 0.02, -0.3, -1.45], [10.93, -0.47, -1.17], [10.935, -0.58, -0.9], [xs, RT.startY, -0.72], [xs, RT.startY, -sz - 0.03]], 0.035, 8, 30)];
     for (const side of [1, -1]) sp.push(FR.pipe([[xs, RT.startY, -sz - 0.03], ...(side > 0 ? [[xs, RT.startY, sz - 0.03]] : []), [xs + 0.08, -0.7, side * sz], [AM.s0 + 0.1, -0.86, side * sz], [AM.s1 + 0.02, -0.88, side * sz], [AM.s1 + 0.06, AM.y - 0.01, side * (AM.z - 0.13)]], 0.033, 8, 30));
     P('APU start path to AMADs', {
       system: 'Electrical', material: 'Insulated start-air ducting', mass: 10,
@@ -757,7 +762,7 @@ export function buildSystems(ctx) {
       // forward loads: to the IFDL processor (right) and the aft VMS box (left) ahead of it
       g.push(FR.pipe(z > 0 ? [[pd[0] - 0.29, pd[1], pd[2]], [3.75, pd[1] + 0.02, pd[2]], [3.62, -0.25, 0.42]] : [[pd[0] - 0.29, pd[1], -pd[2]], [3.2, -0.25, -0.41], [3.03, -0.18, -0.41], [2.99, -0.165, -0.405]], 0.018, 6, 8));
       g.push(FR.pipe([[pd[0] + 0.28, pd[1] - 0.03, z * (pd[2] + 0.04)], [pd[0] + 0.32, pd[1] - 0.04, z * 0.5], [D[0], -0.36, z * 0.52], [D[1], NH[1], z * 0.53],
-        [RT.nose.rise, NH[1], z * 0.52], [6.1, NH[1], z * NH[0]], [RT.nose.slot - 0.05, NH[1], z * NH[0]], [RT.nose.slot, NH[1], z * 0.75], [RT.nose.slot + 0.02, NH[1], z * 0.98], [7.05, -0.66, z * 1.0], [7.15, hz[1], z * hz[0]], [9.0, hz[1], z * hz[0]],
+        [RT.nose.rise, NH[1], z * 0.52], [6.1, NH[1], z * NH[0]], [RT.nose.slot - 0.05, NH[1], z * NH[0]], [RT.nose.slot, NH[1] + RT.nose.slotDrop, z * 0.75], [RT.nose.slot + 0.02, NH[1] + RT.nose.slotDrop, z * 0.98], [7.05, -0.69, z * 1.0], [7.15, hz[1], z * hz[0]], [9.0, hz[1], z * hz[0]],
         // (inboard behind the ammunition container under the APU start-air crossing, then below the bleed duct's aft run)
         [FR.MAIN_BAY.s1, hz[1], z * hz[0]], ...inside([[FR.AMMO.s1 + 0.04, -0.69, z * 1.01], [RT.cross - 0.05, -0.72, z * 0.7], [RT.cross + 0.01, -0.78, z * 0.42], [RT.cross + 0.13, -0.78, z * 0.2], [RT.cross + 0.33, -0.74, z * 0.12]], 0.025), [RT.aftPdc[0] - 0.24, RT.aftPdc[1], z * RT.aftPdc[2]], [RT.aftPdc[0] - 0.2, RT.aftPdc[1], z * RT.aftPdc[2]]], 0.018, 6, 110));
       // generator feeders: from each generator back to its distribution centre
@@ -784,8 +789,9 @@ export function buildSystems(ctx) {
       const port = [12.67, ey + dir.y * 0.3, ez + dir.x * 0.3];
       g.push(FR.pipe([port, [12.66, ey + dir.y * 0.5, ez + dir.x * 0.5], [12.6, -0.7, z * 0.26], [12.3, -0.74, z * 0.24], [11.9, -0.75, z * 0.235], [11.45, -0.74, z * 0.23], [xb + 0.06, RT.bleedY, z * 0.24],
         [xb, RT.bleedY, z * 0.6], [xb - 0.02, RT.bleedY, z * 0.97], [FR.AMMO.s0 + 0.02, RT.bleedY + 0.05, z * 0.99], [FR.MAIN_BAY.s1 - 0.05, BL[1], z * BL[0]], [9.0, BL[1], z * BL[0]], [7.1, BL[1], z * BL[0]],
-        // (dipping under the duct's floor where it comes down behind the inlet, then up inboard of it)
-        [6.98, -0.6, z * 1.05], [RT.nose.slot + 0.005, -0.6, z * 0.95], [RT.nose.slot + 0.004, -0.6, z * 0.75], [RT.nose.slot + 0.003, RT.nose.bleedY, z * 0.6], [E.s1 - 0.02, -0.5, z * 0.4], [E.hx[0] + 0.15, E.hx[1] + 0.06, z * E.hx[2]]], 0.03, 8, 120));
+        // (down under the duct's floor where it comes down behind the inlet, over the other through-runs, which drop
+        // further at the slot, then up inboard of the duct and in over the nose lanes)
+        [7.02, -0.545, z * 1.07], [6.95, -0.585, z * 1.02], [RT.nose.slot + 0.018, -0.595, z * 0.9], [RT.nose.slot + 0.015, -0.595, z * 0.7], [RT.nose.slot + 0.01, -0.55, z * 0.6], [RT.nose.slot + 0.003, RT.nose.bleedY, z * 0.56], [E.s1 - 0.02, -0.5, z * 0.4], [E.hx[0] + 0.15, E.hx[1] + 0.06, z * E.hx[2]]], 0.03, 8, 120));
       vb.push(new THREE.CylinderGeometry(0.05, 0.05, 0.15, 14).rotateZ(Math.PI / 2).translate(X(12.45), -0.73, z * 0.245));      // shut-off valve
       vb.push(FR.boxS(12.45, -0.665, z * 0.245, 0.07, 0.06, 0.06));
       vb.push(new THREE.CylinderGeometry(0.045, 0.045, 0.13, 14).rotateZ(Math.PI / 2).translate(X(12.05), -0.75, z * 0.235));     // pressure-regulating valve
@@ -901,9 +907,9 @@ export function buildSystems(ctx) {
       desc: 'When the detector loops warn of a fire, the pilot shuts off that engine\'s fuel and fires one or both bottles, which flood the bay through spray tubes (agent and positions approximate).',
     }, [mesh(merge(g), F.red()), mesh(merge(l), F.pipe())]);
     // dry-bay fire suppression: canisters in the gun bay (right) and the APU bay (left) beside the fuel cells (in the
-    // APU bay ahead of and outboard of the APU's inlet duct)
+    // APU bay ahead of and outboard of the APU's inlet duct, under the upper skin)
     const d = [];
-    for (const [s, z, y] of [[9.1, 1.78, -0.26], [10.03, 1.82, -0.24], [9.6, -1.6, 0.1], [10.0, -1.95, 0.0]]) d.push(new THREE.CapsuleGeometry(0.035, 0.1, 4, 8).rotateZ(Math.PI / 2).translate(X(s), y, z));
+    for (const [s, z, y] of [[9.1, 1.78, -0.26], [10.03, 1.82, -0.24], [9.6, -1.6, FR.topAt(9.6, 1.6) - 0.037], [10.0, -1.95, FR.topAt(10.0, 1.95) - 0.037]]) d.push(new THREE.CapsuleGeometry(0.035, 0.1, 4, 8).rotateZ(Math.PI / 2).translate(X(s), y, z));
     P('Dry-bay fire suppression', {
       system: 'Environmental control', material: 'Fast-acting suppressant canisters with optical fire detectors', mass: 10, count: 4,
       explode: [0, 1.75, 0.5],

@@ -346,11 +346,11 @@ export function buildGear(ctx) {
     {
       const sD = legGroup();
       // (on the lower leg, below the side brace's lug and inboard of the tyre's inner face)
-      const t0 = 0.43, t1 = 0.66, wIn = -0.10, wOut = 0.07, off = 0.11, th = 0.02;
+      const t0 = 0.47, t1 = 0.66, wIn = -0.10, wOut = 0.07, off = 0.11, th = 0.02;
       const pts = (t, wv) => at(t, -off, 0).addScaledVector(out, wv);
       const grid = toothedGrid((t, v) => pts(t, lerp(wIn, wOut, v)).toArray(), [t0, (t0 + t1) / 2, t1], { width: wOut - wIn, pitch: 0.08 });
       const door = slab(grid, () => aft.clone().multiplyScalar(th).toArray());
-      const br = [rodV(at(0.47, -off + th), at(0.47, -0.05), 0.012, 6), rodV(at(0.62, -off + th), at(0.62, -0.05), 0.012, 6)];
+      const br = [rodV(at(0.5, -off + th), at(0.5, -0.05), 0.012, 6), rodV(at(0.62, -off + th), at(0.62, -0.05), 0.012, 6)];
       sD.inner.add(mesh(door, F.door()), mesh(merge(br), F.steel()));
       P(`Main gear strut door (${R})`, {
         system: 'Skin & fairings', skin: true, material: 'Composite door, saw-tooth edges', mass: 6,
@@ -503,7 +503,8 @@ export function buildGear(ctx) {
       anim.gearDoorsMain = anim.gearDoorsMain || [];
       anim.gearDoorsMain.push({ h, angle: FR.MAIN_DOORS.open.main * FR.DEG, transit: FR.MAIN_DOORS.open.transit * FR.DEG });
       // rotary actuator at the aft end of the hinge line, inside the wing, bracketed to the 49 % spar
-      const ax = p1.clone().sub(p0).normalize(), a0 = p1.clone().addScaledVector(ax, 0.012).add(V(0, 0.045, 0)), a1 = a0.clone().addScaledVector(ax, 0.13);
+      // (5 cm outboard of the hinge line, outside the well's wall, inside the wing)
+      const ax = p1.clone().sub(p0).normalize(), a0 = p1.clone().addScaledVector(ax, 0.012).add(V(0, 0.045, side * 0.05)), a1 = a0.clone().addScaledVector(ax, 0.13);
       const sp = FR.wingLE(hz) + 0.49 * (FR.wingTEline(hz) - FR.wingLE(hz));
       const ra = [rodV(a0, a1, 0.035, 14), new THREE.BoxGeometry(Math.abs(X(sp) - a1.x) + 0.02, 0.05, 0.06).translate((X(sp) + a1.x) / 2, a1.y, a1.z), rodV(p1.clone(), a0, 0.012, 6)];
       P(`Main gear door actuator (${R})`, {
