@@ -66,7 +66,11 @@ function rodV(a, b, r, seg = 10) {
 /** Box centred at c with its edges along the (orthonormal) axes ex, ey, ez and sizes sx, sy, sz. */
 function boxAlong(c, ex, ey, ez, sx, sy, sz) {
   const g = new THREE.BoxGeometry(sx, sy, sz);
-  g.applyMatrix4(new THREE.Matrix4().makeBasis(ex, ey, ez));
+  // (a left-handed basis would mirror the box and turn its faces inside out, so the near faces were culled and the
+  // part showed its dark inner side; the box is symmetric, so the third axis can simply be reversed)
+  const m = new THREE.Matrix4().makeBasis(ex, ey, ez);
+  if (m.determinant() < 0) m.makeBasis(ex, ey, ez.clone().negate());
+  g.applyMatrix4(m);
   return g.translate(c.x, c.y, c.z);
 }
 

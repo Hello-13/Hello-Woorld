@@ -125,7 +125,7 @@ export const F = {
   // offset keeps their saw-tooth edges from flickering against it
   // (a shade lighter than the surrounding skin: the doors' sealed, re-coated edges give the real jet its faint panel
   // pattern, so the panel tone follows real doors rather than a generic tile)
-  door: () => once('f22.door', () => { const m = F.skin().clone(); m.color.set(0x747c83); m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; return m; }),
+  door: () => once('f22.door', () => { const m = F.skin().clone(); m.color.set(0x71797f); m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; return m; }),
   doorWing: () => once('f22.doorWing', () => { const m = F.wing().clone(); m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; return m; }),
   // isogrid: integrally machined triangular stiffening on the aft-boom panels (≈ 0.1 m pockets, estimate)
   isogrid: () => once('f22.isogrid', () => {

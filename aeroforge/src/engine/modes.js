@@ -111,6 +111,19 @@ export class RenderModes {
     return mat;
   }
 
+  /** Skin X-ray material dimmed to weight w; parts that set no xraySkinWeight get the standard faint skin. */
+  xraySkinWeighted(w) {
+    if (!(w < 1)) return this.xraySkin;
+    const k = Math.max(0.05, Math.round(w * 20) / 20);
+    let mat = this.xraySkinDim?.get(k);
+    if (!mat) {
+      mat = xrayMaterial(0x5fd4ff, 3.2, 0.006);
+      mat.uniforms.color.value.multiplyScalar(k);
+      (this.xraySkinDim || (this.xraySkinDim = new Map())).set(k, mat);
+    }
+    return mat;
+  }
+
   meshes(vehicle) {
     if (!vehicle._meshes) {
       const list = [];
@@ -189,7 +202,7 @@ export class RenderModes {
         m.castShadow = true;
       } else if (mode === 'xray') {
         const info = partOf(m)?.userData.part;
-        m.material = inSel(m) ? this.xraySel : info?.skin ? this.xraySkin : this.xrayWeighted(m.userData.xrayWeight ?? info?.xrayWeight ?? 1);
+        m.material = inSel(m) ? this.xraySel : info?.skin ? this.xraySkinWeighted(info.xraySkinWeight) : this.xrayWeighted(m.userData.xrayWeight ?? info?.xrayWeight ?? 1);
         if (edges) edges.visible = false;
         m.castShadow = false;
       } else if (mode === 'systems') {

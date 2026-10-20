@@ -108,7 +108,25 @@ export function buildFighter() {
     const part = partOf(name);
     if (!part) return;
     const m = firstMesh(part);
-    part.add(decal(m, tex, { ...opts, into: part }));
+    const d = decal(m, tex, { ...opts, into: part });
+    // keep only the faces turned toward the projection: where a thin surface (a wing's trailing edge, a fin) lies
+    // wholly inside the box, the far skin would otherwise carry a mirrored copy
+    const g = d.geometry, P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv;
+    const dir = new THREE.Vector3(...opts.dir).normalize(), n = new THREE.Vector3();
+    const keep = [];
+    for (let i = 0; i < P.count; i += 3) {
+      n.set(0, 0, 0);
+      for (let k = 0; k < 3; k++) n.x += N.getX(i + k), n.y += N.getY(i + k), n.z += N.getZ(i + k);
+      if (n.normalize().dot(dir) > 0.2) keep.push(i);
+    }
+    if (keep.length * 3 < P.count) {
+      const take = (A, w) => { const out = new Float32Array(keep.length * 3 * w); keep.forEach((i, j) => { for (let k = 0; k < 3 * w; k++) out[j * 3 * w + k] = A.array[i * w + k]; }); return new THREE.BufferAttribute(out, w); };
+      const ng = new THREE.BufferGeometry();
+      ng.setAttribute('position', take(P, 3)); ng.setAttribute('normal', take(N, 3)); if (U) ng.setAttribute('uv', take(U, 2));
+      g.dispose();
+      d.geometry = ng;
+    }
+    part.add(d);
   };
   for (const side of [1, -1]) {
     const R = side > 0 ? 'right' : 'left';
@@ -153,19 +171,30 @@ export function buildFighter() {
     [/^F119 (shafts & bearings|annular combustor) /, 0.55], [/^Serpentine inlet duct /, 0.6], [/^Inlet throat & boundary-layer bleed /, 0.6], [/^AIM-120C AMRAAM/, 0.6],
     // broad thin surfaces read as solid sheets in X-ray (each face adds its glow); the control surfaces, nozzle flaps
     // and booms are drawn faint like the skins they belong to
-    [/^(Stabilator|Leading-edge flap|Flaperon|Aileron|Rudder) \(/, 0.3], [/^Nozzle (external flaps|transition duct)/, 0.35], [/^Aft boom /, 0.35],
+    [/^(Stabilator|Leading-edge flap|Flaperon|Aileron|Rudder) \(/, 0.15], [/^Nozzle (external flaps|transition duct)/, 0.25], [/^Aft boom /, 0.25],
     [/^Main bay centre divider$/, 0.4], [/^Cockpit tub & floor$/, 0.6], [/^LAU-142\/A AVEL/, 0.6],
   ];
   // and the big stacked volumes in the centre fuselage, which otherwise wash it out into a milky fog
-  const XRAY_LOW = [[/^(Centre fuselage tank|Wing tank A-2|F-1B pump box|Forward fuselage tank F-1A|A-1 aft feed tank)/, 0.35], [/^Side bay & gear-well liners$/, 0.3], [/^Main weapons bay$/, 0.35], [/^Keel & weapons-bay longerons$/, 0.4]];
+  // (measured: with the skins, the inlet ducts, tanks, bays and frame stacks gave most of the glow behind the cockpit)
+  const XRAY_LOW = [
+    [/^(Centre fuselage tank|Wing tank A-2|F-1B pump box|Forward fuselage tank F-1A|A-1 aft feed tank|A-3 tank)/, 0.3], [/^Side bay & gear-well liners$/, 0.25],
+    [/^Main weapons bay$/, 0.3], [/^Keel & weapons-bay longerons$/, 0.35], [/^Serpentine inlet duct /, 0.15], [/^Inlet throat & boundary-layer bleed /, 0.2],
+    [/^F119 (augmentor|fan) /, 0.35], [/^Wing (titanium spars|RTM sine-wave spars|ribs) /, 0.4], [/^(Engine-bay frames|Mid-fuselage (aluminium frames|titanium bulkheads))$/, 0.35],
+  ];
   for (const p of A.parts) {
     const i = p.userData.part;
+    // the skins stack up to six deep over the mid and aft fuselage (outer skins, doors, panels, wing roots), so
+    // they are drawn at 45 % of the shared faint-skin glow
+    if (i.skin) i.xraySkinWeight = 0.45;
     const low = XRAY_LOW.find(([re]) => re.test(i.name));
     if (low) { i.xrayWeight = low[1]; continue; }
     if (i.xrayWeight < 1) continue;
     const hit = XRAY.find(([re]) => re.test(i.name));
     if (hit) i.xrayWeight = hit[1];
   }
+  // with about 300 parts packed into an 18.9 m airframe, every part is drawn at 75 % of the standard X-ray glow, so
+  // the centre and aft fuselage stay readable instead of saturating (and blooming) where dozens of layers overlap
+  for (const p of A.parts) { const i = p.userData.part; if (!i.skin) i.xrayWeight = Math.max(0.1, (i.xrayWeight ?? 1) * 0.75); }
 
   A.finalize();
 
