@@ -490,9 +490,10 @@ function renderHome(app) {
     <a class="tool" href="#exam"><span class="ti">Tx</span><b>Test mode</b><span>Pick chapters and take a mixed quiz. See your score by chapter and review what you missed.</span></a>
   </section>
   <section class="howto">
-    <div><h2>Bench</h2><p>Interactive models you can poke at. Change a value and watch what the chemistry does.</p></div>
-    <div><h2>Key ideas</h2><p>The rules and formulas for the chapter, written short enough to review in a minute.</p></div>
-    <div><h2>Practice</h2><p>Endless randomized problems with worked solutions. Filter by problem type to drill one skill.</p></div>
+    <div><h2>1 · Learn</h2><p>New topic? Start with the lesson: one idea per step, worked examples you reveal a move at a time, and quick checks.</p></div>
+    <div><h2>2 · Watch and explore</h2><p>See the atoms in the Watch it animation, then change the bench's controls and predict what will happen.</p></div>
+    <div><h2>3 · Practice</h2><p>Fresh problems with hints and worked solutions until the meter fills. Use the hint before the full solution.</p></div>
+    <div><h2>4 · Review daily</h2><p>Every skill you practice joins the Daily Review, which brings it back right before you would forget it.</p></div>
   </section>`;
   if (typeof Storyboard !== 'undefined') { try { cleanup = Storyboard(document.getElementById('hero-vis'), reactionFrames(), { compact: true, loop: true, hold: 1700, tween: 1300 }); } catch (err) { console.error(err); } }
 }
@@ -507,6 +508,7 @@ function renderLab(app, lab) {
       <p class="lede">${lab.blurb}</p>
     </div>
   </div>
+  ${typeof lessonBanner !== 'undefined' ? `<div class="fam-${lab.fam}">${lessonBanner(lab)}</div>` : ''}
   ${typeof STORIES !== 'undefined' && STORIES[lab.id] ? `<section class="watch" id="watch" aria-labelledby="watch-h"><h2 id="watch-h">Watch it <span class="story-title"></span></h2><div class="story-body"></div></section>` : ''}
   <div class="lab-grid">
     <section class="bench" aria-labelledby="bench-h"><h2 id="bench-h">Bench</h2><div id="bench"></div></section>
