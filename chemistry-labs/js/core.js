@@ -449,11 +449,14 @@ function weakSpots(n = 4) {
 document.addEventListener('click', e => {
   const a = e.target.closest('[data-preset]'); if (a) PRESET_TYPE = a.dataset.preset;
 });
+/* Soft hyphens so long words break cleanly inside narrow tiles ("Thermo-chemistry", not "Thermochemis-try") */
+const SHY = { Thermochemistry: 'Thermo&shy;chemistry', Electrochemistry: 'Electro&shy;chemistry', Intermolecular: 'Inter&shy;molecular', Configurations: 'Config&shy;urations', Stoichiometry: 'Stoichio&shy;metry', Concentration: 'Concen&shy;tration', Radioactivity: 'Radio&shy;activity', Measurement: 'Measure&shy;ment', Composition: 'Compo&shy;sition', Equilibrium: 'Equili&shy;brium', Kinetics: 'Kinetics' };
+const shy = t => t.replace(/[A-Za-z]{11,}/g, w => SHY[w] || w);
 function tileHTML(lab, big) {
   const st = Store.get(lab.id);
   return `<a class="tile fam-${lab.fam}${big ? ' big' : ''}" href="#${lab.id}">
     <span class="z">${lab.code || lab.ch}</span><span class="m">${st.c >= MASTER ? '★' : ''}</span>
-    <span class="sym">${lab.sym}</span><span class="nm">${lab.title}</span>${meterHTML(st.c)}</a>`;
+    <span class="sym">${lab.sym}</span><span class="nm">${shy(lab.title)}</span>${meterHTML(st.c)}</a>`;
 }
 function renderHome(app) {
   const mastered = LABS.filter(l => Store.get(l.id).c >= MASTER).length;

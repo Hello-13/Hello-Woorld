@@ -102,13 +102,14 @@ main { max-width: 1240px; margin: 0 auto; padding-inline: 16px; padding-block: 2
 .howto p { color: var(--muted); font-size: 0.94rem; }
 
 .fam-gen { --fam: var(--f-gen); } .fam-life { --fam: var(--f-life); } .fam-found { --fam: var(--f-found); } .fam-atom { --fam: var(--f-atom); } .fam-rx { --fam: var(--f-rx); } .fam-state { --fam: var(--f-state); } .fam-nuc { --fam: var(--f-nuc); }
-.tile { position: relative; display: grid; grid-template-rows: auto 1fr auto auto; aspect-ratio: 1 / 1.02; max-width: 100%; padding: 10px 12px 12px; border: 2px solid color-mix(in srgb, var(--fam) 55%, var(--line)); border-radius: 6px; background: color-mix(in srgb, var(--fam) 7%, var(--raised)); color: var(--ink); text-decoration: none; transition: transform .15s ease, border-color .15s ease; }
+.tile { position: relative; display: grid; grid-template-rows: auto auto 1fr auto; row-gap: 6px; min-height: 140px; min-width: 0; max-width: 100%; padding: 10px 12px 12px; border: 2px solid color-mix(in srgb, var(--fam) 55%, var(--line)); border-radius: 6px; background: color-mix(in srgb, var(--fam) 7%, var(--raised)); color: var(--ink); text-decoration: none; transition: transform .15s ease, border-color .15s ease; }
 .tile:hover { transform: translateY(-2px); border-color: var(--fam); }
 .tile .z { font-family: var(--mono); font-size: 0.85rem; color: var(--muted); }
 .tile .m { position: absolute; top: 8px; right: 11px; color: var(--fam); font-size: 0.9rem; }
-.tile .sym { font-family: var(--display); font-weight: 800; font-size: 2.7rem; letter-spacing: -0.03em; color: var(--fam); align-self: center; line-height: 1; }
-.tile .nm { font-size: 0.86rem; line-height: 1.25; font-weight: 700; margin-bottom: 8px; hyphens: auto; -webkit-hyphens: auto; overflow-wrap: anywhere; min-width: 0; }
-.tile.big { width: 112px; flex: none; aspect-ratio: 1 / 1.05; }
+.tile .sym { font-family: var(--display); font-weight: 800; font-size: 2.7rem; letter-spacing: -0.03em; color: var(--fam); line-height: 1; margin-top: 2px; }
+.tile .nm { font-size: 0.84rem; line-height: 1.25; font-weight: 700; align-self: start; hyphens: manual; -webkit-hyphens: manual; overflow-wrap: normal; min-width: 0; }
+.tile .meter { align-self: end; margin-top: 4px; }
+.tile.big { width: 112px; flex: none; min-height: 0; aspect-ratio: 1 / 1.05; grid-template-rows: auto 1fr auto; }
 .tile.big .sym { font-size: 2.4rem; }
 .tile.big .nm { display: none; }
 .meter { display: block; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--fam, var(--accent)) 16%, transparent); overflow: hidden; min-width: 60px; }
