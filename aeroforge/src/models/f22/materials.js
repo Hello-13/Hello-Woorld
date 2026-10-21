@@ -48,10 +48,22 @@ export const F = {
   // F-22 low-observable coating: medium "haze" grey (FS 36170 class), low-gloss matte. The jet's own map set
   // (raptorPaint below) carries only a faint large-scale tone and sheen variation: the coating is taped and sealed
   // smooth, so the panels that show are the modelled doors and panels themselves, not a generic repeating tile.
-  skin: () => once('f22.skin', () => paint(0x6e767d, 1 / 6.5)),
+  // panel lines, fasteners and tone from the shared stealth skin maps, in the lighter haze grey
+  skin: () => once('f22.skin', () => { const m = SKIN.stealth().clone(); m.color.set(0x6e767d); m.metalness = 0.18; m.clearcoat = 0.12; m.clearcoatRoughness = 0.45; return m; }),
   // the wing: the same paint, tiled on its own (its skins are a few large composite panels; the hinge lines of the
   // leading-edge flap, flaperon and aileron and the saw-tooth access doors are modelled)
-  wing: () => once('f22.wing', () => paint(0x6b737a, 1 / 7.5)),
+  wing: () => once('f22.wing', () => {
+    const m = SKIN.stealth().clone();
+    for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'bumpMap', 'aoMap']) {
+      if (!m[k]) continue;
+      const t = m[k].clone();
+      t.repeat.set(1 / 2.2, 1 / 2.2);
+      t.needsUpdate = true;
+      m[k] = t;
+    }
+    m.normalScale.set(0.5, 0.5); m.color.set(0x6b737a); m.metalness = 0.18; m.clearcoat = 0.12; m.clearcoatRoughness = 0.45;
+    return m;
+  }),
   /**
    * One-piece canopy: polycarbonate with a gold-tinted indium-tin-oxide film. Roughness is held
    * above ~0.1 on both lobes so the large curved bubble carries broad, steady highlights.

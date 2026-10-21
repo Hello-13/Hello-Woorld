@@ -436,7 +436,7 @@ export class Stage {
     this.stepViewShift(dt);
     if (this.tween) this.stepTween(dt);
     for (const fn of this.frameHooks) fn(dt, this.time);
-    this.controls.update();
+    this.controls.update(dt);   // with the frame time, so auto-rotate turns at the same speed at any frame rate
     // shadow maps render in the beauty pass only, not again in AO / outline sub-passes; at high
     // frame rates every other frame (the key light is fixed, so only moving parts lag, by ~4 ms)
     this.renderer.shadowMap.autoUpdate = false;
