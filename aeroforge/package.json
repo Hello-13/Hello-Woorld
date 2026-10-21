@@ -1,0 +1,12 @@
+{
+  "name": "aeroforge",
+  "version": "1.0.0",
+  "description": "Interactive aerospace & defense engineering lab: procedural 3-D vehicles with real flight, launch, propulsion and orbital physics.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "npx --yes http-server -c-1 -p 8080 .",
+    "test": "node --test \"tests/**/*.test.mjs\""
+  },
+  "license": "MIT"
+}
