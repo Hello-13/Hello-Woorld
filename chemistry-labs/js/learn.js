@@ -18,6 +18,12 @@ const LESSONS = {};
 const S = (t, body, o = {}) => ({ t, body, ...o });
 const P = title => ({ part: title });
 const MASTERY_N = 6, MASTERY_PASS = 5;
+/* Shuffle choice order so the right answer is never in a predictable spot; keep ordered sets (numbers, Yes/No pairs) in order */
+const choiceOrder = ch => {
+  const idx = ch.map((_, k) => k), plain = ch.map(x => String(x).replace(/<[^>]+>/g, '').trim());
+  const ordered = plain.every(x => /^[−-]?[\d.,]+$/.test(x)) || ch.length === 2;
+  return ordered ? idx : U.shuffle(idx);
+};
 function lesson(id, minutes, raw, meta = {}) {
   const steps = []; let part = '';
   raw.forEach(s => { if (s.part !== undefined && !s.t) part = s.part; else steps.push({ ...s, part }); });
@@ -95,7 +101,7 @@ function renderLesson(app, id) {
   function step(s, k) {
     const exs = s.exList.map((ex, j) => `<div class="ls-ex" data-x="${j}"><div class="ls-tag">Worked example${s.exList.length > 1 ? ' ' + (j + 1) : ''}</div><div class="ls-exq">${ex[0]}</div><ol class="ls-exs"></ol><button type="button" class="btn ls-reveal">Try it, then show the first step</button></div>`).join('');
     const checks = s.checks.map((c, j) => c.kind === 'ck'
-      ? `<div class="ls-ck" data-j="${j}"><div class="ls-tag">Check ${s.checks.length > 1 ? j + 1 : 'yourself'}</div><div class="q">${c.c[0]}</div><div class="choices">${c.c[1].map((x, q) => `<button type="button" class="choice" data-c="${q}">${x}</button>`).join('')}</div><div class="fb" hidden></div></div>`
+      ? `<div class="ls-ck" data-j="${j}"><div class="ls-tag">Check ${s.checks.length > 1 ? j + 1 : 'yourself'}</div><div class="q">${c.c[0]}</div><div class="choices">${choiceOrder(c.c[1]).map(q => `<button type="button" class="choice" data-c="${q}">${c.c[1][q]}</button>`).join('')}</div><div class="fb" hidden></div></div>`
       : `<div class="ls-ck" data-j="${j}"><div class="ls-tag">Check ${s.checks.length > 1 ? j + 1 : 'yourself'}</div><div class="q">${c.c[0]}</div><form class="ans" novalidate><input id="ls-ans-${j}" class="ls-ans" autocomplete="off" inputmode="decimal" placeholder="your answer" aria-label="Your answer">${c.c[2] ? `<span class="unit">${c.c[2]}</span>` : ''}<button class="btn primary" type="submit">Check</button></form><div class="fb" hidden></div></div>`).join('');
     const gated = s.checks.length > 0, hideChecks = s.exList.length > 0 && gated;
     app.innerHTML = head() + `<article class="panel-card ls-step fam-${lab.fam}">
@@ -129,7 +135,7 @@ function renderLesson(app, id) {
         box.querySelector('.choices').addEventListener('click', e => {
           const b = e.target.closest('[data-c]'); if (!b || answered) return; answered = true;
           const ok = +b.dataset.c === c.c[2];
-          b.classList.add(ok ? 'right' : 'wrong'); if (!ok) box.querySelectorAll('.choice')[c.c[2]].classList.add('right');
+          b.classList.add(ok ? 'right' : 'wrong'); if (!ok) box.querySelector(`.choice[data-c="${c.c[2]}"]`).classList.add('right');
           box.querySelectorAll('.choice').forEach(x => { x.disabled = true; });
           fb.hidden = false; fb.className = 'fb ' + (ok ? 'ok' : 'no'); fb.innerHTML = `<div class="verdict">${ok ? 'Correct' : 'Not quite'}</div><div class="explain">${c.c[3]}</div>`;
           unlock();
