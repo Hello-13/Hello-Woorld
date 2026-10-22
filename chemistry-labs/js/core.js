@@ -452,9 +452,9 @@ document.addEventListener('click', e => {
 /* Soft hyphens so long words break cleanly inside narrow tiles ("Thermo-chemistry", not "Thermochemis-try") */
 const SHY = { Thermochemistry: 'Thermo&shy;chemistry', Electrochemistry: 'Electro&shy;chemistry', Intermolecular: 'Inter&shy;molecular', Configurations: 'Config&shy;urations', Stoichiometry: 'Stoichio&shy;metry', Concentration: 'Concen&shy;tration', Radioactivity: 'Radio&shy;activity', Measurement: 'Measure&shy;ment', Composition: 'Compo&shy;sition', Equilibrium: 'Equili&shy;brium', Kinetics: 'Kinetics' };
 const shy = t => t.replace(/[A-Za-z]{11,}/g, w => SHY[w] || w);
-function tileHTML(lab, big) {
+function tileHTML(lab, big, idx) {
   const st = Store.get(lab.id);
-  return `<a class="tile fam-${lab.fam}${big ? ' big' : ''}" href="#${lab.id}">
+  return `<a class="tile fam-${lab.fam}${big ? ' big' : ''}" href="#${lab.id}"${idx !== undefined ? ` style="--i:${idx}"` : ''}>
     <span class="z">${lab.code || lab.ch}</span><span class="m">${st.c >= MASTER ? '★' : ''}</span>
     <span class="sym">${lab.sym}</span><span class="nm">${shy(lab.title)}</span>${meterHTML(st.c)}</a>`;
 }
@@ -480,11 +480,11 @@ function renderHome(app) {
   <div class="cta-row">${typeof reviewSummaryHTML !== 'undefined' ? reviewSummaryHTML() : ''}${typeof memSummaryHTML !== 'undefined' ? memSummaryHTML() : ''}</div>
   <section aria-label="Labs by chapter">
     <div class="legend">${Object.entries(FAMILIES).filter(([k]) => k !== 'gen').map(([k, v]) => `<span class="lg fam-${k}"><i></i>${v}</span>`).join('')}</div>
-    <div class="grid">${LABS.filter(l => !l.code).map(l => tileHTML(l)).join('')}</div>
+    <div class="grid">${LABS.filter(l => !l.code).map((l, i) => tileHTML(l, false, i)).join('')}</div>
     <p class="hint">Each tile is one chapter: the big number is the chapter, the meter fills as you answer ${MASTER} problems correctly. Progress is saved in this browser.</p>
   </section>
   ${LABS.some(l => l.code) ? `<section class="bridge" aria-labelledby="bridge-h"><div class="bridge-head"><h2 id="bridge-h">Gen Chem Bridge</h2><p class="note">The general chemistry topics your intro course only touches: thermochemistry, weak acids and buffers, kinetics, thermodynamics, electrochemistry and bonding theory. Work through these before next semester.</p></div>
-    <div class="grid">${LABS.filter(l => l.code).map(l => tileHTML(l)).join('')}</div></section>` : ''}
+    <div class="grid">${LABS.filter(l => l.code).map((l, i) => tileHTML(l, false, i)).join('')}</div></section>` : ''}
   ${(() => { const w = weakSpots(); return w.length ? `<section class="weak" aria-labelledby="weak-h"><h2 id="weak-h">Your weak spots</h2><p class="note">The skills you miss most often. Tap one to drill it.</p>
     <div class="weak-list">${w.map(x => `<a class="weak-item fam-${x.lab.fam}" href="#${x.lab.id}" data-preset="${U.esc(x.type)}"><span class="wl">${chTag(x.lab)} · ${x.lab.title}</span><b>${x.type}</b><span class="wp">${Math.round(x.pct * 100)}% right of ${x.a}</span></a>`).join('')}</div></section>` : ''; })()}
   <section class="tools" aria-label="Study tools">
