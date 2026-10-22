@@ -135,6 +135,8 @@ registerLab({
 const WEAK_ACIDS = [['HC2H3O2', 'acetic acid', 1.8e-5], ['HF', 'hydrofluoric acid', 6.8e-4], ['HNO2', 'nitrous acid', 4.6e-4], ['HCOOH', 'formic acid', 1.8e-4], ['HClO', 'hypochlorous acid', 2.9e-8], ['HCN', 'hydrocyanic acid', 4.9e-10], ['C6H5COOH', 'benzoic acid', 6.5e-5]];
 const WEAK_BASES = [['NH3', 'ammonia', 1.8e-5], ['CH3NH2', 'methylamine', 4.4e-4], ['C5H5N', 'pyridine', 1.7e-9]];
 const BUFFERS = [['HC2H3O2 / C2H3O2⁻', 'acetic acid / acetate', 1.8e-5], ['NH4⁺ / NH3', 'ammonium / ammonia', 5.6e-10], ['H2PO4⁻ / HPO4²⁻', 'dihydrogen / hydrogen phosphate', 6.2e-8], ['H2CO3 / HCO3⁻', 'carbonic acid / bicarbonate', 4.3e-7]];
+/* conjugate base of a weak acid: carboxylic acids lose the H at the end (HCOOH → HCOO⁻), others the H in front */
+const conjBase = f => /COOH$/.test(f) ? f.slice(0, -1) : f.replace(/^H/, '');
 const xExact = (K, C) => (-K + Math.sqrt(K * K + 4 * K * C)) / 2;
 /* pH of a buffer (or what is left of it) after adding strong acid/base, by stoichiometry then Henderson–Hasselbalch */
 function bufferPH(Ka, nHA, nA, addH, V) {
@@ -183,7 +185,7 @@ registerLab({
     function ice() {
       const [f, name, Ka] = WEAK_ACIDS[$('#ice-a').value], C = 10 ** +$('#ice-c').value, x = xExact(Ka, C), xa = Math.sqrt(Ka * C), pct = x / C * 100;
       $('#ice-c-o').textContent = fmtP(C, 3) + ' M';
-      const base = f.replace(/^H/, '');
+      const base = conjBase(f);
       $('#ice-out').innerHTML = `<div class="callout" style="overflow-x:auto;white-space:nowrap">${fmtF(f)} ⇌ H⁺ + ${fmtF(base)}⁻ &nbsp; K<sub>a</sub> = ${sci(Ka)}</div>
         <div class="scroll"><table class="t"><tr><th></th><th class="n">[${fmtF(f)}]</th><th class="n">[H⁺]</th><th class="n">[${fmtF(base)}⁻]</th></tr>
         <tr><td><b>I</b>nitial</td><td class="n">${fmtP(C, 3)}</td><td class="n">0</td><td class="n">0</td></tr>
@@ -257,7 +259,7 @@ registerLab({
         explain: `${acid ? `H⁺ + A⁻ → HA: A⁻ drops to ${fmtP(nA, 3)} mol, HA rises to ${fmtP(nHA, 3)} mol` : `OH⁻ + HA → A⁻ + H₂O: HA drops to ${fmtP(nHA, 3)} mol, A⁻ rises to ${fmtP(nA, 3)} mol`}. pH = 4.74 + log(${fmtP(nA, 3)}/${fmtP(nHA, 3)}) = <b>${p.toFixed(2)}</b>.` };
     } },
     { name: 'K<sub>b</sub> from K<sub>a</sub>', gen() {
-      const [f, name, Ka] = U.pick(WEAK_ACIDS), Kb = 1e-14 / Ka, base = f.replace(/^H/, '');
+      const [f, name, Ka] = U.pick(WEAK_ACIDS), Kb = 1e-14 / Ka, base = conjBase(f);
       return { kind: 'num', tol: 0.03, q: `K<sub>a</sub> for ${fmtF(f)} is ${sci(Ka)}. What is K<sub>b</sub> for its conjugate base, ${fmtF(base)}⁻?`, answer: Kb, explain: `<span class="eqn">K<sub>b</sub> = K<sub>w</sub>/K<sub>a</sub> = 1.0×10⁻¹⁴ / ${sci(Ka)} = ${fmt(Kb, 2)}</span>` };
     } },
     { name: 'Choose a buffer', gen() {
@@ -378,7 +380,7 @@ registerLab({
       const Ea = U.ri(40, 120), T1 = U.ri(280, 320), T2 = T1 + U.ri(10, 50), k1 = U.sf(0.001, 0.5, 2);
       const r = Math.exp(Ea * 1000 / R_J * (1 / T1 - 1 / T2));
       if (Math.random() < 0.5) return { kind: 'num', unit: 's⁻¹', tol: 0.04, q: `A reaction has E<sub>a</sub> = <b>${Ea} kJ/mol</b> and k = ${k1} s⁻¹ at ${T1} K. What is k at <b>${T2} K</b>?`, answer: k1 * r, explain: `<span class="eqn">ln(k₂/k₁) = (E<sub>a</sub>/R)(1/T₁ − 1/T₂) = (${Ea * 1000}/8.314)(1/${T1} − 1/${T2}) = ${Math.log(r).toFixed(3)}</span>, so k₂/k₁ = ${r.toFixed(2)} and k₂ = <b>${fmt(k1 * r, 3)} s⁻¹</b>.` };
-      return { kind: 'num', unit: 'kJ/mol', tol: 0.04, q: `The rate constant of a reaction goes from ${k1} s⁻¹ at ${T1} K to <b>${fmt(k1 * r, 3).replace(/<[^>]+>/g, '')} s⁻¹</b> at ${T2} K. What is E<sub>a</sub>?`, answer: Ea, explain: `<span class="eqn">E<sub>a</sub> = R·ln(k₂/k₁) / (1/T₁ − 1/T₂) = 8.314 × ${Math.log(r).toFixed(3)} / ${(1 / T1 - 1 / T2).toExponential(3)} = ${Ea} kJ/mol</span>` };
+      return { kind: 'num', unit: 'kJ/mol', tol: 0.04, q: `The rate constant of a reaction goes from ${k1} s⁻¹ at ${T1} K to <b>${fmt(k1 * r, 3).replace(/<[^>]+>/g, '')} s⁻¹</b> at ${T2} K. What is E<sub>a</sub>?`, answer: Ea, explain: `<span class="eqn">E<sub>a</sub> = R·ln(k₂/k₁) / (1/T₁ − 1/T₂) = 8.314 × ${Math.log(r).toFixed(3)} / ${(1 / T1 - 1 / T2).toExponential(3)} = ${Ea * 1000} J/mol = ${Ea} kJ/mol</span>` };
     } },
     { name: 'Relative rates', gen() {
       const rx = U.pick([['2 N₂O₅ → 4 NO₂ + O₂', ['N₂O₅', 2, -1], [['NO₂', 4], ['O₂', 1]]], ['N₂ + 3 H₂ → 2 NH₃', ['H₂', 3, -1], [['NH₃', 2], ['N₂', 1]]], ['2 H₂O₂ → 2 H₂O + O₂', ['H₂O₂', 2, -1], [['O₂', 1], ['H₂O', 2]]]]);
@@ -732,7 +734,7 @@ registerLab({
     { name: 'Expanded-octet shapes', gen() {
       const [m, hyb, shape, g, lp] = U.pick(HYBRID.filter(h => h[3] >= 5));
       return { ...mc(shape, ['trigonal bipyramidal', 'seesaw', 'T-shaped', 'linear', 'octahedral', 'square pyramidal', 'square planar'].filter(s => s !== shape).sort(() => Math.random() - 0.5).slice(0, 3)), q: `What is the molecular geometry of <b>${m}</b>?`,
-        explain: `${g} electron groups with ${lp} lone pair${lp === 1 ? '' : 's'}. ${g === 5 ? 'Lone pairs go in the equatorial positions of the trigonal bipyramid' : 'Lone pairs sit opposite each other in the octahedron'}, giving <b>${shape}</b>.` };
+        explain: `${g} electron groups with ${lp} lone pair${lp === 1 ? '' : 's'}. ${!lp ? `With no lone pairs, all ${g} positions hold atoms` : g === 5 ? 'Lone pairs go in the equatorial positions of the trigonal bipyramid' : lp === 1 ? 'The lone pair takes one corner of the octahedron' : 'The two lone pairs sit opposite each other in the octahedron'}, giving <b>${shape}</b>.` };
     } },
     { name: 'σ and π bonds', gen() {
       const [m, s, p] = U.pick(SIGMA_PI), ask = Math.random() < 0.5 ? 'σ' : 'π';

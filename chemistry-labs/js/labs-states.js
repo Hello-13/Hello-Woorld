@@ -359,7 +359,8 @@ registerLab({
     { name: 'Freezing & boiling point', gen() {
       const [f, name] = U.pick([['C6H12O6', 'glucose'], ['C12H22O11', 'sucrose'], ['C2H6O2', 'ethylene glycol'], ['CH3OH', 'methanol']]);
       const g = U.sf(10, 200, 3), kg = U.sf(0.2, 2, 3), m = g / Chem.molarMass(f) / kg;
-      if (Math.random() < .5) return { kind: 'num', unit: '°C', q: `<b>${g} g of ${name}</b> (${fmtF(f)}) is dissolved in <b>${kg} kg of water</b>. What is the new freezing point? (K<sub>f</sub> = 1.86 °C/m)`, answer: -m * 1.86, abs: 0.05, explain: `m = ${fmt(g / Chem.molarMass(f), 3)} mol ÷ ${kg} kg = ${fmt(m, 3)} m. ΔT<sub>f</sub> = ${fmt(m, 3)} × 1.86 = ${fmt(m * 1.86, 3)} °C, so it freezes at <b>${fmt(-m * 1.86, 3)} °C</b>.` };
+      // methanol is volatile, so ΔTb = m·Kb does not apply to it: freezing point only
+      if (f === 'CH3OH' || Math.random() < .5) return { kind: 'num', unit: '°C', q: `<b>${g} g of ${name}</b> (${fmtF(f)}) is dissolved in <b>${kg} kg of water</b>. What is the new freezing point? (K<sub>f</sub> = 1.86 °C/m)`, answer: -m * 1.86, abs: 0.05, explain: `m = ${fmt(g / Chem.molarMass(f), 3)} mol ÷ ${kg} kg = ${fmt(m, 3)} m. ΔT<sub>f</sub> = ${fmt(m, 3)} × 1.86 = ${fmt(m * 1.86, 3)} °C, so it freezes at <b>${fmt(-m * 1.86, 3)} °C</b>.` };
       return { kind: 'num', unit: '°C', q: `<b>${g} g of ${name}</b> (${fmtF(f)}) is dissolved in <b>${kg} kg of water</b>. What is the new boiling point? (K<sub>b</sub> = 0.512 °C/m)`, answer: 100 + m * 0.512, abs: 0.03, tol: 0, explain: `m = ${fmt(m, 3)} m. ΔT<sub>b</sub> = ${fmt(m, 3)} × 0.512 = ${fmt(m * 0.512, 3)} °C, so it boils at <b>${(100 + m * 0.512).toFixed(2)} °C</b>.` };
     } },
   ],
