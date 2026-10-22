@@ -6,7 +6,12 @@ Open `index.html` in any browser. No install or build step. Progress is saved in
 
 Each lab has these parts:
 
-- **Learn** (every lab): a guided lesson for the first time you meet a topic. One idea per step, worked examples revealed one move at a time, quick checks that must be answered to continue, and a summary that hands off to the lab. With Ask Claude available, every step also has an "Explain this another way" button.
+- **Learn** (every lab): a lesson that takes you from no background to mastery.
+  - It opens with what you'll be able to do and what you need first, linking to earlier lessons.
+  - It works through parts, one idea per step: an explanation, diagrams where a picture helps, and worked examples revealed one move at a time (try each move first).
+  - Each step has a memory hook, the most common mistake, a pointer to the clearest YouTube teachers on that idea, and checks you must answer to continue.
+  - It ends with a mastery check: fresh problems from the lab's generators, and passing takes 5 of 6.
+  - With Ask Claude available, every step also has an "Explain this another way" button.
 
 - **Watch it** (12 labs): a captioned, step-by-step animation at the particle level, or a live simulation. Every atom keeps its identity, so you can follow it as bonds break and form: methane burning, an ionic bond forming, salt dissolving, an electron emitting light, covalent sharing in H₂ and H₂O, a limiting reactant running out, strong vs. weak acids, zinc reducing copper, alpha and beta decay, and more. Ch 12 has a live states-of-matter simulation (real particle physics) and Ch 15 a live dynamic-equilibrium simulation.
 
@@ -77,7 +82,7 @@ Gen chem problem types were also added to existing labs: gas density and molar m
 - `js/labs-life.js`: Ch 18–19
 - `js/labs-genchem.js`: Gen Chem Bridge units G1–G6, their Watch it content, and gen chem problems added to existing labs
 - `js/review.js`: Daily Review (spaced repetition across all skills)
-- `js/learn.js`: lesson engine; `js/lessons-1.js` (Ch 2–10), `js/lessons-2.js` (Ch 11–19), `js/lessons-3.js` (G1–G6): lesson content
+- `js/learn.js`: lesson engine (overview, parts, steps, mastery check, summary); `js/lessons/<lab id>.js`: one lesson per lab
 - `js/tools.js`: periodic table, test mode
 - `js/memorize-data.js`: the facts to memorize for each chapter; `js/memorize.js`: the mastery engine, study sheets and sessions
 - `js/story.js`: storyboard animation engine (tweened atoms, bonds that break and form, orbiting electrons, photons)

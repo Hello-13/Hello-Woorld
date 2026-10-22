@@ -268,6 +268,30 @@ footer { max-width: 1240px; margin: 0 auto; padding-inline: 16px; padding-block:
 .ls-ex .ls-reveal { justify-self: start; }
 .ls-ck { border: 1.5px solid var(--line); border-radius: 10px; padding: 12px 16px; display: grid; gap: 10px; background: var(--raised); }
 .ls-gate { margin: 0; }
+.ls-progress { align-items: center; }
+.ls-progress .ls-pt { width: 2px; height: 16px; background: var(--line); border-radius: 1px; flex: none; }
+.ls-progress button.ov, .ls-progress button.mc { max-width: 34px; }
+.ls-progress button.mc i.seen, .ls-progress button.mc { box-shadow: inset 0 0 0 1.5px var(--good); }
+.ls-goals, .ls-need, .ls-parts { display: grid; gap: 4px; }
+.ls-goals ul, .ls-need ul, .ls-parts ol { margin: 0; padding-left: 1.3em; display: grid; gap: 4px; }
+.ls-need p { margin: 0; }
+.ls-vids { display: grid; gap: 8px; }
+.ls-vids .note { margin: 0; }
+.ls-vid { display: inline-flex; align-items: center; gap: 10px; justify-self: start; padding: 8px 14px 8px 8px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); text-decoration: none; font-size: 0.92rem; max-width: 100%; }
+.ls-vid:hover { border-color: #e04040; }
+.ls-vid .lv-play { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 50%; background: #d93025; color: #fff; font-size: 0.7rem; }
+.ls-tip, .ls-trap { border-radius: 10px; padding: 10px 14px; display: grid; gap: 2px; font-size: 0.98rem; }
+.ls-tip { background: color-mix(in srgb, var(--good) 9%, var(--raised)); border: 1px solid color-mix(in srgb, var(--good) 35%, var(--line)); }
+.ls-tip .ls-tag { color: var(--good); margin: 0; }
+.ls-trap { background: color-mix(in srgb, var(--warn) 10%, var(--raised)); border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line)); }
+.ls-trap .ls-tag { color: color-mix(in srgb, var(--warn) 75%, var(--ink)); margin: 0; }
+.ls-fig { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow-x: auto; }
+.ls-fig svg { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+.ls-fig figcaption { font-size: 0.85rem; color: var(--muted); text-align: center; margin-top: 6px; }
+.ls-checks { display: grid; gap: 12px; }
+.ls-body table.t td, .ls-body table.t th { white-space: normal; }
+.ls-body .big { font-size: 1.15em; }
+
 @media (max-width: 520px) { .lesson-cta { grid-template-columns: 1fr; } .lesson-cta .lc-k { grid-row: auto; justify-self: start; } .lesson-cta .lc-sub, .lesson-cta .lc-go { grid-column: 1; grid-row: auto; } }
 
 /* Gen Chem Bridge and Daily Review */
@@ -452,6 +476,32 @@ table.t.mem-sheet td, table.t.mem-missed td { vertical-align: top; overflow-wrap
 <script src="js/lessons-1.js"></script>
 <script src="js/lessons-2.js"></script>
 <script src="js/lessons-3.js"></script>
+<!--LESSONS-->
+<script src="js/lessons/measurement.js"></script>
+<script src="js/lessons/matter-energy.js"></script>
+<script src="js/lessons/atoms.js"></script>
+<script src="js/lessons/compounds.js"></script>
+<script src="js/lessons/composition.js"></script>
+<script src="js/lessons/reactions.js"></script>
+<script src="js/lessons/stoichiometry.js"></script>
+<script src="js/lessons/electrons.js"></script>
+<script src="js/lessons/bonding.js"></script>
+<script src="js/lessons/gases.js"></script>
+<script src="js/lessons/liquids-solids.js"></script>
+<script src="js/lessons/solutions.js"></script>
+<script src="js/lessons/acids-bases.js"></script>
+<script src="js/lessons/equilibrium.js"></script>
+<script src="js/lessons/redox.js"></script>
+<script src="js/lessons/nuclear.js"></script>
+<script src="js/lessons/organic.js"></script>
+<script src="js/lessons/biochem.js"></script>
+<script src="js/lessons/thermo.js"></script>
+<script src="js/lessons/buffers.js"></script>
+<script src="js/lessons/kinetics.js"></script>
+<script src="js/lessons/gibbs.js"></script>
+<script src="js/lessons/electrochem.js"></script>
+<script src="js/lessons/quantum.js"></script>
+<!--/LESSONS-->
 <script src="js/tutor.js"></script>
 <script>start();</script>
 </body>
