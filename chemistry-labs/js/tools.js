@@ -1,5 +1,5 @@
 'use strict';
-/* Study tools: interactive periodic table, flashcards with spaced repetition, and test mode */
+/* Study tools: interactive periodic table, and test mode (flashcards moved to memorize.js) */
 
 /* ================= Periodic table ================= */
 const EN_ALL = '2.20,,0.98,1.57,2.04,2.55,3.04,3.44,3.98,,0.93,1.31,1.61,1.90,2.19,2.58,3.16,,0.82,1.00,1.36,1.54,1.63,1.66,1.55,1.83,1.88,1.91,1.90,1.65,1.81,2.01,2.18,2.55,2.96,3.00,0.82,0.95,1.22,1.33,1.6,2.16,1.9,2.2,2.28,2.20,1.93,1.69,1.78,1.96,2.05,2.1,2.66,2.60,0.79,0.89,1.10,1.12,1.13,1.14,1.13,1.17,1.2,1.2,1.1,1.22,1.23,1.24,1.25,1.1,1.27,1.3,1.5,2.36,1.9,2.2,2.20,2.28,2.54,2.00,1.62,2.33,2.02,2.0,2.2,2.2,0.7,0.9,1.1,1.3,1.5,1.38,1.36,1.28,1.3,1.3,1.3,1.3,1.3,1.3,1.3,1.3'.split(',').map(x => (x ? +x : null));
@@ -111,71 +111,6 @@ registerPage('table', {
   },
 });
 
-/* ================= Flashcards ================= */
-const POLY_EXTRA = [['NH4^+', 'ammonium'], ['H3O^+', 'hydronium'], ['Hg2^2+', 'mercury(I)'], ['HSO4^-', 'hydrogen sulfate (bisulfate)'], ['H2PO4^-', 'dihydrogen phosphate'], ['HPO4^2-', 'hydrogen phosphate'], ['O2^2-', 'peroxide'], ['ClO^-', 'hypochlorite'], ['ClO2^-', 'chlorite'], ['BrO3^-', 'bromate'], ['IO3^-', 'iodate'], ['SCN^-', 'thiocyanate'], ['C2O4^2-', 'oxalate'], ['S2O3^2-', 'thiosulfate'], ['HSO3^-', 'hydrogen sulfite (bisulfite)']];
-const DECKS = {
-  poly: { name: 'Polyatomic ions', blurb: 'Name ⇄ formula with charge', cards: () => ANIONS.filter(a => a.poly).map(a => [a.name, fmtF(a.f + '^' + chargeStr(a.q).replace('−', '-'))]).concat(POLY_EXTRA.map(([f, n]) => [n, fmtF(f)])) },
-  symbols: { name: 'Element symbols', blurb: 'Symbol ⇄ name for the elements you use most', cards: () => ELZ.slice(1, 37).concat(['Rb', 'Sr', 'Ag', 'Sn', 'I', 'Xe', 'Cs', 'Ba', 'W', 'Pt', 'Au', 'Hg', 'Pb', 'Rn', 'Ra', 'U', 'Pu'].map(s => EL[s])).map(e => [`<span style="font-family:var(--display);font-size:2.6em;font-weight:800">${e.sym}</span>`, e.name]) },
-  ions: { name: 'Ion charges', blurb: 'The charge each element usually takes', cards: () => ['Li', 'Na', 'K', 'Mg', 'Ca', 'Ba', 'Al', 'N', 'P', 'O', 'S', 'F', 'Cl', 'Br', 'I', 'Zn', 'Ag'].map(s => [`Ion formed by <b>${EL[s].name}</b>`, `${s}<sup>${chargeStr(ionCharge(s) ?? ({ Zn: 2, Ag: 1 })[s])}</sup>`]).concat(Object.entries({ Fe: 'iron(II) Fe²⁺ · iron(III) Fe³⁺', Cu: 'copper(I) Cu⁺ · copper(II) Cu²⁺', Sn: 'tin(II) Sn²⁺ · tin(IV) Sn⁴⁺', Pb: 'lead(II) Pb²⁺ · lead(IV) Pb⁴⁺' }).map(([s, t]) => [`Ions formed by <b>${EL[s].name}</b>`, t])) },
-  metric: { name: 'Metric prefixes', blurb: 'Prefix ⇄ symbol and power of ten', cards: () => [['giga', 'G · 10⁹'], ['mega', 'M · 10⁶'], ['kilo', 'k · 10³'], ['deci', 'd · 10⁻¹'], ['centi', 'c · 10⁻²'], ['milli', 'm · 10⁻³'], ['micro', 'µ · 10⁻⁶'], ['nano', 'n · 10⁻⁹'], ['pico', 'p · 10⁻¹²']] },
-  greek: { name: 'Naming prefixes', blurb: 'Greek prefixes for molecular compounds and hydrates', cards: () => PREFIX.slice(1).map((p, i) => [p + '-', String(i + 1)]).concat([['hemi-', '½']]) },
-  acids: { name: 'Acids & bases', blurb: 'Strong vs weak, names and formulas', cards: () => [['HCl', 'hydrochloric acid · strong'], ['HBr', 'hydrobromic acid · strong'], ['HI', 'hydroiodic acid · strong'], ['HNO<sub>3</sub>', 'nitric acid · strong'], ['H<sub>2</sub>SO<sub>4</sub>', 'sulfuric acid · strong (diprotic)'], ['HClO<sub>4</sub>', 'perchloric acid · strong'], ['HF', 'hydrofluoric acid · weak'], ['HC<sub>2</sub>H<sub>3</sub>O<sub>2</sub>', 'acetic acid · weak'], ['H<sub>2</sub>CO<sub>3</sub>', 'carbonic acid · weak'], ['H<sub>3</sub>PO<sub>4</sub>', 'phosphoric acid · weak'], ['NaOH', 'sodium hydroxide · strong base'], ['KOH', 'potassium hydroxide · strong base'], ['Ca(OH)<sub>2</sub>', 'calcium hydroxide · strong base'], ['NH<sub>3</sub>', 'ammonia · weak base']] },
-  formulas: { name: 'Constants & formulas', blurb: 'The equations you need on test day', cards: () => [['Avogadro\'s number', '6.022 × 10²³ per mol'], ['Ideal gas law', 'PV = nRT'], ['Gas constant R', '0.08206 L·atm/(mol·K)'], ['Molar volume at STP', '22.4 L/mol (0 °C, 1 atm)'], ['Heat and temperature', 'q = m·c·ΔT'], ['Specific heat of water', '4.184 J/(g·°C)'], ['Combined gas law', 'P₁V₁/T₁ = P₂V₂/T₂'], ['Dilution', 'M₁V₁ = M₂V₂'], ['Molarity', 'M = mol solute / L solution'], ['pH', 'pH = −log[H₃O⁺]'], ['Ion product of water', 'K<sub>w</sub> = [H₃O⁺][OH⁻] = 1.0 × 10⁻¹⁴'], ['Percent yield', 'actual ÷ theoretical × 100%'], ['Kelvin', 'K = °C + 273.15'], ['1 atm in mmHg', '760 mmHg (torr) = 101.325 kPa'], ['Speed of light', 'c = λν = 3.00 × 10⁸ m/s'], ['Photon energy', 'E = hν, h = 6.626 × 10⁻³⁴ J·s'], ['Half-life', 'amount left = start × (½)ⁿ']] },
-};
-
-registerPage('cards', {
-  title: 'Flashcards',
-  render(app) {
-    const box = Store.bag('cards');
-    let deck = null, cards = [], cur = -1, flipped = false, dir = 'front', lastIdx = -1;
-    const key = (d, i) => d + '|' + i;
-    const learned = d => DECKS[d].cards().filter((_, i) => (box[key(d, i)] || 0) >= 3).length;
-    function home() {
-      deck = null;
-      app.innerHTML = `<div class="lab-head"><div class="lab-title"><p class="eyebrow">Memorize</p><h1>Flashcards</h1><p class="lede">Flip a card, then say whether you knew it. Cards you miss come back often; cards you know drift away. A card counts as learned after you get it right three times in a row.</p></div></div>
-        <div class="decks">${Object.entries(DECKS).map(([k, d]) => { const n = d.cards().length, l = learned(k); return `<button type="button" class="deck" data-d="${k}"><b>${d.name}</b><span>${d.blurb}</span><span class="meter"><i style="width:${l / n * 100}%"></i></span><span class="note">${l} of ${n} learned</span></button>`; }).join('')}</div>`;
-      app.querySelector('.decks').addEventListener('click', e => { const b = e.target.closest('[data-d]'); if (b) open(b.dataset.d); });
-    }
-    function pickNext() {
-      const lv = cards.map((_, i) => box[key(deck, i)] || 0);
-      // weight low boxes heavily: box 0 → 16, 1 → 8, ... 4 → 1
-      const weights = lv.map((b, i) => (i === lastIdx && cards.length > 1 ? 0 : 2 ** (4 - Math.min(b, 4))));
-      let r = Math.random() * weights.reduce((a, b) => a + b, 0);
-      for (let i = 0; i < weights.length; i++) { r -= weights[i]; if (r <= 0) return i; }
-      return 0;
-    }
-    function open(d) { deck = d; cards = DECKS[d].cards(); next(); }
-    function next() { cur = pickNext(); lastIdx = cur; flipped = false; draw(); }
-    function draw() {
-      const [front, back] = cards[cur], rev = dir === 'back' || (dir === 'mixed' && (cur * 7 + cards.length) % 2 === 1);
-      const shown = flipped ? (rev ? front : back) : (rev ? back : front);
-      const lvl = box[key(deck, cur)] || 0;
-      app.innerHTML = `<div class="lab-head"><div class="lab-title"><p class="eyebrow"><a href="#cards" id="fc-back">Flashcards</a> · ${DECKS[deck].name}</p><h1>${DECKS[deck].name}</h1></div></div>
-        <div class="fc-wrap">
-          <div class="row" style="justify-content:space-between"><div class="seg" id="fc-dir" role="group" aria-label="Which side to show first">${[['front', 'Name first'], ['back', 'Answer first'], ['mixed', 'Mixed']].map(([k, t]) => `<button type="button" data-dir="${k}" aria-pressed="${dir === k}">${t}</button>`).join('')}</div><span class="note">${learned(deck)} of ${cards.length} learned</span></div>
-          <button type="button" class="fcard${flipped ? ' flipped' : ''}" id="fc-card" aria-live="polite"><span class="fc-side">${flipped ? 'Answer' : 'Prompt'} · box ${lvl}</span><span class="fc-text">${shown}</span><span class="fc-tip">${flipped ? '' : 'Tap or press Space to flip'}</span></button>
-          <div class="btn-row" style="justify-content:center" ${flipped ? '' : 'hidden'} id="fc-grade"><button type="button" class="btn" id="fc-again">Missed it</button><button type="button" class="btn primary" id="fc-good">Knew it</button></div>
-        </div>`;
-      app.querySelector('#fc-card').addEventListener('click', () => { flipped = !flipped; draw(); app.querySelector('#fc-card').focus(); });
-      app.querySelector('#fc-dir').addEventListener('click', e => { const b = e.target.closest('[data-dir]'); if (b) { dir = b.dataset.dir; flipped = false; draw(); } });
-      app.querySelector('#fc-back').addEventListener('click', e => { e.preventDefault(); home(); });
-      const gradeCard = good => { const k = key(deck, cur); box[k] = good ? Math.min(5, (box[k] || 0) + 1) : 0; Store.save(); next(); app.querySelector('#fc-card').focus(); };
-      app.querySelector('#fc-again').addEventListener('click', () => gradeCard(false));
-      app.querySelector('#fc-good').addEventListener('click', () => gradeCard(true));
-    }
-    const onKey = e => {
-      if (!deck || e.target.matches('input, select, textarea')) return;
-      if (e.key === ' ' && document.activeElement?.id !== 'fc-card') { e.preventDefault(); flipped = !flipped; draw(); }
-      else if (flipped && (e.key === 'ArrowRight' || e.key === 'k')) app.querySelector('#fc-good')?.click();
-      else if (flipped && (e.key === 'ArrowLeft' || e.key === 'j')) app.querySelector('#fc-again')?.click();
-    };
-    document.addEventListener('keydown', onKey);
-    home();
-    return () => document.removeEventListener('keydown', onKey);
-  },
-});
-
-/* ================= Test mode ================= */
 registerPage('exam', {
   title: 'Test Mode',
   render(app) {

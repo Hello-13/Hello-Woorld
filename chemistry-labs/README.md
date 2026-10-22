@@ -20,7 +20,12 @@ Study tools (top navigation):
 - **Review**: a daily, interleaved review across every skill you have practiced, scheduled by spaced repetition (a correct answer pushes the skill out 1, 2, 4, 8, 16, then 32 days; a miss brings it back the same day). Practice and test answers feed the same schedule.
 
 - **Table**: interactive periodic table of all 118 elements. Color by family, block, state or electronegativity; tap an element for its mass, configuration, common ions and more.
-- **Cards**: flashcard decks (polyatomic ions, element symbols, ion charges, metric and Greek prefixes, acids and bases, constants and formulas). Cards you miss come back more often.
+- **Memorize**: a mastery system for everything a chapter expects you to know by heart (734 facts across all 24 units): element symbols, ion charges, polyatomic ions, prefixes, conversion factors, solubility rules, VSEPR shapes, gas laws, strong acids, rate laws and more. Each chapter has a study sheet you can cover to quiz yourself, and every set can be studied on its own.
+  - Each fact climbs six levels: New, Learning, Familiar, Known, Strong, Mastered.
+  - New facts are introduced a few at a time, then checked with multiple choice.
+  - From Familiar on, you must produce the answer: type it (formulas are case-sensitive, and charges can be written SO4 2- or SO4^2-), or say it before revealing.
+  - Correct recalls space the fact out 1, 3, 7 and 21 days, so Mastered means recalled correctly on four separate days. A miss drops it back to Learning.
+  - Cram drills your 20 weakest facts before a quiz.
 - **Test**: a mixed quiz from the chapters you choose, with a score by chapter and worked solutions for everything you missed.
 - **Weak spots**: the home page lists the problem types you miss most and links straight to drilling them.
 
@@ -73,7 +78,8 @@ Gen chem problem types were also added to existing labs: gas density and molar m
 - `js/labs-genchem.js`: Gen Chem Bridge units G1–G6, their Watch it content, and gen chem problems added to existing labs
 - `js/review.js`: Daily Review (spaced repetition across all skills)
 - `js/learn.js`: lesson engine; `js/lessons-1.js` (Ch 2–10), `js/lessons-2.js` (Ch 11–19), `js/lessons-3.js` (G1–G6): lesson content
-- `js/tools.js`: periodic table, flashcards, test mode
+- `js/tools.js`: periodic table, test mode
+- `js/memorize-data.js`: the facts to memorize for each chapter; `js/memorize.js`: the mastery engine, study sheets and sessions
 - `js/story.js`: storyboard animation engine (tweened atoms, bonds that break and form, orbiting electrons, photons)
 - `js/stories.js`: the Watch it storyboards for each lab
 - `js/sims.js`: live simulations (states of matter, dynamic equilibrium)

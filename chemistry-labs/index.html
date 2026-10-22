@@ -356,12 +356,80 @@ button:disabled { opacity: .55; cursor: default; }
   .slider .lbl { grid-column: 1 / -1; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* Memorize */
+.cta-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); column-gap: 18px; }
+.mb-l0 { --c: transparent; } .mb-l1 { --c: color-mix(in srgb, var(--bad) 70%, var(--raised)); } .mb-l2 { --c: color-mix(in srgb, var(--warn) 80%, var(--raised)); } .mb-l3 { --c: color-mix(in srgb, var(--accent) 55%, var(--raised)); } .mb-l4 { --c: color-mix(in srgb, var(--good) 60%, var(--raised)); } .mb-l5 { --c: var(--good); }
+.mem-bar { display: flex; height: 10px; border-radius: 6px; overflow: hidden; background: color-mix(in srgb, var(--ink) 9%, transparent); margin: 10px 0 6px; }
+.mem-bar i { display: block; height: 100%; background: var(--c); transition: width .5s ease; }
+.mem-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.8rem; color: var(--muted); }
+.mem-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.mem-legend i, .mem-sheet .lvd i { width: 10px; height: 10px; border-radius: 50%; background: var(--c); border: 1.5px solid color-mix(in srgb, var(--ink) 25%, transparent); display: inline-block; }
+.mem-legend em { font-style: normal; font-family: var(--mono); font-size: 0.72rem; opacity: .8; }
+.mem-overview { margin-bottom: 14px; }
+.mem-how { border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 16px; background: var(--surface); margin-bottom: 22px; }
+.mem-how summary { cursor: pointer; font-weight: 700; }
+.mem-how ol { padding-left: 20px; display: grid; gap: 6px; margin: 10px 0; }
+.mem-h { font-size: 1.3rem; margin: 6px 0 12px; }
+.mem-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 12px; }
+.mem-chap { display: grid; gap: 2px; padding: 14px 16px; border-radius: 10px; border: 1.5px solid color-mix(in srgb, var(--fam) 45%, var(--line)); border-left-width: 5px; background: color-mix(in srgb, var(--fam) 5%, var(--raised)); color: var(--ink); text-decoration: none; min-width: 0; transition: transform .15s ease; }
+.mem-chap:hover { transform: translateY(-2px); }
+.mem-chap .mc-tag { font-family: var(--mono); font-size: 0.74rem; color: var(--fam); font-weight: 600; }
+.mem-chap b { font-family: var(--display); font-size: 1.08rem; }
+.mem-chap .note { font-size: 0.8rem; }
+.mem-chap .mc-foot { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; font-family: var(--mono); gap: 8px; }
+.mem-rail { margin-bottom: 4px; }
+.mem-rail-link { display: grid; gap: 2px; padding: 12px 14px; border: 1.5px solid color-mix(in srgb, var(--fam, var(--accent)) 45%, var(--line)); border-radius: 10px; background: var(--raised); color: var(--ink); text-decoration: none; }
+.mem-rail-link:hover { border-color: var(--accent); }
+.mem-rail-link .mr-go { font-weight: 700; color: var(--accent); font-size: 0.9rem; }
+.mem-cta { box-shadow: 5px 5px 0 color-mix(in srgb, var(--good) 35%, transparent); }
+.mem-cta .rc-k { color: var(--good); }
+.mem-cta .rc-streak { background: color-mix(in srgb, var(--good) 14%, transparent); }
+.mem-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.mem-top .note { flex: 1; min-width: 0; }
+.mem-x { font-weight: 700; text-decoration: none; }
+.mem-count { font-family: var(--mono); font-size: 0.85rem; }
+.mem-prog { height: 6px; border-radius: 4px; background: color-mix(in srgb, var(--ink) 9%, transparent); overflow: hidden; margin-bottom: 18px; }
+.mem-prog i { display: block; height: 100%; background: var(--accent); transition: width .35s ease; }
+.mem-card { max-width: 680px; margin: 0 auto; display: grid; gap: 12px; padding: 20px 22px; border-radius: 14px; border: 2px solid color-mix(in srgb, var(--fam, var(--accent)) 50%, var(--line)); background: var(--raised); animation: memIn .3s ease; }
+.mem-card.intro { border-style: dashed; }
+@keyframes memIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.mem-meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.mem-cue { font-family: var(--mono); font-size: 0.76rem; letter-spacing: .1em; text-transform: uppercase; color: var(--fam, var(--accent)); margin: 0; }
+.mem-q { font-family: var(--display); font-size: clamp(1.4rem, 4.5vw, 2rem); font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.mem-a { font-size: 1.25rem; font-weight: 700; padding: 10px 14px; border-radius: 8px; background: color-mix(in srgb, var(--good) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--good) 35%, var(--line)); overflow-wrap: anywhere; }
+.mem-note { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.mem-choices .choice { display: flex; gap: 10px; align-items: baseline; }
+.mem-choices .kn { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; flex: none; }
+.mem-tiny { font-size: 0.82rem; margin: 0; }
+.linkbtn { font: inherit; background: none; border: none; padding: 0; color: var(--accent); text-decoration: underline; cursor: pointer; }
+kbd { font-family: var(--mono); font-size: 0.72rem; border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; opacity: .7; }
+.pill.lv1 { color: var(--bad); } .pill.lv2 { color: var(--warn); } .pill.lv3 { color: var(--accent); } .pill.lv4, .pill.lv5 { color: var(--good); }
+.mem-stats { justify-content: flex-start; }
+.mem-missed td:first-child { color: var(--muted); }
+.mem-sheet-head { justify-content: space-between; align-items: center; margin-top: 8px; }
+.mem-group { margin: 14px 0 20px; }
+.mem-gh { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-bottom: 6px; }
+.mem-gh h3 { font-size: 1.02rem; }
+.mem-gh .btn { margin-left: auto; padding: 5px 12px; font-size: 0.86rem; }
+.mem-sheet { width: 100%; }
+.mem-sheet { table-layout: fixed; }
+table.t.mem-sheet td, table.t.mem-missed td { vertical-align: top; overflow-wrap: anywhere; white-space: normal; }
+.mem-sheet td:nth-child(2) { width: 42%; }
+.mem-sheet td.lvd { width: 26px; padding-right: 0; }
+.mem-sheet .ans-c span { font-weight: 700; }
+.mem-sheet .ans-c small { display: block; color: var(--muted); font-size: 0.8rem; }
+.mem-sheet.covered tr { cursor: pointer; }
+.mem-sheet.covered .ans-c > * { filter: blur(7px); opacity: .5; transition: filter .2s ease, opacity .2s ease; }
+.mem-sheet.covered tr.peek .ans-c > * { filter: none; opacity: 1; }
+.nuc { display: inline-flex; flex-direction: column; font-size: 0.55em; line-height: 1.05; vertical-align: middle; text-align: right; margin-right: 1px; }
+@media (prefers-reduced-motion: reduce) { .mem-card { animation: none; } .mem-bar i, .mem-prog i { transition: none; } }
 </style>
 </head>
 <body>
 <header class="topbar"><div class="in">
   <a class="brand" href="#" aria-label="Chem Bench home"><span class="cell">C</span><span class="bt">Chem Bench</span></a>
-  <nav class="topnav" aria-label="Sections"><a href="#">Labs</a><a href="#review">Review</a><a href="#table">Table</a><a href="#cards">Cards</a><a href="#exam">Test</a></nav>
+  <nav class="topnav" aria-label="Sections"><a href="#">Labs</a><a href="#review">Review</a><a href="#table">Table</a><a href="#memorize">Memorize</a><a href="#exam">Test</a></nav>
 </div></header>
 <main id="app"></main>
 <footer>Practice sets are randomized. Constants: N<sub>A</sub> = 6.022 × 10<sup>23</sup>, R = 0.08206 L·atm/(mol·K), standard atomic masses (IUPAC).</footer>
@@ -378,6 +446,8 @@ button:disabled { opacity: .55; cursor: default; }
 <script src="js/labs-genchem.js"></script>
 <script src="js/tools.js"></script>
 <script src="js/review.js"></script>
+<script src="js/memorize-data.js"></script>
+<script src="js/memorize.js"></script>
 <script src="js/learn.js"></script>
 <script src="js/lessons-1.js"></script>
 <script src="js/lessons-2.js"></script>

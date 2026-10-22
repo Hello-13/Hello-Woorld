@@ -477,7 +477,7 @@ function renderHome(app) {
       </div>
     </div>
   </section>
-  ${typeof reviewSummaryHTML !== 'undefined' ? reviewSummaryHTML() : ''}
+  <div class="cta-row">${typeof reviewSummaryHTML !== 'undefined' ? reviewSummaryHTML() : ''}${typeof memSummaryHTML !== 'undefined' ? memSummaryHTML() : ''}</div>
   <section aria-label="Labs by chapter">
     <div class="legend">${Object.entries(FAMILIES).filter(([k]) => k !== 'gen').map(([k, v]) => `<span class="lg fam-${k}"><i></i>${v}</span>`).join('')}</div>
     <div class="grid">${LABS.filter(l => !l.code).map(l => tileHTML(l)).join('')}</div>
@@ -489,7 +489,7 @@ function renderHome(app) {
     <div class="weak-list">${w.map(x => `<a class="weak-item fam-${x.lab.fam}" href="#${x.lab.id}" data-preset="${U.esc(x.type)}"><span class="wl">${chTag(x.lab)} · ${x.lab.title}</span><b>${x.type}</b><span class="wp">${Math.round(x.pct * 100)}% right of ${x.a}</span></a>`).join('')}</div></section>` : ''; })()}
   <section class="tools" aria-label="Study tools">
     <a class="tool" href="#table"><span class="ti">Pt</span><b>Periodic table</b><span>All 118 elements. Color by family or electronegativity, tap one for its details.</span></a>
-    <a class="tool" href="#cards"><span class="ti">Fc</span><b>Flashcards</b><span>Polyatomic ions, element symbols, charges and prefixes. Missed cards come back sooner.</span></a>
+    <a class="tool" href="#memorize"><span class="ti">Mz</span><b>Memorize</b><span>Every fact to know by heart, chapter by chapter, with mastery levels and spaced recall.</span></a>
     <a class="tool" href="#exam"><span class="ti">Tx</span><b>Test mode</b><span>Pick chapters and take a mixed quiz. See your score by chapter and review what you missed.</span></a>
   </section>
   <section class="howto">
@@ -516,6 +516,7 @@ function renderLab(app, lab) {
   <div class="lab-grid">
     <section class="bench" aria-labelledby="bench-h"><h2 id="bench-h">Bench</h2><div id="bench"></div></section>
     <div class="rail">
+      ${typeof memRailHTML !== 'undefined' ? memRailHTML(lab) : ''}
       <section class="ideas" aria-labelledby="ideas-h"><h2 id="ideas-h">Key ideas</h2><ul>${lab.ideas.map(x => `<li>${x}</li>`).join('')}</ul></section>
       <section class="practice" aria-labelledby="prac-h"><h2 id="prac-h">Practice</h2><div id="practice"></div></section>
       <section class="ask" id="ask" aria-labelledby="ask-h" hidden><h2 id="ask-h">Ask Claude</h2><div id="ask-body"></div></section>

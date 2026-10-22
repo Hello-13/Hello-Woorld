@@ -80,4 +80,4 @@ A guitar practice widget for my dashboard: tuner, chord of the day, metronome an
 
 ## Chem Bench
 
-[`chemistry-labs/`](chemistry-labs/) has interactive labs for every chapter of my chemistry course (Ch 2–19), plus a periodic table, flashcards and a test mode. Open `chemistry-labs/index.html` in a browser.
+[`chemistry-labs/`](chemistry-labs/) has interactive labs for every chapter of my chemistry course (Ch 2–19), plus a memorization mastery system, a periodic table and a test mode. Open `chemistry-labs/index.html` in a browser.
