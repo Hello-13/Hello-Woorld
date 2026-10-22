@@ -147,6 +147,12 @@ registerLab({
 /* ================= Ch 19: Biochemistry ================= */
 const CODONS = 'FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG';
 const AA = { F: ['Phe', 'phenylalanine'], L: ['Leu', 'leucine'], S: ['Ser', 'serine'], Y: ['Tyr', 'tyrosine'], C: ['Cys', 'cysteine'], W: ['Trp', 'tryptophan'], P: ['Pro', 'proline'], H: ['His', 'histidine'], Q: ['Gln', 'glutamine'], R: ['Arg', 'arginine'], I: ['Ile', 'isoleucine'], M: ['Met', 'methionine (start)'], T: ['Thr', 'threonine'], N: ['Asn', 'asparagine'], K: ['Lys', 'lysine'], V: ['Val', 'valine'], A: ['Ala', 'alanine'], D: ['Asp', 'aspartic acid'], E: ['Glu', 'glutamic acid'], G: ['Gly', 'glycine'], '*': ['Stop', 'stop codon'] };
+
+function codeTableHTML() {
+  const B = 'UCAG';
+  const rows = [...B].map((b1, i) => `<tr><th>${b1}</th>${[...B].map((b2, j) => `<td>${[...B].map((b3, k) => { const a = CODONS[i * 16 + j * 4 + k]; return `${b1}${b2}${b3} ${AA[a][0]}`; }).join('<br>')}</td>`).join('')}</tr>`).join('');
+  return `<details class="codetab"><summary>Show the genetic code</summary><div class="scroll"><table class="t" style="font-family:var(--mono);font-size:.78rem"><tr><th></th>${[...B].map(b => `<th>${b}</th>`).join('')}</tr>${rows}</table></div><p class="note">Row: first base. Column: second base. Then find the third base in the cell.</p></details>`;
+}
 const translateCodon = c => CODONS['UCAG'.indexOf(c[0]) * 16 + 'UCAG'.indexOf(c[1]) * 4 + 'UCAG'.indexOf(c[2])];
 const DNA_PAIR = { A: 'T', T: 'A', G: 'C', C: 'G' }, RNA_PAIR = { A: 'U', T: 'A', G: 'C', C: 'G' };
 const randBases = (n, set = 'ATGC') => Array.from({ length: n }, () => set[U.ri(0, 3)]).join('');
@@ -252,12 +258,12 @@ registerLab({
     { name: 'Read a codon', gen() {
       let c, a; do { c = randBases(3, 'UCAG'); a = translateCodon(c); } while (a === '*' && Math.random() < 0.7);
       const right = `${AA[a][0]} (${AA[a][1]})`, others = U.shuffle(Object.keys(AA).filter(k => k !== a)).slice(0, 3).map(k => `${AA[k][0]} (${AA[k][1]})`);
-      return { ...mc(right, others), q: `Using the genetic code, what does the mRNA codon <b style="font-family:var(--mono);font-size:1.2em">${c}</b> code for?`, explain: `${c} → <b>${right}</b>. ${a === '*' ? 'Stop codons (UAA, UAG, UGA) end translation.' : 'Look up the first base (row), second base (column), then third base.'}` };
+      return { ...mc(right, others), q: `Using the genetic code, what does the mRNA codon <b style="font-family:var(--mono);font-size:1.2em">${c}</b> code for?${codeTableHTML()}`, explain: `${c} → <b>${right}</b>. ${a === '*' ? 'Stop codons (UAA, UAG, UGA) end translation.' : 'Look up the first base (row), second base (column), then third base.'}` };
     } },
     { name: 'Translate mRNA', gen() {
       const cods = ['AUG']; for (let k = 0; k < U.ri(2, 3); k++) { let c; do c = randBases(3, 'UCAG'); while (translateCodon(c) === '*'); cods.push(c); }
       const seq = cods.map(c => AA[translateCodon(c)][0]), ans = seq.join('-');
-      return { kind: 'text', ph: 'e.g. Met-Gly-Ser', q: `Translate this mRNA into amino acids (three-letter codes, separated by dashes): <b style="font-family:var(--mono);letter-spacing:.06em">${cods.join(' ')}</b>`, answer: ans,
+      return { kind: 'text', ph: 'e.g. Met-Gly-Ser', q: `Translate this mRNA into amino acids (three-letter codes, separated by dashes): <b style="font-family:var(--mono);letter-spacing:.06em">${cods.join(' ')}</b>${codeTableHTML()}`, answer: ans,
         check: r => { const v = r.toLowerCase().replace(/[^a-z]/g, ''); return v ? v === seq.join('').toLowerCase() : null; }, explain: cods.map((c, k) => `${c} → ${seq[k]}`).join(', ') + `. Protein: <b>${ans}</b>.` };
     } },
     { name: 'Classify the biomolecule', gen() {

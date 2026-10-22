@@ -478,7 +478,7 @@ registerLab({
 });
 
 /* ================= Ch 17: Nuclear ================= */
-const ISOTOPES = [['C', 14, 5730, 'years', 'beta'], ['I', 131, 8.02, 'days', 'beta'], ['U', 238, 4.47e9, 'years', 'alpha'], ['Rn', 222, 3.82, 'days', 'alpha'], ['Co', 60, 5.27, 'years', 'beta'], ['Tc', 99, 6.0, 'hours', 'gamma'], ['P', 32, 14.3, 'days', 'beta'], ['Ra', 226, 1600, 'years', 'alpha'], ['H', 3, 12.3, 'years', 'beta'], ['Pu', 239, 24100, 'years', 'alpha']];
+const ISOTOPES = [['C', 14, 5730, 'years', 'beta'], ['I', 131, 8.02, 'days', 'beta'], ['U', 238, 4.47e9, 'years', 'alpha'], ['Rn', 222, 3.82, 'days', 'alpha'], ['Co', 60, 5.27, 'years', 'beta'], ['Tc', '99m', 6.0, 'hours', 'gamma'], ['P', 32, 14.3, 'days', 'beta'], ['Ra', 226, 1600, 'years', 'alpha'], ['H', 3, 12.3, 'years', 'beta'], ['Pu', 239, 24100, 'years', 'alpha']];
 const DECAYS = {
   alpha: { dA: -4, dZ: -2, part: [4, 2, 'He'], name: 'alpha (α)' },
   beta: { dA: 0, dZ: 1, part: [0, -1, 'e'], name: 'beta (β⁻)' },
