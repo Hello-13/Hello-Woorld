@@ -164,7 +164,7 @@ const BIOMOLECULES = [
 ];
 const BIO_INFO = {
   Carbohydrate: ['monosaccharides (simple sugars like glucose)', 'Energy (glucose, starch, glycogen) and structure (cellulose in plants). Formula often C<sub>n</sub>(H<sub>2</sub>O)<sub>n</sub>.'],
-  Lipid: ['not a true polymer: fats are glycerol + 3 fatty acids', 'Insoluble in water. Long-term energy storage, cell membranes (phospholipids) and hormones (steroids).'],
+  Lipid: ['glycerol and fatty acids (fats are not true polymers: one glycerol holds 3 fatty acids)', 'Insoluble in water. Long-term energy storage, cell membranes (phospholipids) and hormones (steroids).'],
   Protein: ['amino acids, joined by peptide bonds', 'Enzymes, structure, transport, hormones. The amino acid sequence folds into a unique 3D shape.'],
   'Nucleic acid': ['nucleotides (sugar + phosphate + base)', 'Store and transmit genetic information. DNA bases A, T, G, C; RNA uses U instead of T.'],
 };

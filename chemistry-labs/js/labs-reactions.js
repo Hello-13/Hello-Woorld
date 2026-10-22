@@ -280,7 +280,7 @@ const gasMoles = side => side.filter(s => s[2] === 'g').reduce((t, s) => t + s[1
 function lcPredict(rx, change) {
   const dn = gasMoles(rx.pr) - gasMoles(rx.re);
   switch (change.k) {
-    case 'addR': return ['Shifts right', `Adding a reactant raises Q below K, so the reaction makes more products.`];
+    case 'addR': return ['Shifts right', `Adding a reactant lowers Q below K, so the reaction makes more products.`];
     case 'remR': return ['Shifts left', `Removing a reactant makes the reaction run backward to replace it.`];
     case 'addP': return ['Shifts left', `Adding a product pushes the reaction back toward reactants.`];
     case 'remP': return ['Shifts right', `Removing a product pulls the reaction forward to replace it.`];
