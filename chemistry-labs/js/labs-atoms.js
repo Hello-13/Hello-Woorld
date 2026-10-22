@@ -491,9 +491,13 @@ registerLab({
         const why = prop === 'radius' ? (sameG ? 'Radius increases down a group (more electron shells).' : 'Radius decreases across a period (more protons pull the same shell closer).')
           : prop === 'ie' ? (sameG ? 'Ionization energy decreases down a group (outer electrons are farther from the nucleus).' : 'Ionization energy generally increases across a period.')
             : (sameG ? 'Electronegativity decreases down a group.' : 'Electronegativity increases across a period toward fluorine.');
-        const other = win === a ? b : a, exc = sameP && prop !== 'radius' && Chem.group(EL[win].Z) < Chem.group(EL[other].Z);
+        const other = win === a ? b : a, gW = Chem.group(EL[win].Z), gO = Chem.group(EL[other].Z), pW = Chem.period(EL[win].Z), pO = Chem.period(EL[other].Z);
+        // does the winner follow the simple trend? radius grows down and to the left; IE and EN grow up and to the right
+        const follows = prop === 'radius' ? (sameG ? pW > pO : gW < gO) : (sameG ? pW < pO : gW > gO);
+        const exc = !follows && (sameP ? ' This pair is a known exception to the trend (a filled or half-filled sublevel is extra stable).'
+          : ' This pair breaks the simple trend: the 10 d-block elements just before it add protons that pull its electrons in more than the extra shell pushes them out.');
         const vals = prop === 'radius' ? `${a} ${data[a]} pm, ${b} ${data[b]} pm` : prop === 'ie' ? `${a} ${data[a]} kJ/mol, ${b} ${data[b]} kJ/mol` : `${a} ${data[a]}, ${b} ${data[b]}`;
-        return { ...mc(`${EL[win].name} (${win})`, [`${EL[a].name} (${a})`, `${EL[b].name} (${b})`]), q: `Which has the <b>${label}</b>?`, explain: `${why}${exc ? ' This pair is a known exception to the trend (a filled or half-filled sublevel is extra stable).' : ''} Data: ${vals}.` };
+        return { ...mc(`${EL[win].name} (${win})`, [`${EL[a].name} (${a})`, `${EL[b].name} (${b})`]), q: `Which has the <b>${label}</b>?`, explain: `${exc ? why.replace('generally ', '').replace(/\.$/, ', in general.') + exc : why} Data: ${vals}.` };
       }
     } },
     { name: 'Light calculations', gen() {
