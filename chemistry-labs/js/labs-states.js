@@ -251,7 +251,12 @@ registerLab({
     { name: 'Higher boiling point', gen() {
       let a, b; do { a = U.pick(IMF_DATA); b = U.pick(IMF_DATA); } while (a === b || Math.abs(a.bp - b.bp) < 15);
       const win = a.bp > b.bp ? a : b, lose = win === a ? b : a;
-      const why = win.imf !== lose.imf && IMF_RANK.indexOf(win.imf) > IMF_RANK.indexOf(lose.imf) ? `${fmtF(win.f)} has stronger IMFs (${win.imf.toLowerCase()} vs ${lose.imf.toLowerCase()}).` : `${fmtF(win.f)} is larger (${Chem.molarMass(win.f).toFixed(0)} vs ${Chem.molarMass(lose.f).toFixed(0)} g/mol), so its dispersion forces are stronger.`;
+      const mw = Chem.molarMass(win.f), ml = Chem.molarMass(lose.f);
+      const same = { 'Hydrogen bonding': 'it forms more hydrogen bonds per molecule', 'Dipole–dipole': 'its molecules are more polar (a larger dipole)', Dispersion: 'its electron cloud is spread over more atoms and is easier to distort' };
+      const why = win.imf !== lose.imf && IMF_RANK.indexOf(win.imf) > IMF_RANK.indexOf(lose.imf) ? `${fmtF(win.f)} has stronger IMFs (${win.imf.toLowerCase()} vs ${lose.imf.toLowerCase()}).`
+        : mw > ml ? `${fmtF(win.f)} is larger (${mw.toFixed(0)} vs ${ml.toFixed(0)} g/mol), so its dispersion forces are stronger${win.imf !== lose.imf ? ', enough to outweigh the other molecule\'s ' + lose.imf.toLowerCase() : ''}.`
+        : win.imf === lose.imf ? `Both have ${win.imf.toLowerCase()} as their strongest force, but ${fmtF(win.f)} has the stronger attractions: ${same[win.imf] || 'its molecules attract each other more strongly'}. Molar mass is only a rough guide (${mw.toFixed(0)} vs ${ml.toFixed(0)} g/mol).`
+        : `${fmtF(win.f)} boils higher even though its strongest force type is weaker; size and shape matter too. Boiling points are measured, and these rules are only a guide.`;
       return { ...mc(fmtF(win.f), [fmtF(a.f), fmtF(b.f)]), q: `Which has the higher boiling point: <b>${fmtF(a.f)}</b> or <b>${fmtF(b.f)}</b>?`, explain: `${why} Boiling points: ${fmtF(a.f)} ${a.bp} °C, ${fmtF(b.f)} ${b.bp} °C.` };
     } },
     { name: 'Melting & boiling heat', gen() {
