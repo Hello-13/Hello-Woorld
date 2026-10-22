@@ -13,7 +13,7 @@
     ${[60, 130, 200].map(y => `<circle cx="300" cy="${y}" r="34" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3" style="stroke:var(--muted)"/><circle cx="300" cy="${y}" r="4" style="fill:var(--bad)"/>`).join('')}
     ${straight.map(y => `<line x1="40" y1="${y}" x2="512" y2="${y}" stroke-width="1.6" style="stroke:var(--accent)"/>${arrow(522, y, 1, 0, 'fill:var(--accent)')}`).join('')}
     <path d="M40 124 L282 124 Q300 120 512 96" fill="none" stroke-width="1.8" style="stroke:var(--warn)"/>${arrow(522, 94.8, 210, -24, 'fill:var(--warn)')}
-    <path d="M40 197 L291 197 Q298 200 291 203 L128 203" fill="none" stroke-width="1.8" style="stroke:var(--bad)"/>${arrow(118, 203, -1, 0, 'fill:var(--bad)')}
+    <path d="M40 198 L289 198 Q297 197 289 192 L128 192" fill="none" stroke-width="1.8" style="stroke:var(--bad)"/>${arrow(118, 192, -1, 0, 'fill:var(--bad)')}
     <text x="314" y="150" font-size="12" style="fill:var(--bad)">nucleus</text>
     <text x="300" y="254" text-anchor="middle" font-size="12" style="fill:var(--muted)">gold atoms: mostly empty space</text></g></svg>
     <figcaption>Most alpha particles miss every nucleus and go straight through. One passing close to a nucleus is pushed aside. One aimed straight at a nucleus is thrown back the way it came.</figcaption>`;
