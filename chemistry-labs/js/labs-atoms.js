@@ -649,7 +649,10 @@ registerLab({
     { name: 'Bond type', gen() {
       for (;;) {
         const keys = Object.keys(EN), a = U.pick(keys), b = U.pick(keys);
-        if (a === b && Math.random() < .7) continue;
+        // metal–metal pairs form metallic bonds, which this ΔEN scale does not describe: keep at least one nonmetal
+        const NONMETAL = ['H', 'C', 'N', 'O', 'F', 'P', 'S', 'Cl', 'Se', 'Br', 'I'];
+        if (!NONMETAL.includes(a) && !NONMETAL.includes(b)) continue;
+        if (a === b && (Math.random() < .7 || !NONMETAL.includes(a))) continue;
         const d = Math.abs(EN[a] - EN[b]);
         if (Math.abs(d - 0.4) < 0.08 || Math.abs(d - 2.0) < 0.12) continue;
         const t = bondType(d);
