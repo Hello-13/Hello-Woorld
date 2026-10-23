@@ -247,7 +247,7 @@ registerLab({
       if (mode === 0) return { kind: 'num', q: `How much heat (in J) is needed to change ${m} g of ${name.toLowerCase()} from ${ti} °C to ${tf} °C? (c = ${c} J/g·°C)`, answer: q, unit: 'J', explain: `<span class="eqn">q = ${m} g × ${c} J/g·°C × (${tf} − ${ti}) °C = ${fmt(q, 3)} J</span>${q < 0 ? ' Negative, so heat is released.' : ''}` };
       if (mode === 1) { const qa = Math.abs(q); return { kind: 'num', q: `A ${m} g sample of ${name.toLowerCase()} (c = ${c} J/g·°C) absorbs ${fmt(qa, 3)} J. By how many °C does its temperature rise?`, answer: qa / (m * c), unit: '°C', explain: `<span class="eqn">ΔT = q / (m·c) = ${fmt(qa, 3)} / (${m} × ${c}) = ${fmt(qa / (m * c), 3)} °C</span>` }; }
       const qa = Math.abs(q), d = Math.abs(dT);
-      return { kind: 'num', q: `An unknown metal sample of ${m} g absorbs ${fmt(qa, 3)} J and warms by ${d} °C. What is its specific heat?`, answer: c, unit: 'J/g·°C', explain: `<span class="eqn">c = q / (m·ΔT) = ${fmt(qa, 3)} / (${m} × ${d}) = ${fmt(c, 3)} J/g·°C</span>, which matches ${name.toLowerCase()}.` };
+      return { kind: 'num', q: `An unknown sample of ${m} g absorbs ${fmt(qa, 3)} J and warms by ${d} °C. What is its specific heat?`, answer: c, unit: 'J/g·°C', explain: `<span class="eqn">c = q / (m·ΔT) = ${fmt(qa, 3)} / (${m} × ${d}) = ${fmt(c, 3)} J/g·°C</span>, which matches ${name.toLowerCase()}.` };
     } },
     { name: 'Temperature scales', gen() {
       const mode = U.ri(0, 3);

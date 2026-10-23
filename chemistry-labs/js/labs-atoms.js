@@ -110,8 +110,9 @@ registerLab({
   problems: [
     { name: 'Protons, neutrons, electrons', gen() {
       const Z = U.ri(1, 56), elx = ELZ[Z];
-      const A = Math.round(elx.mass) + U.ri(-1, 2);
-      const q = Math.random() < .45 && ionCharge(elx.sym) !== undefined ? ionCharge(elx.sym) : 0;
+      const A = Math.max(Z, Math.round(elx.mass) + U.ri(-1, 2));
+      // skip charges that are not real simple ions (B³⁺, H⁺ as a bare nucleus, As³⁻, Sb³⁻)
+      const q = Math.random() < .45 && ionCharge(elx.sym) !== undefined && !['B', 'H', 'As', 'Sb'].includes(elx.sym) ? ionCharge(elx.sym) : 0;
       const ask = U.pick(['protons', 'neutrons', 'electrons']);
       const ans = { protons: Z, neutrons: A - Z, electrons: Z - q }[ask];
       return { kind: 'num', tol: 0, ph: 'whole number', q: `How many <b>${ask}</b> are in <span style="font-size:1.4em">${Chem.isotope(elx.sym, A)}<sup>${chargeStr(q)}</sup></span> (${elx.name}-${A}${q ? `, charge ${signed(q)}` : ''})?`,
@@ -137,8 +138,8 @@ registerLab({
         explain: `${EL[sym].name} is in group ${g <= 2 ? g : g - 10}A. ${q > 0 ? `As a metal it loses ${q} electron${q > 1 ? 's' : ''}` : `As a nonmetal it gains ${-q} electron${q < -1 ? 's' : ''}`} to reach a noble-gas configuration, giving ${EL[sym].sym}<sup>${chargeStr(q)}</sup>.` };
     } },
     { name: 'Name the isotope', gen() {
-      const Z = U.ri(1, 40), elx = ELZ[Z], A = Math.round(elx.mass) + U.ri(-1, 2), N = A - Z;
-      return { kind: 'text', ph: `e.g. ${elx.sym === 'C' ? 'O' : 'C'}-14`, q: `An atom has <b>${Z} protons</b> and <b>${N} neutrons</b>. Write its isotope symbol as Symbol-A.`,
+      const Z = U.ri(1, 40), elx = ELZ[Z], A = Math.max(Z, Math.round(elx.mass) + U.ri(-1, 2)), N = A - Z;
+      return { kind: 'text', ph: `e.g. ${elx.sym === 'C' ? 'O' : 'C'}-14`, q: `An atom has <b>${Z} proton${Z === 1 ? '' : 's'}</b> and <b>${N} neutron${N === 1 ? '' : 's'}</b>. Write its isotope symbol as Symbol-A.`,
         answer: [`${elx.sym}-${A}`, `${elx.name}-${A}`, `${elx.sym}${A}`, `${A}${elx.sym}`], display: `${elx.sym}-${A}`,
         check: r => { const s = r.replace(/\s/g, ''); if (!s) return null; return [`${elx.sym}-${A}`, `${elx.sym}${A}`, `${A}${elx.sym}`, `${A}-${elx.sym}`].includes(s) || normText(s) === normText(`${elx.name}-${A}`); },
         explain: `Z = ${Z} means ${elx.name}. A = ${Z} + ${N} = ${A}, so it is <b>${elx.sym}-${A}</b>.` };
@@ -271,7 +272,7 @@ registerLab({
     { name: 'Hydrates', gen() {
       const [f, n, name] = U.pick(HYDRATES), full = `${f}·${n}H2O`, hn = `${name} ${PREFIX[n]}hydrate`;
       if (Math.random() < .5) return { kind: 'text', q: `Name the hydrate <b style="font-size:1.2em">${fmtF(full)}</b>.`, answer: [hn, hn.replace('monohydrate', 'hydrate')], display: hn, explain: `Name the ionic compound (${name}), then add a prefix for the ${n} water${n > 1 ? 's' : ''} + "hydrate".` };
-      return { kind: 'num', unit: 'g/mol', tol: 0.005, q: `What is the formula mass of <b>${fmtF(full)}</b>?`, answer: Chem.molarMass(full), explain: `${fmtF(f)} = ${fmt(Chem.molarMass(f), 5)}, plus ${n} × 18.02 for the water = <b>${fmt(Chem.molarMass(full), 5)}</b> g/mol.` };
+      return { kind: 'num', unit: 'amu', tol: 0.005, q: `What is the formula mass of <b>${fmtF(full)}</b>?`, answer: Chem.molarMass(full), explain: `${fmtF(f)} = ${fmt(Chem.molarMass(f), 5)}, plus ${n} × 18.02 for the water = <b>${fmt(Chem.molarMass(full), 5)}</b> amu (so its molar mass is the same number in g/mol).` };
     } },
     { name: 'Empirical formula', gen() {
       const [mf, ef] = U.pick(EMPIRICAL_PAIRS);
@@ -353,7 +354,9 @@ registerLab({
     { name: 'Counting atoms', gen() {
       const f = U.pick(COMMON.filter(x => !x.includes('('))), c = Chem.parseFormula(f).counts, e = U.pick(Object.keys(c)), M = Chem.molarMass(c), g = U.sf(1, 100, 3);
       const ans = g / M * NA * c[e];
-      return { kind: 'num', unit: `${e} atoms`, q: `How many <b>${EL[e].name.toLowerCase()} atoms</b> are in ${g} g of ${fmtF(f)}?`, answer: ans, explain: `<span class="eqn">${g} g ÷ ${M.toFixed(2)} g/mol × 6.022×10²³ molecules/mol × ${c[e]} ${e}/molecule = ${fmt(ans, 3)}</span>` };
+      // ionic compounds (metal or NH₄⁺ first) are counted in formula units, molecular ones in molecules
+      const unitWord = /^(Li|Na|K|Mg|Ca|Ba|Al|Fe|Cu|Zn|Ag|Pb|Sn|NH4)/.test(f) ? 'formula unit' : 'molecule';
+      return { kind: 'num', unit: `${e} atoms`, q: `How many <b>${EL[e].name.toLowerCase()} atoms</b> are in ${g} g of ${fmtF(f)}?`, answer: ans, explain: `<span class="eqn">${g} g ÷ ${M.toFixed(2)} g/mol × 6.022×10²³ ${unitWord}s/mol × ${c[e]} ${e}/${unitWord} = ${fmt(ans, 3)}</span>` };
     } },
     { name: 'Mass percent', gen() { const f = U.pick(COMMON), rows = percentComp(f), [e, n, pc] = U.pick(rows); return { kind: 'num', unit: '%', tol: 0.005, abs: 0.06, q: `What is the mass percent of <b>${EL[e].name.toLowerCase()}</b> in ${fmtF(f)}?`, answer: pc, display: pc.toFixed(2) + '%', explain: `<span class="eqn">${n} × ${EL[e].mass} ÷ ${Chem.molarMass(f).toFixed(2)} × 100% = ${pc.toFixed(2)}%</span>` }; } },
     { name: 'Empirical from %', gen() {
@@ -491,9 +494,13 @@ registerLab({
         const why = prop === 'radius' ? (sameG ? 'Radius increases down a group (more electron shells).' : 'Radius decreases across a period (more protons pull the same shell closer).')
           : prop === 'ie' ? (sameG ? 'Ionization energy decreases down a group (outer electrons are farther from the nucleus).' : 'Ionization energy generally increases across a period.')
             : (sameG ? 'Electronegativity decreases down a group.' : 'Electronegativity increases across a period toward fluorine.');
-        const other = win === a ? b : a, exc = sameP && prop !== 'radius' && Chem.group(EL[win].Z) < Chem.group(EL[other].Z);
+        const other = win === a ? b : a, gW = Chem.group(EL[win].Z), gO = Chem.group(EL[other].Z), pW = Chem.period(EL[win].Z), pO = Chem.period(EL[other].Z);
+        // does the winner follow the simple trend? radius grows down and to the left; IE and EN grow up and to the right
+        const follows = prop === 'radius' ? (sameG ? pW > pO : gW < gO) : (sameG ? pW < pO : gW > gO);
+        const exc = !follows && (sameP ? ' This pair is a known exception to the trend (a filled or half-filled sublevel is extra stable).'
+          : ' This pair breaks the simple trend: the 10 d-block elements just before it add protons that pull its electrons in more than the extra shell pushes them out.');
         const vals = prop === 'radius' ? `${a} ${data[a]} pm, ${b} ${data[b]} pm` : prop === 'ie' ? `${a} ${data[a]} kJ/mol, ${b} ${data[b]} kJ/mol` : `${a} ${data[a]}, ${b} ${data[b]}`;
-        return { ...mc(`${EL[win].name} (${win})`, [`${EL[a].name} (${a})`, `${EL[b].name} (${b})`]), q: `Which has the <b>${label}</b>?`, explain: `${why}${exc ? ' This pair is a known exception to the trend (a filled or half-filled sublevel is extra stable).' : ''} Data: ${vals}.` };
+        return { ...mc(`${EL[win].name} (${win})`, [`${EL[a].name} (${a})`, `${EL[b].name} (${b})`]), q: `Which has the <b>${label}</b>?`, explain: `${exc ? why.replace('generally ', '').replace(/\.$/, ', in general.') + exc : why} Data: ${vals}.` };
       }
     } },
     { name: 'Light calculations', gen() {
@@ -645,7 +652,10 @@ registerLab({
     { name: 'Bond type', gen() {
       for (;;) {
         const keys = Object.keys(EN), a = U.pick(keys), b = U.pick(keys);
-        if (a === b && Math.random() < .7) continue;
+        // metal–metal pairs form metallic bonds, which this ΔEN scale does not describe: keep at least one nonmetal
+        const NONMETAL = ['H', 'C', 'N', 'O', 'F', 'P', 'S', 'Cl', 'Se', 'Br', 'I'];
+        if (!NONMETAL.includes(a) && !NONMETAL.includes(b)) continue;
+        if (a === b && (Math.random() < .7 || !NONMETAL.includes(a))) continue;
         const d = Math.abs(EN[a] - EN[b]);
         if (Math.abs(d - 0.4) < 0.08 || Math.abs(d - 2.0) < 0.12) continue;
         const t = bondType(d);

@@ -251,7 +251,12 @@ registerLab({
     { name: 'Higher boiling point', gen() {
       let a, b; do { a = U.pick(IMF_DATA); b = U.pick(IMF_DATA); } while (a === b || Math.abs(a.bp - b.bp) < 15);
       const win = a.bp > b.bp ? a : b, lose = win === a ? b : a;
-      const why = win.imf !== lose.imf && IMF_RANK.indexOf(win.imf) > IMF_RANK.indexOf(lose.imf) ? `${fmtF(win.f)} has stronger IMFs (${win.imf.toLowerCase()} vs ${lose.imf.toLowerCase()}).` : `${fmtF(win.f)} is larger (${Chem.molarMass(win.f).toFixed(0)} vs ${Chem.molarMass(lose.f).toFixed(0)} g/mol), so its dispersion forces are stronger.`;
+      const mw = Chem.molarMass(win.f), ml = Chem.molarMass(lose.f);
+      const same = { 'Hydrogen bonding': 'it forms more hydrogen bonds per molecule', 'Dipole–dipole': 'its molecules are more polar (a larger dipole)', Dispersion: 'its electron cloud is spread over more atoms and is easier to distort' };
+      const why = win.imf !== lose.imf && IMF_RANK.indexOf(win.imf) > IMF_RANK.indexOf(lose.imf) ? `${fmtF(win.f)} has stronger IMFs (${win.imf.toLowerCase()} vs ${lose.imf.toLowerCase()}).`
+        : mw > ml ? `${fmtF(win.f)} is larger (${mw.toFixed(0)} vs ${ml.toFixed(0)} g/mol), so its dispersion forces are stronger${win.imf !== lose.imf ? ', enough to outweigh the other molecule\'s ' + lose.imf.toLowerCase() : ''}.`
+        : win.imf === lose.imf ? `Both have ${win.imf.toLowerCase()} as their strongest force, but ${fmtF(win.f)} has the stronger attractions: ${same[win.imf] || 'its molecules attract each other more strongly'}. Molar mass is only a rough guide (${mw.toFixed(0)} vs ${ml.toFixed(0)} g/mol).`
+        : `${fmtF(win.f)} boils higher even though its strongest force type is weaker; size and shape matter too. Boiling points are measured, and these rules are only a guide.`;
       return { ...mc(fmtF(win.f), [fmtF(a.f), fmtF(b.f)]), q: `Which has the higher boiling point: <b>${fmtF(a.f)}</b> or <b>${fmtF(b.f)}</b>?`, explain: `${why} Boiling points: ${fmtF(a.f)} ${a.bp} °C, ${fmtF(b.f)} ${b.bp} °C.` };
     } },
     { name: 'Melting & boiling heat', gen() {
@@ -354,7 +359,8 @@ registerLab({
     { name: 'Freezing & boiling point', gen() {
       const [f, name] = U.pick([['C6H12O6', 'glucose'], ['C12H22O11', 'sucrose'], ['C2H6O2', 'ethylene glycol'], ['CH3OH', 'methanol']]);
       const g = U.sf(10, 200, 3), kg = U.sf(0.2, 2, 3), m = g / Chem.molarMass(f) / kg;
-      if (Math.random() < .5) return { kind: 'num', unit: '°C', q: `<b>${g} g of ${name}</b> (${fmtF(f)}) is dissolved in <b>${kg} kg of water</b>. What is the new freezing point? (K<sub>f</sub> = 1.86 °C/m)`, answer: -m * 1.86, abs: 0.05, explain: `m = ${fmt(g / Chem.molarMass(f), 3)} mol ÷ ${kg} kg = ${fmt(m, 3)} m. ΔT<sub>f</sub> = ${fmt(m, 3)} × 1.86 = ${fmt(m * 1.86, 3)} °C, so it freezes at <b>${fmt(-m * 1.86, 3)} °C</b>.` };
+      // methanol is volatile, so ΔTb = m·Kb does not apply to it: freezing point only
+      if (f === 'CH3OH' || Math.random() < .5) return { kind: 'num', unit: '°C', q: `<b>${g} g of ${name}</b> (${fmtF(f)}) is dissolved in <b>${kg} kg of water</b>. What is the new freezing point? (K<sub>f</sub> = 1.86 °C/m)`, answer: -m * 1.86, abs: 0.05, explain: `m = ${fmt(g / Chem.molarMass(f), 3)} mol ÷ ${kg} kg = ${fmt(m, 3)} m. ΔT<sub>f</sub> = ${fmt(m, 3)} × 1.86 = ${fmt(m * 1.86, 3)} °C, so it freezes at <b>${fmt(-m * 1.86, 3)} °C</b>.` };
       return { kind: 'num', unit: '°C', q: `<b>${g} g of ${name}</b> (${fmtF(f)}) is dissolved in <b>${kg} kg of water</b>. What is the new boiling point? (K<sub>b</sub> = 0.512 °C/m)`, answer: 100 + m * 0.512, abs: 0.03, tol: 0, explain: `m = ${fmt(m, 3)} m. ΔT<sub>b</sub> = ${fmt(m, 3)} × 0.512 = ${fmt(m * 0.512, 3)} °C, so it boils at <b>${(100 + m * 0.512).toFixed(2)} °C</b>.` };
     } },
   ],
@@ -473,7 +479,7 @@ registerLab({
 });
 
 /* ================= Ch 17: Nuclear ================= */
-const ISOTOPES = [['C', 14, 5730, 'years', 'beta'], ['I', 131, 8.02, 'days', 'beta'], ['U', 238, 4.47e9, 'years', 'alpha'], ['Rn', 222, 3.82, 'days', 'alpha'], ['Co', 60, 5.27, 'years', 'beta'], ['Tc', 99, 6.0, 'hours', 'gamma'], ['P', 32, 14.3, 'days', 'beta'], ['Ra', 226, 1600, 'years', 'alpha'], ['H', 3, 12.3, 'years', 'beta'], ['Pu', 239, 24100, 'years', 'alpha']];
+const ISOTOPES = [['C', 14, 5730, 'years', 'beta'], ['I', 131, 8.02, 'days', 'beta'], ['U', 238, 4.47e9, 'years', 'alpha'], ['Rn', 222, 3.82, 'days', 'alpha'], ['Co', 60, 5.27, 'years', 'beta'], ['Tc', '99m', 6.0, 'hours', 'gamma'], ['P', 32, 14.3, 'days', 'beta'], ['Ra', 226, 1600, 'years', 'alpha'], ['H', 3, 12.3, 'years', 'beta'], ['Pu', 239, 24100, 'years', 'alpha']];
 const DECAYS = {
   alpha: { dA: -4, dZ: -2, part: [4, 2, 'He'], name: 'alpha (α)' },
   beta: { dA: 0, dZ: 1, part: [0, -1, 'e'], name: 'beta (β⁻)' },

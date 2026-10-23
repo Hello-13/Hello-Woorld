@@ -1,10 +1,17 @@
 # Chem Bench
 
-Interactive labs for every chapter of an introductory chemistry course (organized to match Tro, *Introductory Chemistry*, Ch 2–19), plus study tools.
+Interactive labs for every chapter of an introductory chemistry course (organized to match Tro, *Introductory Chemistry*, Ch 2–19), a six-unit Gen Chem Bridge, and study tools.
 
 Open `index.html` in any browser. No install or build step. Progress is saved in your browser.
 
 Each lab has these parts:
+
+- **Learn** (every lab): a lesson that takes you from no background to mastery.
+  - It opens with what you'll be able to do and what you need first, linking to earlier lessons.
+  - It works through parts, one idea per step: an explanation, diagrams where a picture helps, and worked examples revealed one move at a time (try each move first).
+  - Each step has a memory hook, the most common mistake, a pointer to the clearest YouTube teachers on that idea, and checks you must answer to continue.
+  - It ends with a mastery check: fresh problems from the lab's generators, and passing takes 5 of 6.
+  - With Ask Claude available, every step also has an "Explain this another way" button.
 
 - **Watch it** (12 labs): a captioned, step-by-step animation at the particle level, or a live simulation. Every atom keeps its identity, so you can follow it as bonds break and form: methane burning, an ionic bond forming, salt dissolving, an electron emitting light, covalent sharing in H₂ and H₂O, a limiting reactant running out, strong vs. weak acids, zinc reducing copper, alpha and beta decay, and more. Ch 12 has a live states-of-matter simulation (real particle physics) and Ch 15 a live dynamic-equilibrium simulation.
 
@@ -15,8 +22,15 @@ Each lab has these parts:
 
 Study tools (top navigation):
 
+- **Review**: a daily, interleaved review across every skill you have practiced, scheduled by spaced repetition (a correct answer pushes the skill out 1, 2, 4, 8, 16, then 32 days; a miss brings it back the same day). Practice and test answers feed the same schedule.
+
 - **Table**: interactive periodic table of all 118 elements. Color by family, block, state or electronegativity; tap an element for its mass, configuration, common ions and more.
-- **Cards**: flashcard decks (polyatomic ions, element symbols, ion charges, metric and Greek prefixes, acids and bases, constants and formulas). Cards you miss come back more often.
+- **Memorize**: a mastery system for everything a chapter expects you to know by heart (734 facts across all 24 units): element symbols, ion charges, polyatomic ions, prefixes, conversion factors, solubility rules, VSEPR shapes, gas laws, strong acids, rate laws and more. Each chapter has a study sheet you can cover to quiz yourself, and every set can be studied on its own.
+  - Each fact climbs six levels: New, Learning, Familiar, Known, Strong, Mastered.
+  - New facts are introduced a few at a time, then checked with multiple choice.
+  - From Familiar on, you must produce the answer: type it (formulas are case-sensitive, and charges can be written SO4 2- or SO4^2-), or say it before revealing.
+  - Correct recalls space the fact out 1, 3, 7 and 21 days, so Mastered means recalled correctly on four separate days. A miss drops it back to Learning.
+  - Cram drills your 20 weakest facts before a quiz.
 - **Test**: a mixed quiz from the chapters you choose, with a score by chapter and worked solutions for everything you missed.
 - **Weak spots**: the home page lists the problem types you miss most and links straight to drilling them.
 
@@ -41,6 +55,22 @@ Study tools (top navigation):
 | 18 | Organic Molecules | Hydrocarbon builder with structural formulas, functional groups | Naming hydrocarbons, formulas, alkane/alkene/alkyne, functional groups, isomers |
 | 19 | DNA to Protein | Transcription and translation with point mutations, biomolecule classes | Complementary DNA, mRNA, codons, translation, biomolecule classes, building blocks |
 
+
+### Gen Chem Bridge
+
+General chemistry topics an intro course skips or only touches, for the jump to Gen Chem I and II.
+
+| Unit | Lab | Bench | Practice |
+|------|-----|-------|----------|
+| G1 | Thermochemistry | Coffee-cup calorimeter, Hess's law workbench | Calorimetry → ΔH, Hess's law, ΔH° from formation, heat from a reaction, bond energies |
+| G2 | Weak Acids, ICE Tables & Buffers | Live ICE table with 5% check, buffer vs. water titration | Weak acid/base pH, % ionization, Ka from pH, buffer pH, buffer + strong acid/base, choosing a buffer |
+| G3 | Reaction Rates & Kinetics | Integrated rate-law plots, energy distribution with Eₐ and catalyst, collision simulation | Initial-rates orders, half-life, integrated laws, Arrhenius, relative rates |
+| G4 | Entropy & Free Energy | ΔG = ΔH − TΔS explorer with presets | Sign of ΔS, ΔG, crossover T, spontaneity cases, ΔS° from tables, ΔG° ⇄ K |
+| G5 | Batteries & Electrochemistry | Galvanic cell builder with Nernst voltage, animated electron flow | E°cell, anode, spontaneity, ΔG° from E°, Nernst, electrolysis |
+| G6 | Quantum Numbers & Advanced Bonding | Orbital explorer, formal charge and resonance viewer | Allowed quantum numbers, orbital counts, formal charge, hybridization, expanded-octet shapes, σ/π bonds |
+
+Gen chem problem types were also added to existing labs: gas density and molar mass, Graham's law and gas stoichiometry (Gas Laws); van't Hoff factor (Solutions); ICE tables for K and the common-ion effect (Equilibrium).
+
 ## Files
 
 - `index.html`: page, styles, and script includes
@@ -50,7 +80,11 @@ Study tools (top navigation):
 - `js/labs-reactions.js`: Ch 7, 8, 15, 16
 - `js/labs-states.js`: Ch 11–14, 17
 - `js/labs-life.js`: Ch 18–19
-- `js/tools.js`: periodic table, flashcards, test mode
+- `js/labs-genchem.js`: Gen Chem Bridge units G1–G6, their Watch it content, and gen chem problems added to existing labs
+- `js/review.js`: Daily Review (spaced repetition across all skills)
+- `js/learn.js`: lesson engine (overview, parts, steps, mastery check, summary); `js/lessons/<lab id>.js`: one lesson per lab
+- `js/tools.js`: periodic table, test mode
+- `js/memorize-data.js`: the facts to memorize for each chapter; `js/memorize.js`: the mastery engine, study sheets and sessions
 - `js/story.js`: storyboard animation engine (tweened atoms, bonds that break and form, orbiting electrons, photons)
 - `js/stories.js`: the Watch it storyboards for each lab
 - `js/sims.js`: live simulations (states of matter, dynamic equilibrium)

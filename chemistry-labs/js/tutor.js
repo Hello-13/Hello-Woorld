@@ -51,7 +51,7 @@ const Tutor = (() => {
 
   function problemContext(lab, cur, st) {
     const lines = [
-      `Course: introductory chemistry (Tro, Introductory Chemistry). Chapter ${lab.ch}: ${lab.chapter}. Topic: ${lab.title}.`,
+      `Course: introductory chemistry (Tro, Introductory Chemistry). ${lab.code ? 'General chemistry bridge unit ' + lab.code : 'Chapter ' + lab.ch}: ${lab.chapter}. Topic: ${lab.title}.`,
       `Problem type: ${strip(cur.type)}.`,
       `Problem: ${strip(cur.q)}`,
     ];
@@ -101,7 +101,7 @@ const Tutor = (() => {
       const log = body.querySelector('.chat-log'), form = body.querySelector('form'), inp = form.querySelector('input'), stop = body.querySelector('.c-stop');
       const bubble = (role, text) => { const d = document.createElement('div'); d.className = 'msg ' + role; d.textContent = text; log.append(d); return d; };
       turns.forEach(t => bubble(t.role === 'user' ? 'me' : 'claude', t.content));
-      const rules = `You are a friendly chemistry tutor inside a study app for an introductory chemistry course (Tro, Introductory Chemistry). The student is on Chapter ${lab.ch}, ${lab.chapter} (${lab.title}). The chapter's key ideas, as the app shows them:\n${lab.ideas.map(i => '- ' + strip(i)).join('\n')}\n\nAnswer the student's questions about chemistry, focused on this chapter. Keep answers under about 150 words unless they ask for more. If they ask you to quiz them, ask one question and wait for their answer before revealing it. ${STYLE}`;
+      const rules = `You are a friendly chemistry tutor inside a study app for an introductory chemistry course (Tro, Introductory Chemistry). The student is on ${lab.code ? 'general chemistry bridge unit ' + lab.code : 'Chapter ' + lab.ch}, ${lab.chapter} (${lab.title}). The chapter's key ideas, as the app shows them:\n${lab.ideas.map(i => '- ' + strip(i)).join('\n')}\n\nAnswer the student's questions about chemistry, focused on this chapter. Keep answers under about 150 words unless they ask for more. If they ask you to quiz them, ask one question and wait for their answer before revealing it. ${STYLE}`;
       let busy = false;
       async function send(q) {
         q = q.trim(); if (!q || busy) return;
@@ -121,5 +121,20 @@ const Tutor = (() => {
     });
   }
 
-  return { attach, chat, available: () => get().then(Boolean) };
+  /* "Explain this another way" on a lesson step */
+  function explainStep(slot, lab, step) {
+    get().then(sample => {
+      if (!sample || !slot.isConnected) return;
+      slot.innerHTML = `<div class="tutor"><div class="btn-row"><button type="button" class="btn ghost t-alt">Explain this another way</button><button type="button" class="btn ghost t-stop" hidden>Stop</button></div><div class="tutor-out" aria-live="polite" hidden></div></div>`;
+      const out = slot.querySelector('.tutor-out'), stop = slot.querySelector('.t-stop'), b = slot.querySelector('.t-alt');
+      b.addEventListener('click', async () => {
+        b.disabled = true;
+        const text = [`Lesson step: ${strip(step.t)}`, strip(step.body), step.ex ? 'Worked example: ' + step.ex.map(strip).join(' | ') : ''].join('\n');
+        await run(sample, `You are a patient chemistry tutor. A student is reading this step of an introductory lesson on ${lab.chapter} (${lab.title}) and did not understand it.\n\n${text}\n\nRe-explain the same idea from scratch in a different way: start with an everyday analogy, then connect it to the chemistry, then give one tiny example with numbers if it fits. At most 170 words. Do not introduce new topics. ${STYLE}`, out, stop, { modelTier: 'default' });
+        b.disabled = false;
+      });
+    });
+  }
+
+  return { attach, chat, explainStep, available: () => get().then(Boolean) };
 })();
