@@ -7,63 +7,73 @@
 <meta name="description" content="Interactive labs and practice for every chapter of an introductory chemistry course.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
 /* Layout: home is a periodic-table grid of chapter tiles; a lab is a wide "bench" of live models beside a narrow notebook rail (ideas + practice). */
 :root {
-  --bg: #edf1f2;
-  --surface: #f8fafa;
-  --raised: #ffffff;
-  --ink: #13202a;
-  --muted: #55656e;
-  --line: #d0d9dd;
-  --accent: #1a5ccc;
+  --bg: #eef1f8;
+  --surface: rgba(255, 255, 255, .55);
+  --raised: rgba(255, 255, 255, .82);
+  --solid: #ffffff;
+  --ink: #121a2c;
+  --muted: #56617a;
+  --line: rgba(18, 26, 44, .13);
+  --glassline: rgba(255, 255, 255, .7);
+  --accent: #3b63f6;
   --accent-ink: #ffffff;
-  --good: #17784a;
-  --bad: #bb3030;
-  --warn: #9a6210;
-  --f-found: #0a7a72;
+  --good: #0f9b72;
+  --bad: #d2384a;
+  --warn: #9a6a10;
+  --f-found: #0a8077;
   --f-atom: #4a43bf;
   --f-rx: #b9520b;
   --f-state: #176fa6;
   --f-nuc: #9c2d70;
   --f-life: #557a12;
   --f-gen: #b02a3e;
-  --c1: #1a5ccc;
+  --c1: #3b63f6;
   --c2: #c4560c;
   --c3: #0a8077;
-  --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
-  --body: 'Atkinson Hyperlegible', 'Segoe UI', system-ui, sans-serif;
+  --aur1: rgba(84, 120, 255, .16);
+  --aur2: rgba(64, 196, 190, .13);
+  --aur3: rgba(150, 110, 255, .1);
+  --display: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+  --body: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --r: 12px;
-  --shadow-1: 0 1px 2px rgba(16, 32, 43, .05), 0 10px 26px -18px rgba(16, 32, 43, .3);
-  --shadow-2: 0 2px 4px rgba(16, 32, 43, .06), 0 18px 40px -20px rgba(16, 32, 43, .38);
+  --r: 18px;
+  --r-s: 12px;
+  --shadow-1: 0 1px 2px rgba(20, 30, 60, .04), 0 16px 36px -24px rgba(20, 30, 60, .3);
+  --shadow-2: 0 2px 4px rgba(20, 30, 60, .05), 0 24px 50px -26px rgba(20, 30, 60, .38);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0e1519; --surface: #141d22; --raised: #19242a; --ink: #e2eaee; --muted: #93a3ac; --line: #2a3840;
-    --accent: #6f9dff; --accent-ink: #0b1220; --good: #4cc286; --bad: #ff7272; --warn: #e3a948;
+    --bg: #0a0e19; --surface: rgba(27, 34, 56, .52); --raised: rgba(38, 46, 74, .78); --solid: #1a2138;
+    --ink: #e8ecf8; --muted: #98a3bd; --line: rgba(255, 255, 255, .1); --glassline: rgba(255, 255, 255, .13);
+    --accent: #7e9bff; --accent-ink: #0a0e19; --good: #3fd0a4; --bad: #ff7a86; --warn: #e5b45a;
     --f-found: #38c2b6; --f-atom: #9a94ff; --f-rx: #f39150; --f-state: #5cb4ec; --f-nuc: #ea78bb; --f-life: #a3d15a; --f-gen: #ff7a8c;
-    --c1: #6f9dff; --c2: #f39150; --c3: #38c2b6;
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, .45), 0 12px 28px -18px rgba(0, 0, 0, .65);
-    --shadow-2: 0 2px 6px rgba(0, 0, 0, .45), 0 20px 44px -20px rgba(0, 0, 0, .7);
+    --c1: #7e9bff; --c2: #f39150; --c3: #38c2b6;
+    --aur1: rgba(96, 130, 255, .2); --aur2: rgba(52, 206, 196, .12); --aur3: rgba(160, 120, 255, .14);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .4), 0 18px 40px -24px rgba(0, 0, 0, .7);
+    --shadow-2: 0 2px 6px rgba(0, 0, 0, .4), 0 26px 54px -26px rgba(0, 0, 0, .78);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0e1519; --surface: #141d22; --raised: #19242a; --ink: #e2eaee; --muted: #93a3ac; --line: #2a3840;
-  --accent: #6f9dff; --accent-ink: #0b1220; --good: #4cc286; --bad: #ff7272; --warn: #e3a948;
-  --f-found: #38c2b6; --f-atom: #9a94ff; --f-rx: #f39150; --f-state: #5cb4ec; --f-nuc: #ea78bb; --f-life: #a3d15a; --f-gen: #ff7a8c;
-  --c1: #6f9dff; --c2: #f39150; --c3: #38c2b6;
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, .45), 0 12px 28px -18px rgba(0, 0, 0, .65);
-  --shadow-2: 0 2px 6px rgba(0, 0, 0, .45), 0 20px 44px -20px rgba(0, 0, 0, .7);
-  color-scheme: dark;
+  --bg: #0a0e19; --surface: rgba(27, 34, 56, .52); --raised: rgba(38, 46, 74, .78); --solid: #1a2138;
+    --ink: #e8ecf8; --muted: #98a3bd; --line: rgba(255, 255, 255, .1); --glassline: rgba(255, 255, 255, .13);
+    --accent: #7e9bff; --accent-ink: #0a0e19; --good: #3fd0a4; --bad: #ff7a86; --warn: #e5b45a;
+    --f-found: #38c2b6; --f-atom: #9a94ff; --f-rx: #f39150; --f-state: #5cb4ec; --f-nuc: #ea78bb; --f-life: #a3d15a; --f-gen: #ff7a8c;
+    --c1: #7e9bff; --c2: #f39150; --c3: #38c2b6;
+    --aur1: rgba(96, 130, 255, .2); --aur2: rgba(52, 206, 196, .12); --aur3: rgba(160, 120, 255, .14);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .4), 0 18px 40px -24px rgba(0, 0, 0, .7);
+    --shadow-2: 0 2px 6px rgba(0, 0, 0, .4), 0 26px 54px -26px rgba(0, 0, 0, .78);
+    color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
-body { background: radial-gradient(1100px 520px at 88% -140px, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%), radial-gradient(900px 480px at -120px 60px, color-mix(in srgb, var(--c3) 6%, transparent), transparent 70%), var(--bg); background-attachment: fixed; color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55; margin: 0; }
+body { background: radial-gradient(760px 460px at 10% -80px, var(--aur1), transparent 66%), radial-gradient(680px 420px at 96% 6%, var(--aur2), transparent 66%), radial-gradient(560px 420px at 50% 115%, var(--aur3), transparent 66%), var(--bg); background-attachment: fixed; color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55; margin: 0; }
 ::selection { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
 p { margin: 0; }
@@ -453,6 +463,46 @@ table.t.mem-sheet td, table.t.mem-missed td { vertical-align: top; overflow-wrap
 .mem-sheet.covered tr.peek .ans-c > * { filter: none; opacity: 1; }
 .nuc { display: inline-flex; flex-direction: column; font-size: 0.55em; line-height: 1.05; vertical-align: middle; text-align: right; margin-right: 1px; }
 @media (prefers-reduced-motion: reduce) { .mem-card { animation: none; } .mem-bar i, .mem-prog i { transition: none; } }
+
+/* ================= Ground Glass skin ================= */
+.topbar { background: color-mix(in srgb, var(--bg) 52%, transparent); border-bottom: 1px solid var(--glassline); }
+.topbar, .lab-grid > section, .rail > section, .watch, .panel-card, .review-cta, .lesson-cta, .mem-rail-link, .tool, .mem-chap, .mem-how, .mem-card, .pager a, .hero-visual { -webkit-backdrop-filter: blur(16px) saturate(1.35); backdrop-filter: blur(16px) saturate(1.35); }
+.lab-grid > section, .rail > section, .watch, .panel-card, .mem-how, .review-cta, .lesson-cta, .mem-rail-link, .tool, .mem-chap, .mem-card, .pager a, .hero-visual { background: var(--surface); border-color: var(--glassline); }
+.review-cta, .lesson-cta { border-radius: var(--r); }
+.tool, .mem-chap, .mem-rail-link { border-radius: 16px; }
+.mem-card { border-radius: 20px; border-color: var(--glassline); border-top-color: var(--fam, var(--accent)); }
+.ls-step { border-top-color: var(--fam, var(--accent)); }
+.pager a { border-radius: 14px; }
+.hero-visual { border-radius: var(--r); }
+.hero-stats div { background: var(--raised); border-radius: 14px; border-color: var(--glassline); }
+.mem-chap { border-left: 4px solid color-mix(in srgb, var(--fam) 60%, var(--glassline)); background: var(--surface); }
+.tile { background: var(--raised); border: 1px solid var(--glassline); border-radius: 14px; box-shadow: var(--shadow-1); }
+.tile:hover { border-color: color-mix(in srgb, var(--fam) 55%, var(--glassline)); box-shadow: 0 14px 32px -14px color-mix(in srgb, var(--fam) 45%, transparent); }
+.weak-item { background: var(--raised); border-radius: var(--r-s); }
+.btn { border-radius: 999px; padding: 8px 17px; }
+.seg button, .chip { border-color: var(--line); }
+.choice, .fb, .callout, .kv div, .ls-ck, .tutor-out, .review, .q .eqline { border-radius: var(--r-s); }
+input:not([type]), input[type="text"], select { border-radius: var(--r-s); }
+.stepbox { border-radius: var(--r-s); }
+.stepbox button { width: 40px; }
+.canvas-wrap { border-radius: 14px; background: var(--solid); }
+.story-stage { background: radial-gradient(120% 90% at 50% 40%, var(--solid), color-mix(in srgb, var(--bg) 60%, var(--solid))); }
+.ls-ex { border-radius: 6px var(--r-s) var(--r-s) 6px; }
+.ls-fig, .ls-tip, .ls-trap { border-radius: var(--r-s); }
+.ls-fig { background: var(--raised); }
+.grade-badge { border-radius: 16px; background: var(--raised); border-color: var(--glassline); box-shadow: var(--shadow-1); }
+.brand .cell { border-radius: 8px; }
+.msg.claude { background: var(--raised); }
+.exbar, .mem-prog, .mem-bar { border-radius: 999px; }
+.fb, .callout { background: var(--raised); }
+.callout { background: color-mix(in srgb, var(--accent) 10%, var(--raised)); }
+.callout.good { background: color-mix(in srgb, var(--good) 12%, var(--raised)); }
+.callout.bad { background: color-mix(in srgb, var(--bad) 11%, var(--raised)); }
+.callout.warn { background: color-mix(in srgb, var(--warn) 12%, var(--raised)); }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lab-grid > section, .rail > section, .watch, .panel-card, .mem-how, .review-cta, .lesson-cta, .mem-rail-link, .tool, .mem-chap, .mem-card, .pager a, .hero-visual { background: color-mix(in srgb, var(--solid) 94%, var(--bg)); }
+  .topbar { background: var(--bg); }
+}
 </style>
 </head>
 <body>
