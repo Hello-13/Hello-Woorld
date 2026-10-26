@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { xrayMaterial, inferno } from './effects.js';
 import { systemColor } from './systems.js';
+import { clipMaterial } from './section.js';
 
 export const MODES = ['studio', 'xray', 'blueprint', 'systems', 'thermal', 'pressure'];
 
@@ -95,6 +96,9 @@ export class RenderModes {
     this.thermalMats = new Map();
     this.cp = pressureMaterial();
     this.cpBody = new THREE.MeshStandardMaterial({ color: 0x8e959c, roughness: 0.7, metalness: 0.1 });
+    // Section cut (engine/section.js): its shared plane list; every material a mesh is given below is
+    // handed to clipMaterial() with it, so the cut follows the mesh through every mode and vehicle.
+    this.clippingPlanes = null;
   }
 
   /** X-ray material dimmed to weight w (0..1): dense rows of blades or vanes set a low weight so the
@@ -189,11 +193,12 @@ export class RenderModes {
     for (const m of this.meshes(vehicle)) {
       const edges = m.userData.edges;
       const ghosted = focus && !focus.has(partOf(m));
-      if (m.userData.decal) { m.visible = mode === 'studio' && !ghosted; continue; }
+      if (m.userData.decal) { m.visible = mode === 'studio' && !ghosted; clipMaterial(m.material, this.clippingPlanes); continue; }
       if (ghosted) {
         m.material = this.ghostMat;
         if (edges) edges.visible = false;
         m.castShadow = false;
+        clipMaterial(m.material, this.clippingPlanes);
         continue;
       }
       if (mode === 'studio') {
@@ -232,6 +237,8 @@ export class RenderModes {
         if (edges) edges.visible = false;
         m.castShadow = true;
       }
+      clipMaterial(m.material, this.clippingPlanes);
+      if (m.userData.edges) clipMaterial(m.userData.edges.material, this.clippingPlanes);
     }
     for (const fx of this.fxObjects(vehicle)) {
       if (fx.userData.keepInModes) continue;
@@ -261,6 +268,7 @@ export class RenderModes {
     for (const m of this.meshes(vehicle)) {
       if (m.userData.decal || (this.focus && !this.focus.has(partOf(m)))) continue;
       m.material = this.thermalMaterial(this.temperature(vehicle, m), vehicle.thermalRange || [200, 1200]);
+      clipMaterial(m.material, this.clippingPlanes);
     }
   }
 }

@@ -1,15 +1,16 @@
-// Environment sets: HDRI image-based lighting (Poly Haven CC0), a Preetham physical sky,
-// floors and backdrops for each "look", a starfield, and an Earth-limb backdrop that keeps
-// the correct angular size for any altitude (used in orbit and during ascent).
+// Environment sets: HDRI image-based lighting (Poly Haven CC0), the open-sky dome with its
+// real-scale cloud deck (sky.js), floors and backdrops for each "look", a starfield, and an
+// Earth-limb backdrop that keeps the correct angular size for any altitude (used in orbit and
+// during ascent).
 
 import * as THREE from 'three';
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
-import { Sky } from 'three/addons/objects/Sky.js';
 import { skyDome, gridFloor } from './effects.js';
 import { concrete, floorMarkings, fbm } from './surface.js';
 import { rng } from './materials.js';
 import { createEarth, setEarthDetail } from './earth.js';
 import { Showroom, showroomEnvironment } from './showroom.js';
+import { SkyDome, skyEnvironment } from './sky.js';
 
 const R_EARTH_KM = 6371;
 
@@ -30,16 +31,17 @@ export const LOOKS = {
     exposure: 1.05, bgRotation: -2.45, floor: 'studio', turntable: true, maxDistance: 26,
     key: { color: 0xffffff, intensity: 2.8 }, hemi: [0xffffff, 0x202020, 0.15], rim: 1.1,
   },
+  // In flight: the sky dome draws the 8K / 4K plate of the same pure-sky HDRI above the horizon and
+  // the cloud deck below it; the key light is the plate's sun, the hemisphere light is sky above
+  // and cloud-top bounce below, and the altitude set on the environment grades all of it (sky.js).
   sky: {
-    label: 'Open sky', hdri: 'sky', hdriSun: [0.6, 48], background: 'sky', bgRotation: -0.28, envIntensity: 1.0,
-    exposure: 1.0, floor: 'clouds', turntable: false, fog: [0xaecbe8, 0.0016],
-    sky: { turbidity: 3.2, rayleigh: 1.1, mie: 0.004, g: 0.82 },
-    key: { color: 0xfff6e8, intensity: 3.4 }, hemi: [0xa8c8ff, 0x8a8f96, 0.45], rim: 0.0,
+    label: 'Open sky', hdri: 'sky', hdriSun: [0.631, 42.9], background: 'sky', plate: 'sky', plateGain: 1.0, bgRotation: -0.28, envIntensity: 0.85,
+    exposure: 1.0, floor: null, turntable: false, fog: [0xa9bbd4, 0.0004], envBelow: 0xd9d3c9,
+    key: { color: 0xfff6ea, intensity: 3.6 }, hemi: [0x7aa0ee, 0xd9d3c9, 0.7], rim: 0.0,
   },
   pad: {
     label: 'Launch pad', hdri: 'dawn', hdriSun: [0.79, 3.9], background: 'hdri', plate: 'dawn', plateGain: 1.9, bgIntensity: 0.85, bgRotation: 1.12, envIntensity: 0.8,
     exposure: 1.0, floor: 'pad', turntable: false, fog: [0x8a7f8c, 0.0011],
-    sky: { turbidity: 3.2, rayleigh: 3.0, mie: 0.006, g: 0.88 },
     key: { color: 0xffb27a, intensity: 2.0 }, hemi: [0x8a9ac8, 0x3a3228, 0.35], rim: 0.0, floods: true,
   },
   orbit: {
@@ -226,35 +228,6 @@ function padGround() {
   return g;
 }
 
-function cloudDeck() {
-  const g = new THREE.Group();
-  const tex = new THREE.TextureLoader().load('assets/earth/clouds.jpg');
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(3, 1.5);
-  const layers = [];
-  for (const [y, op, rep] of [[-60, 0.95, 1], [-38, 0.5, 1.7]]) {
-    const t = tex.clone();
-    t.repeat.set(3 * rep, 1.5 * rep);
-    t.needsUpdate = true;
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshLambertMaterial({ color: 0xffffff, alphaMap: t, transparent: true, opacity: op, depthWrite: false, fog: true }));
-    m.rotation.x = -Math.PI / 2;
-    m.position.y = y;
-    m.userData.fx = true;
-    m.userData.noAO = true;
-    m.renderOrder = -4;
-    g.add(m);
-    layers.push(t);
-  }
-  const sea = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshStandardMaterial({ color: 0x1d3a52, roughness: 0.25, metalness: 0.1 }));
-  sea.rotation.x = -Math.PI / 2;
-  sea.position.y = -140;
-  sea.userData.fx = true;
-  sea.userData.noAO = true;
-  g.add(sea);
-  g.userData.layers = layers;
-  return g;
-}
-
 function turntable() {
   const g = new THREE.Group();
   // machined, hard-anodised turntable with concentric tool marks
@@ -336,20 +309,15 @@ export class Environment {
       this.floods.push(s);
     }
 
-    // backdrops
-    this.sky = new Sky();
-    this.sky.scale.setScalar(1800);
-    this.sky.material.fragmentShader = this.sky.material.fragmentShader
-      .replace('uniform vec3 up;', 'uniform vec3 up;\n\t\tuniform float skyFade;\n\t\tuniform float skyScale;\n\t\tuniform vec3 hazeColor;')
-      .replace('gl_FragColor = vec4( retColor, 1.0 );', 'retColor = mix(retColor, hazeColor, smoothstep(0.0, -0.18, direction.y) * skyFade);\n\t\t\tgl_FragColor = vec4( retColor * skyFade * skyScale, 1.0 );');
-    this.sky.material.uniforms.skyFade = { value: 1 };
-    this.sky.material.uniforms.skyScale = { value: 0.3 };
-    this.sky.material.uniforms.hazeColor = { value: new THREE.Color(0x6b6f80) };
-    this.sky.userData.fx = true;
-    this.sky.userData.noAO = true;
-    this.sky.renderOrder = -10;
-    this.sky.visible = false;
+    // backdrops: the flight sky (plate above the horizon, procedural cloud deck below it)
+    this.sky = new SkyDome();
     scene.add(this.sky);
+    /** Flight state for the sky look, set by the labs each frame: altitude (m) grades the sky and
+     *  places the cloud deck; cloudSpeed (m/s, the airspeed) scrolls the deck aft; unitMetres is
+     *  the scene's scale (metres per unit) for the camera's own offset above the deck. */
+    this.altitude = 11000;
+    this.cloudSpeed = 0;
+    this.unitMetres = 1.7;
 
     this.gradient = skyDome();
     this.gradient.visible = false;
@@ -367,7 +335,7 @@ export class Environment {
     scene.add(this.ground);
     this.showroom = new Showroom(stage);
     scene.add(this.showroom.dome);
-    this.floors = { hangar: hangarFloor(), studio: studioCove(), pad: padGround(), clouds: cloudDeck(), showroom: this.showroom.group };
+    this.floors = { hangar: hangarFloor(), studio: studioCove(), pad: padGround(), showroom: this.showroom.group };
     for (const f of Object.values(this.floors)) { f.visible = false; this.ground.add(f); }
     this.turn = turntable();
     this.ground.add(this.turn.group);
@@ -379,7 +347,6 @@ export class Environment {
     this.earthDip = null;        // angle of the Earth's centre below the horizontal when it is a ball in the sky
     this.earthDrift = 0;
     this.sunDir = new THREE.Vector3(0.4, 0.8, 0.3).normalize();
-    this.cloudSpeed = 0;
   }
 
   async loadHDRI(name) {
@@ -397,17 +364,19 @@ export class Environment {
   /** The backdrop photograph for an HDRI look: Poly Haven's 8K (or 4K) tonemapped render of the same
    *  panorama, far sharper than the 2K HDR that lights the scene. plateGain matches its median
    *  brightness to the HDR's, so bgIntensity means the same thing for both. */
-  loadPlate(name) {
+  loadPlate(name, { mipmaps = true } = {}) {
     const url = `assets/hdri/${name}-${this.platesHires ? '8k' : '4k'}.jpg`;
-    if (!this.plates.has(url)) {
-      this.plates.set(url, new THREE.TextureLoader().loadAsync(url).then((t) => {
+    const key = mipmaps ? url : `${url}#flat`;
+    if (!this.plates.has(key)) {
+      this.plates.set(key, new THREE.TextureLoader().loadAsync(url).then((t) => {
         t.mapping = THREE.EquirectangularReflectionMapping;
         t.colorSpace = THREE.SRGBColorSpace;
-        t.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+        if (mipmaps) t.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+        else { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; }   // the sky dome magnifies the plate at every field of view
         return t;
       }).catch((e) => { console.warn('Backdrop failed', url, e); return null; }));
     }
-    return this.plates.get(url);
+    return this.plates.get(key);
   }
 
   /** 8K backdrops and Earth maps for the 4K / Ultra presets, when the GPU takes 8K textures. */
@@ -423,6 +392,14 @@ export class Environment {
   /** Put an HDRI look's backdrop behind the scene (plate when it has one, else the HDR itself). */
   async showBackdrop(name) {
     const L = LOOKS[name];
+    if (L.background === 'sky') {
+      // the plate goes to the sky dome, which draws it above the dipped horizon and the deck below
+      const plate = L.plate ? await this.loadPlate(L.plate, { mipmaps: false }) : null;
+      if (this.look !== name) return;
+      this.sky.setPlate(plate, L.bgRotation || 0);
+      this.sky.uniforms.plateGain.value = L.plateGain ?? 1;
+      return;
+    }
     const h = await this.loadHDRI(L.hdri);
     const plate = L.plate ? await this.loadPlate(L.plate) : null;
     if (this.look !== name || this.overlay || this.space || L.background !== 'hdri') return;
@@ -523,7 +500,6 @@ export class Environment {
     if (L.background === 'space') this.scene.background = new THREE.Color(0x000000);
     this.renderer.toneMappingExposure = L.exposure;
     this.scene.fog = L.fog ? new THREE.FogExp2(L.fog[0], L.fog[1]) : null;
-    if (L.fog) this.sky.material.uniforms.hazeColor.value.set(L.fog[0]);
 
     // sun / key light
     const key = this.lights.key;
@@ -546,15 +522,7 @@ export class Environment {
     this.lights.rim.intensity = L.rim;
     this.lights.rim2.intensity = L.rim2 || 0;
     for (const f of this.floods) f.intensity = L.floods ? 140 : 0;
-    if (L.sky) {
-      const u = this.sky.material.uniforms;
-      u.turbidity.value = L.sky.turbidity;
-      u.rayleigh.value = L.sky.rayleigh;
-      u.mieCoefficient.value = L.sky.mie;
-      u.mieDirectionalG.value = L.sky.g;
-      u.sunPosition.value.copy(dir);
-      u.skyFade.value = 1;
-    }
+    if (L.background === 'sky') this.sky.setSun(dir, L.key.color);
     st.controls.maxDistance = L.maxDistance || 220;
 
     // earth backdrop
@@ -567,12 +535,14 @@ export class Environment {
 
     // image-based lighting
     this.scene.environmentIntensity = L.envIntensity;
-    if (L.background === 'hdri') this.showBackdrop(name);
+    if (L.background === 'hdri' || L.background === 'sky') this.showBackdrop(name);
     if (L.hdri) {
       const req = name;
       this.loadHDRI(L.hdri).then((h) => {
         if (!h || this.look !== req) return;
-        this.scene.environment = h.env;
+        // a flight look lights from the sky above and the cloud deck below (the HDR's lower half is a mirrored sky)
+        if (L.envBelow && !h.flightEnv) h.flightEnv = skyEnvironment(this.pmrem, h.equirect, { cloud: L.envBelow });
+        this.scene.environment = L.envBelow ? h.flightEnv : h.env;
         this.scene.environmentRotation.set(0, L.bgRotation || 0, 0);
       });
     } else if (L.env === 'showroom') {
@@ -672,8 +642,19 @@ export class Environment {
     this.stars.material.uniforms.dpr.value = this.renderer.getPixelRatio();
     this.stars.visible = this.stars.material.uniforms.opacity.value > 0.005;
     this.turn.ringMat.emissiveIntensity = 2.4 + Math.sin(this.stage.time * 1.4) * 0.35;
-    if (this.floors.clouds.visible) {
-      for (const t of this.floors.clouds.userData.layers) t.offset.x -= dt * this.cloudSpeed * 0.0004;
+    if (this.sky.visible) {
+      // the flight sky: deck detail by preset, then the altitude grading carried to the fog and lights
+      const q = this.stage.quality;
+      this.sky.tier = q === 'performance' ? { detail: 0, shadows: 0 } : q === 'balanced' ? { detail: 0, shadows: 1 } : { detail: 1, shadows: 1 };
+      this.sky.update(dt, camera, { altitude: this.altitude, speed: this.cloudSpeed, unitMetres: this.unitMetres });
+      const g = this.sky.grade;
+      if (this.scene.fog) {
+        this.scene.fog.color.setRGB(g.haze[0], g.haze[1], g.haze[2]);
+        this.scene.fog.density = (LOOKS.sky.fog?.[1] || 0.0004) * (1 - 0.6 * THREE.MathUtils.smoothstep(this.altitude, 2000, 16000));
+      }
+      if (!this.vehicleLighting?.sky?.hemi) this.lights.hemi.color.copy(g.skyLight);
+      if (!this.vehicleLighting?.sky?.key) this.lights.key.color.copy(g.key);
+      this.sky.setSun(this.sunDir, g.key);
     }
     if (this.earth && this.earth.group.visible) {
       // keep the Earth's angular radius right for the current altitude: sin ρ = R / (R + h)

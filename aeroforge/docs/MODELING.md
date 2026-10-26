@@ -116,6 +116,19 @@ figures), `sources`, `root`, `parts`, `view: { dir, fill }`, `displaySize`, `the
 lifting surfaces carrying the `chord` attribute from `wingPanel`). Keep every method the
 vehicle's lab, tour and the app already call on it.
 
+## The open-sky look (in flight)
+
+`engine/sky.js` draws the flight backdrop in one pass on a camera-centred dome: the 8K / 4K
+plate of a Poly Haven pure-sky HDRI above the horizon (decoded back to HDR, so bloom sees the
+sun) and a procedural, real-scale cloud deck below it, on a sphere of Earth radius so the horizon
+dips with altitude. A lab that flies its vehicle sets three things on `stage.env` every frame:
+`altitude` (m, from the lab's own state: it grades the zenith, the haze, the fog, the lights and
+places the cloud tops about 3 km below the aircraft), `cloudSpeed` (true airspeed, m/s: the deck
+scrolls aft at it, nose toward +x) and optionally `unitMetres` (metres per scene unit, i.e.
+`1 / v._fitScale`). The look's lighting on the vehicle (key = the plate's sun, hemisphere = sky
+above / cloud bounce below, IBL = the HDR over a lit deck) follows the same altitude, so a
+vehicle's `lighting.sky` override is only needed for paint that misbehaves.
+
 ## Checking your work
 
 ```bash

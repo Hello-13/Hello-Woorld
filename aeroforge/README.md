@@ -28,6 +28,22 @@ estimates unless a published figure is cited, and the inspector says which.
   yaw, thrust vectoring, the weapons bays opening, the rotor's swashplate tilting, the thrust
   reverser deploying, solar arrays turning, flow through the engine. The step card can be folded
   away to see the whole model.
+- **Test me** — a ten-question quiz generated from the vehicle on deck (press `T` or the button
+  beside the tour). Find a named part by clicking it on the model (three tries, wrong clicks name
+  what you hit and dim it, then the part is revealed; interior parts are asked in X-ray), name a
+  highlighted part among four (distractors from the same system), say which system a part belongs
+  to, and pick a tour step's key idea or fill in a number blanked out of its key line. Score,
+  streak and time are kept; the end card lists the missed parts with a review that focuses each
+  in turn, and the best score per vehicle is remembered in the browser.
+- **Section cut** — slice the vehicle with a cutting plane (press `C` or the Section toggle under
+  the render modes): choose a station (longitudinal), waterline (vertical) or buttline (lateral)
+  cut, slide it through the vehicle with its position shown in metres from the nose, bottom or
+  centreline, and flip it to keep the other side. It works in every render mode and with the
+  exploded view, and walls seen through the cut stay solid.
+- **Part search** — press `/` (or *Find a part* in the nav) and type: parts are filtered by name,
+  system and the words of their descriptions as you type, with system colour chips; Enter or a
+  click focuses and selects the part as a click on the model would, switching to X-ray when the
+  part is inside.
 - **Systems view** — every part belongs to a real system (structure, propulsion, fuel, flight
   controls, hydraulics, electrical, avionics, rotor and drive, optics, attitude control …),
   coloured by system with a legend; click a system to isolate it and trace it end to end.
@@ -107,8 +123,12 @@ file system will not work because browsers block ES modules on `file://`.
 | `X` | Toggle exploded view |
 | `L` | Toggle callouts |
 | `R` | Reset the camera |
-| `Esc` | Clear the selection, then close the engineering dossier |
+| `T` | Test me: start (or leave) the ten-question quiz on this vehicle |
+| `C` | Toggle the section cut (axis buttons, slider and Flip appear under the render modes) |
+| `/` | Find a part: type to filter, `↑` `↓` to choose, Enter to focus it, `Esc` to clear |
+| `Esc` | Leave the quiz or the search, clear the selection, then close the engineering dossier |
 | **Start guided tour** | Step through the vehicle's lesson (Back / Next, or click a progress dot) |
+| **Test me** | Ten mixed questions on the vehicle; Skip reveals the answer, Enter moves on |
 | **Engineering lab** / **Specifications** / **Mission log** | Open the dossier panel on that section |
 
 A vehicle can be deep-linked with `#fighter`, `#helicopter`, `#uav`, `#turbofan`, `#rocket`,
@@ -126,6 +146,9 @@ values: 1976 Standard Atmosphere tables, Hohmann transfers and Kepler's equation
 orbit insertion, GE90-115B take-off thrust and station temperatures, Breguet best-endurance speed,
 rotor hover power and the diffraction limit. Each vehicle's tests also check its model against
 published dimensions and counts, and that every tour step points at real parts.
+`tests/learn.test.mjs` checks the quiz generator (question mix, same-system distractors, no twin
+parts as distractors, number blanks that leave designations and dates alone) and the part-search
+ranking (name before system before description, every query word must match).
 
 ## Layout
 
@@ -137,13 +160,15 @@ aeroforge/
 │   ├── fleet.js           the vehicles, their labs and environments (each loads as its own module)
 │   ├── physics/           atmosphere, aero, launch, turbofan, orbital, endurance, rotor, optics (no DOM)
 │   ├── engine/            stage (renderer + post-processing), environments, showroom, Earth, render modes,
-│   │                      picking, callouts, force arrows, decals, procedural surfaces,
-│   │                      geometry toolkit (loft / NACA wing / lathe / lattice), shaders, orbit scene
+│   │                      section cut (clipping plane), picking, callouts, force arrows, decals,
+│   │                      procedural surfaces, geometry toolkit (loft / NACA wing / lathe / lattice),
+│   │                      shaders, orbit scene
 │   ├── models/            one entry file per vehicle, with its subsystems in f22/, uh60/, mq9/,
 │   │                      ge90/, falcon/, gps3/, hst/
 │   ├── labs/              one engineering lab per vehicle
-│   ├── learn/             guided-tour player and one tour per vehicle (learn/tours/)
-│   └── ui/                controls, canvas charts, event log
+│   ├── learn/             guided-tour player and one tour per vehicle (learn/tours/), the Test me quiz
+│   │                      generator and player, part-search ranking
+│   └── ui/                controls, canvas charts, event log, the part-search palette
 ├── assets/                HDR environments, Earth textures (see assets/CREDITS.md)
 ├── docs/MODELING.md       the modelling standard every vehicle is held to
 └── tests/                 physics and per-vehicle model tests (node --test)

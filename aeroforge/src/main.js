@@ -1,5 +1,5 @@
-// AEROFORGE — app shell: fleet, render modes, picking, exploded view, part inspector,
-// engineering labs and the mission event log.
+// AEROFORGE — app shell: fleet, render modes, picking, exploded view, section cut, part inspector,
+// part search, guided tours, the Test me quiz, engineering labs and the mission event log.
 
 import * as THREE from 'three';
 import { Stage, solidBounds } from './engine/stage.js';
@@ -11,16 +11,20 @@ import { triangleCount } from './engine/geometry.js';
 import { INFERNO_CSS } from './engine/effects.js';
 import { LOOKS } from './engine/environment.js';
 import { TourPlayer } from './learn/tour.js';
-import { loadTours } from './learn/tours.js';
+import { loadTours, TOURS } from './learn/tours.js';
+import { QuizPlayer } from './learn/quiz.js';
+import { SectionCut, AXES, AXIS_ORDER } from './engine/section.js';
+import { PartSearch } from './ui/search.js';
 import { SYSTEMS, systemColor } from './engine/systems.js';
 import { QUALITY } from './engine/stage.js';
 import { setTextureDetail } from './engine/surface.js';
 import { EventLog } from './ui/log.js';
-import { el, fmt } from './ui/dom.js';
+import { el, fmt, segmented } from './ui/dom.js';
 import { FLEET } from './fleet.js';
 
 const MODE_LABEL = { studio: 'Studio', xray: 'X-ray', blueprint: 'Blueprint', systems: 'Systems', thermal: 'Thermal', pressure: 'Pressure' };
 const SEE_THROUGH = new Set(['xray', 'blueprint', 'systems']);   // modes where clicks pass through skins
+const SECTION_NOSE = { turbofan: 'intake', hubble: 'aperture', satellite: 'forward end' };   // what a station cut measures from
 
 const $ = (id) => document.getElementById(id);
 const boot = $('boot');
@@ -53,8 +57,9 @@ async function start() {
     return;
   }
   const modes = new RenderModes(stage);
+  const section = new SectionCut(stage, modes);
   // console handle for tinkering: __aeroforge.stage, .modes, .FLEET, .app
-  window.__aeroforge = { stage, modes, FLEET, get app() { try { return app; } catch { return undefined; } } };   // undefined until boot has made it
+  window.__aeroforge = { stage, modes, FLEET, section, get app() { try { return app; } catch { return undefined; } } };   // undefined until boot has made it
   const log = new EventLog($('log'));
   // Ultra and 4K paint the large skins and stencils at twice the resolution for 4K close-ups
   setTextureDetail(stage.quality === '4k' || stage.quality === 'ultra' ? 2 : 1);
@@ -274,11 +279,11 @@ async function start() {
     if (narrow()) { stage.setViewShift(0); stage.frameCover = 0; stage.frameCoverY = 0; return; }
     const w = Math.max(1, stage.container.clientWidth), h = Math.max(1, stage.container.clientHeight);
     const right = dossierOpen() ? dossier.offsetWidth / w : 0;
-    const left = tour.active ? 0.15 : dossierOpen() ? (app.orbit ? 0.13 : 0.07) : 0.14;
+    const left = tour.active || quiz.active ? 0.15 : dossierOpen() ? (app.orbit ? 0.13 : 0.07) : 0.14;
     // The colour legend (Systems / Thermal / Pressure) narrows the free view's framing but does not
     // shift it: shifting would push the subject under the hero copy. Tour steps frame themselves
     // around the legend, so it does not count there.
-    const key = !tour.active && !dossierOpen() && !legend.hidden && legend.offsetWidth ? (legend.offsetWidth + 38) / w : 0;
+    const key = !tour.active && !quiz.active && !dossierOpen() && !legend.hidden && legend.offsetWidth ? (legend.offsetWidth + 38) / w : 0;
     // nav bar above; fleet index and view tools below
     const top = 68 / h, bottom = 156 / h;
     stage.setViewShift(left - right / 2, (bottom - top) / 2);
@@ -286,14 +291,14 @@ async function start() {
     stage.frameCoverY = top + bottom;
   }
   const reframe = () => {
-    if (!tour.active && !app.orbit && !app.current?.state?.launching) stage.frameVehicle(app.current);
+    if (!tour.active && !quiz.active && !app.orbit && !app.current?.state?.launching) stage.frameVehicle(app.current);
   };
   window.addEventListener('resize', () => updateViewShift());
 
   // ------------------------------------------------------------------ picking & callouts
   const callouts = new Callouts((part) => selectPart(part));
   // labels keep clear of whatever interface panels are showing
-  const calloutPanels = ['.nav', '#hero', '.view-bar', '#part-card', '#tour', '#legend', '.hud-tools', '.fleet', '#dossier'];
+  const calloutPanels = ['.nav', '#hero', '.view-bar', '#part-card', '#tour', '#quiz', '#search', '#legend', '.hud-tools', '.fleet', '#dossier'];
   callouts.obstacles = () => {
     const box = stage.labels.domElement.getBoundingClientRect();
     const out = [];
@@ -315,7 +320,7 @@ async function start() {
   };
   function showHoverTip(part) {
     const ev = picker?.last;
-    if (!part || app.orbit || !ev || ev.pointerType === 'touch') { hoverTip.hidden = true; return; }
+    if (!part || app.orbit || quiz.active || !ev || ev.pointerType === 'touch') { hoverTip.hidden = true; return; }   // no names given away mid-quiz
     const info = part.userData.part;
     hoverTip.replaceChildren(
       el('span', { class: 'sys-dot', style: `background:${systemColor(info.system)}` }),
@@ -331,7 +336,8 @@ async function start() {
     enabled: () => !app.orbit,
     onHover: (part) => { app.hovered = part; refreshOutline(); showHoverTip(part); },
     accept: (part) => !(SEE_THROUGH.has(app.mode) && part.userData.part.skin) && (!modes.focus || modes.focus.has(part)),
-    onSelect: (part) => selectPart(part),
+    keeps: (point) => section.keeps(point),              // a section cut: clicks land on what is drawn
+    onSelect: (part) => (quiz.active ? quiz.onPick(part) : selectPart(part)),
   });
   function refreshOutline() {
     stage.setOutlined([app.selected, app.hovered].filter(Boolean));
@@ -400,6 +406,7 @@ async function start() {
     setMode, setExplode,
     log: (src, msg, level) => log.push(src, msg, level),
     onStart: () => {
+      if (quiz.active) quiz.stop({ silent: true });
       selectPart(null); setAutoRotate(false); document.body.classList.add('is-touring');
       app.sysFocus = null;
       callouts.setVisible(true);
@@ -413,6 +420,106 @@ async function start() {
     },
   });
   tourBtn.addEventListener('click', () => (tour.active ? tour.stop() : tour.start(app.entry.id)));
+
+  // ------------------------------------------------------------------ test me (quiz)
+  /** Tour-style framing: the camera looks at these objects from a direction, filling the free frame. */
+  function frameParts(objs, dirArr, fill = 1) {
+    const box = new THREE.Box3();
+    (app.current.root.parent || app.current.root).updateMatrixWorld(true);
+    for (const o of objs) box.union(solidBounds(o));
+    if (box.isEmpty()) return;
+    const sph = box.getBoundingSphere(new THREE.Sphere());
+    const dir = new THREE.Vector3(...dirArr).normalize();
+    const { tanV, tanH } = stage.frameTan();
+    const dist = Math.max(3, (sph.radius / Math.min(tanV, tanH)) * fill * 1.05);
+    stage.flyTo(sph.center.clone().addScaledVector(dir, Math.min(dist, stage.controls.maxDistance * 0.92)), sph.center, 1.3);
+  }
+  const quizBtn = $('quiz-start');
+  const quiz = new QuizPlayer($('quiz'), {
+    getVehicle: () => app.current,
+    getId: () => app.entry.id,
+    steps: (id) => TOURS[id] || [],
+    otherSteps: (id) => Object.keys(TOURS).filter((k) => k !== id).flatMap((k) => TOURS[k] || []),
+    isExterior: (g) => picker.visibleFromOutside(g, app.current.root),
+    setMode: (m, o) => setMode(m, o),
+    focusPart,
+    frame: () => stage.frameVehicle(app.current),
+    highlight: (g) => { stage.setOutlined(g ? [g] : []); modes.apply(app.current, app.mode, g); },
+    keep: (groups) => modes.setFocus(app.current, groups),
+    spotlight: (step) => {
+      const v = app.current;
+      const focus = (step?.focus || []).map((n) => v.parts.find((p) => p.userData.part.name === n)).filter(Boolean);
+      setMode(step?.mode || 'studio', { quiet: true });
+      modes.setFocus(v, focus.length ? focus : null);
+      frameParts(focus.length ? focus : [v.root], step?.view?.dir || v.view.dir, step?.view?.fill || 1);
+    },
+    snapshot: () => ({ mode: app.mode, explode: app.explodeTarget, pos: stage.camera.position.clone(), target: stage.controls.target.clone(), autoRotate: app.autoRotate, muted: !!callouts.muted }),
+    restore: (s) => {
+      if (!s) return;
+      setMode(s.mode, { quiet: true });
+      setExplode(s.explode);
+      callouts.setMuted(s.muted);
+      setAutoRotate(s.autoRotate);
+      refreshOutline();
+      stage.flyTo(s.pos, s.target, 1.2);
+    },
+    systemColor,
+    log: (src, msg, level) => log.push(src, msg, level),
+    onStart: () => {
+      selectPart(null); isolate(false); setAutoRotate(false); setExplode(0);
+      app.sysFocus = null; callouts.setFilter(null); callouts.setMuted(true);   // labels would give the answers away
+      hoverTip.hidden = true;
+      search.close();
+      document.body.classList.add('is-quizzing');
+      quizBtn.textContent = 'Exit test';
+      updateViewShift();
+    },
+    onStop: () => {
+      document.body.classList.remove('is-quizzing');
+      quizBtn.textContent = 'Test me';
+      updateLegend();
+      updateViewShift();
+    },
+  });
+  const startQuiz = () => { if (app.orbit) return; if (tour.active) tour.stop({ silent: true }); quiz.start(); };
+  quizBtn.addEventListener('click', () => (quiz.active ? quiz.stop() : startQuiz()));
+
+  // ------------------------------------------------------------------ section cut
+  const secToggle = $('section'), secTools = $('section-tools'), secCut = $('section-cut'), secOut = $('section-out');
+  const secAxis = segmented({ label: 'Cutting axis', options: AXIS_ORDER.map((k) => [k, AXES[k].label]), value: section.axis, onChange: (k) => { section.setAxis(k); log.push('VIEW', `Section cut along the ${AXES[k].label.toLowerCase()} · ${section.label()}`); } });
+  secAxis.el.classList.add('seg-axis');
+  $('section-axis').replaceWith(secAxis.el);
+  secCut.addEventListener('input', () => section.setFraction(+secCut.value / 100));
+  $('section-flip').addEventListener('click', () => { section.flip(); log.push('VIEW', `Section cut flipped · ${section.label()}`); });
+  section.onChange = (sc) => { secOut.textContent = sc.box ? sc.label() : '—'; };
+  function setSection(on, { quiet = false } = {}) {
+    on = !!on && !app.orbit;
+    if (on === section.enabled) return;
+    section.setEnabled(on);
+    pressed(secToggle, on);
+    secTools.hidden = !on;
+    document.body.classList.toggle('has-section', on);
+    modes.apply(app.current, app.mode, app.selected);   // hands every mesh's material the cut (modes.js)
+    if (!quiet) log.push('VIEW', on ? `Section cut on · ${AXES[section.axis].label.toLowerCase()} ${section.label()}` : 'Section cut off');
+  }
+  secToggle.addEventListener('click', () => setSection(!section.enabled));
+
+  // ------------------------------------------------------------------ part search
+  const search = new PartSearch($('search'), {
+    getParts: () => app.current?.parts || [],
+    systemColor,
+    onHover: (g) => { app.hovered = g; refreshOutline(); },
+    onPick: (g) => {
+      // an interior part is shown in X-ray so it can be seen; a see-through mode already on is kept
+      if (!SEE_THROUGH.has(app.mode) && !picker.visibleFromOutside(g, app.current.root)) setMode('xray');
+      selectPart(g);
+      focusPart(g);
+    },
+    onOpen: () => document.body.classList.add('is-searching'),
+    onClose: () => { document.body.classList.remove('is-searching'); app.hovered = null; refreshOutline(); },
+  });
+  $('search-open').addEventListener('click', () => { if (!quiz.active && !app.orbit) search.toggle(); });
+  Object.assign(window.__aeroforge, { quiz, search, picker });
 
   // ------------------------------------------------------------------ inspector: specs & parts
   const massText = (info) => (info.mass == null ? '—' : info.massSource ? `${fmt.n(info.mass)} kg` : `≈ ${fmt.n(info.mass)} kg (estimate)`);
@@ -432,7 +539,7 @@ async function start() {
   /** Spotlight one subsystem: everything else is ghosted and the camera frames what is left. */
   function focusSystem(name) {
     const v = app.current;
-    if (!v || tour.active) return;
+    if (!v || tour.active || quiz.active) return;
     app.sysFocus = name;
     const parts = name ? v.parts.filter((p) => p.userData.part.system === name) : null;
     modes.setFocus(v, parts);
@@ -514,6 +621,7 @@ async function start() {
     polarLimit();
     stage.controls.minDistance = on ? 3 : 2;
     callouts.setVisible(app.labels && !on);
+    if (on) { setSection(false, { quiet: true }); search.close(); }
     orbitNote.hidden = !on;
     document.body.classList.toggle('is-orbit', on);
     updateViewShift();
@@ -545,6 +653,8 @@ async function start() {
     const f = FLEET.find((x) => x.id === id) || FLEET[0];
     if (app.entry === f) return;
     if (tour.active) tour.stop({ silent: true });
+    if (quiz.active) quiz.stop({ silent: true });
+    search.reset();
     app.lab?.dispose();
     if (app.orbit) setOrbitMode(false);
     if (app.current) { isolate(false); for (const p of app.current.parts) p.visible = true; }
@@ -563,6 +673,7 @@ async function start() {
     renderLooks();
     stage.setVehicle(v, { reveal: true });
     if (v._baseY == null) v._baseY = v.root.position.y;
+    section.attach(v, app.explode, { vertical: f.id === 'rocket', nose: SECTION_NOSE[f.id] || 'nose' });
     syncModeButtons();
     if (app.mode === 'pressure' && !v.aero) setMode('studio', { quiet: true });
     modes.apply(v, app.mode);
@@ -622,7 +733,8 @@ async function start() {
 
   // ------------------------------------------------------------------ keyboard
   window.addEventListener('keydown', (e) => {
-    if (e.target.closest?.('input[type="text"], textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target.closest?.('input[type="text"], input[type="search"], textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (quiz.active && e.key === 'Escape') { quiz.stop(); return; }
     if (tour.active) {
       if (e.key === 'ArrowRight') { tour.next(); e.preventDefault(); return; }
       if (e.key === 'ArrowLeft') { tour.prev(); e.preventDefault(); return; }
@@ -637,8 +749,12 @@ async function start() {
     else if (k === 'l') labelsBtn.click();
     else if (k === 'r') resetBtn.click();
     else if (k === 'f' && document.fullscreenEnabled) toggleFull();
+    else if (k === 't') { if (quiz.active) quiz.stop(); else startQuiz(); }
+    else if (k === 'c') setSection(!section.enabled);
+    else if (e.key === '/') { if (!quiz.active && !app.orbit) { search.show(); e.preventDefault(); } }
     else if (e.key === 'Escape') {
-      if (app.selected) { isolate(false); selectPart(null); } else if (dossierOpen() && !narrow()) setDossier(false);
+      if (search.open) search.close();
+      else if (app.selected) { isolate(false); selectPart(null); } else if (dossierOpen() && !narrow()) setDossier(false);
     }
   });
 

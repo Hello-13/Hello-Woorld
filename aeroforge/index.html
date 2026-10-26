@@ -32,6 +32,7 @@
   <div class="nav-tools">
     <label class="quality" for="quality"><span class="quality-label">Graphics</span> <select id="quality"></select></label>
     <span class="nav-fps" id="perf"><b id="res">--</b> <span class="nav-mp" id="mp"></span><span class="nav-sep" aria-hidden="true">·</span><b id="fps">--</b> fps</span>
+    <button type="button" class="nav-full nav-search" id="search-open" aria-keyshortcuts="/" title="Find a part (/)"><span>Find a part</span><kbd>/</kbd></button>
     <button type="button" class="nav-full" id="fullscreen" aria-pressed="false" hidden>Full screen</button>
   </div>
 </header>
@@ -47,6 +48,7 @@
     <dl class="hero-stats" id="hero-stats"></dl>
     <div class="hero-cta">
       <button type="button" class="btn btn-primary" id="tour-start">Start guided tour</button>
+      <button type="button" class="btn btn-line" id="quiz-start" aria-keyshortcuts="t" title="Ten questions on this vehicle (T)">Test me</button>
       <button type="button" class="btn btn-line" id="open-lab">Open engineering lab</button>
     </div>
     <p class="hud-hint">Drag to orbit · scroll to zoom · click any part to inspect it</p>
@@ -56,10 +58,23 @@
   <div class="view-bar">
     <div class="seg seg-modes" id="modes" role="radiogroup" aria-label="Render mode"></div>
     <div class="seg seg-looks" id="looks" role="radiogroup" aria-label="Environment"></div>
+    <div class="section-bar" id="section-bar" role="group" aria-label="Section cut">
+      <button type="button" class="toggle" id="section" aria-pressed="false" aria-keyshortcuts="c" title="Slice the vehicle with a cutting plane (C)"><span class="toggle-led" aria-hidden="true"></span><span>Section</span></button>
+      <div class="section-tools" id="section-tools" hidden>
+        <div class="seg seg-axis" id="section-axis" role="radiogroup" aria-label="Cutting axis"></div>
+        <label class="section-slider" for="section-cut">
+          <input type="range" id="section-cut" min="0" max="100" step="0.5" value="50" aria-label="Cut position">
+          <output id="section-out" for="section-cut">—</output>
+        </label>
+        <button type="button" class="tool-btn section-flip" id="section-flip" title="Cut from the other end, keeping the other side">Flip</button>
+      </div>
+    </div>
   </div>
 
+  <div class="search-palette" id="search" role="dialog" aria-label="Find a part" hidden></div>
   <aside class="part-card" id="part-card" aria-live="polite" hidden></aside>
   <aside class="tour-card" id="tour" aria-live="polite" hidden></aside>
+  <aside class="tour-card quiz-card" id="quiz" aria-live="polite" hidden></aside>
 
   <div class="hud-legend" id="legend" hidden>
     <span class="legend-title" id="legend-title">Surface temperature</span>
