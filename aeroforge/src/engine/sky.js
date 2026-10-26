@@ -131,7 +131,7 @@ const frag = /* glsl */`
   uniform float camH; uniform float deckR; uniform float dip; uniform float hAmp;
   uniform vec2 camXZ; uniform vec2 shift; uniform float drift;
   uniform float coverage; uniform float detail; uniform float shadows; uniform float groundHaze;
-  uniform vec3 groundColor;
+  uniform vec3 groundColor; uniform float pixAngle;
   varying vec3 vDir;
 
   const float PI = 3.14159265;
@@ -177,16 +177,23 @@ const frag = /* glsl */`
     return col;
   }
 
+  // A noise sample at a tile size (m) with its mip level chosen from the pixel's footprint on
+  // the deck (m), not from screen derivatives: the same filtering on every GPU, no shimmer at
+  // grazing angles and nothing undefined at the horizon branch.
+  vec4 nz(vec2 q, float tile, float foot) {
+    return textureLod(noiseTex, q / tile, log2(max(foot * 512.0 / tile, 1.0)) + 0.5);
+  }
+
   // the cloud field at a ground point: coverage (0 clear → 1 solid) and top height (0..1)
-  vec2 cloudField(vec2 q) {
+  vec2 cloudField(vec2 q, float foot) {
     vec2 qr = rot2(q, 0.65);
     vec2 qd = q + vec2(drift, drift * 0.4);               // the cells' own slow evolution
-    float big  = texture2D(noiseTex, q / 90000.0 + 0.37).g;                 // open / closed regions
-    float base = texture2D(noiseTex, qr / 12000.0).r;                       // the cells, 1–3 km
-    float mid  = texture2D(noiseTex, qd / 2600.0 + 0.11).g;
-    float fine = texture2D(noiseTex, rot2(qd, 0.65) / 520.0).b;
+    float big  = nz(q + 0.37 * 90000.0, 90000.0, foot).g;                   // open / closed regions
+    float base = nz(qr, 12000.0, foot).r;                                   // the cells, 1–3 km
+    float mid  = nz(qd + 0.11 * 2600.0, 2600.0, foot).g;
+    float fine = nz(rot2(qd, 0.65), 520.0, foot).b;
     float fine2 = 0.5;
-    if (detail > 0.0) fine2 = texture2D(noiseTex, qd / 110.0 + 0.5).r;
+    if (detail > 0.0) fine2 = nz(qd + 55.0, 110.0, foot).r;
     // coverage from the large scales (the fine ones only roughen the edges); height from all of them
     float f = base * 0.56 + mid * 0.3 + fine * 0.1 + (fine2 - 0.5) * 0.04 * detail + 0.04;
     float thr = 0.66 - coverage * 0.34 + (0.5 - big) * 0.4;
@@ -199,12 +206,15 @@ const frag = /* glsl */`
     vec3 p = d * t;                                     // the cloud-top point, metres from the camera
     vec2 q = p.xz + camXZ + shift;                      // ground-fixed coordinates, scrolled at airspeed
     vec3 N0 = normalize(vec3(p.x, p.y + oc, p.z));      // the deck sphere's normal
-    vec2 cf = cloudField(q);
+    // the pixel's footprint on the deck: its size at this distance, stretched by the grazing angle
+    // (geometric mean of along- and across-view, as anisotropic filtering would keep)
+    float foot = t * pixAngle / sqrt(max(abs(dot(d, N0)), 0.03));
+    vec2 cf = cloudField(q, foot);
     float cov = cf.x, h = cf.y;
     // shading normal from the height field's slope, sampled a growing step apart with distance
     // (ground-space differences: stable at every angle, unlike screen-space derivatives)
     float dq = max(45.0, t * 0.0025);
-    float hx = cloudField(q + vec2(dq, 0.0)).y, hz = cloudField(q + vec2(0.0, dq)).y;
+    float hx = cloudField(q + vec2(dq, 0.0), foot).y, hz = cloudField(q + vec2(0.0, dq), foot).y;
     vec3 N = normalize(N0 + vec3(-(hx - h) * hAmp / dq, 0.0, -(hz - h) * hAmp / dq));
 
     // lit tops: a wide soft terminator (the tops scatter), sky light from above, the hollows
@@ -221,11 +231,11 @@ const frag = /* glsl */`
 
     // the ground through the gaps: land / sea far below, under a deep column of hazy air, in the
     // deck's own shadow where the sun is behind cloud
-    float land = texture2D(noiseTex, q / 40000.0 + 0.7).b;
+    float land = nz(q + 0.7 * 40000.0, 40000.0, foot).b;
     vec3 ground = mix(groundColor * 0.75, groundColor * 1.3, land);
     if (shadows > 0.5) {
       vec2 qs = q + sunDir.xz / max(sunDir.y, 0.25) * 2200.0;
-      ground *= 1.0 - 0.55 * cloudField(qs).x;
+      ground *= 1.0 - 0.55 * cloudField(qs, foot).x;
     }
     ground = mix(ground, hazeColor * 0.92, groundHaze);
     vec3 col = mix(ground, cloud, smoothstep(0.0, 0.45, cov));
@@ -267,7 +277,7 @@ export class SkyDome extends THREE.Mesh {
       camH: { value: 3000 }, deckR: { value: R_EARTH_M + 8000 }, dip: { value: 0.03 }, hAmp: { value: 700 },
       camXZ: { value: new THREE.Vector2() }, shift: { value: new THREE.Vector2() }, drift: { value: 0 },
       coverage: { value: 0.55 }, detail: { value: 1 }, shadows: { value: 1 }, groundHaze: { value: 0.6 },
-      groundColor: { value: new THREE.Color(0.22, 0.27, 0.35) },
+      groundColor: { value: new THREE.Color(0.22, 0.27, 0.35) }, pixAngle: { value: 5e-4 },
     };
     const mat = new THREE.ShaderMaterial({
       uniforms, vertexShader: vert, fragmentShader: frag,
@@ -308,7 +318,7 @@ export class SkyDome extends THREE.Mesh {
    * Per frame. altitude: aircraft altitude (m); speed: airspeed (m/s), the deck scrolls aft at it;
    * unitMetres: metres per scene unit (camera offsets become real distances); camera: the stage camera.
    */
-  update(dt, camera, { altitude = 11000, speed = 0, unitMetres = 1.7 } = {}) {
+  update(dt, camera, { altitude = 11000, speed = 0, unitMetres = 1.7, pixels = 1080 } = {}) {
     const u = this.uniforms;
     if (!u.noiseTex.value) u.noiseTex.value = cloudNoise();
     this.position.copy(camera.position);
@@ -328,6 +338,7 @@ export class SkyDome extends THREE.Mesh {
     u.hAmp.value = 620 + 140 * this.tier.detail;
     u.groundHaze.value = THREE.MathUtils.clamp(0.4 + deckTop / 14000, 0.4, 0.88);
     u.camXZ.value.set(camera.position.x * unitMetres, camera.position.z * unitMetres);
+    u.pixAngle.value = (camera.fov * Math.PI / 180) / Math.max(pixels, 1);
     // scroll: the aircraft flies toward +x (every model's nose), so the ground passes toward -x;
     // the noise tiles every 90 km in x (the largest scale's period), so the shift wraps there
     this.shift = (this.shift + dt * speed) % 90000;

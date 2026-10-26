@@ -646,7 +646,7 @@ export class Environment {
       // the flight sky: deck detail by preset, then the altitude grading carried to the fog and lights
       const q = this.stage.quality;
       this.sky.tier = q === 'performance' ? { detail: 0, shadows: 0 } : q === 'balanced' ? { detail: 0, shadows: 1 } : { detail: 1, shadows: 1 };
-      this.sky.update(dt, camera, { altitude: this.altitude, speed: this.cloudSpeed, unitMetres: this.unitMetres });
+      this.sky.update(dt, camera, { altitude: this.altitude, speed: this.cloudSpeed, unitMetres: this.unitMetres, pixels: this.stage.renderSize?.height });
       const g = this.sky.grade;
       if (this.scene.fog) {
         this.scene.fog.color.setRGB(g.haze[0], g.haze[1], g.haze[2]);
