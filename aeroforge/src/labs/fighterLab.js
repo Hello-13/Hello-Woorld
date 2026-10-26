@@ -205,6 +205,7 @@ export function mountFighterLab(root, ctx) {
       }
       if (t - lastThermal > 0.5) { lastThermal = t; ctx.refreshThermal(); }
       ctx.stage.env.cloudSpeed = v.state.airborne * (v.state.flight ? v.state.flight.V : 0);
+      ctx.stage.env.altitude = p.altitude;
     },
     dispose() { forces.setVisible(false); },
     api,

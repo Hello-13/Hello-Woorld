@@ -111,6 +111,7 @@ export function mountUavLab(root, ctx) {
     update() {
       if (dirty) { dirty = false; compute(); }
       ctx.stage.env.cloudSpeed = v.state.airborne * p.speed;
+      ctx.stage.env.altitude = p.altitude;
       if (forces.group.visible) placeForces();
     },
     dispose() { forces.setVisible(false); v.setStick?.({}); },

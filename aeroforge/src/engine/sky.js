@@ -220,8 +220,8 @@ const frag = /* glsl */`
     // lit tops: a wide soft terminator (the tops scatter), sky light from above, the hollows
     // between the lumps in shadow, darker thin edges
     float lit = smoothstep(-0.2, 0.7, dot(N, sunDir));
-    float hollow = 0.5 + 0.5 * smoothstep(0.0, 0.8, h);
-    vec3 cloud = sunColor * (lit * 1.1 * hollow + 0.04) + skyAmbient * (0.5 + 0.5 * N.y) * (0.35 + 0.35 * hollow);
+    float hollow = 0.4 + 0.6 * smoothstep(0.0, 0.8, h);
+    vec3 cloud = sunColor * (lit * 1.35 * hollow + 0.04) + skyAmbient * (0.5 + 0.5 * N.y) * (0.3 + 0.4 * hollow);
     float thick = smoothstep(0.03, 0.7, cov);
     cloud *= mix(0.7, 1.0, thick);
     cloud = mix(cloud * vec3(0.88, 0.93, 1.0), cloud, thick);
