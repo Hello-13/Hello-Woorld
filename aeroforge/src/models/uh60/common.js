@@ -242,9 +242,9 @@ export const MAT = {
   primer: () => std('h.primer', { color: 0x8c9570, roughness: 0.7, metalness: 0.15 }),      // zinc-chromate-green structure
   structure: () => std('h.structure', { color: 0x9aa09a, roughness: 0.55, metalness: 0.55 }),
   casting: () => std('h.casting', { color: 0x7f857c, roughness: 0.52, metalness: 0.55 }),     // magnesium/aluminium gearbox cases
-  steel: () => std('h.steel', { color: 0xa2a8ae, roughness: 0.38, metalness: 0.95 }),
-  titanium: () => std('h.titanium', { color: 0x9da4aa, roughness: 0.4, metalness: 0.95 }),
-  hubTi: () => std('h.hubTi', { color: 0x8e959b, roughness: 0.48, metalness: 0.9 }),
+  steel: () => std('h.steel', { color: 0xa2a8ae, roughness: 0.5, metalness: 0.92 }),
+  titanium: () => std('h.titanium', { color: 0x9da4aa, roughness: 0.52, metalness: 0.92 }),
+  hubTi: () => std('h.hubTi', { color: 0x8e959b, roughness: 0.58, metalness: 0.88 }),
   darkMetal: () => std('h.darkMetal', { color: 0x2d3033, roughness: 0.45, metalness: 0.8 }),
   hot: () => std('h.hot', { color: 0x5d544c, roughness: 0.48, metalness: 0.85 }),
   rubber: () => std('h.rubber', { color: 0x161616, roughness: 0.9, metalness: 0 }),
@@ -256,7 +256,7 @@ export const MAT = {
   seat: () => std('h.seat', { color: 0x2b2d2f, roughness: 0.8, metalness: 0.1 }),
   armour: () => std('h.armour', { color: 0x5a5e5c, roughness: 0.6, metalness: 0.3 }),
   fuelCell: () => std('h.fuelCell', { color: 0x7c6440, roughness: 0.85, metalness: 0 }),
-  hydraulic: () => std('h.hydraulic', { color: 0xa9adb1, roughness: 0.38, metalness: 0.9 }),
+  hydraulic: () => std('h.hydraulic', { color: 0xa9adb1, roughness: 0.5, metalness: 0.9 }),
   copper: () => std('h.copper', { color: 0xb87a4b, roughness: 0.35, metalness: 0.9 }),
   wiring: () => std('h.wiring', { color: 0x202224, roughness: 0.7, metalness: 0.05 }),
   yellow: () => std('h.yellow', { color: 0xc9a227, roughness: 0.6, metalness: 0.1 }),
@@ -264,7 +264,7 @@ export const MAT = {
   intake: () => std('h.intake', { color: 0x0d0e0f, roughness: 0.95, metalness: 0.1, side: THREE.DoubleSide }),
   // cockpit transparencies: tinted acrylic/glass, rough enough not to sparkle on the large curves
   glass: () => once('h.glass', () => new THREE.MeshPhysicalMaterial({
-    color: 0x2a3a40, roughness: 0.22, metalness: 0.0, clearcoat: 0.3, clearcoatRoughness: 0.3,
+    color: 0x2a3a40, roughness: 0.26, metalness: 0.0, clearcoat: 0.25, clearcoatRoughness: 0.35,
     transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 0.9,
   })),
   screen: () => std('h.screen', { color: 0x0a1410, emissive: 0x2a8f62, emissiveIntensity: 0.9, roughness: 0.3, metalness: 0.1 }),

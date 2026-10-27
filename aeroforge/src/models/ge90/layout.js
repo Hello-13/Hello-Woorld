@@ -187,3 +187,47 @@ export function agbTrain(R, pads, { maxIdler = 0.06, minGap = 0.008 } = {}) {
   return out;
 }
 
+
+// ------------------------------------------------------------------ Boeing 777-300ER strut (pylon) stub
+// Side lines [y, r] of the strut's top and underside and its half-width [y, w] (metres), from the
+// nose on the fan cowl to the tail of the aft fairing; r is height above the engine axis. Boeing
+// publishes no drawings, so the lines are read off photographs of the 777-300ER installation: the
+// nose sits on the fan cowl about 0.6 m aft of the inlet joint, the box runs aft over the nacelle
+// to the wing, where this stub is cut off some 0.3 m above the cowl, and behind the fan nozzle
+// the aft fairing steps down onto the core cowl and tapers to a point behind the core nozzle. The
+// underside over the nacelle is set 40 mm inside its skin, so the two surfaces meet without a gap.
+export const STRUT = {
+  nose: -0.3, tail: -6.35,
+  top: [[-0.3, 2.066], [-0.45, 2.2], [-0.7, 2.33], [-1.0, 2.42], [-3.0, 2.43], [-4.5, 2.38], [-5.2, 2.24], [-5.6, 1.98], [-6.0, 1.56], [-6.35, 1.15]],
+  bottom: [[-0.3, 2.066], [-1.45, 2.066], [-1.9, 2.053], [-2.4, 2.0], [-2.9, 1.886], [-3.35, 1.746], [-3.7, 1.61], [-3.95, 1.52], [-4.1, 1.36], [-4.3, 1.15], [-4.55, 1.05], [-5.1, 0.99], [-5.6, 0.975], [-6.0, 1.0], [-6.35, 1.15]],
+  width: [[-0.3, 0.0], [-0.45, 0.17], [-0.7, 0.24], [-1.0, 0.26], [-3.0, 0.3], [-5.0, 0.3], [-5.6, 0.24], [-6.0, 0.14], [-6.35, 0.0]],
+};
+
+/** Monotone (Fritsch–Carlson) cubic through [x, v] keys: smooth, and it never overshoots a key. */
+export function monotone(keys, x) {
+  const n = keys.length;
+  if (x <= keys[0][0]) return keys[0][1];
+  if (x >= keys[n - 1][0]) return keys[n - 1][1];
+  const d = [], h = [];
+  for (let i = 0; i < n - 1; i++) { h.push(keys[i + 1][0] - keys[i][0]); d.push((keys[i + 1][1] - keys[i][1]) / h[i]); }
+  const m = [d[0]];
+  for (let i = 1; i < n - 1; i++) m.push(d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2);
+  m.push(d[n - 2]);
+  for (let i = 0; i < n - 1; i++) {
+    if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+    const a = m[i] / d[i], b = m[i + 1] / d[i], s = a * a + b * b;
+    if (s > 9) { const t = 3 / Math.sqrt(s); m[i] = t * a * d[i]; m[i + 1] = t * b * d[i]; }
+  }
+  let i = 0;
+  while (x > keys[i + 1][0]) i++;
+  const t = (x - keys[i][0]) / h[i], t2 = t * t, t3 = t2 * t;
+  return (2 * t3 - 3 * t2 + 1) * keys[i][1] + (t3 - 2 * t2 + t) * h[i] * m[i] + (-2 * t3 + 3 * t2) * keys[i + 1][1] + (t3 - t2) * h[i] * m[i + 1];
+}
+
+/** Strut section at station y: top and bottom heights above the axis and the half-width. */
+export function strutAt(y) {
+  return { top: monotone(STRUT.top, y), bottom: monotone(STRUT.bottom, y), w: monotone(STRUT.width, y) };
+}
+
+/** Display cradle: the aft saddle sits on the core cowl (its inner face follows cowlAt + gap). */
+export const CRADLE = { aftSaddle: { y0: -4.38, y1: -4.72, gap: 0.012, t: 0.07, arc: 0.6 } };

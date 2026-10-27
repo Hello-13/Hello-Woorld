@@ -16,9 +16,9 @@ import { beam, mergeGeometries } from '../engine/geometry.js';
 import { M } from '../engine/materials.js';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { inferno } from '../engine/effects.js';
-import { setCut, sector, updateRotor, kept, phiOf } from './ge90/geom.js';
+import { setCut, sector, sectorLoop, updateRotor, kept, phiOf } from './ge90/geom.js';
 import { n1Demand, n2Line } from '../physics/turbofan.js';
-import { STATIONS, NACELLE, coreAt, bypassAt, FAN_NOZZLE_Y, PLUG_TIP } from './ge90/layout.js';
+import { STATIONS, NACELLE, CRADLE, coreAt, bypassAt, cowlAt, FAN_NOZZLE_Y, PLUG_TIP } from './ge90/layout.js';
 import { buildNacelle } from './ge90/nacelle.js';
 import { buildFan } from './ge90/fan.js';
 import { buildCore } from './ge90/core.js';
@@ -75,10 +75,14 @@ export function buildTurbofan() {
   const R_SAD = NACELLE.maxR + 0.012;
   for (const z of [-1, 1]) sg.push(beam([F - 0.05, -0.8, z * 1.15], [(R_SAD + 0.06) * Math.cos(0.42), -0.8, z * (R_SAD + 0.06) * Math.sin(0.42)], 0.12, 0.12));
   sg.push(beam([F - 0.05, -0.8, 0], [R_SAD + 0.07, -0.8, 0], 0.18, 0.18));
-  // aft yoke under the core cowl
-  sg.push(beam([F - 0.05, -4.55, 0], [1.06, -4.55, 0], 0.2, 0.2));
-  for (const z of [-1.15, 1.15]) sg.push(beam([F - 0.05, -4.55, z], [1.5, -4.55, z * 0.08], 0.1, 0.1));
-  const saddles = [sector(R_SAD, R_SAD + 0.08, -0.6, -1.0, Math.PI / 2 - 0.5, Math.PI / 2 + 0.5, 16), sector(1.0, 1.06, -4.38, -4.72, Math.PI / 2 - 0.6, Math.PI / 2 + 0.6, 16)];
+  // aft yoke under the core cowl; its saddle follows the cowl's line (which tapers aft here) so it
+  // sits on the surface instead of cutting into it
+  const AS = CRADLE.aftSaddle, yMid = (AS.y0 + AS.y1) / 2;
+  sg.push(beam([F - 0.05, yMid, 0], [cowlAt(yMid) + AS.gap + AS.t + 0.01, yMid, 0], 0.2, 0.2));
+  for (const z of [-1.15, 1.15]) sg.push(beam([F - 0.05, yMid, z], [1.5, yMid, z * 0.08], 0.1, 0.1));
+  const ySad = [0, 0.25, 0.5, 0.75, 1].map((f) => AS.y0 + (AS.y1 - AS.y0) * f);
+  const aftLoop = [...ySad.map((y) => [cowlAt(y) + AS.gap, y]), ...ySad.slice().reverse().map((y) => [cowlAt(y) + AS.gap + AS.t, y])];
+  const saddles = [sector(R_SAD, R_SAD + 0.08, -0.6, -1.0, Math.PI / 2 - 0.5, Math.PI / 2 + 0.5, 16), sectorLoop(aftLoop, Math.PI / 2 - AS.arc, Math.PI / 2 + AS.arc, 16)];
   const frame = mesh(mergeGeometries([...sg, ...saddles].map((g) => (g.index ? g.toNonIndexed() : g))), M.gse());
   const casters = [];
   for (const y of [1.15, -5.85]) for (const z of [-1.15, 1.15]) {
@@ -198,10 +202,14 @@ export function buildTurbofan() {
   // Dense rows of airfoils (38 to 156 per row) are drawn additively in X-ray and would bury the
   // shafts, bearings and sumps behind them: dim them
   const DENSE = /^(Fan blades|Fan outlet guide vanes|Booster (rotor|stator|inlet guide|outlet guide)|HPC (rotor|stator|variable|outlet)|HPT stage \d (nozzle|blades)|LPT stage \d (nozzle|blades)|Combustor domes|Fuel nozzles)/;
-  for (const p of A.parts) { const i = p.userData.part; if (DENSE.test(i.name)) i.xrayWeight = i.name === 'Fan blades' ? 0.4 : 0.32; }
-  // and the big casings a little, so the shafts, bearings and sumps inside read through them
+  for (const p of A.parts) { const i = p.userData.part; if (DENSE.test(i.name)) i.xrayWeight = i.name === 'Fan blades' ? 0.3 : 0.2; }
+  // and the big casings, so the shafts, bearings and sumps inside read through them
   const CASES = /^(Fan containment case|Fan case rub strip|Booster casing|HPC casing|Combustion case|HPT casing|LPT casing|Turbine rear frame|Core exhaust nozzle)/;
-  for (const p of A.parts) { const i = p.userData.part; if (CASES.test(i.name)) i.xrayWeight = 0.55; }
+  for (const p of A.parts) { const i = p.userData.part; if (CASES.test(i.name)) i.xrayWeight = 0.4; }
+  // the HP spool, combustor and turbine-centre-frame solids stack inside those casings and rows and
+  // washed the core out to a white mass: dim them too, so the region keeps its structure
+  const HOT = /^(HPC stage|HP shaft|Rotating CDP seal|Forward HPT rotor seal|Interstage HPT rotor seal|HPT stage \d disk|HPT active clearance|Compressor rear frame|Combustor (outer|inner) liner|Combustor centerbody|Dual annular combustor|Fuel manifolds|Igniters|VSV actuators|Turbine center frame|TCF (sump|bearing)|Borescope ports)/;
+  for (const p of A.parts) { const i = p.userData.part; if (HOT.test(i.name) && !(i.xrayWeight < 1)) i.xrayWeight = 0.55; }
 
   // Part masses are estimates from size and material; scale the engine's so they add up to the
   // published dry mass (massSource stays unset, so the UI still marks each one as an estimate)
@@ -211,7 +219,7 @@ export function buildTurbofan() {
 
   A.finalize();
 
-  const state = { throttle: 1, n1: 100, n2: 100, cutaway: true, flow: false, a1: 0, a2: 0, fromLab: false, reverser: 0, reverserTarget: 0 };
+  const state = { throttle: 1, n1: 100, n2: 100, cutaway: true, flow: false, a1: 0, a2: 0, fromLab: false, reverser: 0, reverserTarget: 0, glow: 0 };
   ctx.reverser.set(0);
   const turn = () => {
     for (const s of spin.n1) { if (s.rotor) updateRotor(s.rotor, state.a1, state.cutaway); else s.g.rotation.y = state.a1; }
@@ -240,7 +248,18 @@ export function buildTurbofan() {
       };
     });
   }
+  // The combustor glow is the gas burning: on a museum cradle the engine is cold, so it stays off
+  // until the lab's cycle runs (state.fromLab), fades in and out with it, and goes out while the
+  // exploded view has pulled the combustor apart (the flame would otherwise float with the liners).
+  // The material hides while it is off; the other render modes swap it out, so Thermal and X-ray
+  // still show the flame zone.
   const burnerMat = ctx.burnerMat;
+  burnerMat.transparent = true;
+  burnerMat.depthWrite = false;
+  burnerMat.emissiveIntensity = 0;
+  burnerMat.opacity = 0;
+  burnerMat.visible = false;
+  const flamePart = A.parts.find((p) => p.userData.part.name === 'Dual annular combustor');
 
   const vehicle = {
     id: 'turbofan',
@@ -331,7 +350,13 @@ export function buildTurbofan() {
       state.a2 = (state.a2 + n2 * N2_RPM * (Math.PI / 30) * SHOW * dt) % (Math.PI * 2);
       turn();
       flow.visible = state.flow && fanPart.position.distanceToSquared(fanPart.userData.base) < 1e-6;
-      burnerMat.emissiveIntensity = 0.8 + thr * 4.6 * Math.max(0, (T['4'] - 900) / 900);
+      const burning = state.fromLab && flamePart.position.distanceToSquared(flamePart.userData.base) < 1e-6;
+      const want = burning ? 0.6 + thr * 4.6 * Math.max(0, (T['4'] - 900) / 900) : 0;
+      state.glow += (want - state.glow) * Math.min(1, dt * 3);
+      if (Math.abs(want - state.glow) < 0.01) state.glow = want;
+      burnerMat.emissiveIntensity = state.glow;
+      burnerMat.opacity = Math.min(1, state.glow / 0.5);
+      burnerMat.visible = state.glow > 0.01;
       if (state.reverser !== state.reverserTarget) {
         // about 2 s end to end, eased (the real deploy takes roughly that long)
         const step = dt / 2;

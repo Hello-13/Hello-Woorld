@@ -6,6 +6,7 @@
 // but is not used on the production engine shown.)
 
 import * as THREE from 'three';
+import { SKIN } from '../../engine/materials.js';
 
 const cache = new Map();
 const std = (key, p) => { if (!cache.has(key)) cache.set(key, new THREE.MeshStandardMaterial(p)); return cache.get(key); };
@@ -13,8 +14,9 @@ const phys = (key, p) => { if (!cache.has(key)) cache.set(key, new THREE.MeshPhy
 const lerp = (a, b, f) => new THREE.Color(a).lerp(new THREE.Color(b), Math.min(1, Math.max(0, f)));
 
 export const GM = {
-  composite: () => phys('composite', { color: 0x2b2e33, roughness: 0.42, metalness: 0.05, clearcoat: 0.45, clearcoatRoughness: 0.32 }),
-  tiSheath: () => std('tiSheath', { color: 0xc8ccd0, roughness: 0.24, metalness: 1 }),
+  // the blades' clearcoat is kept low: a sharper one threw the key light back as a bloom hot spot
+  composite: () => phys('composite', { color: 0x2b2e33, roughness: 0.5, metalness: 0.05, clearcoat: 0.18, clearcoatRoughness: 0.5 }),
+  tiSheath: () => std('tiSheath', { color: 0xc8ccd0, roughness: 0.36, metalness: 1 }),
   titanium: () => std('titanium', { color: 0xb6bcc2, roughness: 0.3, metalness: 1 }),
   ti6246: (i) => std(`hpc${i}`, { color: lerp(0xb6bcc2, 0xab8f62, (i - 3) / 6), roughness: 0.32, metalness: 1 }),
   nickel: () => std('nickel', { color: 0x8a8279, roughness: 0.4, metalness: 0.95 }),
@@ -46,6 +48,24 @@ export const GM = {
   red: () => std('red', { color: 0xa3261e, roughness: 0.5, metalness: 0.2 }),
   blue: () => std('blue', { color: 0x2f5f8e, roughness: 0.5, metalness: 0.3 }),
   cascade: () => std('cascade', { color: 0x3b3f44, roughness: 0.5, metalness: 0.4 }),
+  // the reverser's torque box and cascade vane boxes, the light-grey structure the open sleeves expose
+  cascadeBox: () => std('cascadeBox', { color: 0xc6cacd, roughness: 0.62, metalness: 0.1, side: THREE.DoubleSide }),
+  cascadeVane: () => std('cascadeVane', { color: 0x9fa5aa, roughness: 0.58, metalness: 0.2, side: THREE.DoubleSide }),
+  // the strut stub's light-grey paint
+  strut: () => std('strut', { color: 0xb9bec2, roughness: 0.5, metalness: 0.15 }),
+  // cut faces of the museum cutaway: the strong red of a sectioned exhibit
+  section: () => std('section', { color: 0xc4181c, roughness: 0.58, metalness: 0.04, side: THREE.DoubleSide }),
+  // Boeing nacelle paint: the shared skin tile, with less clearcoat (so the key light's reflection
+  // on the white cowl does not bloom like a lamp) and a lighter normal map (flush panel joints)
+  nacelle: () => {
+    if (!cache.has('nacelle')) {
+      const m = SKIN.nacelle().clone();
+      m.clearcoat = 0.2; m.clearcoatRoughness = 0.42; m.roughness = 0.46;
+      m.normalScale.set(0.12, 0.12);
+      cache.set('nacelle', m);
+    }
+    return cache.get('nacelle');
+  },
   // holes (cooling, dilution and web holes) drawn as dark discs through a wall
   hole: () => std('hole', { color: 0x16130f, roughness: 0.9, metalness: 0.1 }),
   gear: () => std('gear', { color: 0xb9b2a4, roughness: 0.26, metalness: 1 }),

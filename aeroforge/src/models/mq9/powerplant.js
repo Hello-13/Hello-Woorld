@@ -176,12 +176,12 @@ export function exhaustDuctGeo() {
     { p: fusePoint(9.27, 0.6, 0.075), w: 0.085, h: 0.05 },                         // along the upper starboard side, below the
     { p: fusePoint(9.45, 0.62, 0.08), w: 0.085, h: 0.05 },                         // V-tail root fittings and outboard of the inlet duct
     { p: fusePoint(9.62, 0.68, 0.085), w: 0.085, h: 0.05 },
-    { p: fusePoint(9.72, 0.78, 0.09), w: 0.08, h: 0.055 },
-    { p: fusePoint(9.78, 0.95, 0.07), w: 0.07, h: 0.06 },                          // then straight up through the cowling beside the
-    { p: [XS(9.84), 2.12, 0.12], w: 0.065, h: 0.055, up: [0, 0, 1] },             // inlet duct's end, as a narrow ribbon, clear of the
-    { p: [XS(9.9), 2.18, 0.06], w: 0.07, h: 0.055, up: [0, 0.5, 0.85] },           // gearbox and its front mount below, and over
-    { p: [XS(9.98), 2.21, 0.01], w: 0.08, h: 0.055, up: [0, 1, 0] },              // onto the centreline inside the stack's base
-    { p: [XS(10.08), 2.225, 0], w: 0.085, h: 0.06, up: [0, 1, 0] },               // ends inside the stack
+    { p: fusePoint(9.72, 0.74, 0.09), w: 0.08, h: 0.055 },
+    { p: fusePoint(9.78, 0.85, 0.1), w: 0.06, h: 0.05 },                           // then steeply up through the cowling beside the
+    { p: [XS(9.845), 2.2, 0.085], w: 0.05, h: 0.04, up: [0, 0, 1] },              // inlet duct's end, as a narrow ribbon, clear of the
+    { p: [XS(9.905), 2.215, 0.045], w: 0.07, h: 0.055, up: [0, 0.6, 0.8] },        // gearbox and its front mount below, and over
+    { p: [XS(9.98), 2.22, 0.01], w: 0.08, h: 0.055, up: [0, 1, 0] },              // onto the centreline inside the stack's base
+    { p: [XS(10.08), 2.23, 0], w: 0.085, h: 0.06, up: [0, 1, 0] },                // ends inside the stack
   ];
   return merge([...bell, sectionLoft(ctrl, { N: 64, n: 20 })]);
 }
@@ -191,15 +191,17 @@ export function exhaustStackGeo() {
     const s = 5.5 - q[0];
     if (s > FUSE_END) return q;
     const yS = skinY(s, q[2]);
-    return q[1] < yS + 0.004 ? [q[0], yS - 0.015, q[2]] : q;
+    return q[1] < yS + 0.004 ? [q[0], yS - 0.006, q[2]] : q;
   };
+  // the base stands on the skin with near-vertical sides (its section's centre sits just under the skin, so the walls run straight
+  // down to the clip); from s 10.0 it lifts clear of the cowling to the open lip
+  const base = (s, roof, w) => { const c = skinY(s, 0) - 0.02; return { p: [XS(s), c, 0], w, h: roof - c, k: 0.6 }; };
   const ctrl = [
-    { p: [XS(9.7), skinY(9.7, 0) - 0.004, 0], w: 0.006, h: 0.006, k: 0.6 },         // nose of the base fairing, behind the V-tail
-    { p: [XS(9.78), 2.112, 0], w: 0.13, h: 0.045, k: 0.6 },
-    { p: [XS(9.85), 2.145, 0], w: 0.21, h: 0.09, k: 0.6 },
-    { p: [XS(9.93), 2.17, 0], w: 0.21, h: 0.11, k: 0.6 },
-    { p: [XS(10.0), 2.19, 0], w: 0.19, h: 0.105, k: 0.6 },
-    { p: [XS(10.1), 2.215, 0], w: 0.168, h: 0.1, k: 0.6 },
+    { p: [XS(9.71), skinY(9.71, 0) - 0.004, 0], w: 0.006, h: 0.006, k: 0.6 },       // nose of the base fairing, behind the V-tail
+    base(9.76, 2.135, 0.14), base(9.8, 2.178, 0.18), base(9.86, 2.238, 0.19), base(9.93, 2.28, 0.19),
+    { p: [XS(10.0), 2.12, 0], w: 0.18, h: 0.175, k: 0.6 },
+    { p: [XS(10.1), 2.19, 0], w: 0.168, h: 0.125, k: 0.6 },
+    { p: [XS(10.2), 2.23, 0], w: 0.162, h: 0.105, k: 0.6 },
     { p: [XS(STACK_S - 0.02), 2.245, 0], w: 0.16, h: 0.1, k: 0.6 },
     { p: [XS(STACK_S), 2.248, 0], w: 0.166, h: 0.106, k: 0.6 },                    // rolled lip
   ];

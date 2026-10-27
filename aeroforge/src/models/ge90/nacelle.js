@@ -7,9 +7,9 @@
 
 import * as THREE from 'three';
 import { SKIN } from '../../engine/materials.js';
-import { lathe } from '../../engine/geometry.js';
+import { lathe, loftRings, orientOutward } from '../../engine/geometry.js';
 import { GM } from './materials.js';
-import { NACELLE, FAN, bypassAt, FAN_NOZZLE_Y, CORE_COWL } from './layout.js';
+import { NACELLE, FAN, bypassAt, FAN_NOZZLE_Y, CORE_COWL, STRUT, strutAt } from './layout.js';
 import { cutLathe, cutPair, wall, sector, boxAt, axialCyl, radialCyl, tangentCyl, merge, P3, kept, tube, arc, cutTube } from './geom.js';
 
 const TAU = Math.PI * 2;
@@ -26,7 +26,7 @@ const outerLine = (line) => line.map(([y, r]) => [y, r + grow(y)]);
 
 export function buildNacelle(ctx) {
   const { P, cut } = ctx;
-  const nac = SKIN.nacelle();
+  const nac = GM.nacelle();
   const N = { cut: 'nacelle', seg: 96 };
 
   // ------------------------------------------------------------------ inlet
@@ -62,7 +62,7 @@ export function buildNacelle(ctx) {
     system: 'Structure', material: 'Hook latches with flush handles (count estimated)', mass: 4, count: 4,
     explode: [0.15, 0.1, -0.9], temp: 300,
     desc: 'Four hook latches join the two doors along the bottom of the nacelle. Their handles sit flush and are painted bright so an unlatched cowl stands out on the walk-round: a cowl that is not latched can tear off on take-off.',
-  }, mesh0(merge([0.0, -0.4, -0.8, -1.2].map((y) => boxAt(R_COWL + 0.008, y, DOWN + 0.02, [0.025, 0.14, 0.05]))), GM.red()));
+  }, mesh0(merge([0.05, -0.42, -1.12, -1.38].map((y) => boxAt(R_COWL + 0.008, y, DOWN + 0.02, [0.025, 0.14, 0.05]))), GM.red()));
   P('Fan cowl hold-open rods', {
     system: 'Structure', material: 'Telescopic aluminium rods, stowed on clips inside each door', mass: 6, count: 4,
     explode: [-0.45, 0.1, -1.4], temp: 300,
@@ -98,18 +98,19 @@ export function buildNacelle(ctx) {
     slats.push([[1.7, y - 0.03], [1.71, y - 0.03], [1.86, y + 0.025], [1.85, y + 0.025]]);
   }
   slats.push([[1.7, cavityAft + 0.02], [1.86, cavityAft + 0.02], [1.86, cavityAft + 0.005], [1.7, cavityAft + 0.005]]);
-  const cascRings = cut(cutLathe([torqueBox, ...slats], GM.cascade(), N));
+  const cascBox = cut(cutLathe([torqueBox], GM.cascadeBox(), N));
+  const cascRings = cut(cutLathe(slats, GM.cascadeVane(), N));
   const rails = cut(cutPair((keep) => {
     const list = [];
     for (let i = 0; i < 40; i++) { const phi = (i / 40) * TAU; if (keep(phi)) list.push(boxAt(1.78, (sleeveFwd + cavityAft) / 2, phi, [0.16, sleeveFwd - cavityAft, 0.012])); }
     return merge(list);
-  }, GM.cascade(), 'nacelle'));
+  }, GM.cascadeVane(), 'nacelle'));
   P('Thrust reverser cascades', {
     system: 'Propulsion', material: 'Carbon-fibre cascade vane boxes on an aluminium torque box', mass: 260,
     explode: [-0.5, -0.55, -1.0], temp: 300,
     desc: 'Grids of curved vanes hidden under the sleeves. When the sleeves open, bypass air blocked in the duct escapes through them and is turned forward, so the fan stream pushes the aircraft backwards.',
     callout: true, anchor: [-1.78, -2.0, -0.08],
-  }, [cascRings, rails]);
+  }, [cascBox, cascRings, rails]);
 
   // blocker doors: hinged at their forward edge to the sleeve and flush with its inner wall when
   // stowed. A drag link of fixed length ties each door to the core cowl, so when the sleeve slides
@@ -227,7 +228,7 @@ export function buildNacelle(ctx) {
   }, [cut(cutLathe([[0.995, -1.82], [1.012, -1.82], [1.012, -1.86], [0.995, -1.86]], GM.orange(), N)),
     cut(cutPair((keep) => merge([
       ...[DOWN - 0.085, DOWN + 0.085, UP - 0.085, UP + 0.085].filter((p) => keep(p)).map((phi) => boxAt(1.07, -2.9, phi, [0.025, 1.8, 0.016])),
-      ...[UP - 0.15, UP + 0.15].filter((p) => keep(p)).map((phi) => boxAt(2.06, -0.575, phi, [0.02, 1.75, 0.02])),
+      ...[UP - 0.15, UP + 0.15].filter((p) => keep(p)).map((phi) => boxAt(2.06, -0.9, phi, [0.02, 1.1, 0.02])),
     ]), GM.orange(), 'nacelle'))]);
 
   // deploy the reverser: 0 stowed … 1 deployed
@@ -270,16 +271,42 @@ export function buildNacelle(ctx) {
   }, cut(cutPair((keep) => (keep(Math.PI + 0.6) ? merge([sector(1.06, 1.072, -3.05, -3.4, Math.PI + 0.48, Math.PI + 0.72, 8)]) : new THREE.BufferGeometry()), GM.red(), 'nacelle')));
 
   // ------------------------------------------------------------------ pylon (strut) stub
-  // side profile (y, r) of the strut stub, extruded across its 0.42 m width at 12 o'clock
-  const side = [[-0.55, 1.99], [-0.75, 2.2], [-1.05, 2.42], [-5.7, 2.42], [-5.7, 1.5], [-5.48, 1.07], [-5.05, 1.05], [-4.55, 1.12], [-4.1, 1.5], [-3.9, 1.99]];
-  const shape = new THREE.Shape(side.map(([y, r]) => new THREE.Vector2(-r, y)));
-  const pylon = new THREE.ExtrudeGeometry(shape, { depth: 0.42, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 2, curveSegments: 4 });
-  pylon.translate(0, 0, -0.21);
+  // Lofted from the section lines in layout.js (STRUT): a rounded nose rising off the fan cowl, a box
+  // with a rounded top and a flared underside fairing that wraps the nacelle, then the aft fairing
+  // stepping down onto the core cowl over the aft mount and tapering to a point. Each ring runs from
+  // the base centre up the right side, over the top and down the left; the base follows the
+  // cylinder it sits on. Lathe frame: up is −x, lateral is z.
+  const strutRing = (y) => {
+    const { top, bottom, w } = strutAt(y);
+    const d = Math.max(0.004, top - bottom), hw = Math.max(0.006, w);
+    const c = Math.min(0.12, hw, d / 2);                  // top corner radius
+    const f = Math.min(0.07, 0.35 * d, 0.4 * hw);          // underside fairing fillet
+    const wb = hw + f;
+    const base = (u) => Math.sqrt(Math.max(0, bottom * bottom - u * u));
+    const right = [];
+    for (let i = 0; i <= 3; i++) { const u = (wb * i) / 3; right.push([u, base(u)]); }
+    const hb = base(wb);
+    for (let k = 1; k <= 4; k++) { const th = Math.PI * 1.5 - (Math.PI / 2) * (k / 4); right.push([hw + f + f * Math.cos(th), hb + f + f * Math.sin(th)]); }
+    right.push([hw, (hb + f + top - c) / 2]);
+    for (let k = 0; k <= 6; k++) { const a = (Math.PI / 2) * (k / 6); right.push([hw - c + c * Math.cos(a), top - c + c * Math.sin(a)]); }
+    right.push([(hw - c) / 2, top], [0, top]);
+    const left = right.slice(1, -1).reverse().map(([u, h]) => [-u, h]);
+    return [...right, ...left].map(([u, h]) => [-h, y, u]);
+  };
+  const ys = [];
+  for (let y = STRUT.nose - 0.012; y > -1.0; y -= 0.04) ys.push(y);
+  for (let y = -1.0; y > -3.8; y -= 0.1) ys.push(y);
+  for (let y = -3.8; y > -4.7; y -= 0.045) ys.push(y);
+  for (let y = -4.7; y > -5.5; y -= 0.1) ys.push(y);
+  for (let y = -5.5; y > STRUT.tail - 0.012 + 0.03; y -= 0.05) ys.push(y);
+  ys.push(STRUT.tail + 0.012);
+  const pylon = orientOutward(loftRings(ys.map(strutRing), { capStart: true, capEnd: true }));
+  pylon.computeVertexNormals();
   P('Pylon (strut) stub', {
     system: 'Structure', skin: true, material: 'Titanium and steel box beam under aluminium fairings (Boeing)', mass: 900,
     explode: [-0.8, -0.2, 0], temp: 300,
-    desc: 'The forward end of the 777\'s engine strut, cut off where it would join the wing. It carries thrust, weight and gust loads into the wing box, and houses the precooler and the fuel, bleed, hydraulic and electrical connections (drawn see-through in X-ray and Systems so they show). Boeing hardware, outside the engine\'s dry weight.',
-  }, mesh0(pylon, GM.painted()));
+    desc: 'The forward end of the 777\'s engine strut, cut off where it would join the wing. It carries thrust, weight and gust loads into the wing box, and houses the precooler and the fuel, bleed, hydraulic and electrical connections (drawn see-through in X-ray and Systems so they show). Its aft fairing steps down behind the fan nozzle onto the core cowl, over the aft mount. Boeing hardware, outside the engine\'s dry weight.',
+  }, mesh0(pylon, GM.strut()));
 
   // ------------------------------------------------------------------ mounts and thrust links
   const fwdMount = merge([boxAt(1.8, -1.75, UP, [0.12, 0.3, 0.46]), boxAt(1.75, -1.68, UP + 0.12, [0.06, 0.08, 0.05]), boxAt(1.75, -1.68, UP - 0.12, [0.06, 0.08, 0.05]), boxAt(1.75, -1.82, UP, [0.06, 0.08, 0.12])]);

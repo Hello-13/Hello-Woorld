@@ -149,7 +149,7 @@ export function aircraftSkin({ seed = 7, tile = 512, sawtooth = true, rivets = t
       ctx.fillStyle = '#808080';
       ctx.fillRect(0, 0, s, s);
       const r = rng(seed);
-      ctx.strokeStyle = '#565656';
+      ctx.strokeStyle = '#5e5e5e';
       ctx.lineWidth = Math.max(1.5, s / 340);
       const cols = 3, rows = 2;
       for (let i = 0; i <= cols; i++) {
@@ -190,7 +190,7 @@ export function aircraftSkin({ seed = 7, tile = 512, sawtooth = true, rivets = t
     rough(ctx, s) {
       ctx.drawImage(grime(s, seed + 9, 0.48, 0.72), 0, 0);
     },
-    normalStrength: 1.2,
+    normalStrength: 1.0,
   });
 }
 

@@ -1,10 +1,11 @@
 // GPS III antenna subsystem element on the Earth deck (Marquis & Shaw 2011, Figs. 3 and 4; layout
 // from the manufacturer's scale model, Steigenberger et al. 2020, Fig. 4, see layout.js): the black
 // L-band panel with 12 tapered Earth-coverage helices and 4 military Earth-coverage (M-code)
-// elements, 12 white UHF crosslink elements interleaved with them, the beam-forming and crosslink
+// elements, 12 pale-grey UHF crosslink elements interleaved with them, the beam-forming and crosslink
 // feed networks, the forward TT&C S-band mast and a second mast, the aft TT&C antenna, eight
 // deployable JIB monopoles, the stowed antenna on the +X face and the hosted-payload antennas.
-// Element sizes and heights are estimates scaled from the photographs.
+// Element sizes and heights are estimates scaled from the manufacturer's render: the black
+// L-band cans are the tallest and fattest elements, the crosslink radomes shorter and thinner.
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
@@ -24,14 +25,17 @@ function radomeG(x, y, r, h, z0, rt = r, seg = 28) {
 }
 const circle = (x, y, r) => { const p = new THREE.Path(); p.absarc(x, y, r, 0, Math.PI * 2, true); return p; };
 
-/** A helical element on the panel: base cup, mast, radome and conductor. */
-function element(x, y, { h, r, rt = r, turns, quad = false, mat }) {
+/** A helical element on the panel: base cup, mast, radome and conductor; `cap` adds the gold
+ *  (alodined) end ring the manufacturer's render shows on the L-band elements. */
+function element(x, y, { h, r, rt = r, turns, quad = false, mat, cap = false }) {
   const z0 = PANEL_Z;
   const metal = merge([cylG([x, y, z0 + 0.015], r + 0.008, 0.03, 'z', 24), cylG([x, y, z0 + 0.03 + (h - 0.07) / 2], 0.009, h - 0.07, 'z', 8)]);
   const wire = quad
     ? merge([0, 1, 2, 3].map((k) => helixG(x, y, Math.min(r, rt) - 0.015, z0 + 0.05, z0 + h - 0.02, turns, 0.004, (k * Math.PI) / 2)))
     : helixG(x, y, r - 0.018, z0 + 0.04, z0 + h - 0.03, turns, 0.0032, 0, rt - 0.012);
-  return [mesh(metal, G.aluminium()), mesh(radomeG(x, y, r, h, z0 + 0.03, rt), mat), mesh(wire, G.helixWire())];
+  const out = [mesh(metal, G.aluminium()), mesh(radomeG(x, y, r, h, z0 + 0.03, rt), mat), mesh(wire, G.helixWire())];
+  if (cap) out.push(mesh(cylG([x, y, z0 + 0.03 + h - 0.035], rt + 0.004, 0.03, 'z', 28), G.alodine()));
+  return out;
 }
 
 /** Radius of the beam-forming network's central disc on the Earth deck (the L-band feeds plug into its rim). */
@@ -70,7 +74,10 @@ export function buildAntennas(P) {
   }, mesh(merge(bfn), G.connector()));
 
   // ------------------------------------------------------------------ Earth-coverage and M-code helices (black, tapered)
-  const EC = { h: 0.35, r: 0.06, rt: 0.034, turns: 6, mat: G.radomeBlack() };
+  // The L-band array is the prominent element of the nadir deck: in the manufacturer's render the
+  // black, gold-tipped cans stand about 0.5 m tall and are the tallest and fattest things on the deck,
+  // the crosslink elements shorter and thinner beside them (sizes scaled from the render, estimated).
+  const EC = { h: 0.5, r: 0.065, rt: 0.045, turns: 7, mat: G.radomeBlack(), cap: true };
   EC_INNER.forEach(([x, y], k) => P(`L-band helix, inner ${k + 1}`, {
     system: 'Payload', material: 'Tapered copper helix on a dielectric support inside a black tapered radome', mass: 1.8, temp: 240, explode: [(x - ARRAY_C[0]) * 0.4, y * 0.4, 2.35],
     desc: 'One of the four central Earth-coverage elements, about 0.17 m from the array centre. An axial-mode helix about one wavelength round (19 cm at L1) radiates right-hand circularly polarised waves; each element carries L1, L2 and L5 at once, at more than 300 W of continuous RF per antenna (patent figure). Element dimensions estimated.',
@@ -79,16 +86,16 @@ export function buildAntennas(P) {
     system: 'Payload', material: 'Tapered copper helix on a dielectric support inside a black tapered radome', mass: 1.8, temp: 240, explode: [(x - ARRAY_C[0]) * 0.4, y * 0.4, 2.3],
     desc: 'One of eight ring elements of the Earth-coverage array, about 0.53 m from its centre. Fed with a phase offset from the central four, the ring pushes power out toward the limb so the beam covers the whole Earth disc, 13.9° either side of nadir (element dimensions estimated).',
   }, element(x, y, EC)));
-  const MECE = { h: 0.3, r: 0.058, rt: 0.034, turns: 5.5, mat: G.radomeBlack() };
+  const MECE = { h: 0.42, r: 0.06, rt: 0.042, turns: 6, mat: G.radomeBlack(), cap: true };
   MEC.forEach(([x, y], k) => P(`M-code helix ${k + 1}`, {
     system: 'Payload', material: 'Tapered copper helix in a black radome', mass: 1.6, temp: 240, explode: [-0.35, (y - 0.02) * 0.8, 2.3],
     desc: 'One of four military Earth-coverage (MEC) elements in the group at the −X end of the antenna panel. They add M-code power for military users: GPS III delivers M-code at no less than −153 dBW at 5° elevation, against −158 dBW for Block IIR and IIF (element size estimated).',
   }, element(x, y, MECE)));
 
-  // ------------------------------------------------------------------ UHF crosslink elements (white cylinders), interleaved
-  const UHF = { h: 0.45, r: 0.08, turns: 0.75, quad: true, mat: G.radome() };
+  // ------------------------------------------------------------------ UHF crosslink elements (pale grey cylinders), interleaved
+  const UHF = { h: 0.3, r: 0.06, turns: 0.75, quad: true, mat: G.radomeGrey() };
   const uhf = (name, x, y, inner) => P(name, {
-    system: 'Communications', material: 'Quadrifilar helix in a white fibreglass radome', mass: 2.4, temp: 245, explode: [(x - ARRAY_C[0]) * 0.55, y * 0.55, 2.2],
+    system: 'Communications', material: 'Quadrifilar helix in a grey fibreglass radome', mass: 2.0, temp: 245, explode: [(x - ARRAY_C[0]) * 0.55, y * 0.55, 2.2],
     desc: inner
       ? 'One of the four inner UHF crosslink elements (about 0.36 m from the array centre), interleaved with the L-band helices as the GPS III patent drawing shows: satellites exchange data and measure the distances between each other over these links. The form of each element (here a quadrifilar helix) is an estimate.'
       : 'One of eight outer-ring UHF crosslink elements; the ring is about 1.66 m across, almost the full 1.78 m deck depth. Placing crosslink elements among high-power L-band helices raises the risk of passive intermodulation, one reason Lockheed and Northrop Grumman have patented other layouts (element form estimated).',
@@ -120,7 +127,9 @@ export function buildAntennas(P) {
     const can = merge([boxG([x, y, PANEL_Z + 0.033], [0.1, 0.1, 0.065]), cylG([x, y, PANEL_Z + 0.07], 0.022, 0.012, 'z', 14)]);
     const pivot = new THREE.Group();
     pivot.position.set(x, y, PANEL_Z + 0.075);
-    const rod = mesh(merge([cylG([0, 0, JIB_L / 2], 0.0065, JIB_L, 'z', 8), cylG([0, 0, JIB_L], 0.01, 0.012, 'z', 8)]), G.stem());
+    // every rod stands normal to the panel, as a monopole over its ground plane does (a wide-angle
+    // view close to the deck makes parallel rods seem to splay; they do not)
+    const rod = mesh(merge([cylG([0, 0, JIB_L / 2], 0.008, JIB_L, 'z', 10), cylG([0, 0, JIB_L], 0.012, 0.014, 'z', 10)]), G.stem());
     pivot.add(rod);
     rods.push(pivot);
     P(`JIB antenna ${k + 1}`, {

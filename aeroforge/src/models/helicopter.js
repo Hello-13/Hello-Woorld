@@ -29,9 +29,11 @@ const TR_RATIO = 1190 / 258;              // tail-rotor : main-rotor speed
 /** "UNITED STATES ARMY" tail-cone stencil, flat black on Army green (letters about 0.2 m high). */
 const armyText = () => decalTexture('uh60.army', 1792, 256, (ctx, w, h) => {
   ctx.fillStyle = 'rgba(12,13,12,0.96)';
-  ctx.font = '600 168px "Barlow Semi Condensed", "Arial Narrow", sans-serif';
   if ('letterSpacing' in ctx) ctx.letterSpacing = '10px';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  // size the lettering to the patch whatever font the browser resolves (web fonts may be unavailable)
+  let px = 168;
+  for (; px > 60; px -= 4) { ctx.font = `600 ${px}px "Barlow Semi Condensed", "Arial Narrow", sans-serif`; if (ctx.measureText('UNITED STATES ARMY').width <= w * 0.9) break; }
   ctx.fillText('UNITED STATES ARMY', w / 2, h / 2 + 8);
 });
 
@@ -124,7 +126,7 @@ export function buildHelicopter() {
     // paint a mid green all round, as in daylight photos; a slightly softer key stops the roof
     // and blade tops washing out.
     lighting: {
-      showroom: { hemi: [0x4e5a68, 0x8a877c, 2.4], key: { color: 0xfff8f0, intensity: 1.8 }, rim: 1.4 },
+      showroom: { hemi: [0x4e5a68, 0x9a978c, 2.6], key: { color: 0xfff8f0, intensity: 1.8 }, rim: 1.4 },
       hangar: { hemi: [0xbfd2ff, 0x6c6a66, 0.6] },
     },
     displaySize: 13,

@@ -1,5 +1,5 @@
 // GPS III surface materials: black and silver multi-layer insulation, quartz OSR radiators,
-// triple-junction cells, the black antenna panel with black Earth-coverage and white crosslink
+// triple-junction cells, the black antenna panel with black Earth-coverage and grey crosslink
 // radomes, and the finishes of avionics boxes. Exterior finishes follow the pre-launch images of
 // SV02 and the manufacturer's scale model (Steigenberger et al. 2020, §4 and Fig. 4): silver MLI on
 // the Sun-facing +X face and the +Z antenna face, black MLI on −X and most of −Z.
@@ -34,22 +34,24 @@ const osrTexture = () => decalTexture('gps3.osr', 512, 512, (ctx, w) => {
   }
 });
 
-// triple-junction cells (≈ 4 × 7 cm) with silver interconnects, the panel's cell side
+// triple-junction cells (≈ 4 × 7 cm): near-black blue with a faint, thin silver grid of
+// interconnects and gaps, the panel's cell side (the manufacturer's render shows the cells
+// almost black, the grid barely there, under a glossy coverglass sheen)
 const cellTexture = () => decalTexture('gps3.cells', 512, 512, (ctx, w) => {
-  ctx.fillStyle = '#9ea6ae';
+  ctx.fillStyle = '#5a6168';
   ctx.fillRect(0, 0, w, w);
   const cols = 8, rows = 12, cw = w / cols, ch = w / rows;
   for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
     const k = ((i * 5 + j * 3) % 7) / 7;
     const g = ctx.createLinearGradient(i * cw, j * ch, (i + 1) * cw, (j + 1) * ch);
-    g.addColorStop(0, `rgb(${18 + k * 6},${30 + k * 8},${70 + k * 16})`);
-    g.addColorStop(1, `rgb(${12 + k * 5},${22 + k * 6},${56 + k * 12})`);
+    g.addColorStop(0, `rgb(${7 + k * 4},${11 + k * 5},${30 + k * 10})`);
+    g.addColorStop(1, `rgb(${4 + k * 3},${7 + k * 4},${20 + k * 8})`);
     ctx.fillStyle = g;
-    ctx.fillRect(i * cw + 2, j * ch + 2, cw - 4, ch - 4);
-    ctx.fillStyle = 'rgba(200,210,225,0.35)';
-    for (let k2 = 1; k2 < 6; k2++) ctx.fillRect(i * cw + 2 + ((cw - 4) * k2) / 6, j * ch + 2, 1, ch - 4);
-    ctx.fillStyle = 'rgba(210,215,225,0.6)';
-    ctx.fillRect(i * cw + 2, j * ch + 2, cw - 4, 2);
+    ctx.fillRect(i * cw + 1, j * ch + 1, cw - 2, ch - 2);
+    ctx.fillStyle = 'rgba(150,160,175,0.16)';
+    for (let k2 = 1; k2 < 6; k2++) ctx.fillRect(i * cw + 1 + ((cw - 2) * k2) / 6, j * ch + 1, 1, ch - 2);
+    ctx.fillStyle = 'rgba(170,178,190,0.3)';
+    ctx.fillRect(i * cw + 1, j * ch + 1, cw - 2, 1);
   }
 });
 
@@ -63,12 +65,15 @@ export const G = {
     });
   }),
   /** Silver multi-layer insulation (aluminised outer layer): the Sun-facing +X face and, in a
-   *  radio-transparent version, the +Z antenna face. */
+   *  radio-transparent version, the +Z antenna face. Crinkled foil is a satin, not a mirror: a
+   *  mid-grey base at roughness ≈ 0.5 so the orbit sun (intensity 4.2) lights the face silver-grey
+   *  with bright creases where the normal map catches it, instead of clipping the whole face to
+   *  white (the shared roughness map of mliSurface runs 0.18–0.42 and would make it a mirror). */
   silverMLI: (r = 1.2) => once(`silverMLI${r}`, () => {
     const s = mliSurface();
     return new THREE.MeshStandardMaterial({
-      color: 0xc9ced3, normalMap: tile(s.normalMap, r), roughnessMap: tile(s.roughnessMap, r),
-      normalScale: new THREE.Vector2(0.3, 0.3), roughness: 0.3, metalness: 0.85,
+      color: 0x9da2a8, normalMap: tile(s.normalMap, r),
+      normalScale: new THREE.Vector2(0.55, 0.55), roughness: 0.5, metalness: 0.65,
     });
   }),
   /** Gold (aluminised Kapton, amber side out) wrap of the oxidiser tanks in the scale model. */
@@ -79,12 +84,14 @@ export const G = {
   radomeBlack: () => once('radomeBlack', () => new THREE.MeshStandardMaterial({ color: 0x1b1c20, roughness: 0.45, metalness: 0.05 })),
   /** Optical solar reflector radiator: quartz mirrors on aluminium honeycomb. */
   osr: (rx, ry) => once(`osr${rx}.${ry}`, () => new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, map: tile(osrTexture(), rx, ry), metalness: 0.85, roughness: 0.14,
-    clearcoat: 0.6, clearcoatRoughness: 0.1,
+    color: 0xffffff, map: tile(osrTexture(), rx, ry), metalness: 0.85, roughness: 0.24,
+    clearcoat: 0.6, clearcoatRoughness: 0.18,
   })),
+  /** Coverglassed cells: a dark dielectric under a glossy clearcoat, so the panel reads near-black
+   *  blue with a sheen and the sun's glint stays a highlight, not a bloom. */
   cells: (rx, ry) => once(`cells${rx}.${ry}`, () => new THREE.MeshPhysicalMaterial({
-    color: 0xffffff, map: tile(cellTexture(), rx, ry), roughness: 0.2, metalness: 0.45,
-    clearcoat: 1, clearcoatRoughness: 0.09, iridescence: 0.2, iridescenceIOR: 1.6,
+    color: 0xffffff, map: tile(cellTexture(), rx, ry), roughness: 0.32, metalness: 0.08,
+    clearcoat: 1, clearcoatRoughness: 0.32, iridescence: 0.15, iridescenceIOR: 1.6,
   })),
   panelBack: () => once('panelBack', () => {
     const cw = carbonWeave();
@@ -97,6 +104,9 @@ export const G = {
   honeycomb: () => once('honeycomb', () => new THREE.MeshStandardMaterial({ color: 0xa9afb5, roughness: 0.45, metalness: 0.8 })),
   whitePaint: () => once('whitePaint', () => new THREE.MeshStandardMaterial({ color: 0xeef0f1, roughness: 0.55, metalness: 0.02 })),
   radome: () => once('radome', () => new THREE.MeshStandardMaterial({ color: 0xf3f2ec, roughness: 0.42, metalness: 0.0 })),
+  /** The UHF crosslink radomes: pale grey fibreglass, a step below the white TT&C radomes so the
+   *  black L-band array stays the dominant element of the nadir deck (manufacturer's render). */
+  radomeGrey: () => once('radomeGrey', () => new THREE.MeshStandardMaterial({ color: 0xc4c6c2, roughness: 0.5, metalness: 0.0 })),
   helixWire: () => once('helixWire', () => new THREE.MeshStandardMaterial({ color: 0xc98b4a, roughness: 0.3, metalness: 1.0 })),
   alodine: () => once('alodine', () => new THREE.MeshStandardMaterial({ color: 0xc8b47a, roughness: 0.38, metalness: 0.85 })),
   silverBox: () => once('silverBox', () => new THREE.MeshStandardMaterial({ color: 0xb4b9be, roughness: 0.35, metalness: 0.9 })),

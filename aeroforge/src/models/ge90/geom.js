@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { lathe, loftRings, orientOutward, mergeGeometries } from '../../engine/geometry.js';
 import { bladeRings } from './blade.js';
-import { M } from '../../engine/materials.js';
+import { GM } from './materials.js';
 
 const TAU = Math.PI * 2;
 
@@ -64,7 +64,7 @@ export function cutLathe(profile, material, { seg = 64, caps = true, closed = tr
   if (caps && closed) {
     const capGeo = merge(profiles.map((p) => new THREE.ShapeGeometry(new THREE.Shape(p.map(([r, y]) => new THREE.Vector2(r, y))))));
     for (const phi of [c.start, c.start + c.length]) {
-      const m = mesh(capGeo, capMat || M.section(), { cast: false });
+      const m = mesh(capGeo, capMat || GM.section(), { cast: false });
       m.rotation.y = phi - Math.PI / 2;
       group.add(m);
       capMeshes.push(m);
@@ -199,7 +199,12 @@ export function tangentCyl(r, y, phi, radius, length, seg = 16) {
 
 /** A curved box (sector of an annulus) between radii r0…r1, stations y0…y1, angles p0…p1. */
 export function sector(r0, r1, y0, y1, p0, p1, seg = 12) {
-  const loop = ccw([[r0, Math.min(y0, y1)], [r1, Math.min(y0, y1)], [r1, Math.max(y0, y1)], [r0, Math.max(y0, y1)]]);
+  return sectorLoop([[r0, Math.min(y0, y1)], [r1, Math.min(y0, y1)], [r1, Math.max(y0, y1)], [r0, Math.max(y0, y1)]], p0, p1, seg);
+}
+
+/** A closed [r, y] loop swept between angles p0…p1, with end faces (a saddle that follows a cowl's line …). */
+export function sectorLoop(profile, p0, p1, seg = 12) {
+  const loop = ccw(profile);
   const g = lathe(loop.concat([loop[0]]), seg, p0, p1 - p0);
   // end faces: ShapeGeometry faces +z, which the rotation turns towards decreasing phi
   const shape = new THREE.Shape(loop.map(([r, y]) => new THREE.Vector2(r, y)));

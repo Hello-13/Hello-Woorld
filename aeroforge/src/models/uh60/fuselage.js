@@ -25,7 +25,7 @@ const K = {
 // and the cap wraps round it with a tangent-continuous, flat vertical front face of NOSE_FACE
 // times the last section (closed by a flat cap). The lower part is scaled much less, so the
 // keel runs almost straight into the face: the sharp lower chin of the real beak.
-const NOSE_X0 = 4.35, NOSE_M = 2.6, NOSE_FACE = 0.42, NOSE_CHIN = 0.3;
+const NOSE_X0 = 4.35, NOSE_M = 3.0, NOSE_FACE = 0.4, NOSE_FACE_UP = 0.56, NOSE_CHIN = 0.25;
 export const NOSE_X = 4.81, TAIL_X = -9.35;
 
 const sectionCache = new Map();
@@ -50,10 +50,11 @@ export function surfPoint(x, a, off = 0) {
   let y = s.yW + (up ? s.yT - s.yW : s.yW - s.yB) * Math.sign(sn) * Math.pow(Math.abs(sn), e);
   if (x > NOSE_X0) {
     const t = Math.min(1, (x - NOSE_X0) / (NOSE_X - NOSE_X0));
-    const k = NOSE_FACE + (1 - NOSE_FACE) * Math.pow(1 - Math.pow(t, NOSE_M), 1 / NOSE_M);
+    const r = Math.pow(1 - Math.pow(t, NOSE_M), 1 / NOSE_M);      // 1 at the body → 0 at the face
     const yc = s.yB + 0.3 * (s.yT - s.yB);
-    y = y >= yc ? yc + (y - yc) * k : yc - (yc - y) * (1 - NOSE_CHIN * (1 - k));
-    z *= k;
+    // the face is taller than it is wide (the top rounds over less than the sides close in)
+    y = y >= yc ? yc + (y - yc) * (NOSE_FACE_UP + (1 - NOSE_FACE_UP) * r) : yc - (yc - y) * (1 - NOSE_CHIN * (1 - r));
+    z *= NOSE_FACE + (1 - NOSE_FACE) * r;
   }
   const p = V3(x, y, z);
   if (off) p.addScaledVector(surfNormal(x, a), off);
@@ -177,16 +178,21 @@ function patch(G, { x0 = -99, x1 = 99, a0 = -9, a1 = 9, holes = [], off = 0, onl
       idx.push(a, c, b, b, c, d);
     }
   }
-  const fan = (i, flip) => {
+  // end caps: a shallow dome (centre pushed `dome` metres out) whose rim takes the loft's normals,
+  // so the nose face shades continuously into the cap; the winding is checked, not assumed
+  const fan = (i, dirX, dome) => {
     const ring = G.P[i];
     const cen = ring.reduce((s, p) => s.add(p), V3()).multiplyScalar(1 / ring.length);
+    cen.x += dirX * dome;
     const base = pos.length / 3;
-    pos.push(cen.x, cen.y, cen.z); nrm.push(flip ? -1 : 1, 0, 0); uv.push(cen.x, 0);
-    for (let j = 0; j < NA; j++) { const p = ring[j]; pos.push(p.x, p.y, p.z); nrm.push(flip ? -1 : 1, 0, 0); uv.push(p.x, j * 0.05); }
+    pos.push(cen.x, cen.y, cen.z); nrm.push(dirX, 0, 0); uv.push(cen.x, 0);
+    for (let j = 0; j < NA; j++) { const p = ring[j], n = G.N[i][j]; pos.push(p.x, p.y, p.z); nrm.push(n.x, n.y, n.z); uv.push(p.x, j * 0.05); }
+    const nrmX = ring[0].clone().sub(cen).cross(ring[1].clone().sub(cen)).x;
+    const flip = nrmX * dirX < 0;
     for (let j = 0; j < NA - 1; j++) { if (flip) idx.push(base, base + 2 + j, base + 1 + j); else idx.push(base, base + 1 + j, base + 2 + j); }
   };
-  if (capTip) fan(G.X.length - 1, false);
-  if (capTail) fan(0, true);
+  if (capTip) fan(G.X.length - 1, 1, 0.035);
+  if (capTail) fan(0, -1, 0.0);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));

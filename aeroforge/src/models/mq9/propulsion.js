@@ -104,7 +104,7 @@ export function buildPropulsion({ P, L, m, role }) {
   }, L(screenGeo(), m.darkMetal));
   // dorsal ram-air scoop at the front of the engine hump, a flat duct over the accessory bay and the
   // engine, and the annular plenum round the compressor inlet (routing estimated)
-  const inletPath = [[XS(7.92), 1.882, 0], [XS(8.1), 1.89, 0], [XS(8.45), 1.935, 0], [XS(8.95), 1.99, 0], [XS(9.4), 2.025, 0], [XS(9.68), 2.03, 0], [XS(9.78), 2.0, 0], [XS(9.83), 1.93, 0]];
+  const inletPath = [[XS(7.92), 1.882, 0], [XS(8.1), 1.89, 0], [XS(8.45), 1.935, 0], [XS(8.95), 1.99, 0], [XS(9.4), 2.025, 0], [XS(9.68), 2.03, -0.015], [XS(9.78), 2.0, -0.025], [XS(9.83), 1.93, -0.025]];   // its end eases 2 cm to port, away from the exhaust duct's climb
   const scoop = lru(0.34, 0.075, 0.25, [XS(8.02), 1.895, 0], 0.04);
   P('Engine air inlet & plenum', {
     system: 'Propulsion', material: 'Composite scoop and duct, aluminium plenum (routing approximate)', mass: 8, explode: [0, 1.6, 0],
@@ -319,7 +319,7 @@ export function buildPropulsion({ P, L, m, role }) {
     mt.push(box(0.03, 0.03, 0.03, [XS(9.335), root[1], root[2]]), tubeBetween(root, KNEE, 0.0115, 8));
   }
   mt.push(new THREE.SphereGeometry(0.016, 10, 8).translate(...KNEE));
-  mt.push(tubeBetween(KNEE, [XS(FRONT_MOUNT_S) + 0.004, fmY + 0.004, -0.03], 0.01, 8));
+  mt.push(tubeBetween(KNEE, [XS(FRONT_MOUNT_S) + 0.012, fmY + 0.008, -0.03], 0.009, 8));     // onto the plate's forward port corner
   P('Engine mount truss', {
     system: 'Structure', material: 'Welded steel tube with elastomeric isolators (est.)', mass: 13, explode: [0, 1.15, 0],
     desc: 'The TPE331 hangs from Honeywell’s mount points: a front mount on top of the gearbox and, at the hot end, pads 7.8 in (0.198 m) above and below the centreline and 7.2 in (0.183 m) to either side of it, with rubber isolators to keep engine vibration out of the airframe and the sensors. This truss uses the lower pair, each braced by two tubes to the firewall, clear of the exhaust duct on the upper starboard side; the front mount is picked up by a bracket whose A-frame runs forward over the port side of the engine, outboard of the inlet duct, to the rear V-tail spar frame, leaving the starboard side to the exhaust duct (which pads the MQ-9 uses and the tube layout are estimated).',
