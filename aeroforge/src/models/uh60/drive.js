@@ -359,13 +359,11 @@ export function buildDrive({ A, P, roofY }) {
     const path = [V3(ENG.rear - 0.005, ENG.y, z), V3(-2.0, ENG.y + 0.01, z), V3(-2.2, ENG.y + 0.1, z + 0.02 * s), V3(-2.31, ENG.y + 0.27, z + 0.04 * s), V3(-2.34, ENG.y + 0.42, z + 0.05 * s)];
     const ues = bentDuct(path.slice().reverse(), 0.25, 0.19, 0.29, 0.19, 4.2, 2);
     const top = path[path.length - 1];
-    const plates = [];
-    for (let k = 0; k < 6; k++) plates.push(box(0.5, 0.06, 0.012, [top.x, top.y - 0.03, top.z - 0.2 + k * 0.08]));
-    for (let k = 0; k < 4; k++) plates.push(box(0.012, 0.05, 0.42, [top.x - 0.18 + k * 0.12, top.y - 0.04, top.z]));
+    // the cooling grid sits inside the duct behind the power turbine; nothing shows at the open outlet
     const ex = P(`Upturned exhaust ${R}`, {
       system: 'Propulsion', material: 'Inconel duct and cooling grid, low-emissivity-coated outer skin', mass: 32, explode: [-1.0, 1.25, 1.95 * s],
-      desc: 'The M\'s Upturned Exhaust System: behind the power turbine the ~550 °C exhaust is cooled as it passes a grid of metal plates, then the duct turns it upward into the rotor downwash, which spreads the plume and hides the hot metal from heat-seeking missiles below. (HIRSS — a three-stage removable core with low-reflectance coatings that turns the exhaust outboard — is an older, separate kit.)',
-    }, [mesh(ues.g, MAT.paintDark()), mesh(merge(plates), MAT.hot()), mesh(cyl(0.2, 0.2, 0.01, [top.x, top.y - 0.07, top.z], 'y', 24), MAT.intake())]);
+      desc: 'The M\'s Upturned Exhaust System: behind the power turbine the ~550 °C exhaust is cooled as it passes a grid of metal plates inside the duct, then the duct turns it upward into the rotor downwash, which spreads the plume and hides the hot metal from heat-seeking missiles below. (HIRSS — a three-stage removable core with low-reflectance coatings that turns the exhaust outboard — is an older, separate kit.)',
+    }, [mesh(ues.g, MAT.paintDark()), mesh(cyl(0.2, 0.2, 0.01, [top.x, top.y - 0.12, top.z], 'y', 24), MAT.intake())]);
     ex.userData.part.thermalRole = 'suppressor';
 
     // nacelle cowling (skin): fold-down side cowls double as work platforms

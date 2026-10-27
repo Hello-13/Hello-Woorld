@@ -112,7 +112,7 @@ test('GPS III Earth deck layout: 4 + 8 rings, M-code tab, sunshade corner, no cl
   const [sx, sy] = L.DECK_AT.sunshade;
   assert.ok(sx < -0.3 && sy < -0.6, 'burst-detector sunshade in the −X/−Y corner (IGS axes)');
   const R = { sunshade: 0.225, xray: 0.09, esa: 0.19, hpeSensor: 0.11, hpeS: 0.06, hpeRx: 0.06, lra: 0.22, scot: 0.16, fwdMast: 0.05, mast2: 0.05 };
-  const items = [...L.EC_INNER, ...L.EC_OUTER, ...L.MEC].map((p) => [p, 0.06]).concat([...L.UHF_INNER, ...L.UHF_OUTER].map((p) => [p, 0.08]), L.JIB_POS.map((p) => [p, 0.06]),
+  const items = [...L.EC_INNER, ...L.EC_OUTER, ...L.MEC].map((p) => [p, 0.073]).concat([...L.UHF_INNER, ...L.UHF_OUTER].map((p) => [p, 0.068]), L.JIB_POS.map((p) => [p, 0.06]),
     Object.entries(L.DECK_AT).map(([k, p]) => [p, R[k]]));
   for (const [[x, y], rad] of items) assert.ok(Math.abs(x) + rad <= D.HX + 0.2 && Math.abs(y) <= D.HY, `deck item at (${x}, ${y}) sits on the 2.46 × 1.78 m deck`);
   for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {

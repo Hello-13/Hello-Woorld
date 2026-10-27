@@ -224,14 +224,16 @@ export function buildUAV() {
     if (s < FIREWALL_S) return 'aft';
     return 'cowl';
   });
-  P('SATCOM radome', {
-    system: 'Skin & fairings', skin: true, xraySkinWeight: 0.5, material: 'Dielectric composite shell, painted', mass: 22, explode: [1.3, 2.1, -1.3],
+  const satRadome = P('SATCOM radome', {
+    system: 'Skin & fairings', skin: true, material: 'Dielectric composite shell, painted', mass: 22, explode: [1.3, 2.1, -1.3],
     desc: 'The bulbous upper nose is a radome over the Ku-band satellite dish. It is transparent to the 12–18 GHz link signal, which is why the nose shape is set by a 0.7 m-class dish rather than by aerodynamics.',
   }, L(panels.get('radome'), m.radome));
-  P('Lynx radome', {
-    system: 'Skin & fairings', skin: true, xraySkinWeight: 0.5, material: 'Dielectric composite shell, painted', mass: 7, explode: [1.9, 0.5, -1.3],
+  const lynxRadome = P('Lynx radome', {
+    system: 'Skin & fairings', skin: true, material: 'Dielectric composite shell, painted', mass: 7, explode: [1.9, 0.5, -1.3],
     desc: 'Lower nose fairing over the AN/APY-8 Lynx radar antenna. Ku-band radar energy passes through it with little loss, so it carries no metal structure.',
   }, L(panels.get('lynx'), m.radome));
+  // the two radomes wrap the densest corner of the X-ray view (dish, pedestal, racks): draw them fainter than the other skins
+  satRadome.userData.part.xraySkinWeight = lynxRadome.userData.part.xraySkinWeight = 0.5;
   const fwdSkin = P('Forward fuselage skin', {
     system: 'Skin & fairings', skin: true, material: 'Graphite/epoxy skin on Nomex honeycomb panels', mass: 80, explode: [0.2, 1.95, -1.3],
     desc: 'Skin over the forward bay, the avionics bay and the nose-gear well. Like the whole fuselage it is “a composite structure of impregnated graphite skin and Nomex honeycomb stiffening panels” (NTSB), with light-alloy fittings where loads come in; access panels open the avionics racks from the sides.',
@@ -246,7 +248,7 @@ export function buildUAV() {
   }, L(panels.get('aft'), m.skin)), 'tailcone');
   const cowl = role(P('Engine bay cowling', {
     system: 'Skin & fairings', skin: true, material: 'Graphite/Nomex panels with titanium-faced edges near the exhaust (est.)', mass: 30, explode: [-0.5, 2.05, -1.3],
-    desc: 'Removable cowling round the engine bay aft of the firewall, deep enough for the 0.68 m-tall reduction gearbox and faired straight into the spinner. Panels near the exhaust stacks need heat-resistant facing; the rest come off for engine changes.',
+    desc: 'Removable cowling round the engine bay aft of the firewall, deep enough for the 0.68 m-tall reduction gearbox and faired straight into the spinner. Panels under the exhaust duct and round the stack need heat-resistant facing; the rest come off for engine changes.',
   }, L(panels.get('cowl'), m.skin)), 'cowling');
 
   // ============================================================== fuselage structure
@@ -262,7 +264,7 @@ export function buildUAV() {
     desc: 'Frames that hold the nose shape and carry the radome, nose gear and avionics loads into the longerons. The lower arc at the front carries the Lynx radome ring; the two over the nose-gear well stop at the well walls (spacing estimated).',
   }, L(merge(fwdFrames), m.frame));
   // engine-bay frames are open below, where the lower access panels come off (estimated)
-  // the V-tail spar frames (s 8.78, 9.31) are cut where the dorsal inlet duct and the exhaust pipes pass
+  // the V-tail spar frames (s 8.78, 9.31) are cut where the dorsal inlet duct and, on the starboard side, the exhaust duct pass
   const arcs = (s, list, h) => list.map(([a, b]) => hoop(s, { h, from: a, to: b, n: Math.max(4, Math.round((36 * (b - a)) / (Math.PI * 2))) }));
   const PI = Math.PI, DUCT = 0.3;
   // the frame under the aft cell has a keel cut-out for the feed line and the IFF cable; the one at the oil cooler opens round its scoop
@@ -272,14 +274,14 @@ export function buildUAV() {
   const mainWellArc = { from: 0.12, to: PI - 0.12, n: 24 };
   const aftFrames = [4.25, 5.25, 6.3, 6.95, 7.75, 10.3].map((s) => hoop(s, { h: s > 9 ? 0.035 : 0.045, ...(inWell(s) ? mainWellArc : s > 9 ? { from: -0.35, to: PI + 0.35, n: 30 } : aftOpen[s] ?? {}) }));
   aftFrames.push(...arcs(8.78, [[-PI / 2, PI / 2 - DUCT], [PI / 2 + DUCT, PI * 1.5]], 0.045));
-  aftFrames.push(...arcs(9.31, [[-0.35, 0.66], [1.08, PI / 2 - 0.38], [PI / 2 + 0.38, PI - 1.08], [PI - 0.66, PI + 0.35]], 0.04));   // the duct is wider here, where it rises over the engine
+  aftFrames.push(...arcs(9.31, [[-0.35, 0.2], [0.9, PI / 2 - 0.38], [PI / 2 + 0.38, PI + 0.35]], 0.04));   // the inlet duct is wider here, where it rises over the engine; the exhaust duct passes on the starboard side
   P('Centre & aft fuselage frames', {
     system: 'Structure', material: 'Composite and aluminium ring frames (est.)', mass: 44, count: 8, xrayWeight: 0.4, explode: [-0.3, 0.45, 0],
-    desc: 'Frames at the wing spars, main-gear wells, accessory bay, V-tail spars and the aft end of the cowling. The frames at the front and rear spar positions take the wing’s lift into the body; the two V-tail spar frames carry the tail’s root fittings, the front one cut where the inlet duct passes, the rear one also for the exhaust pipes, and the rear one also takes the engine mount truss’s front-mount yoke; the two over the main-gear wells are open from the keel up to the longerons above the doors, the engine-bay ones are open below, and the two under the aft cell and at the oil cooler have keel cut-outs for the feed line, the cables and the cooler scoop (spacing estimated).',
+    desc: 'Frames at the wing spars, main-gear wells, accessory bay, V-tail spars and the aft end of the cowling. The frames at the front and rear spar positions take the wing’s lift into the body; the two V-tail spar frames carry the tail’s root fittings, the front one cut where the inlet duct passes, the rear one also for the exhaust duct on the starboard side, and the rear one also takes the engine mount truss’s front-mount yoke; the two over the main-gear wells are open from the keel up to the longerons above the doors, the engine-bay ones are open below, and the two under the aft cell and at the oil cooler have keel cut-outs for the feed line, the cables and the cooler scoop (spacing estimated).',
   }, L(merge(aftFrames), m.frame));
   const longerons = [0.9, Math.PI - 0.9, -0.5, -Math.PI + 0.5].map((th) => {
     const pts = [];
-    // the upper pair ends at the firewall, where the inlet duct, the exhaust pipes and the V-tail roots fill the top;
+    // the upper pair ends at the firewall, where the inlet duct, the exhaust duct and the V-tail roots fill the top;
     // the lower pair steps up over the main-gear wells to run above the doors' upper edges
     const lift = (s) => (th < 0 ? smooth(4.5, 4.8, s) * (1 - smooth(6.52, 6.82, s)) * 0.62 : 0);
     // the upper pair starts at the s 2.05 frame behind the SATCOM radome (no carbon in the dish's view), the lower pair at the s 0.95 ring
@@ -601,7 +603,7 @@ export function buildUAV() {
       callout: side > 0, anchor: [vtPoint(0.92, 0.85, 1).x, 0, VT_L * 0.92 * side],
     }, rH.pivot, frame);
     surf.rv.push({ h: rH, side });
-    // the spars start, and the root rib sits, where the surface leaves the fuselage: clear of the dorsal inlet duct and the exhaust pipes below
+    // the spars start, and the root rib sits, where the surface leaves the fuselage: clear of the dorsal inlet duct and the exhaust duct below
     const vs = [sparGeo(0.09, VT_L - 0.05, 0.25, { width: 0.025, steps: 4, root: vtRoot, tip: vtTip, twist: 0 }), sparGeo(0.15, VT_L - 0.08, 0.66, { width: 0.02, steps: 4, root: vtRoot, tip: vtTip, twist: 0 })];
     for (const zz of [0.14, 0.65, 1.25, 1.85, VT_L - 0.03]) vs.push(ribGeo(zz, 0.02, 0.69, { root: vtRoot, tip: vtTip, twist: 0, th: 0.008 }));
     const vh = [];
@@ -615,7 +617,7 @@ export function buildUAV() {
     }, L(f(merge(vh)), m.alu), frame);
     P(`V-tail spar & ribs (${sn})`, {
       system: 'Structure', material: 'Carbon-fibre composite (est.)', mass: 9, explode: [0, 0, 0.55 * side],
-      desc: 'Two spars and five ribs per tail surface. The root rib sits where the surface leaves the fuselage, and the spars’ roots are pinned through root fittings to the two V-tail spar frames, above the engine’s inlet duct and exhaust pipes (layout estimated).',
+      desc: 'Two spars and five ribs per tail surface. The root rib sits where the surface leaves the fuselage, and the spars’ roots are pinned through root fittings to the two V-tail spar frames, above the engine’s inlet duct and its exhaust duct (layout estimated).',
     }, L(f(merge(vs)), m.composite), frame);
     // root fittings: a clevis on the upper and lower cap of each spar root, straddling its spar frame, with a fore-and-aft bolt through each
     const rf = [];
@@ -628,7 +630,7 @@ export function buildUAV() {
     }
     P(`V-tail root fittings (${sn})`, {
       system: 'Structure', material: 'Machined aluminium or titanium lugs and steel pins (est.)', mass: 1.6, count: 4, explode: [0, -0.15, 0.4 * side],
-      desc: 'Clevis fittings on the upper and lower caps of the front and rear spar roots straddle the two V-tail spar frames over the accessory bay and the engine, with a bolt through each clevis and the frame between its plates. They carry the tail’s bending and twisting into the fuselage, and sit outboard of the inlet duct and above the exhaust pipes that pass between the tail roots (layout estimated).',
+      desc: 'Clevis fittings on the upper and lower caps of the front and rear spar roots straddle the two V-tail spar frames over the accessory bay and the engine, with a bolt through each clevis and the frame between its plates. They carry the tail’s bending and twisting into the fuselage, and sit outboard of the inlet duct and, on the starboard side, above the exhaust duct that passes under the tail root (layout estimated).',
     }, L(f(merge(rf)), m.titanium), frame);
   }
   const fin = new THREE.Group();
@@ -1301,7 +1303,7 @@ export function buildUAV() {
   }, L(merge(avPanels), panelMat));
   role(P('Engine bay access doors', {
     system: 'Skin & fairings', skin: true, material: 'Composite doors with titanium-faced edges (layout estimated)', mass: 4, count: 2, xrayWeight: 0.6, explode: [-0.2, 0.75, 1.6],
-    desc: 'Upper engine access panels on both sides, between the V-tail roots and the exhaust stacks, for oil checks and inspections of the fuel control and accessories without removing the cowling. The NTSB found “the upper and lower engine access panels” still attached after the 2006 crash (layout estimated).',
+    desc: 'Upper engine access panels on both sides, below the V-tail roots (the starboard one opens onto the exhaust duct), for oil checks and inspections of the fuel control and accessories without removing the cowling. The NTSB found “the upper and lower engine access panels” still attached after the 2006 crash (layout estimated).',
   }, L(merge(enPanels), panelMat)), 'cowling');
   role(P('Lower engine access panel', {
     system: 'Skin & fairings', skin: true, material: 'Composite panel on quarter-turn fasteners (layout estimated)', mass: 2.5, xrayWeight: 0.6, explode: [-0.3, -1.2, 0.9],
@@ -1398,7 +1400,7 @@ export function buildUAV() {
         case 'oil': return amb + 60 + th * 25;
         case 'generator': return amb + 40 + th * 25;
         case 'battery': return amb + 12;
-        case 'cowling': return amb + 30 + th * 40;   // skin over the engine and the exhaust stacks
+        case 'cowling': return amb + 30 + th * 40;   // skin over the engine and under the exhaust duct
         case 'tailcone': return amb + 18 + th * 20;
         default: break;
       }

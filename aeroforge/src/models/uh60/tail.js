@@ -6,6 +6,8 @@
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
+import { decal } from '../../engine/decals.js';
+import { decalTexture } from '../../engine/surface.js';
 import { wingPanel, mirrorZ, loftRings, orientOutward, airfoilLoop, lathe } from '../../engine/geometry.js';
 import { MAT, DEG, V3, merge, box, cyl, tube, pipe, pchip, unitRod, aimRod, TAIL, pylonLean, strobeMat, DEICE, TR_CTL } from './common.js';
 
@@ -148,10 +150,13 @@ export function buildTail({ A, P, air, roofY }) {
   // primary servos that stand on the deck ahead of the gearbox
   const well = cyl(WELL, WELL, 0.17, [shaftX, 2.705, 0], 'y', 44, true);
   const wellLip = new THREE.TorusGeometry(WELL, 0.018, 6, 44).rotateX(Math.PI / 2).translate(shaftX, 2.79, 0);
+  // the opening closes up to the swashplate: a shallow conical boot from the lip in to the guide tube,
+  // with the servo rams and the stationary scissors passing through it (as the real boots do)
+  const boot = orientOutward(lathe([[0.2, 2.735], [WELL, 2.776], [WELL, 2.76], [0.2, 2.72], [0.2, 2.735]], 44)).translate(shaftX, 0, 0);
   P('Transmission fairing', {
     system: 'Skin & fairings', skin: true, material: 'Kevlar/graphite composite cowls on quick-release hinges', mass: 55, explode: [2.4, 1.0, 0],
     desc: 'Streamlines the forward upper deck, the flight-control closet, the main gearbox and its input and accessory modules. Its panels open as walkways for daily inspection of the rotor head.',
-  }, [mesh(merge([trans, well, wellLip]), paint), mesh(well.clone(), MAT.interior())]);
+  }, [mesh(merge([trans, well, wellLip, boot]), paint), mesh(well.clone(), MAT.interior())]);
   // between the nacelles its flanks run into the cowls' inboard sides, closing the deck (no open
   // slot between the engines and the fairing, and the fuel lines pass from one to the other inside)
   const aftF = fairing(aftKeys(roofY), roofY, { nu: 36, nv: 28 });
@@ -185,11 +190,32 @@ export function buildTail({ A, P, air, roofY }) {
   };
   lean(pyl);
   const tgbBulge = new THREE.SphereGeometry(1, 20, 14).scale(0.42, 0.26, 0.22).translate(TAIL.tgb[0] + 0.02, TAIL.tgb[1] + 0.02, TAIL.tgb[2] + 0.035);   // round the 90° box's case
-  P('Tail pylon', {
+  const pylonPart = P('Tail pylon', {
     system: 'Skin & fairings', skin: true, material: 'Aluminium skins, cambered NACA 0021 (mod) section, Kevlar leading edge', mass: 70, explode: [-2.9, 0.5, 0],
     desc: 'The swept vertical fin (41° at the quarter chord) is cambered so that in forward flight it makes a side force that unloads the tail rotor. Above the tail cone it leans 20° to port, which tilts the tail-rotor shaft and lets the tail rotor help lift the tail.',
     callout: true, anchor: [-8.9, 3.0, pylonLean(3.0) + 0.1],   // mid-fin, right face
   }, [mesh(merge([pyl, tgbBulge]), paint)]);
+  // serial and warning stencils on both faces of the pylon (low-contrast black, as on Army green)
+  {
+    const pylMesh = pylonPart.children[0];
+    const serialTex = decalTexture('uh60.serial', 512, 320, (ctx, w, h) => {
+      ctx.fillStyle = 'rgba(12,13,12,0.95)';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '600 118px "Barlow", "Helvetica Neue", Arial, sans-serif';
+      ctx.fillText('0-20704', w / 2, h * 0.3);
+      ctx.font = '700 54px "Barlow", "Helvetica Neue", Arial, sans-serif';
+      ctx.fillText('DANGER', w / 2, h * 0.64);
+      ctx.fillText('KEEP AWAY', w / 2, h * 0.84);
+    });
+    const nS = V3(0, Math.sin(TAIL.cant), Math.cos(TAIL.cant));      // starboard face of the leaning fin
+    for (const sd of [1, -1]) {
+      const y = 3.0, x = sd > 0 ? -9.1 : -8.98;                        // port: ahead of the pylon shaft cover
+      const at = V3(x, y, pylonLean(y) + sd * 0.16);
+      const d = decal(pylMesh, serialTex, { at: at.toArray(), dir: nS.clone().multiplyScalar(sd).toArray(), size: [0.56, 0.35, 0.4], roughness: 1.0, metalness: 0 });
+      d.material.envMapIntensity = 0.25;
+      pylonPart.add(d);
+    }
+  }
 
   // Front spar at 18 % chord; its foot forks round the last tail-shaft joint and the 42° gearbox's
   // input housing where they lie on top of the tail cone. The pylon drive shaft climbs from 36 % chord
@@ -222,10 +248,12 @@ export function buildTail({ A, P, air, roofY }) {
   const sPivot = new THREE.Group();
   sPivot.position.set(-9.4, 1.66, 0);            // pivot inside the end of the tail cone, under the pylon trailing edge
   // GenHel: span 14.38 ft (4.38 m), root chord 3.67 ft (1.12 m), tip 2.54 ft (0.77 m), NACA 0014
-  const sRoot = { le: [0.35, 0, 0.14], chord: 1.12, t: 0.14 };
+  // one continuous surface through the tail cone: the two halves meet at the centreline (the
+  // published 1.12 m root chord is the exposed root; the centreline section is slightly longer)
+  const sRoot = { le: [0.357, 0, 0], chord: 1.144, t: 0.14 };
   const sTip = { le: [0.25, 0, 2.19], chord: 0.77, t: 0.14 };
   const half = wingPanel({ root: sRoot, tip: sTip, stations: 4, camber: -0.02, n: 18, withChord: false });
-  const stab = merge([half, mirrorZ(half), cyl(0.05, 0.05, 0.3, [0, 0, 0], 'z', 12)]);
+  const stab = merge([half, mirrorZ(half)]);
   sPivot.add(mesh(stab, paint));
   P('Stabilator', {
     system: 'Flight controls', material: 'Aluminium/composite all-moving surface, 4.38 m span', mass: 50, explode: [-3.2, -0.6, 0],

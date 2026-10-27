@@ -11,13 +11,21 @@ import { mesh } from '../../engine/assembly.js';
 import { MAT, pchip, merge, tube, pipe, box, cyl, bar, V3, mirror } from './common.js';
 
 const K = {
-  yB: [[-9.35, 1.62], [-8.75, 1.52], [-8.0, 1.43], [-6.5, 1.29], [-5.0, 1.14], [-4.0, 1.0], [-3.2, 0.8], [-2.6, 0.62], [-2.0, 0.51], [-1.6, 0.47], [2.4, 0.47], [3.2, 0.49], [3.8, 0.53], [4.2, 0.6], [4.5, 0.7], [4.7, 0.84], [4.81, 1.0]],
-  yT: [[-9.35, 1.9], [-8.75, 1.96], [-8.0, 1.99], [-6.5, 2.05], [-5.0, 2.11], [-4.0, 2.16], [-3.2, 2.21], [-2.6, 2.24], [-1.6, 2.25], [2.4, 2.28], [3.0, 2.31], [3.35, 2.26], [3.6, 2.1], [3.9, 1.86], [4.2, 1.6], [4.5, 1.47], [4.7, 1.32], [4.81, 1.08]],
-  hw: [[-9.35, 0.16], [-8.75, 0.26], [-8.0, 0.3], [-6.5, 0.37], [-5.0, 0.47], [-4.0, 0.58], [-3.2, 0.8], [-2.6, 1.02], [-2.0, 1.15], [-1.6, 1.18], [2.3, 1.18], [2.9, 1.14], [3.4, 1.09], [3.8, 1.0], [4.1, 0.9], [4.4, 0.75], [4.6, 0.58], [4.72, 0.4], [4.78, 0.24], [4.81, 0.03]],
+  yB: [[-9.35, 1.62], [-8.75, 1.52], [-8.0, 1.43], [-6.5, 1.29], [-5.0, 1.14], [-4.0, 1.0], [-3.2, 0.8], [-2.6, 0.62], [-2.0, 0.51], [-1.6, 0.47], [2.4, 0.47], [3.2, 0.49], [3.8, 0.53], [4.2, 0.6], [4.5, 0.68], [4.81, 0.8]],
+  yT: [[-9.35, 1.9], [-8.75, 1.96], [-8.0, 1.99], [-6.5, 2.05], [-5.0, 2.11], [-4.0, 2.16], [-3.2, 2.21], [-2.6, 2.24], [-1.6, 2.25], [2.4, 2.28], [3.0, 2.31], [3.35, 2.26], [3.6, 2.1], [3.9, 1.86], [4.2, 1.6], [4.5, 1.52], [4.7, 1.46], [4.81, 1.42]],
+  hw: [[-9.35, 0.16], [-8.75, 0.26], [-8.0, 0.3], [-6.5, 0.37], [-5.0, 0.47], [-4.0, 0.58], [-3.2, 0.8], [-2.6, 1.02], [-2.0, 1.15], [-1.6, 1.18], [2.3, 1.18], [2.9, 1.14], [3.4, 1.09], [3.8, 1.0], [4.1, 0.9], [4.4, 0.76], [4.6, 0.66], [4.81, 0.56]],
   yW: [[-9.35, 1.76], [-8.75, 1.74], [-6.5, 1.67], [-4.0, 1.55], [-3.2, 1.42], [-2.6, 1.26], [-2.0, 1.15], [-1.6, 1.12], [2.4, 1.12], [3.4, 1.1], [4.2, 1.05], [4.81, 1.04]],
-  nUp: [[-9.35, 2.2], [-3.2, 2.3], [-2.0, 2.8], [2.4, 3.0], [3.4, 2.6], [4.2, 2.4], [4.81, 2.2]],
-  nLo: [[-9.35, 2.2], [-3.2, 2.6], [-2.0, 4.0], [2.4, 4.5], [3.6, 3.5], [4.3, 2.6], [4.81, 2.2]],
+  // section exponents: near-elliptical (n ≈ 2.05–2.1) along the tail cone so the sides round
+  // smoothly through the waist instead of showing a flat band, boxier through the cabin
+  nUp: [[-9.35, 2.05], [-3.4, 2.1], [-3.0, 2.3], [-2.0, 2.8], [2.4, 3.0], [3.4, 2.6], [4.2, 2.4], [4.81, 2.2]],
+  nLo: [[-9.35, 2.1], [-3.4, 2.2], [-3.0, 2.6], [-2.0, 4.0], [2.4, 4.5], [3.6, 3.5], [4.3, 2.6], [4.81, 2.2]],
 };
+// Nose cap: forward of NOSE_X0 the station sections are scaled down about a point low in the
+// section by a superellipse profile (1 − t^m)^(1/m), so the keys above run on as the nose "body"
+// and the cap wraps round it with a tangent-continuous, flat vertical front face of NOSE_FACE
+// times the last section (closed by a flat cap). The lower part is scaled much less, so the
+// keel runs almost straight into the face: the sharp lower chin of the real beak.
+const NOSE_X0 = 4.35, NOSE_M = 2.6, NOSE_FACE = 0.42, NOSE_CHIN = 0.3;
 export const NOSE_X = 4.81, TAIL_X = -9.35;
 
 const sectionCache = new Map();
@@ -38,8 +46,15 @@ export function surfPoint(x, a, off = 0) {
   const c = Math.cos(a), sn = Math.sin(a);
   const up = sn >= 0;
   const e = 2 / (up ? s.nUp : s.nLo);
-  const z = s.hw * Math.sign(c) * Math.pow(Math.abs(c), e);
-  const y = s.yW + (up ? s.yT - s.yW : s.yW - s.yB) * Math.sign(sn) * Math.pow(Math.abs(sn), e);
+  let z = s.hw * Math.sign(c) * Math.pow(Math.abs(c), e);
+  let y = s.yW + (up ? s.yT - s.yW : s.yW - s.yB) * Math.sign(sn) * Math.pow(Math.abs(sn), e);
+  if (x > NOSE_X0) {
+    const t = Math.min(1, (x - NOSE_X0) / (NOSE_X - NOSE_X0));
+    const k = NOSE_FACE + (1 - NOSE_FACE) * Math.pow(1 - Math.pow(t, NOSE_M), 1 / NOSE_M);
+    const yc = s.yB + 0.3 * (s.yT - s.yB);
+    y = y >= yc ? yc + (y - yc) * k : yc - (yc - y) * (1 - NOSE_CHIN * (1 - k));
+    z *= k;
+  }
   const p = V3(x, y, z);
   if (off) p.addScaledVector(surfNormal(x, a), off);
   return p;
@@ -101,13 +116,17 @@ function buildGrid() {
   for (const r of Object.values(O)) { edgesX.push(r.x0, r.x1); edgesA.push(r.a0, r.a1, Math.PI - r.a0, Math.PI - r.a1); }
   edgesX.push(-3.4, -1.8, 2.2, 3.36, 4.2);
   const xs = [];
-  for (let x = TAIL_X; x < 4.5; x += 0.11) xs.push(x);
-  for (let x = 4.5; x < NOSE_X; x += 0.03) xs.push(x);
+  for (let x = TAIL_X; x < 4.4; x += 0.11) xs.push(x);
+  // the nose cap turns through 90° in its last few centimetres: finer stations as it closes
+  for (let x = 4.4; x < 4.7; x += 0.025) xs.push(x);
+  for (let x = 4.7; x < 4.78; x += 0.01) xs.push(x);
+  for (let x = 4.78; x < NOSE_X - 0.002; x += 0.004) xs.push(x);
   const dedup = (arr, edges, tol) => {
-    const keep = arr.filter((v) => !edges.some((e) => Math.abs(v - e) < tol));
+    const tolAt = typeof tol === 'function' ? tol : () => tol;
+    const keep = arr.filter((v) => !edges.some((e) => Math.abs(v - e) < tolAt(v)));
     return [...new Set([...keep, ...edges].map((v) => +v.toFixed(5)))].sort((p, q) => p - q);
   };
-  const X = dedup(xs, [...edgesX, NOSE_X, TAIL_X], 0.035).filter((x) => x >= TAIL_X - 1e-6 && x <= NOSE_X + 1e-6);
+  const X = dedup(xs, [...edgesX, NOSE_X, TAIL_X], (v) => (v > 4.45 ? 0.0025 : 0.035)).filter((x) => x >= TAIL_X - 1e-6 && x <= NOSE_X + 1e-6);
   const as = [];
   const NA = 84;
   for (let j = 0; j <= NA; j++) as.push(-Math.PI / 2 + (2 * Math.PI * j) / NA);
@@ -216,7 +235,7 @@ export function stencil(texture, { x0, x1, a0, a1, side = 1, off = 0.004, nx = 1
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setIndex(idx);
-  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: texture, transparent: true, depthWrite: false, roughness: 0.8, metalness: 0.02, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: texture, transparent: true, depthWrite: false, roughness: 1.0, metalness: 0.0, envMapIntensity: 0.25, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
   m.userData.decal = true;
   m.raycast = () => {};
   return m;

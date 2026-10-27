@@ -11,7 +11,7 @@ const WING_BOX = [
 ];
 const ENGINE = [
   'TPE331 turbine case', 'Annular combustor liner', 'Three-stage axial turbine', 'Turbine nozzle rings', 'Main fuel manifolds & nozzles', 'Starting fuel manifold',
-  'Igniter plugs', 'Ignition exciter', 'Exhaust outlet & Y-duct', 'Exhaust stacks', 'TPE331 compressor housing', 'Centrifugal impellers', 'Main shaft & bearings',
+  'Igniter plugs', 'Ignition exciter', 'Exhaust duct', 'Exhaust stack', 'TPE331 compressor housing', 'Centrifugal impellers', 'Main shaft & bearings',
   'Inlet screen', 'Engine air inlet & plenum', 'Propeller reduction gearbox', 'Accessory drive case', 'Tachometer-generator', 'Starter-generator', 'Backup generator',
   'Fuel control unit', 'Engine-driven fuel pump', 'Mechanical fuel shutoff valve (MSOV)', 'Metered fuel line', 'Engine fuel heater', 'Fuel purge system',
   'Oil tank', 'Oil filter & chip detector', 'Oil pressure & temperature sensors', 'Engine oil lines', 'Oil cooler & scoop', 'Oil temperature control valve',
@@ -73,7 +73,7 @@ export default [
   },
   {
     title: 'A turboprop at the back',
-    body: 'A Honeywell TPE331-10GD makes up to 900 shp (671 kW) from an engine only 1.09 m long, mounted right ahead of the propeller. Air from a dorsal scoop enters between the gearbox and the compressor, is squeezed 10.55 times by two centrifugal impellers, burns in a reverse-flow annular combustor wrapped around the turbine, and drives three turbine stages on one shaft at 41,730 rpm. In this pusher the hot end faces forward, so a Y-duct turns the exhaust back out of two side stacks. The fuel control sits on top of the engine; servos in the accessory bay work its levers through cables. A tube truss hangs the engine from Honeywell’s mount pads: one on top of the gearbox and two at the hot end.',
+    body: 'A Honeywell TPE331-10GD makes up to 900 shp (671 kW) from an engine only 1.09 m long, mounted right ahead of the propeller. Air from a dorsal scoop enters between the gearbox and the compressor, is squeezed 10.55 times by two centrifugal impellers, burns in a reverse-flow annular combustor wrapped around the turbine, and drives three turbine stages on one shaft at 41,730 rpm. In this pusher the hot end faces forward, so a collector bell turns the exhaust back into one flattened duct along the starboard side of the engine and out of a single stack on top of the cowling, above the spinner. The fuel control sits on top of the engine; servos in the accessory bay work its levers through cables. A tube truss hangs the engine from Honeywell’s mount pads: one on top of the gearbox and two at the hot end.',
     key: 'Power required P = D · V / η_prop. At a 7,600 m loiter a clean Reaper needs only about 150 kW (the lab’s estimate), well under half of the ≈ 400 kW (530 shp) Honeywell’s TPE331-10 chart gives at 25,000 ft; 671 kW at sea level. The lab’s simpler lapse model gives ≈ 450 kW.',
     mode: 'xray', focus: ENGINE, view: { dir: [0.3, 0.08, 1], fill: 1.2 },
   },

@@ -235,6 +235,7 @@ export const MAT = {
     return new THREE.MeshStandardMaterial({ color: 0x434b39, ...t, normalScale: new THREE.Vector2(0.32, 0.32), roughness: 1.18, metalness: 0.04 });
   }),
   paintDark: () => std('h.paintDark', { color: 0x30362b, roughness: 0.78, metalness: 0.06 }),
+  antenna: () => std('h.antenna', { color: 0x30362b, roughness: 0.78, metalness: 0.06, side: THREE.DoubleSide }),   // thin blade antennas: lit from both faces
   paintPlain: () => std('h.paintPlain', { color: 0x434b39, roughness: 0.74, metalness: 0.04 }),
   interior: () => std('h.interior', { color: 0x6d7268, roughness: 0.86, metalness: 0.02, side: THREE.BackSide }),
   interiorFront: () => std('h.interiorFront', { color: 0x666b62, roughness: 0.86, metalness: 0.02 }),
@@ -263,7 +264,7 @@ export const MAT = {
   intake: () => std('h.intake', { color: 0x0d0e0f, roughness: 0.95, metalness: 0.1, side: THREE.DoubleSide }),
   // cockpit transparencies: tinted acrylic/glass, rough enough not to sparkle on the large curves
   glass: () => once('h.glass', () => new THREE.MeshPhysicalMaterial({
-    color: 0x2a3a40, roughness: 0.1, metalness: 0.0, clearcoat: 0.6, clearcoatRoughness: 0.12,
+    color: 0x2a3a40, roughness: 0.22, metalness: 0.0, clearcoat: 0.3, clearcoatRoughness: 0.3,
     transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide, envMapIntensity: 0.9,
   })),
   screen: () => std('h.screen', { color: 0x0a1410, emissive: 0x2a8f62, emissiveIntensity: 0.9, roughness: 0.3, metalness: 0.1 }),

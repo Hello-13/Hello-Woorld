@@ -607,15 +607,15 @@ export function buildCabin({ A, P, surfPoint, surfNormal, roofY, servoInputs = [
   P('VHF-FM (SINCGARS) antennas', {
     system: 'Communications', material: 'Composite blade antennas', mass: 3, count: 2, explode: [0.4, 0.8, 0],
     desc: 'Secure frequency-hopping FM for talking to troops on the ground, and FM homing to find them. Blade antennas on the cockpit roof (placement approximate).',
-  }, [mesh(antennas([[2.45, 1.2], [2.45, Math.PI - 1.2]]), MAT.paintDark())]);
+  }, [mesh(antennas([[2.45, 1.2], [2.45, Math.PI - 1.2]]), MAT.antenna())]);
   P('UHF/VHF-AM antennas', {
     system: 'Communications', material: 'Composite blade antennas', mass: 3, count: 2, explode: [0, -0.8, 0],
     desc: 'Air-to-air and air-traffic-control voice on the belly, where the fuselage shadows them from the rotor (placement approximate).',
-  }, [mesh(antennas([[1.0, -1.45], [-0.6, -1.65]]), MAT.paintDark())]);
+  }, [mesh(antennas([[1.0, -1.45], [-0.6, -1.65]]), MAT.antenna())]);
   P('IFF transponder antennas', {
     system: 'Communications', material: 'Small blade antennas, top and bottom', mass: 2, count: 2, explode: [-1.6, 0.4, -0.4],
     desc: 'One above and one below, so the identification-friend-or-foe transponder answers interrogations from any direction (placement approximate).',
-  }, [mesh(antennas([[-1.4, -1.57], [-4.8, Math.PI / 2 + 0.55]]), MAT.paintDark())]);
+  }, [mesh(antennas([[-1.4, -1.57], [-4.8, Math.PI / 2 + 0.55]]), MAT.antenna())]);
   const hf = [];
   const hfPts = [];
   for (let k = 0; k <= 10; k++) hfPts.push(surfPoint(-3.8 - 0.38 * k, 0.25, 0.1));   // ends on the -3.8 and -7.6 standoffs

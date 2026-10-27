@@ -58,6 +58,14 @@ export function fusePoint(s, th, d = 0) {
   return [X(s), yc + a * Math.sign(sn) * Math.abs(sn) ** (2 / P), b * Math.sign(c) * Math.abs(c) ** (2 / P)];
 }
 
+/** Height of the skin at station s over z (the upper surface; the lower surface with lower = true). */
+export function skinY(s, z, lower = false) {
+  const { top, bot, hw, yc } = prof(s);
+  const a = (top - bot) / 2, u = Math.min(1, Math.abs(z) / hw);
+  const dy = a * (1 - u ** P) ** (1 / P);
+  return lower ? yc - dy : yc + dy;
+}
+
 /** Closed section ring. The seam sits on the keel (θ = −π/2) where it never catches a highlight. */
 export function ring(s, n = 44, d = 0) {
   const pts = [];

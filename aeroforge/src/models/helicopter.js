@@ -15,7 +15,7 @@
 import * as THREE from 'three';
 import { Assembly } from '../engine/assembly.js';
 import { decalTexture } from '../engine/surface.js';
-import { DEG, TAIL } from './uh60/common.js';
+import { DEG, TAIL, MAT } from './uh60/common.js';
 import { buildFuselage, surfNormal, stencil } from './uh60/fuselage.js';
 import { buildMainRotor } from './uh60/mainRotor.js';
 import { buildDrive } from './uh60/drive.js';
@@ -26,12 +26,13 @@ import { buildCabin } from './uh60/cabin.js';
 const OMEGA = (258 * 2 * Math.PI) / 60;   // rad/s at 100 % Nr
 const TR_RATIO = 1190 / 258;              // tail-rotor : main-rotor speed
 
-/** "U.S. ARMY" tail-cone stencil in the low-contrast black used on Army green. */
-const armyText = () => decalTexture('uh60.army', 1024, 160, (ctx, w, h) => {
-  ctx.fillStyle = 'rgba(14,16,14,0.9)';
-  ctx.font = '700 118px "Barlow Semi Condensed", "Arial Narrow", sans-serif';
+/** "UNITED STATES ARMY" tail-cone stencil, flat black on Army green (letters about 0.2 m high). */
+const armyText = () => decalTexture('uh60.army', 1792, 256, (ctx, w, h) => {
+  ctx.fillStyle = 'rgba(12,13,12,0.96)';
+  ctx.font = '600 168px "Barlow Semi Condensed", "Arial Narrow", sans-serif';
+  if ('letterSpacing' in ctx) ctx.letterSpacing = '10px';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('U.S. ARMY', w / 2, h / 2 + 6);
+  ctx.fillText('UNITED STATES ARMY', w / 2, h / 2 + 8);
 });
 
 export function buildHelicopter() {
@@ -59,7 +60,9 @@ export function buildHelicopter() {
   // X-ray: dim the stacked hardware round the rotor head and the thin runs so the control chain
   // (blades, swashplates, horns, pitch rods, servos) stays the brightest thing in the view
   const xw = { 'Blade cuffs & quick-release pins': 0.6, 'Blade spindles': 0.6, 'Lead-lag dampers': 0.6, 'Droop stops & flap restrainers': 0.5,
-    'Main rotor de-ice harness': 0.5, 'Main rotor blade heater blankets': 0.5, 'Main rotor slip ring': 0.6, 'De-ice distributor': 0.6, 'Main rotor shaft': 0.6,
+    // thin slabs seen edge-on light both faces at grazing angles: dim the blades and the stabilator
+    'Main rotor blade 1': 0.45, 'Main rotor blade 2': 0.45, 'Main rotor blade 3': 0.45, 'Main rotor blade 4': 0.45, 'Tail rotor blades': 0.5, 'Stabilator': 0.45,
+    'Main rotor de-ice harness': 0.5, 'Main rotor blade heater blankets': 0.3, 'Main rotor slip ring': 0.6, 'De-ice distributor': 0.6, 'Main rotor shaft': 0.6,
     'Swashplate guide': 0.5, 'Uniball & sliding sleeve': 0.5, 'Swashplate duplex bearing': 0.5, 'Rotating scissors': 0.7, 'Stationary scissors': 0.7,
     'Generator feeders, current transformers & limiters': 0.6, 'Generator cooling-oil lines': 0.6, 'Oil cooler lines & thermostatic valve': 0.6,
     'Fire extinguisher discharge lines': 0.6, 'Tail drive shaft disc couplings': 0.6, 'Control bellcranks & cable pulleys': 0.7, 'Cabin door posts': 0.4,
@@ -75,7 +78,7 @@ export function buildHelicopter() {
 
   // markings: painted straight onto the tail-cone surface
   const tc = byName('Tail cone skin');
-  for (const side of [1, -1]) tc.add(stencil(armyText(), { x0: -6.15, x1: -4.45, a0: -0.12, a1: 0.42, side }));
+  for (const side of [1, -1]) tc.add(stencil(armyText(), { x0: -6.9, x1: -4.3, a0: -0.25, a1: 0.55, side, nx: 24 }));
 
   A.finalize();
 
@@ -115,7 +118,15 @@ export function buildHelicopter() {
     air,
     trHub: TAIL.hub,
     parts: A.parts,
-    view: { dir: [1.0, 0.42, 1.15], fill: 1.0 },
+    view: { dir: [1.0, 0.38, 1.15], fill: 0.86 },
+    // Showroom: the stock look's near-black hemisphere ground leaves everything below the window
+    // line black on lusterless olive drab. A grey floor bounce and a cooler, dimmer sky keep the
+    // paint a mid green all round, as in daylight photos; a slightly softer key stops the roof
+    // and blade tops washing out.
+    lighting: {
+      showroom: { hemi: [0x4e5a68, 0x8a877c, 2.4], key: { color: 0xfff8f0, intensity: 1.8 }, rim: 1.4 },
+      hangar: { hemi: [0xbfd2ff, 0x6c6a66, 0.6] },
+    },
     displaySize: 13,
     thermalRange: [260, 700],
     state,
@@ -192,8 +203,16 @@ export function buildHelicopter() {
       for (const p of cab.pedals) p.g.position.x = 3.74 + p.side * s.stick.yaw * 0.05;   // right pedal forward = nose right
       for (const o of gear.oleos) o.pistonGroup.position.copy(o.dir).multiplyScalar(0.08 * s.airborne);
 
+      // exterior and cockpit lights: dark on the parked aircraft, on for the hover (lab / tour)
+      const lit = s.airborne;
+      MAT.navRed().emissiveIntensity = 5 * lit;
+      MAT.navGreen().emissiveIntensity = 5 * lit;
+      MAT.navWhite().emissiveIntensity = 3 * lit;
+      MAT.formation().emissiveIntensity = 0.55 * lit;
+      MAT.screen().emissiveIntensity = 0.9 * lit;
+      MAT.screenAmber().emissiveIntensity = 0.7 * lit;
       s.strobeT += dt;
-      tail.strobe.emissiveIntensity = s.nr > 0.05 && (s.strobeT % 1.1) < 0.08 ? 16 : 0;
+      tail.strobe.emissiveIntensity = lit > 0.3 && (s.strobeT % 1.1) < 0.08 ? 16 : 0;
 
       // hover pose: 10 ft wheel height, nose slightly up and left side a little low (tail-rotor drift trim)
       const a = s.airborne;

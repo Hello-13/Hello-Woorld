@@ -86,7 +86,8 @@ function bladeGeometry() {
 
 /**
  * Electro-thermal heater blanket bonded into the blade leading edge (r 1.6 → 7.6 m), 0.15 m of
- * chord wrapped round the nose, drawn 3 mm proud of the section so it can be picked and coloured.
+ * chord wrapped round the nose, drawn 4 mm inside the section: under the skin and erosion strip,
+ * as in service, so from outside only the strip shows; it reads in X-ray, Systems and Exploded.
  */
 function heaterBlanketGeometry() {
   const rings = [];
@@ -99,7 +100,7 @@ function heaterBlanketGeometry() {
       // outward normal of the counter-clockwise loop: the tangent turned clockwise
       const tx = pts[j + 1][0] - pts[j - 1][0], ty = pts[j + 1][1] - pts[j - 1][1];
       const l = Math.hypot(tx, ty) || 1;
-      ring.push(toFeather(r, st, pts[j][0] + (0.003 * ty) / l, pts[j][1] - (0.003 * tx) / l));
+      ring.push(toFeather(r, st, pts[j][0] - (0.004 * ty) / l, pts[j][1] + (0.004 * tx) / l));
     }
     rings.push(ring);
   }
@@ -119,7 +120,7 @@ function bladeMaterial() {
   const orm = canvasTex('uh60.bladeOrm', 512, 128, (ctx, w, h) => {
     ctx.fillStyle = 'rgb(255,195,12)'; ctx.fillRect(0, 0, w, h);          // G roughness 0.76, B metal 0.05
     ctx.fillStyle = 'rgb(255,100,230)'; ctx.fillRect(0, h * 0.46, w, h * 0.08);
-    ctx.fillStyle = 'rgb(255,100,220)'; ctx.fillRect(0, 0, uRoot * w, h);
+    ctx.fillStyle = 'rgb(255,150,200)'; ctx.fillRect(0, 0, uRoot * w, h);      // root fitting: satin, not mirror
   }, { srgb: false });
   return new THREE.MeshStandardMaterial({ map, roughnessMap: orm, metalnessMap: orm, roughness: 1, metalness: 1 });
 }
@@ -205,7 +206,7 @@ export function buildMainRotor({ A, parent }) {
     desc: 'A heater blanket runs along each blade\'s leading edge from about 1.6 m to 7.6 m radius. Its job is to melt the ice\'s bond to the blade, so the airflow throws the ice off evenly from all four blades instead of leaving one blade iced and the rotor out of balance. In service it lies under the erosion strip, so from outside you see only the strip.',
   }, []);
   const blanketG = heaterBlanketGeometry();
-  const blanketM = new THREE.MeshStandardMaterial({ color: 0x7d8388, roughness: 0.38, metalness: 0.9, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  const blanketM = new THREE.MeshStandardMaterial({ color: 0x4a4d50, roughness: 0.7, metalness: 0.4 });   // under the skin: seen only in X-ray / Systems / Exploded
   for (const c of makeChains(blanketPart)) c.feather.add(mesh(blanketG, blanketM, { cast: false }));
 
   // ------------------------------------------------------------------ hub

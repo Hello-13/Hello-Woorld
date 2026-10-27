@@ -132,25 +132,24 @@ const grime = (size, seed, lo, hi) => fieldToCanvas(fbm(size, { seed, octaves: 6
 /**
  * Aircraft skin tile (2 m × 2 m at repeat 1): access-panel seams with sawtooth edges,
  * fastener rows, slight paint mottling. Height: seams cut in (dark), fasteners raised.
+ * The tone variation is a soft fBm mottle only (no hard-edged patches: real paint is one
+ * uniform matte coat) and the relief is shallow, so panel lines read flush and subtle.
  */
 export function aircraftSkin({ seed = 7, tile = 512, sawtooth = true, rivets = true } = {}) {
   return mapSet(`skin.${seed}.${sawtooth}.${rivets}`, tile, {
     hires: true,
     albedo(ctx, s) {
-      ctx.drawImage(grime(s, seed, 0.86, 1.0), 0, 0);
-      const r = rng(seed + 3);
-      ctx.globalAlpha = 0.07;
-      for (let i = 0; i < 26; i++) {
-        ctx.fillStyle = r() > 0.5 ? '#000' : '#fff';
-        ctx.fillRect(r() * s, r() * s, 30 + r() * 120, 20 + r() * 90);
-      }
+      ctx.drawImage(grime(s, seed, 0.9, 1.0), 0, 0);
+      // a second, broader mottle (weathering, overspray) at low contrast
+      ctx.globalAlpha = 0.4;
+      ctx.drawImage(fieldToCanvas(fbm(s, { seed: seed + 3, octaves: 3, base: 2 }), s, (v) => 0.88 + 0.12 * v), 0, 0);
       ctx.globalAlpha = 1;
     },
     height(ctx, s) {
       ctx.fillStyle = '#808080';
       ctx.fillRect(0, 0, s, s);
       const r = rng(seed);
-      ctx.strokeStyle = '#2a2a2a';
+      ctx.strokeStyle = '#565656';
       ctx.lineWidth = Math.max(1.5, s / 340);
       const cols = 3, rows = 2;
       for (let i = 0; i <= cols; i++) {
@@ -172,7 +171,7 @@ export function aircraftSkin({ seed = 7, tile = 512, sawtooth = true, rivets = t
         const x = r() * (s - w), y = r() * (s - h);
         ctx.beginPath(); ctx.roundRect(x, y, w, h, s * 0.01); ctx.stroke();
         if (rivets) {
-          ctx.fillStyle = '#b4b4b4';
+          ctx.fillStyle = '#9a9a9a';
           for (let t = 0; t <= 1.0001; t += 0.125) {
             for (const [px, py] of [[x + t * w, y - s * 0.008], [x + t * w, y + h + s * 0.008], [x - s * 0.008, y + t * h], [x + w + s * 0.008, y + t * h]]) {
               ctx.beginPath(); ctx.arc(px, py, s * 0.0028, 0, Math.PI * 2); ctx.fill();
@@ -181,7 +180,7 @@ export function aircraftSkin({ seed = 7, tile = 512, sawtooth = true, rivets = t
         }
       }
       if (rivets) {
-        ctx.fillStyle = '#a8a8a8';
+        ctx.fillStyle = '#949494';
         for (let j = 0; j <= rows; j++) {
           const y = (j / rows) * s;
           for (let x = 0; x < s; x += s / 64) { ctx.beginPath(); ctx.arc(x, y + s * 0.012, s * 0.0024, 0, Math.PI * 2); ctx.fill(); }
@@ -191,7 +190,7 @@ export function aircraftSkin({ seed = 7, tile = 512, sawtooth = true, rivets = t
     rough(ctx, s) {
       ctx.drawImage(grime(s, seed + 9, 0.48, 0.72), 0, 0);
     },
-    normalStrength: 2.6,
+    normalStrength: 1.2,
   });
 }
 

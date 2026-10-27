@@ -8,7 +8,7 @@ import { loftRings, orientTubeOutward } from '../../engine/geometry.js';
 import { X, prof, fusePoint, merge, box, lru, cylX, tubeBetween, pipe, bulkhead } from './shape.js';
 import {
   ENGINE_Y, SHAFT_Y, PROP_X, PROP_R, STATIONS, GEARBOX, PADS, FRONT_MOUNT_S, REAR_MOUNT_S, REAR_MOUNT_R, REAR_MOUNT_Z, STACK_S,
-  combustorGeo, turbineGeo, manifoldGeo, startManifoldGeo, ignitersGeo, exhaustGeo, stacksGeo, compressorGeo, impellersGeo,
+  combustorGeo, turbineGeo, manifoldGeo, startManifoldGeo, ignitersGeo, exhaustDuctGeo, exhaustStackGeo, compressorGeo, impellersGeo,
   mainShaftGeo, screenGeo, plenumGeo, gearboxGeo, padsGeo, bladesGeo, hubGeo, pitchGeo, spinnerGeo,
 } from './powerplant.js';
 
@@ -77,16 +77,15 @@ export function buildPropulsion({ P, L, m, role }) {
     system: 'Propulsion', material: 'Surface-discharge igniters', mass: 0.6, count: 2, explode: [0.75, 1.3, -0.4],
     desc: 'Two igniters, one on top of the combustor case and one on its left side (the NTSB names “the top igniter” and “the left side igniter”). The TPE331-10 has dual continuous ignition, so it can also be left on in heavy rain or turbulence.',
   }, L(ignitersGeo(), m.darkMetal)), 'turbine');
-  role(P('Exhaust outlet & Y-duct', {
-    system: 'Propulsion', material: 'Inconel', mass: 7, explode: [0.95, 0.8, 0],
-    desc: 'The engine exhausts through one round outlet, 0.277 m across, at its hot end, which in this pusher faces forward. A Y-duct splits the flow and turns it back into a pipe up each side of the engine (routing estimated from photographs).',
-  }, L(exhaustGeo(), m.hot)), 'exhaust');
-  const stackG = stacksGeo();
+  role(P('Exhaust duct', {
+    system: 'Propulsion', material: 'Inconel, flattened to fit between the engine case and the cowling', mass: 8, explode: [0.95, 0.8, 0],
+    desc: 'The engine exhausts through one round outlet, 0.277 m across, at its hot end, which in this pusher faces forward. A collector bell turns the flow back into a single flattened duct that runs aft along the upper starboard side of the engine, under the access door, and climbs over the front of the gearbox into the stack (routing inside the cowling estimated).',
+  }, L(exhaustDuctGeo(), m.hot)), 'exhaust');
   const hotDouble = m.hot.clone(); hotDouble.side = THREE.DoubleSide;
-  role(P('Exhaust stacks', {
-    system: 'Propulsion', material: 'Inconel', mass: 4, count: 2, explode: [0.2, 0.75, 0],
-    desc: 'Short stacks on each upper side, just behind the V-tail trailing edge and ahead of the spinner, throw the exhaust aft and outward. Little jet thrust is left at that point: the propeller does the work.',
-  }, L(stackG, hotDouble)), 'exhaust');
+  role(P('Exhaust stack', {
+    system: 'Propulsion', material: 'Inconel, sooted inside', mass: 5, explode: [0.2, 0.75, 0],
+    desc: 'One large rectangular stack on top of the cowling, on the centreline just behind the V-tail and directly above the spinner, throws the exhaust aft over the propeller disc (USAF tail-on photographs show it sooted black inside). Little jet thrust is left at that point: the propeller does the work.',
+  }, L(exhaustStackGeo(), hotDouble)), 'exhaust');
   role(P('TPE331 compressor housing', {
     system: 'Propulsion', material: 'Aluminium and steel housings, diffusers and crossover ducts', mass: 26, explode: [0, 1.05, 0],
     desc: 'Houses the two centrifugal stages in series: crossover ducts carry the air from the first stage to the second. Honeywell gives the TPE331-10 a 10.55:1 pressure ratio and 3.5 kg/s (7.7 lb/s) of airflow, for a specific fuel consumption of 0.534 lb per equivalent shaft horsepower per hour.',
@@ -174,7 +173,7 @@ export function buildPropulsion({ P, L, m, role }) {
   role(P('Fuel control unit', {
     system: 'Propulsion', material: 'Hydromechanical fuel control with underspeed governor', mass: 5, explode: [-0.2, 1.3, 0.5],
     desc: 'On top of the engine over the compressor (Honeywell drawing), the hydromechanical fuel control meters fuel for the power lever’s setting. In the beta range its underspeed governor holds rpm with fuel flow. After the 2006 crash investigators found the power lever at 90°, the propeller pitch control at 89° and the underspeed governor at 32°. In 2025 a chafed wire inside an FCU fired the electrical shutoff valve and an MQ-9 was lost.',
-  }, L(merge([lru(0.2, 0.06, 0.13, [fcuP[0], fcuP[1], 0], 0.02), box(0.03, 0.03, 0.03, [fcuP[0] + 0.06, fcuP[1] + 0.035, 0.05]), cylX(fcuP[0] - 0.05, fcuP[0] - 0.02, 0.012, 0.012, fcuP[1] + 0.038, -0.04, 8)]), m.darkMetal)), 'compressor');
+  }, L(merge([lru(0.2, 0.06, 0.13, [fcuP[0], fcuP[1], 0], 0.02), box(0.03, 0.03, 0.03, [fcuP[0] + 0.06, fcuP[1] + 0.02, 0.07]), cylX(fcuP[0] - 0.05, fcuP[0] - 0.02, 0.012, 0.012, fcuP[1] + 0.038, -0.04, 8)]), m.darkMetal)), 'compressor');
   const pumpP = [XS(9.7025), ENGINE_Y + 0.23, 0.04], PUMP_H = 0.0475;
   role(P('Engine-driven fuel pump', {
     system: 'Propulsion', material: 'Gear-type high-pressure pump on a drive from the gearbox', mass: 3, explode: [-0.45, 1.25, 0.3],
@@ -282,7 +281,7 @@ export function buildPropulsion({ P, L, m, role }) {
   const cables = [
     pipe([cabStart(0), [XS(8.95), 1.9, -0.1], [XS(9.3), 1.94, -0.08], [fcuP[0] + 0.08, fcuP[1] + 0.03, -0.06]], 0.003, 4, 24),       // power lever → FCU
     pipe([cabStart(1), [XS(8.95), 1.88, 0.0], [XS(9.3), 1.94, -0.04], [msovP[0], msovP[1] + 0.034, msovP[2] - 0.02]], 0.003, 4, 24),       // condition lever → MSOV lever
-    pipe([cabStart(2), [XS(8.9), 1.83, 0.17], [XS(8.95), 1.7, 0.22], [XS(9.05), 1.6, 0.27], [XS(9.2), 1.58, 0.28], [XS(9.55), 1.605, 0.29], [XS(9.72), 1.64, 0.28], [govArm[0], govArm[1] + 0.003, govArm[2] + 0.002]], 0.003, 4, 48),  // speed lever, low through the firewall clear of the exhaust Y-duct → governor arm
+    pipe([cabStart(2), [XS(8.9), 1.83, 0.17], [XS(8.95), 1.7, 0.22], [XS(9.05), 1.6, 0.27], [XS(9.2), 1.58, 0.28], [XS(9.55), 1.605, 0.29], [XS(9.72), 1.64, 0.28], [govArm[0], govArm[1] + 0.003, govArm[2] + 0.002]], 0.003, 4, 48),  // speed lever, low through the firewall clear of the exhaust duct → governor arm
   ];
   P('Engine control cables', {
     system: 'Propulsion', material: 'Push-pull control cables in conduit', mass: 0.8, count: 3, explode: [0.1, 1.55, 0.2],
@@ -294,11 +293,11 @@ export function buildPropulsion({ P, L, m, role }) {
     system: 'Structure', material: 'Titanium sheet (est.)', mass: 9, explode: [0.15, 0.95, 0],
     desc: 'Fireproof bulkhead between the engine bay and the accessory bay ahead of it, with fire-sealed pass-throughs for the fuel, oil, control cables and harnesses. Titanium keeps its strength at flame temperatures where aluminium would melt.',
   }, L(bulkhead(FIREWALL_S), m.titanium));
-  // Welded tube truss on Honeywell's three mount points (tube layout estimated). Rear: the two lower hot-end pads (the upper pair
-  // sits where the exhaust pipes run in this installation), each braced by a V of tubes to the firewall. Front: the pad on top of
-  // the gearbox, which only a yoke from forward can reach (the gearbox top is 2 cm under the cowling): two long tubes from the
-  // V-tail rear spar frame run aft over the engine between the inlet duct and the exhaust pipes to a cross tube just ahead of
-  // the gearbox, and two short tubes carry the load to a plate on an isolator on the pad.
+  // Welded tube truss on Honeywell's three mount points (tube layout estimated). Rear: the two lower hot-end pads (the starboard
+  // upper one sits where the exhaust duct runs in this installation), each braced by a V of tubes to the firewall. Front: the pad
+  // on top of the gearbox, which only a yoke from forward can reach (the gearbox top is 2 cm under the cowling): two long tubes
+  // from the V-tail rear spar frame run aft over the engine, just outboard of the inlet duct and inboard of the exhaust duct, to a
+  // cross tube over the duct's end just ahead of the gearbox, and two short tubes carry the load to a plate on an isolator on the pad.
   const mt = [];
   const FW = FIREWALL_S + 0.022;                                   // aft face of the firewall root fittings
   for (const zs of [1, -1]) {
@@ -310,20 +309,20 @@ export function buildPropulsion({ P, L, m, role }) {
       mt.push(box(0.02, 0.045, 0.045, [XS(FIREWALL_S + 0.016), root[1], root[2]]), tubeBetween(root, pad, 0.012, 8));
     }
   }
-  const KNEE_S = 9.8, KNEE = (zs) => [XS(KNEE_S), 2.048, 0.142 * zs];
+  const KNEE_S = 9.8, KNEE = (zs) => [XS(KNEE_S), 2.062, 0.12 * zs];
   const fmY = ENGINE_Y + GEARBOX.top + 0.002;                      // top face of the gearbox's front mount pad
   mt.push(new THREE.CylinderGeometry(0.026, 0.026, 0.004, 16).translate(XS(FRONT_MOUNT_S), fmY + 0.002, 0));   // isolator
-  mt.push(box(0.05, 0.004, 0.124, [XS(FRONT_MOUNT_S), fmY + 0.006, 0]));                                            // yoke plate
+  mt.push(box(0.05, 0.004, 0.08, [XS(FRONT_MOUNT_S), fmY + 0.006, 0]));                                             // yoke plate
   mt.push(tubeBetween(KNEE(1), KNEE(-1), 0.0115, 8));
   for (const zs of [1, -1]) {
     const t = zs > 0 ? 1.16 : Math.PI - 1.16;
     const root = fusePoint(9.335, t, 0.042);
     mt.push(box(0.03, 0.03, 0.03, [XS(9.335), root[1], root[2]]), tubeBetween(root, KNEE(zs), 0.0115, 8));
-    mt.push(tubeBetween(KNEE(zs), [XS(FRONT_MOUNT_S) + 0.004, fmY + 0.004, 0.056 * zs], 0.009, 8));
+    mt.push(tubeBetween(KNEE(zs), [XS(FRONT_MOUNT_S) + 0.004, fmY + 0.004, 0.034 * zs], 0.009, 8));
   }
   P('Engine mount truss', {
     system: 'Structure', material: 'Welded steel tube with elastomeric isolators (est.)', mass: 13, explode: [0, 1.15, 0],
-    desc: 'The TPE331 hangs from Honeywell’s mount points: a front mount on top of the gearbox and, at the hot end, pads 7.8 in (0.198 m) above and below the centreline and 7.2 in (0.183 m) to either side of it, with rubber isolators to keep engine vibration out of the airframe and the sensors. This truss uses the lower pair, each braced by two tubes to the firewall, clear of the exhaust pipes on the upper sides; the front mount is picked up by a yoke whose long tubes run forward over the engine, between the inlet duct and the exhaust pipes, to the rear V-tail spar frame (which pads the MQ-9 uses and the tube layout are estimated).',
+    desc: 'The TPE331 hangs from Honeywell’s mount points: a front mount on top of the gearbox and, at the hot end, pads 7.8 in (0.198 m) above and below the centreline and 7.2 in (0.183 m) to either side of it, with rubber isolators to keep engine vibration out of the airframe and the sensors. This truss uses the lower pair, each braced by two tubes to the firewall, clear of the exhaust duct on the upper starboard side; the front mount is picked up by a yoke whose long tubes run forward over the engine, between the inlet duct and the exhaust duct, to the rear V-tail spar frame (which pads the MQ-9 uses and the tube layout are estimated).',
   }, L(merge(mt), m.darkMetal));
 
   // ---- propeller (rotating groups)

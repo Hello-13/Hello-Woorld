@@ -3,8 +3,9 @@
 // through a two-stage centrifugal compressor, turns into a reverse-flow annular combustor wrapped
 // around a three-stage axial turbine and leaves at the end opposite the gearbox. In the pusher
 // MQ-9 the gearbox faces aft and drives the propeller directly (USAF engine-change photographs
-// show the propeller bolted to the gearbox), so the hot end faces forward and a Y-duct turns the
-// exhaust back to a stack on each upper side, just ahead of the spinner.
+// show the propeller bolted to the gearbox), so the hot end faces forward and a collector bell turns
+// the exhaust back into one duct along the upper starboard side of the engine, to a single stack on top
+// of the cowling directly above the spinner (as tail-on photographs show).
 //
 // Envelope (Honeywell TPE331-10 brochure N61-1491, specification table and installation drawing):
 // length 1.088 m (42.82 in) from the exhaust flange to the propeller flange; the gearbox is the
@@ -22,7 +23,7 @@
 
 import * as THREE from 'three';
 import { loftRings, orientOutward, orientTubeOutward, airfoilLoop } from '../../engine/geometry.js';
-import { X, fusePoint, merge, cylX, latheX, tubeBetween, pipe, lru, box } from './shape.js';
+import { X, fusePoint, skinY, FUSE_END, merge, cylX, latheX, tubeBetween, pipe, lru, box } from './shape.js';
 
 export const ENGINE_Y = 1.69;          // engine centreline
 export const SHAFT_Y = ENGINE_Y + 0.0897;   // propeller axis: the gearbox output is 3.53 in above the engine centreline
@@ -115,38 +116,87 @@ export function ignitersGeo() {
 }
 
 /**
- * Exhaust: the engine's round outlet flange (Ø 0.277 m) at the hot end, a Y-duct that splits the
- * forward-facing flow and turns it back, and a pipe up each upper side to a stack just aft of the
- * V-tail trailing edge (routing estimated from photographs).
+ * Exhaust: the engine's round outlet flange (Ø 0.277 m) at the hot end, a collector bell that turns the forward-facing flow,
+ * and one flattened duct that runs aft along the upper starboard side of the engine, under the access door, and climbs over the
+ * front of the gearbox to a single stack on top of the cowling, on the centreline just behind the V-tail and directly above the
+ * spinner. Photographs (tail-on and side views of USAF aircraft) show that one large rectangular stack, sooted inside; the duct's
+ * route inside the cowling is estimated, and its section is flattened because only 0.15 m separates the engine case from the skin.
  */
-export const STACK_S = 9.76;
-const TH_EX = (k, side) => (side > 0 ? k : Math.PI - k);
-export function exhaustPaths() {
-  const xo = XS(STATIONS.exhaust);
-  return [1, -1].map((s) => [
-    [xo + 0.04, ENGINE_Y + 0.02, 0.07 * s], [xo + 0.1, ENGINE_Y + 0.1, 0.15 * s], [xo + 0.075, ENGINE_Y + 0.2, 0.19 * s],
-    fusePoint(9.25, TH_EX(0.875, s), 0.08), fusePoint(9.45, TH_EX(0.86, s), 0.08), fusePoint(9.62, TH_EX(0.83, s), 0.075),
-  ]);
-}
-export function exhaustGeo() {
-  const xo = XS(STATIONS.exhaust);
-  const out = [
-    cylX(xo - 0.004, xo + 0.012, 0.15, 0.15, ENGINE_Y, 0, 30),                     // outlet flange
-    latheX([[0.139, xo], [0.139, xo + 0.03], [0.12, xo + 0.07], [0.07, xo + 0.1]], 28).translate(0, ENGINE_Y, 0),   // Y-duct collector bell
-  ];
-  for (const path of exhaustPaths()) out.push(pipe(path, 0.058, 14, 40));
-  return merge(out);
-}
-/** The stack stubs where the exhaust leaves the skin, angled aft, up and out (open-ended). */
-export function stacksGeo() {
-  const out = [];
-  for (const s of [1, -1]) {
-    const pts = [fusePoint(9.62, TH_EX(0.83, s), 0.075), fusePoint(STACK_S - 0.05, TH_EX(0.8, s), 0.05), fusePoint(STACK_S, TH_EX(0.785, s), 0.02), fusePoint(STACK_S + 0.06, TH_EX(0.775, s), -0.012)];
-    out.push(pipe(pts, 0.06, 16, 16));
-    const e = new THREE.Vector3(...pts[3]), d = e.clone().sub(new THREE.Vector3(...pts[2])).normalize();
-    out.push(new THREE.TorusGeometry(0.06, 0.006, 6, 18).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), d)).translate(e.x, e.y, e.z));
+export const STACK_S = 10.3;             // the stack's lip
+const SECT_C = [ENGINE_Y, 0];            // the engine axis (y, z): the duct's section is kept flat against the skin, radially from it
+
+/**
+ * Loft a duct of varying section along a Catmull-Rom path. ctrl: [{ p: [x, y, z], w, h, k }] with half-width w (tangential),
+ * half-height h (radial) and k the superellipse exponent (1 = ellipse, 0.6 = rounded rectangle), interpolated between points.
+ * `up` (radial direction) defaults to the direction from the engine axis; clip(point) may move a ring vertex (the stack's base).
+ */
+export function sectionLoft(ctrl, { N = 48, n = 20, capStart = true, capEnd = true, upY = false, clip = null } = {}) {
+  const curve = new THREE.CatmullRomCurve3(ctrl.map((c) => new THREE.Vector3(...c.p)), false, 'centripetal');
+  const rings = [];
+  let prevUp = null;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N, f = t * (ctrl.length - 1), i0 = Math.min(ctrl.length - 2, Math.floor(f)), fr = f - i0;
+    const A = ctrl[i0], B = ctrl[i0 + 1];
+    const w = A.w + (B.w - A.w) * fr, h = A.h + (B.h - A.h) * fr, k = (A.k ?? 1) + ((B.k ?? 1) - (A.k ?? 1)) * fr;
+    const p = curve.getPoint(t), tg = curve.getTangent(t).normalize();
+    let up = new THREE.Vector3(0, p.y - SECT_C[0], p.z - SECT_C[1]);
+    if (upY || up.length() < 0.06) up.set(0, 1, 0);
+    up.addScaledVector(tg, -up.dot(tg)).normalize();
+    if (prevUp && up.dot(prevUp) < 0) up.negate();
+    prevUp = up;
+    const side = new THREE.Vector3().crossVectors(tg, up).normalize();
+    const ring = [];
+    for (let j = 0; j < n; j++) {
+      const ph = (j / n) * Math.PI * 2, c = Math.cos(ph), sn = Math.sin(ph);
+      const a = Math.sign(c) * Math.abs(c) ** k * w, b = Math.sign(sn) * Math.abs(sn) ** k * h;
+      const q = [p.x + side.x * a + up.x * b, p.y + side.y * a + up.y * b, p.z + side.z * a + up.z * b];
+      ring.push(clip ? clip(q) : q);
+    }
+    rings.push(ring);
   }
-  return merge(out);
+  return orientTubeOutward(loftRings(rings, { capStart, capEnd, uvMode: 'metric' }));
+}
+
+/** The internal exhaust duct: outlet flange, collector bell and the flattened duct to the stack's base. */
+export function exhaustDuctGeo() {
+  const xo = XS(STATIONS.exhaust);
+  const bell = [
+    cylX(xo - 0.004, xo + 0.012, 0.15, 0.15, ENGINE_Y, 0, 30),                     // outlet flange
+    latheX([[0.139, xo], [0.139, xo + 0.03], [0.12, xo + 0.07], [0.07, xo + 0.1]], 28).translate(0, ENGINE_Y, 0),   // collector bell
+  ];
+  const ctrl = [
+    { p: [xo + 0.03, ENGINE_Y + 0.02, 0.03], w: 0.06, h: 0.06 },                   // inside the bell
+    { p: [xo + 0.12, ENGINE_Y + 0.12, 0.1], w: 0.065, h: 0.065 },                  // the elbow, forward and up
+    { p: [xo + 0.1, ENGINE_Y + 0.215, 0.17], w: 0.08, h: 0.055 },                  // turning aft, flattening against the skin
+    { p: fusePoint(9.27, 0.6, 0.075), w: 0.085, h: 0.05 },                         // along the upper starboard side, below the
+    { p: fusePoint(9.45, 0.62, 0.08), w: 0.085, h: 0.05 },                         // V-tail root fittings and outboard of the inlet duct
+    { p: fusePoint(9.62, 0.68, 0.085), w: 0.085, h: 0.05 },
+    { p: fusePoint(9.76, 0.8, 0.09), w: 0.085, h: 0.05 },
+    { p: fusePoint(9.85, 0.9, 0.08), w: 0.075, h: 0.055 },                         // climbing over the front of the gearbox
+    { p: fusePoint(9.95, 1.3, 0.02), w: 0.065, h: 0.06 },                          // through the cowling into the stack's base
+    { p: [XS(10.03), 2.19, 0.02], w: 0.08, h: 0.055 },
+    { p: [XS(10.1), 2.215, 0], w: 0.085, h: 0.06 },                                // ends inside the stack
+  ];
+  return merge([...bell, sectionLoft(ctrl, { N: 56, n: 20 })]);
+}
+/** The stack on top of the cowling: a rounded-rectangle duct faired down onto the skin at its front, open aft over the spinner. */
+export function exhaustStackGeo() {
+  const clip = (q) => {
+    const s = 5.5 - q[0];
+    if (s > FUSE_END) return q;
+    const yS = skinY(s, q[2]);
+    return q[1] < yS + 0.004 ? [q[0], yS - 0.015, q[2]] : q;
+  };
+  const ctrl = [
+    { p: [XS(9.7), skinY(9.7, 0) - 0.004, 0], w: 0.006, h: 0.006, k: 0.6 },         // nose of the base fairing, behind the V-tail
+    { p: [XS(9.78), 2.112, 0], w: 0.085, h: 0.045, k: 0.6 },
+    { p: [XS(9.87), 2.14, 0], w: 0.15, h: 0.085, k: 0.6 },
+    { p: [XS(9.96), 2.175, 0], w: 0.17, h: 0.1, k: 0.6 },
+    { p: [XS(10.08), 2.212, 0], w: 0.165, h: 0.1, k: 0.6 },
+    { p: [XS(STACK_S - 0.02), 2.245, 0], w: 0.16, h: 0.1, k: 0.6 },
+    { p: [XS(STACK_S), 2.248, 0], w: 0.166, h: 0.106, k: 0.6 },                    // rolled lip
+  ];
+  return sectionLoft(ctrl, { N: 40, n: 28, capStart: true, capEnd: false, upY: true, clip });
 }
 
 /** Compressor housing: first- and second-stage impeller shrouds, diffusers and crossover ducts. */
