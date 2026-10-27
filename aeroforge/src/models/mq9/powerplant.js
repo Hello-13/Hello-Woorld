@@ -128,7 +128,8 @@ const SECT_C = [ENGINE_Y, 0];            // the engine axis (y, z): the duct's s
 /**
  * Loft a duct of varying section along a Catmull-Rom path. ctrl: [{ p: [x, y, z], w, h, k }] with half-width w (tangential),
  * half-height h (radial) and k the superellipse exponent (1 = ellipse, 0.6 = rounded rectangle), interpolated between points.
- * `up` (radial direction) defaults to the direction from the engine axis; clip(point) may move a ring vertex (the stack's base).
+ * `up` (the h direction) defaults to the direction from the engine axis, or a control point's own `up`, blended along the path;
+ * clip(point) may move a ring vertex (the stack's base).
  */
 export function sectionLoft(ctrl, { N = 48, n = 20, capStart = true, capEnd = true, upY = false, clip = null } = {}) {
   const curve = new THREE.CatmullRomCurve3(ctrl.map((c) => new THREE.Vector3(...c.p)), false, 'centripetal');
@@ -139,9 +140,13 @@ export function sectionLoft(ctrl, { N = 48, n = 20, capStart = true, capEnd = tr
     const A = ctrl[i0], B = ctrl[i0 + 1];
     const w = A.w + (B.w - A.w) * fr, h = A.h + (B.h - A.h) * fr, k = (A.k ?? 1) + ((B.k ?? 1) - (A.k ?? 1)) * fr;
     const p = curve.getPoint(t), tg = curve.getTangent(t).normalize();
-    let up = new THREE.Vector3(0, p.y - SECT_C[0], p.z - SECT_C[1]);
-    if (upY || up.length() < 0.06) up.set(0, 1, 0);
-    up.addScaledVector(tg, -up.dot(tg)).normalize();
+    const radial = (q) => { const r = new THREE.Vector3(0, q.y - SECT_C[0], q.z - SECT_C[1]); return upY || r.length() < 0.06 ? new THREE.Vector3(0, 1, 0) : r.normalize(); };
+    const uA = A.up ? new THREE.Vector3(...A.up) : radial(new THREE.Vector3(...A.p)), uB = B.up ? new THREE.Vector3(...B.up) : radial(new THREE.Vector3(...B.p));
+    const up = uA.clone().lerp(uB, fr);
+    if (up.length() < 0.2) up.copy(radial(p));
+    up.addScaledVector(tg, -up.dot(tg));
+    if (up.length() < 0.2) up.set(0, 0, 1).addScaledVector(tg, -tg.z);
+    up.normalize();
     if (prevUp && up.dot(prevUp) < 0) up.negate();
     prevUp = up;
     const side = new THREE.Vector3().crossVectors(tg, up).normalize();
@@ -165,19 +170,20 @@ export function exhaustDuctGeo() {
     latheX([[0.139, xo], [0.139, xo + 0.03], [0.12, xo + 0.07], [0.07, xo + 0.1]], 28).translate(0, ENGINE_Y, 0),   // collector bell
   ];
   const ctrl = [
-    { p: [xo + 0.03, ENGINE_Y + 0.02, 0.03], w: 0.06, h: 0.06 },                   // inside the bell
-    { p: [xo + 0.12, ENGINE_Y + 0.12, 0.1], w: 0.065, h: 0.065 },                  // the elbow, forward and up
+    { p: [xo + 0.07, ENGINE_Y + 0.01, 0.02], w: 0.05, h: 0.05 },                   // inside the bell
+    { p: [xo + 0.13, ENGINE_Y + 0.12, 0.09], w: 0.06, h: 0.06 },                   // the elbow, forward and up
     { p: [xo + 0.1, ENGINE_Y + 0.215, 0.17], w: 0.08, h: 0.055 },                  // turning aft, flattening against the skin
     { p: fusePoint(9.27, 0.6, 0.075), w: 0.085, h: 0.05 },                         // along the upper starboard side, below the
     { p: fusePoint(9.45, 0.62, 0.08), w: 0.085, h: 0.05 },                         // V-tail root fittings and outboard of the inlet duct
     { p: fusePoint(9.62, 0.68, 0.085), w: 0.085, h: 0.05 },
-    { p: fusePoint(9.76, 0.8, 0.09), w: 0.085, h: 0.05 },
-    { p: fusePoint(9.85, 0.9, 0.08), w: 0.075, h: 0.055 },                         // climbing over the front of the gearbox
-    { p: fusePoint(9.95, 1.3, 0.02), w: 0.065, h: 0.06 },                          // through the cowling into the stack's base
-    { p: [XS(10.03), 2.19, 0.02], w: 0.08, h: 0.055 },
-    { p: [XS(10.1), 2.215, 0], w: 0.085, h: 0.06 },                                // ends inside the stack
+    { p: fusePoint(9.72, 0.78, 0.09), w: 0.08, h: 0.055 },
+    { p: fusePoint(9.78, 0.95, 0.07), w: 0.07, h: 0.06 },                          // then straight up through the cowling beside the
+    { p: [XS(9.84), 2.12, 0.12], w: 0.065, h: 0.055, up: [0, 0, 1] },             // inlet duct's end, as a narrow ribbon, clear of the
+    { p: [XS(9.9), 2.18, 0.06], w: 0.07, h: 0.055, up: [0, 0.5, 0.85] },           // gearbox and its front mount below, and over
+    { p: [XS(9.98), 2.21, 0.01], w: 0.08, h: 0.055, up: [0, 1, 0] },              // onto the centreline inside the stack's base
+    { p: [XS(10.08), 2.225, 0], w: 0.085, h: 0.06, up: [0, 1, 0] },               // ends inside the stack
   ];
-  return merge([...bell, sectionLoft(ctrl, { N: 56, n: 20 })]);
+  return merge([...bell, sectionLoft(ctrl, { N: 64, n: 20 })]);
 }
 /** The stack on top of the cowling: a rounded-rectangle duct faired down onto the skin at its front, open aft over the spinner. */
 export function exhaustStackGeo() {
@@ -189,10 +195,11 @@ export function exhaustStackGeo() {
   };
   const ctrl = [
     { p: [XS(9.7), skinY(9.7, 0) - 0.004, 0], w: 0.006, h: 0.006, k: 0.6 },         // nose of the base fairing, behind the V-tail
-    { p: [XS(9.78), 2.112, 0], w: 0.085, h: 0.045, k: 0.6 },
-    { p: [XS(9.87), 2.14, 0], w: 0.15, h: 0.085, k: 0.6 },
-    { p: [XS(9.96), 2.175, 0], w: 0.17, h: 0.1, k: 0.6 },
-    { p: [XS(10.08), 2.212, 0], w: 0.165, h: 0.1, k: 0.6 },
+    { p: [XS(9.78), 2.112, 0], w: 0.13, h: 0.045, k: 0.6 },
+    { p: [XS(9.85), 2.145, 0], w: 0.21, h: 0.09, k: 0.6 },
+    { p: [XS(9.93), 2.17, 0], w: 0.21, h: 0.11, k: 0.6 },
+    { p: [XS(10.0), 2.19, 0], w: 0.19, h: 0.105, k: 0.6 },
+    { p: [XS(10.1), 2.215, 0], w: 0.168, h: 0.1, k: 0.6 },
     { p: [XS(STACK_S - 0.02), 2.245, 0], w: 0.16, h: 0.1, k: 0.6 },
     { p: [XS(STACK_S), 2.248, 0], w: 0.166, h: 0.106, k: 0.6 },                    // rolled lip
   ];

@@ -295,9 +295,10 @@ export function buildPropulsion({ P, L, m, role }) {
   }, L(bulkhead(FIREWALL_S), m.titanium));
   // Welded tube truss on Honeywell's three mount points (tube layout estimated). Rear: the two lower hot-end pads (the starboard
   // upper one sits where the exhaust duct runs in this installation), each braced by a V of tubes to the firewall. Front: the pad
-  // on top of the gearbox, which only a yoke from forward can reach (the gearbox top is 2 cm under the cowling): two long tubes
-  // from the V-tail rear spar frame run aft over the engine, just outboard of the inlet duct and inboard of the exhaust duct, to a
-  // cross tube over the duct's end just ahead of the gearbox, and two short tubes carry the load to a plate on an isolator on the pad.
+  // on top of the gearbox, which only a bracket from forward can reach (the gearbox top is 2 cm under the cowling, the exhaust duct
+  // climbs past its starboard side): an A-frame of two tubes from the port side of the V-tail rear spar frame runs aft over the
+  // engine, outboard of the inlet duct, to a knee ahead of the gearbox, and a short tube carries the load to a plate on an isolator
+  // on the pad.
   const mt = [];
   const FW = FIREWALL_S + 0.022;                                   // aft face of the firewall root fittings
   for (const zs of [1, -1]) {
@@ -309,20 +310,19 @@ export function buildPropulsion({ P, L, m, role }) {
       mt.push(box(0.02, 0.045, 0.045, [XS(FIREWALL_S + 0.016), root[1], root[2]]), tubeBetween(root, pad, 0.012, 8));
     }
   }
-  const KNEE_S = 9.8, KNEE = (zs) => [XS(KNEE_S), 2.062, 0.12 * zs];
+  const KNEE = [XS(9.78), 2.05, -0.14];
   const fmY = ENGINE_Y + GEARBOX.top + 0.002;                      // top face of the gearbox's front mount pad
   mt.push(new THREE.CylinderGeometry(0.026, 0.026, 0.004, 16).translate(XS(FRONT_MOUNT_S), fmY + 0.002, 0));   // isolator
-  mt.push(box(0.05, 0.004, 0.08, [XS(FRONT_MOUNT_S), fmY + 0.006, 0]));                                             // yoke plate
-  mt.push(tubeBetween(KNEE(1), KNEE(-1), 0.0115, 8));
-  for (const zs of [1, -1]) {
-    const t = zs > 0 ? 1.16 : Math.PI - 1.16;
-    const root = fusePoint(9.335, t, 0.042);
-    mt.push(box(0.03, 0.03, 0.03, [XS(9.335), root[1], root[2]]), tubeBetween(root, KNEE(zs), 0.0115, 8));
-    mt.push(tubeBetween(KNEE(zs), [XS(FRONT_MOUNT_S) + 0.004, fmY + 0.004, 0.034 * zs], 0.009, 8));
+  mt.push(box(0.05, 0.004, 0.08, [XS(FRONT_MOUNT_S), fmY + 0.006, 0]));                                             // bracket plate
+  for (const [t, inset] of [[Math.PI - 1.1, 0.042], [Math.PI - 0.55, 0.05]]) {   // upper and lower roots on the port side of the frame
+    const root = fusePoint(9.335, t, inset);
+    mt.push(box(0.03, 0.03, 0.03, [XS(9.335), root[1], root[2]]), tubeBetween(root, KNEE, 0.0115, 8));
   }
+  mt.push(new THREE.SphereGeometry(0.016, 10, 8).translate(...KNEE));
+  mt.push(tubeBetween(KNEE, [XS(FRONT_MOUNT_S) + 0.004, fmY + 0.004, -0.03], 0.01, 8));
   P('Engine mount truss', {
     system: 'Structure', material: 'Welded steel tube with elastomeric isolators (est.)', mass: 13, explode: [0, 1.15, 0],
-    desc: 'The TPE331 hangs from Honeywell’s mount points: a front mount on top of the gearbox and, at the hot end, pads 7.8 in (0.198 m) above and below the centreline and 7.2 in (0.183 m) to either side of it, with rubber isolators to keep engine vibration out of the airframe and the sensors. This truss uses the lower pair, each braced by two tubes to the firewall, clear of the exhaust duct on the upper starboard side; the front mount is picked up by a yoke whose long tubes run forward over the engine, between the inlet duct and the exhaust duct, to the rear V-tail spar frame (which pads the MQ-9 uses and the tube layout are estimated).',
+    desc: 'The TPE331 hangs from Honeywell’s mount points: a front mount on top of the gearbox and, at the hot end, pads 7.8 in (0.198 m) above and below the centreline and 7.2 in (0.183 m) to either side of it, with rubber isolators to keep engine vibration out of the airframe and the sensors. This truss uses the lower pair, each braced by two tubes to the firewall, clear of the exhaust duct on the upper starboard side; the front mount is picked up by a bracket whose A-frame runs forward over the port side of the engine, outboard of the inlet duct, to the rear V-tail spar frame, leaving the starboard side to the exhaust duct (which pads the MQ-9 uses and the tube layout are estimated).',
   }, L(merge(mt), m.darkMetal));
 
   // ---- propeller (rotating groups)
