@@ -230,7 +230,7 @@ export function buildUpper(A, parent, { explodeBase = [0, 0, 0] } = {}) {
     explode: [0, -0.9, 0],
   }, [ch, inj]);
   c1.userData.part.thermalRole = 'engine2';
-  const rg = mesh(mvacRegen(56), SKIN.bell()); rg.position.y = ex;
+  const rg = mesh(mvacRegen(56), FM.nozzle()); rg.position.y = ex;
   const c2 = V('MVac regenerative nozzle', {
     material: 'Regeneratively cooled channel-wall nozzle', mass: 80,
     desc: 'Fuel-cooled section from the throat to the extension joint, where the expansion is about 19 : 1.',

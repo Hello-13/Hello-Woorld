@@ -17,7 +17,6 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { latticePanel, loftRings, rod, beam, lathe, ogiveProfile, hingedMesh } from '../../engine/geometry.js';
-import { SKIN } from '../../engine/materials.js';
 import { R, Y, ENGINE_RING, T0_Y, polar } from './dims.js';
 import { merge, barrel, dome, domeY, pipe, hoop, post, block, bottle, radialYaw, perforatedDisc, bar } from './util.js';
 import { merlinBell, merlinNozzle, merlinChamber, merlinKit, pintleInjector, placeAll } from './merlin.js';
@@ -45,10 +44,13 @@ const arc = (r, y, a0, a1, n = 8) => Array.from({ length: n + 1 }, (_, i) => at(
 // hinge and piston fittings are estimates sized from photographs (see the 'landing legs' desc)
 const LEG = {
   hingeR: R + 0.1, hingeY: 1.5,   // hinge on the engine-section skirt
-  len: 7.9,                       // stowed from y 1.45 to 9.35
-  deployDeg: 115,                 // deployed: 25° below horizontal, foot pads ≈ 9.1 m from the axis (≈ 18.3 m across), ≈ 2 m below the nozzle exits
+  len: 8.0,                       // stowed from y 1.45 to 9.45
+  deployDeg: 115,                 // deployed: 25° below horizontal, foot pads ≈ 9.15 m from the axis (≈ 18.3 m across), ≈ 1.9 m below the nozzle exits
+  // foot pad (radius) and its centre [short of the tip, out from the hinge line]: folded into the
+  // tip for ascent, swung to the end of the leg for landing
+  foot: { r: 0.26, stowed: [0.55, 0.105], landed: [0.25, 0.15] },
   pistonB: [R + 0.13, 3.4],       // piston's stage fitting [r, y] at the top of the engine section
-  pistonL: [6.6, 0.12],           // piston's leg fitting: distance along the leg, offset outward
+  pistonL: [6.6, 0.1],            // piston's leg fitting: distance along the leg, offset outward (inside the leg's fairing)
   tube: [3.0, 3.0, 3.0],          // nested piston sections (outer, middle, inner)
 };
 
@@ -130,22 +132,28 @@ function engineGeometry() {
   return ENGINE_GEO;
 }
 
-/** Stowed landing leg in leg frame: x tangential, y along the leg (0 → len), z radial outward. */
+/**
+ * Stowed landing leg in leg frame: x tangential, y along the leg (0 → len), z radial outward. A
+ * Block 5 leg is widest and deepest at the hinge and tapers to a narrow rounded tip that lies flat
+ * on the tank (no end face: the last rings close the shell smoothly). Section: a flattened lens, flat
+ * inner face against the stage, rounded outer fairing. The foot pad folds into the tip.
+ */
 function legGeometry(len) {
   const rings = [];
-  const N = 10;
+  const N = 22;
+  const M = 14;
   for (let i = 0; i <= N; i++) {
     const t = i / N;
     const y = t * len;
-    const w = 0.92 - 0.38 * t;                // tapers toward the foot
-    const th = 0.34 - 0.1 * t;
+    // straight taper to 85 % of the length, then an elliptical rounding to the tip
+    const k = t < 0.85 ? 1 : Math.sqrt(Math.max(0, 1 - ((t - 0.85) / 0.15) ** 2));
+    const w = Math.max(0.03, (1.02 - 0.42 * Math.min(t, 0.85) / 0.85) * k);
+    const th = Math.max(0.012, (0.36 - 0.16 * Math.min(t, 0.85) / 0.85) * k);
     const ring = [];
-    const M = 12;
     for (let j = 0; j < M; j++) {
       const a = (j / M) * Math.PI * 2;
       const cx = Math.cos(a), cz = Math.sin(a);
-      // flattened lens: flat-ish inner face against the stage, rounded outer fairing
-      const z = cz > 0 ? cz * th : cz * 0.06;
+      const z = cz > 0 ? cz * th : cz * 0.06 * k;
       ring.push([cx * w * 0.5, y, z + 0.06]);
     }
     rings.push(ring);
@@ -508,7 +516,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
       ? 'Eight of the centre core\'s nine engines, each 845 kN at sea level and 914 kN in vacuum and ≈ 467 kg with its TVC actuators. The centre core throttles them back shortly after liftoff so it still has propellant when the side boosters separate. Merlin 1D throttles from 845 kN to 482 kN (≈ 57 %, Falcon User\'s Guide).'
       : 'Eight Merlin 1D on the Octaweb ring, 845 kN each at sea level (7.6 MN per core with the centre engine) and ≈ 467 kg each with TVC. Each bell expands the exhaust 16 : 1; fuel flowing through channels in the copper liner cools the chamber and nozzle before it is burned.',
     explode: [0, -4.2, 0],
-  }, mesh(EG.bells, SKIN.bell()));
+  }, mesh(EG.bells, FM.nozzle()));
   O('outer Merlin 1D turbopumps', {
     material: 'Single shaft: LOX impeller, RP-1 impeller, turbine', mass: 8 * 70,
     desc: 'Each engine\'s own turbopump: one shaft carries the LOX impeller, the RP-1 impeller and the turbine that drives them, raising both propellants to injection pressure. The 1D\'s pump speed and power are not published (the Merlin 1C\'s ran at 36,000 rpm and ≈ 10,000 hp).',
@@ -555,7 +563,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
       material: 'Regeneratively cooled channel-wall nozzle', mass: 110, hot: true,
       desc: 'Expands the exhaust 16 : 1 to a ≈ 0.92 m exit. Sized for sea level: a bigger bell would over-expand at liftoff and the flow would separate from the wall.',
       explode: [0, -3.3, 4.6],
-    }, mesh(EG.nozzle, SKIN.bell()));
+    }, mesh(EG.nozzle, FM.nozzle()));
     E('Merlin 1D turbopump', {
       material: 'Single shaft: LOX impeller, RP-1 impeller, turbine', mass: 120,
       desc: 'One shaft carries the LOX impeller (top), the RP-1 impeller and the turbine (bottom), so a single bearing system and a single turbine drive both pumps. The 36,000 rpm and ≈ 10,000 hp often quoted are for the Merlin 1C\'s Barber-Nichols pump; the 1D, with more than twice the thrust, has no published figure.',
@@ -626,10 +634,10 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   let finY;
   if (centre) {
     const inter = P('interstage', {
-      system: 'Separation', skin: true, material: 'Carbon-fibre face sheets on aluminium honeycomb; black thermal layer painted white-grey on Falcon Heavy centre cores', mass: 2100,
-      desc: 'Composite shroud 4.5 m long (Espace & Exploration), fixed to the forward end of the first-stage tank. It covers the Merlin Vacuum nozzle, carries the grid fins, cold-gas thrusters and the stage-separation system at its forward end, and stays with the centre core at separation. On Falcon Heavy centre cores its Block 5 black thermal layer is painted over in white-grey behind the Falcon Heavy logo.',
+      system: 'Separation', skin: true, material: 'Carbon-fibre face sheets on aluminium honeycomb under the Block 5 black thermal layer', mass: 2100,
+      desc: 'Composite shroud 4.5 m long (Espace & Exploration), fixed to the forward end of the first-stage tank. It covers the Merlin Vacuum nozzle, carries the grid fins, cold-gas thrusters and the stage-separation system at its forward end, and stays with the centre core at separation. Block 5 left it black (an uninsulated, heat-tolerant layer for re-entry) in place of the painted interstage of earlier Falcons; the first Falcon Heavy\'s centre core in 2018 still had a white-painted one.',
       explode: [0, 2.0, 0],
-    }, [mesh(barrel(R, Y.s1Top, Y.interTop, { rings: 3 }), FM.interstageWhite()), mesh(barrel(R - 0.03, Y.s1Top, Y.interTop), FM.compositeInner())]);
+    }, [mesh(barrel(R, Y.s1Top, Y.interTop, { rings: 3 }), FM.blackTPS()), mesh(barrel(R - 0.03, Y.s1Top, Y.interTop), FM.compositeInner())]);
     inter.userData.part.thermalRole = 'ambient';
     const door = { panel: [], bolt: [] };
     accessPanel(150, 44.3, 0.6, 0.8, door);
@@ -637,7 +645,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
       system: 'Skin & fairings', skin: true, material: 'Bolted composite door', mass: 6,
       desc: 'Lets technicians reach the Merlin Vacuum nozzle, the separation system and the interstage equipment once the stages are mated. Position taken from photographs.',
       explode: [0, 2.0, 1.2],
-    }, [mesh(merge(door.panel), FM.interstageWhite()), mesh(merge(door.bolt), FM.aluDark())]);
+    }, [mesh(merge(door.panel), FM.blackTPS()), mesh(merge(door.bolt), FM.aluDark())]);
     const latch = [];
     for (const a of [0, 120, 240]) {
       // a hook latch closed over a fitting on the second stage's aft ring, with its pneumatic release actuator
@@ -687,21 +695,29 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   }
 
   // ------------------------------------------------------------------ grid fins (hinged, stowed)
-  const finGeo = latticePanel(1.22, 1.52, 0.115, 0.014, 0.12, 0.05);
-  finGeo.translate(0, -0.76 - 0.05, 0);
+  // A Block 5 fin: a thick cast frame round a fine diagonal lattice (cells ≈ 6 cm), 11 cm deep. Stowed
+  // it lies almost flush on the interstage, hung from a hinge fitting at its top edge: a housing on
+  // the skin with two lugs that straddle the frame, and the actuator shaft through them.
+  const FIN = { w: 1.22, h: 1.52, depth: 0.11, frame: 0.07, gap: 0.03 };
+  const finGeo = latticePanel(FIN.w, FIN.h, 0.065, 0.011, FIN.depth, FIN.frame);
+  finGeo.translate(0, -FIN.h / 2 - 0.02, 0);
+  const finR = R + FIN.gap + FIN.depth / 2;                // hinge line: the fin's mid-depth, just off the skin
   const finGroup = [];
   const finActs = [];
   for (const a of LEGS) {
     const hinge = new THREE.Group();
-    const [x, z] = polar(R + 0.2, a);
+    const [x, z] = polar(finR, a);
     hinge.position.set(x, finY, z);
     hinge.rotation.y = radialYaw(a);
     const m = mesh(finGeo, FM.titanium());
     hinge.add(m);
     finGroup.push(hinge);
     out.fins.push(m);
-    finActs.push(unit(R + 0.12, a, finY + 0.16, 0.62, 0.36, 0.24));
-    finActs.push(rod(at(R - 0.25, a, finY + 0.1), at(R + 0.12, a, finY + 0.1), 0.06, 8));
+    const dAz = (0.58 * 180) / (Math.PI * R);              // lugs just outside the frame's top corners
+    finActs.push(unit(R + 0.1, a, finY + 0.17, 0.5, 0.2, 0.2));                             // actuator housing on the skin
+    for (const s of [-1, 1]) finActs.push(unit(R + 0.09, a + s * dAz, finY + 0.01, 0.07, 0.2, 0.18));   // hinge lugs
+    finActs.push(rod(at(finR, a - dAz * 1.1, finY), at(finR, a + dAz * 1.1, finY), 0.03, 8));            // hinge / actuator shaft
+    finActs.push(rod(at(R - 0.25, a, finY + 0.17), at(R + 0.05, a, finY + 0.17), 0.05, 8));              // shaft into the stage
   }
   const gf = P('grid fins', {
     system: 'Recovery', count: 4, xrayWeight: 0.5, material: 'Single-piece cast and machined titanium', mass: 4 * 180,
@@ -711,7 +727,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   gf.userData.part.thermalRole = 'ambient';
   P('grid-fin actuators', {
     system: 'Hydraulics', count: 4, material: 'Closed-loop hydraulic actuators in aerodynamic housings', mass: 4 * 35,
-    desc: 'Each fin rotates on a hydraulic actuator in a housing at its root. Block 5 uses a closed-loop hydraulic system; early Falcon 9 grid fins vented their hydraulic fluid overboard and could run out.',
+    desc: 'Each fin hangs from a compact hinge fitting at its top edge — two lugs on a housing bolted to the skin — and rotates on a hydraulic actuator inside the housing. Block 5 uses a closed-loop hydraulic system; early Falcon 9 grid fins vented their hydraulic fluid overboard and could run out.',
     explode: [0, 2.7, 0],
   }, mesh(merge(finActs), FM.black()));
   // the unit sits 20° off the outboard side on a side booster (mirrored between A and B), clear of
@@ -733,7 +749,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     pipe([at(1.68, rsA, ringY), at(1.665, rsA, hpuY + 0.42), at(hR + 0.01, rsA, hpuY + 0.18)], 0.02, { seg: 6, tubular: 8 }),
     pipe([at(hR + 0.01, rsA, hpuY - 0.12), at(hR + 0.005, hpuAz + 5, hpuY - 0.14), at(hR, hpuAz, hpuY - 0.12)], 0.022, { seg: 6, tubular: 8 }),
   ];
-  for (const a of LEGS) hpu.push(pipe([at(1.68, a, ringY), at(1.66, a, finY - 0.05), at(R - 0.25, a, finY + 0.1)], 0.022, { seg: 6, tubular: 8 }));
+  for (const a of LEGS) hpu.push(pipe([at(1.68, a, ringY), at(1.66, a, finY - 0.05), at(R - 0.25, a, finY + 0.17)], 0.022, { seg: 6, tubular: 8 }));
   // the relief valve sits on the pressure line and dumps back into the return line beside it
   const relief = [unit(1.645, hpuAz, hpuY + 0.42, 0.075, 0.09, 0.075), pipe([at(1.645, hpuAz, hpuY + 0.42), at(1.66, hpuAz + 5, hpuY + 0.44), at(1.665, rsA, hpuY + 0.42)], 0.012, { seg: 4, tubular: 6 })];
   P('grid-fin hydraulic power unit', {
@@ -748,8 +764,8 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   // the legs from stowed (0) to the landing stance (1) and extends the pistons with them.
   const legGeo = legGeometry(LEG.len);
   legGeo.translate(0, LEG.hingeY - 0.05, 0);         // starts at the hinge, so it swings clear of the skirt
-  const footGeo = new THREE.CylinderGeometry(0.36, 0.4, 0.12, 20);
-  const legPivots = [], legStatic = [], pistons = [], collets = [];
+  const footGeo = new THREE.CylinderGeometry(LEG.foot.r - 0.03, LEG.foot.r, 0.06, 20);
+  const legPivots = [], legStatic = [], pistons = [], collets = [], feet = [];
   const thd = (LEG.deployDeg * Math.PI) / 180;
   const pistonParts = { tubes: [], crush: [], colletMeshes: [] };
   for (const a of LEGS) {
@@ -761,14 +777,21 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     g.rotateY(radialYaw(a));
     g.translate(r.x * (R + 0.01), 0, r.z * (R + 0.01));
     const hm = hingedMesh(g, FM.legBlack(), H, H.clone().sub(tng));        // positive angle swings the tip outward
-    // foot pad: lies flat on the ground in the landing stance
-    const tip = new THREE.Vector3(r.x * (LEG.hingeR + 0.18), LEG.hingeY + LEG.len - 0.32, r.z * (LEG.hingeR + 0.18));
-    const f = footGeo.clone();
-    const up = new THREE.Vector3(0, 1, 0).applyAxisAngle(H.clone().sub(tng).sub(H).normalize(), -thd);   // world up seen from the stowed leg
-    f.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), up));
-    f.translate(tip.x - H.x, tip.y - H.y, tip.z - H.z);
-    const fm = mesh(f, FM.black());
-    hm.pivot.add(fm);
+    // foot pad: folded into the leg's tip for ascent (its face along the leg), swung to lie flat on
+    // the ground in the landing stance
+    const footAt = ([back, outL]) => new THREE.Vector3(r.x * (LEG.hingeR + outL), LEG.hingeY + LEG.len - back, r.z * (LEG.hingeR + outL)).sub(H);
+    const axis = H.clone().sub(tng).sub(H).normalize();
+    const up = new THREE.Vector3(0, 1, 0).applyAxisAngle(axis, -thd);     // world up seen from the stowed leg
+    const foot = new THREE.Group();
+    const pStowed = footAt(LEG.foot.stowed), pLanded = footAt(LEG.foot.landed);
+    foot.position.copy(pStowed);
+    const yAxis = new THREE.Vector3(0, 1, 0);
+    const qStowed = new THREE.Quaternion().setFromUnitVectors(yAxis, r);  // face radial: flush in the tip
+    const qLanded = new THREE.Quaternion().setFromUnitVectors(yAxis, up);
+    foot.quaternion.copy(qStowed);
+    foot.add(mesh(footGeo, FM.black()));
+    hm.pivot.add(foot);
+    feet.push({ foot, qStowed, qLanded, pStowed, pLanded });
     legPivots.push(hm);
     legStatic.push(unit(LEG.hingeR, a, LEG.hingeY, 0.7, 0.3, 0.3));                     // hinge fitting on the skirt
     // piston: three nested sections in a frame at its stage fitting B, +y toward the leg fitting
@@ -796,7 +819,7 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
   }
   const legs = P('landing legs', {
     system: 'Recovery', count: 4, xrayWeight: 0.5, material: 'Carbon fibre over aluminium honeycomb under Block 5 black thermal protection; hinge fittings; foot pads', mass: 4 * 500,
-    desc: 'Four A-frame legs, carbon fibre with aluminium honeycomb, together under 2,100 kg. They lie folded against the stage for ascent and swing down on helium-driven pistons in the last seconds of the landing burn to a stance about 18 m (60 ft) across, the span SpaceX gives; Block 5 added a black thermal-protection layer and legs that can be stowed again after landing. Leg length (≈ 7.9 m here) and the deployed angle (25° below horizontal) are estimates chosen to give that span.',
+    desc: 'Four A-frame legs, carbon fibre with aluminium honeycomb, together under 2,100 kg. They lie folded against the stage for ascent and swing down on helium-driven pistons in the last seconds of the landing burn to a stance about 18 m (60 ft) across, the span SpaceX gives; Block 5 added a black thermal-protection layer and legs that can be stowed again after landing. Stowed, each leg tapers to a narrow rounded tip lying flat on the tank with its foot pad folded inside; the telescoping piston runs hidden behind it. Leg length (≈ 8.0 m here) and the deployed angle (25° below horizontal) are estimates chosen to give that span.',
     callout: !centre && attachSide > 0, anchor: [polar(R + 0.35, 45)[0], 8.0, polar(R + 0.35, 45)[1]], explode: [0, -1.6, 0],
   }, [...legPivots.map((h) => h.pivot), mesh(merge(legStatic), FM.black())]);
   legs.userData.part.thermalRole = 'ambient';
@@ -818,6 +841,9 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     const th = thd * smooth(kk);
     for (let i = 0; i < legPivots.length; i++) {
       legPivots[i].setAngle(th);
+      const fk = smooth(Math.max(0, (kk - 0.45) / 0.55)), ft = feet[i];
+      ft.foot.quaternion.slerpQuaternions(ft.qStowed, ft.qLanded, fk);
+      ft.foot.position.lerpVectors(ft.pStowed, ft.pLanded, fk);
       const p = pistons[i];
       L.copy(p.L0).sub(p.H).applyAxisAngle(p.axis, th).add(p.H);
       dir.subVectors(L, p.B);

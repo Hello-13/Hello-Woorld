@@ -1,7 +1,8 @@
 // Falcon Heavy surface finishes. Block 5 livery: white-painted aluminium-lithium tanks with
-// friction-stir weld seams, black thermal-protection paint on the booster forward sections, the
-// landing legs and the first-stage raceways (Block 5), the centre-core interstage painted
-// white-grey on Falcon Heavy, bare cast titanium grid fins, white composite nose cones and fairing. The white is a matte paint (no clearcoat, albedo ≈ 0.7) so that under the pad's
+// friction-stir weld seams, black thermal-protection paint on the interstage, the booster forward
+// sections, the landing legs and the first-stage raceways (Block 5; on Block 5 Falcon Heavy centre
+// cores the interstage is black like a Falcon 9's, as on Arabsat-6A and STP-2 in 2019), bare cast
+// titanium grid fins, white composite nose cones and fairing. The white is a matte paint (no clearcoat, albedo ≈ 0.7) so that under the pad's
 // floodlights it reads as painted white rather than glowing; roughness stays ≥ 0.3 on the big
 // curved shells so highlights stay stable.
 
@@ -143,11 +144,6 @@ export const FM = {
     const c = carbonSet(3, 14);
     return new THREE.MeshPhysicalMaterial({ color: 0x9a9da2, map: c.map, normalMap: c.normalMap, roughness: 0.55, metalness: 0.2, clearcoat: 0.4, clearcoatRoughness: 0.4 });
   }),
-  /** Falcon Heavy centre-core interstage: the black thermal layer painted over in white-grey. */
-  interstageWhite: () => once('interWhite', () => {
-    const c = carbonSet(40, 12);
-    return paint(new THREE.MeshStandardMaterial({ color: 0xc9cccf, normalMap: c.normalMap, normalScale: new THREE.Vector2(0.15, 0.15), roughness: 0.64, metalness: 0.03 }));
-  }),
   parafoil: () => once('parafoil', () => new THREE.MeshStandardMaterial({ color: 0x3d4a5c, roughness: 0.85, metalness: 0.0 })),
   cable: () => once('cable', () => new THREE.MeshStandardMaterial({ color: 0x2b2d30, roughness: 0.75, metalness: 0.1 })),
   safety: () => once('safety', () => new THREE.MeshStandardMaterial({ color: 0x7a3b2e, roughness: 0.55, metalness: 0.4 })),
@@ -176,24 +172,41 @@ export const FM = {
   gold: () => once('gold', () => new THREE.MeshStandardMaterial({ color: 0xc89b45, roughness: 0.4, metalness: 1.0 })),
   blanket: () => once('blanket', () => new THREE.MeshStandardMaterial({ color: 0xd9d6cc, roughness: 0.95, metalness: 0.0, side: THREE.DoubleSide })),
   niobium: () => once('niobium', () => new THREE.MeshStandardMaterial({ color: 0x302b2a, roughness: 0.4, metalness: 0.85, side: THREE.DoubleSide })),
+  /** Merlin 1D / MVac regeneratively cooled nozzle and chamber jacket: a uniform dark grey, faintly blued by heat on a flown engine, no copper showing. */
+  nozzle: () => once('nozzle', () => new THREE.MeshStandardMaterial({ color: 0x3a3e44, roughness: 0.46, metalness: 0.8, side: THREE.DoubleSide })),
   bellInner: () => once('bellInner', () => new THREE.MeshStandardMaterial({ color: 0x2b2420, roughness: 0.6, metalness: 0.7, side: THREE.BackSide })),
   // ground support
   padSteel: () => once('padSteel', () => new THREE.MeshStandardMaterial({ color: 0x6c7176, roughness: 0.6, metalness: 0.55 })),
-  fssSteel: () => once('fssSteel', () => new THREE.MeshStandardMaterial({ color: 0x8a8d8f, roughness: 0.6, metalness: 0.45 })),
-  teWhite: () => once('teWhite', () => new THREE.MeshStandardMaterial({ color: 0xc4c6c7, roughness: 0.6, metalness: 0.3 })),
+  /** The fixed service structure: shuttle-era steel repainted black by SpaceX in 2017. */
+  fssSteel: () => once('fssSteel', () => new THREE.MeshStandardMaterial({ color: 0x25272a, roughness: 0.62, metalness: 0.5 })),
+  /** SpaceX's transporter-erector: black-painted steel, the darkest thing on the pad beside the white rocket. */
+  teBlack: () => once('teBlack', () => new THREE.MeshStandardMaterial({ color: 0x1c1d20, roughness: 0.55, metalness: 0.55 })),
+  /** Light-grey ground equipment (hydraulic unit, tail service masts, crew access arm). */
+  teWhite: () => once('teWhite', () => new THREE.MeshStandardMaterial({ color: 0xb9bcbd, roughness: 0.6, metalness: 0.3 })),
   refractory: () => once('refractory', () => new THREE.MeshStandardMaterial({ color: 0x34322e, roughness: 0.95, metalness: 0.02 })),   // soot-darkened refractory brick
   deflector: () => once('deflector', () => new THREE.MeshStandardMaterial({ color: 0x5c5955, roughness: 0.9, metalness: 0.1 })),   // scorched steel and refractory concrete
   water: () => once('waterPipe', () => new THREE.MeshStandardMaterial({ color: 0xb7b9b2, roughness: 0.5, metalness: 0.6 })),
   hardstand: () => once('hardstand', () => {
-    const c = concrete({ seed: 11 });           // same tile as the pad floor (cached)
+    const c = concrete({ seed: 11 });           // same tile as the pad floor (cached), 5 m tiles so the mottling reads
     const out = {};
-    for (const k of ['map', 'normalMap', 'roughnessMap']) { const t = c[k].clone(); t.repeat.set(1 / 12, 1 / 12); t.needsUpdate = true; out[k] = t; }
-    return new THREE.MeshStandardMaterial({ color: 0xb4b0a8, ...out, roughness: 1, metalness: 0 });
+    for (const k of ['map', 'normalMap', 'roughnessMap']) { const t = c[k].clone(); t.repeat.set(1 / 5, 1 / 5); t.needsUpdate = true; out[k] = t; }
+    return new THREE.MeshStandardMaterial({ color: 0x9e9b94, ...out, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 1, metalness: 0 });
   }),
-  /** Grassed earth embankment of the pad mound. */
+  /**
+   * The same weathered concrete with per-vertex grime: the hardstand top, lip and ramp carry a colour
+   * attribute (scorch beside the trench and at its exits, rain streaks, faded patches).
+   */
+  hardstandWeathered: () => once('hardstandW', () => {
+    const c = concrete({ seed: 11 });
+    const out = {};
+    for (const k of ['map', 'normalMap', 'roughnessMap']) { const t = c[k].clone(); t.repeat.set(1 / 5, 1 / 5); t.needsUpdate = true; out[k] = t; }
+    return new THREE.MeshStandardMaterial({ color: 0xa6a39c, ...out, normalScale: new THREE.Vector2(0.8, 0.8), roughness: 1, metalness: 0, vertexColors: true });
+  }),
+  /** Grassed earth embankment of the pad mound (per-vertex colour: worn to sand where the exhaust exits). */
   embankment: () => once('embankment', () => {
     const c = concrete({ seed: 11 });
-    const n = c.normalMap.clone(); n.repeat.set(1 / 9, 1 / 9); n.needsUpdate = true;
-    return new THREE.MeshStandardMaterial({ color: 0x67704f, normalMap: n, normalScale: new THREE.Vector2(1.5, 1.5), roughness: 1, metalness: 0 });
+    const n = c.normalMap.clone(); n.repeat.set(1 / 6, 1 / 6); n.needsUpdate = true;
+    const r = c.roughnessMap.clone(); r.repeat.set(1 / 6, 1 / 6); r.needsUpdate = true;
+    return new THREE.MeshStandardMaterial({ color: 0x6e7456, normalMap: n, roughnessMap: r, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 1, metalness: 0, vertexColors: true });
   }),
 };

@@ -180,10 +180,13 @@ test('landing-leg stance matches the ≈ 18 m (60 ft) span the desc and the tour
   const leg = core.match(/const LEG = \{([\s\S]*?)\n\};/)[1];
   const num = (k) => Number(leg.match(new RegExp(`\\b${k}:\\s*([\\d.]+)`))[1]);
   const len = num('len'), hingeY = num('hingeY'), th = (num('deployDeg') * Math.PI) / 180;
-  // foot pad (radius 0.4 m) centred 0.18 m outboard of the hinge line and 0.32 m short of the leg's
-  // tip; the hinge sits 0.1 m outside the skin (core.js landing legs)
-  const rFoot = CORE_R + 0.1 + 0.18 * Math.cos(th) + (len - 0.32) * Math.sin(th) + 0.4;
-  const yFoot = hingeY + (len - 0.32) * Math.cos(th) - 0.18 * Math.sin(th);
+  // the foot pad swings to the end of the leg for landing: its radius and its landed centre [short of
+  // the tip, outboard of the hinge line] come from LEG.foot; the hinge sits 0.1 m outside the skin
+  const foot = leg.match(/foot:\s*\{\s*r:\s*([\d.]+),[^}]*landed:\s*\[([\d.]+),\s*([\d.]+)\]/);
+  assert.ok(foot, 'LEG.foot has r and landed [back, out]');
+  const [, rPad, back, outL] = foot.map(Number);
+  const rFoot = CORE_R + 0.1 + outL * Math.cos(th) + (len - back) * Math.sin(th) + rPad;
+  const yFoot = hingeY + (len - back) * Math.cos(th) - outL * Math.sin(th);
   close(2 * rFoot, 18.3, 0.5, 'deployed span m');
   assert.ok(yFoot < -1 && yFoot > -2.5, `foot pads ${yFoot.toFixed(2)} m below the nozzle exits`);
   assert.match(core, /about 18 m \(60 ft\) across/, 'landing-leg desc quotes the span');

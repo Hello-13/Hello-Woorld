@@ -21,13 +21,16 @@ import { FM } from './materials.js';
 const H = PAD.hardstand;
 const W = PAD.trenchHalfWidth;
 const DECK = H + PAD.mountDeck;
-// hardstand top half-extents, slope run and the chamfered concrete edge (compressed footprint)
-const TX = 25, TZ = 23, RUN = 7.5, LIP = 1.4, LIP_DROP = 0.9;
+// hardstand top half-extents, the run of the mound's slopes and the rounded concrete edge
+// (compressed footprint; the real mound's sides fall ≈ 14.6 m at a gentle grade, so RUN is long)
+const TX = 25, TZ = 23, RUN = 30, LIP = 1.4, LIP_DROP = 0.9;
+// how far down the slopes the stage frames the vehicle (the toes are scenery, like the ramp)
+const FRAME_RUN = 7.5;
 // transporter-erector tracks: one each side of the trench (centre ±RAIL_X), rail gauge (estimates)
 const RAIL_X = 10.0, GAUGE = 1.2;
 // what the stage frames the vehicle on: the hardstand and the towers, not the far-reaching ramp,
 // catenary wire and storage farm (see noFrame)
-const FRAME_BOX = new THREE.Box3(new THREE.Vector3(-TX - RUN, 0, -TZ - RUN - 4), new THREE.Vector3(TX + RUN, 88.4, TZ + RUN));
+const FRAME_BOX = new THREE.Box3(new THREE.Vector3(-TX - FRAME_RUN, 0, -TZ - FRAME_RUN - 4), new THREE.Vector3(TX + FRAME_RUN, 88.4, TZ + FRAME_RUN));
 
 /**
  * Leave a far-reaching ground part out of the vehicle's framing. The stage fits and frames a vehicle
@@ -64,9 +67,9 @@ function ribbon(a, b, ref) {
 // toward its toe, like the real mound's slopes.
 const LIP_PROFILE = [[0, H], [0.35, H - 0.06], [0.85, H - 0.38], [LIP, H - LIP_DROP]];
 const SLOPE_PROFILE = [];
-for (let i = 0; i <= 9; i++) {
-  const u = i / 9;
-  SLOPE_PROFILE.push([LIP + (RUN - LIP) * u, (H - LIP_DROP) * Math.pow(1 - u, 1.35)]);
+for (let i = 0; i <= 14; i++) {
+  const u = i / 14;
+  SLOPE_PROFILE.push([LIP + (RUN - LIP) * u, (H - LIP_DROP) * Math.pow(1 - u, 1.5)]);
 }
 
 /**
@@ -117,11 +120,11 @@ function moundHalf(s) {
     if (probe.y < 0) { for (let i = 0; i < idx.length; i += 3) { const t = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = t; } g.setIndex(idx); g.computeVertexNormals(); }
     return g;
   };
-  const top = new THREE.PlaneGeometry(TX - W, 2 * TZ).rotateX(-Math.PI / 2).translate(s * (TX + W) / 2, H, 0);
+  const top = new THREE.PlaneGeometry(TX - W, 2 * TZ, 16, 32).rotateX(-Math.PI / 2).translate(s * (TX + W) / 2, H, 0);
   // metric UVs on the top so its concrete tile matches the lip
   const tp = top.attributes.position, tu = top.attributes.uv;
   for (let i = 0; i < tp.count; i++) tu.setXY(i, tp.getX(i), tp.getZ(i));
-  return { top, lip: sweep(LIP_PROFILE), slope: sweep(SLOPE_PROFILE) };
+  return { top: tint(top, concreteGrime), lip: tint(sweep(LIP_PROFILE), concreteGrime), slope: tint(sweep(SLOPE_PROFILE), grassWear) };
 }
 
 /** The trench wall under one half: the top edge, then down both ends along the mound profile. */
@@ -153,6 +156,44 @@ function faceAway(g, ref) {
   p.needsUpdate = true;
   g.computeVertexNormals();
   return g;
+}
+
+/** Give a geometry a vertex colour from fn(x, y, z) → [r, g, b] (materials with vertexColors). */
+function tint(g, fn) {
+  const p = g.attributes.position;
+  const col = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) {
+    const [r, gg, b] = fn(p.getX(i), p.getY(i), p.getZ(i));
+    col[i * 3] = r; col[i * 3 + 1] = gg; col[i * 3 + 2] = b;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return g;
+}
+const hash2 = (x, z) => { const v = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453; return v - Math.floor(v); };
+/**
+ * Weathered concrete: soot fanning out of the trench (darkest at its two exits, where the exhaust
+ * comes out), rain streaks running down the slopes (along z on the top) and faded patches.
+ */
+function concreteGrime(x, y, z) {
+  const dTrench = Math.max(0, Math.abs(x) - W);
+  const exit = Math.max(0, (Math.abs(z) - (TZ - 10)) / 14);                   // 0 inside, ≈ 1 past the ends
+  const soot = (0.5 * Math.exp(-dTrench / 4) + 0.35 * exit * Math.exp(-dTrench / 9)) * (0.75 + 0.25 * hash2(Math.floor(x / 3), Math.floor(z / 3)));
+  const patch = 0.9 + 0.1 * hash2(Math.floor(x / 6), Math.floor(z / 6));
+  const streak = 1 - 0.08 * hash2(Math.floor(x / 1.5), 0);
+  const k = patch * streak;
+  return [k * (1 - soot * 0.85), k * (1 - soot * 0.87), k * (1 - soot * 0.9)];
+}
+/** The mound's grass: worn to sand beside the trench exits, browner and patchier toward the toe. */
+function grassWear(x, y, z) {
+  const exit = Math.max(0, (Math.abs(z) - TZ) / 8) * Math.exp(-Math.max(0, Math.abs(x) - W - 4) / 10);
+  const sand = Math.min(1, exit * 1.3);
+  const dry = 0.25 * (1 - y / H) + 0.2 * hash2(Math.floor(x / 5), Math.floor(z / 5));
+  const g = [0.95 + 0.1 * hash2(Math.floor(x / 4) + 7, Math.floor(z / 4)), 1, 0.9];
+  const sandCol = [1.75, 1.5, 1.05];                                           // × the material's green → sand
+  const dryCol = [1.3, 1.05, 0.7];
+  const out = [];
+  for (let i = 0; i < 3; i++) { const base = g[i] * (1 - dry) + dryCol[i] * dry; out.push(base * (1 - sand) + sandCol[i] * sand); }
+  return out;
 }
 
 /** A lattice-truss tower face set: columns, level beams and alternating diagonals. */
@@ -198,10 +239,11 @@ export function buildPad(A, site, base, bed) {
 
   // ------------------------------------------------------------------ hardstand and flame trench
   const halves = [moundHalf(1), moundHalf(-1)];
-  G('Pad hardstand', {
+  const hs = G('Pad hardstand', {
     skin: true, material: 'Reinforced concrete pad on a raised, grassed earth-and-fill mound', mass: null,
-    desc: 'LC-39A stands on a raised hardstand built for Saturn V. Its surface is about 48 ft above sea level, high enough for the 42 ft-deep flame trench to drain at grade. Footprint compressed here.',
-  }, [mesh(merge(halves.flatMap((h) => [h.top, h.lip])), FM.hardstand()), mesh(merge(halves.map((h) => h.slope)), FM.embankment())], bed);
+    desc: 'LC-39A stands on a raised hardstand built for Saturn V: a long, gently sloped mound of fill with the concrete pad on top. Its surface is about 48 ft above sea level, high enough for the 42 ft-deep flame trench to drain at grade; the exhaust blackens the concrete beside the trench and scours the grass at its two exits. Footprint compressed here.',
+  }, [mesh(merge(halves.flatMap((h) => [h.top, h.lip])), FM.hardstandWeathered()), mesh(merge(halves.map((h) => h.slope)), FM.embankment())], bed);
+  hs.children[1].traverse((o) => { if (o.isMesh) noFrame(o); });          // the long slopes are scenery for framing
 
   const lining = [trenchWall(1), trenchWall(-1)];
   const floor = new THREE.PlaneGeometry(2 * W, 2 * (TZ + RUN)).rotateX(-Math.PI / 2).translate(0, 0.04, 0);
@@ -314,9 +356,9 @@ export function buildPad(A, site, base, bed) {
   for (let y = DECK; y <= top + 0.01; y += 3.0) levels.push(y);
   const te = truss(-1.6, zf, 3.2, zb - zf, levels, { col: 0.42, hor: 0.26, diag: 0.2, mid: false });
   G('Transporter-erector strongback', {
-    material: 'Steel lattice strongback', mass: null,
+    material: 'Black-painted steel lattice strongback', mass: null,
     desc: 'The ≈ 212 ft spine of SpaceX\'s transporter-erector: it carries the integrated vehicle horizontally from the hangar, raises it onto the launch mount and then stands as its umbilical tower, carrying the arms, lines and ground harness. It is retracted a few degrees just before launch (Falcon User\'s Guide).',
-  }, mesh(merge(te), FM.teWhite()));
+  }, mesh(merge(te), FM.teBlack()));
 
   const tb = [block(0, DECK + 0.6, (zb + zf) / 2, 4.2, 1.2, 2.6)];                  // base block under the strongback
   for (const sx of [1, -1]) {
@@ -331,7 +373,7 @@ export function buildPad(A, site, base, bed) {
   G('TE base frame & erector hinges', {
     material: 'Steel base frame on rail trucks, trench-spanning girders, strongback hinges', mass: null,
     desc: 'The strongback pivots on hinges bolted to the edge of the launch mount. Its base frame stands on rail trucks either side of the flame trench, the way the Apollo crawler straddled it, with two girders bridging the trench under the hinge and the erector cylinders. Layout estimated.',
-  }, mesh(merge(tb), FM.teWhite()));
+  }, mesh(merge(tb), FM.teBlack()));
 
   const cyl = [];
   for (const sx of [1, -1]) {
@@ -344,7 +386,7 @@ export function buildPad(A, site, base, bed) {
   G('TE erector cylinders', {
     count: 2, material: 'Hydraulic erector cylinders, Ø ≈ 0.7 m barrels, trunnion bases', mass: null,
     desc: 'Two long hydraulic cylinders rotate the strongback and the integrated vehicle from horizontal to vertical in minutes. The vehicle is normally erected only once per campaign; after a scrub it stays vertical on the pad (Falcon User\'s Guide).',
-  }, mesh(merge(cyl), FM.padSteel()));
+  }, mesh(merge(cyl), FM.teBlack()));
 
   // second-stage umbilical arm and the vehicle clamp arms
   // each arm roots on a cross beam between the strongback's front columns and its two beams run
@@ -365,7 +407,7 @@ export function buildPad(A, site, base, bed) {
   G('TE second-stage umbilical arm', {
     material: 'Steel arm, quick-disconnect carrier plate', mass: null,
     desc: 'Holds the ground half of the second stage\'s T-0 quick disconnect: RP-1 and LOX fill and drain, helium, nitrogen, power, data and the payload harness. The plate pulls away as the vehicle rises.',
-  }, mesh(merge(s2arm), FM.padSteel()));
+  }, mesh(merge(s2arm), FM.teBlack()));
   const clampArms = [];
   for (const [ys, wrap] of [[56.2, 1.0], [44.0, 0.8]]) {
     const y = armAt(ys, wrap, clampArms);
@@ -374,7 +416,7 @@ export function buildPad(A, site, base, bed) {
   G('TE clamp arms', {
     count: 2, material: 'Steel arms with padded clamp shoes', mass: null,
     desc: 'Cradle the stack against the strongback while it is horizontal and during erection, at the interstage and the top of the second stage, and steady it against the wind on the pad.',
-  }, mesh(merge(clampArms), FM.padSteel()));
+  }, mesh(merge(clampArms), FM.teBlack()));
 
   const lines = [];
   for (const [x, r] of [[-0.48, 0.1], [-0.17, 0.14], [0.15, 0.12], [0.44, 0.09]]) {
@@ -443,7 +485,7 @@ export function buildPad(A, site, base, bed) {
     for (let i = 0; i <= N; i++) {
       const z = zRamp0 - (rampL * i) / N, y = rampY(z) + 0.02;
       top0.push([sx * (W + 0.25), y, z]); top1.push([sx * (RAIL_X + 3.2), y, z]);
-      side1.push([sx * (RAIL_X + 3.2 + 1.5 * y), 0.02, z]);
+      side1.push([sx * (RAIL_X + 3.2 + 2.4 * y), 0.02, z]);
       wall0.push([sx * (W + 0.25), 0.02, z]);
     }
     ramp.push(ribbon(top0, top1, new THREE.Vector3(sx * 11, -100, -140)));
@@ -453,7 +495,7 @@ export function buildPad(A, site, base, bed) {
   const rp = G('TE rails & ramp', {
     count: 2, material: 'Steel rails on concrete, the Apollo / Shuttle crawlerway ramp', mass: null,
     desc: 'The transporter-erector rides rails up the old crawlerway ramp from SpaceX\'s hangar at the foot of the pad; the steepest incline the integrated vehicle sees on the way is 2.9° (Falcon User\'s Guide), so the ramp runs ≈ 250 m from the pad down to grade. The tracks straddle the flame trench as the crawler\'s did; rail spacing estimated.',
-  }, [mesh(merge(rails), FM.padSteel()), mesh(merge(railBed), FM.hardstand()), mesh(merge(ramp), FM.hardstand()), mesh(merge(rampSide), FM.embankment())]);
+  }, [mesh(merge(rails), FM.padSteel()), mesh(merge(railBed), FM.hardstand()), mesh(tint(merge(ramp), concreteGrime), FM.hardstandWeathered()), mesh(tint(merge(rampSide), grassWear), FM.embankment())]);
   rp.traverse((o) => { if (o.isMesh) noFrame(o); });
 
 
@@ -465,8 +507,8 @@ export function buildPad(A, site, base, bed) {
   for (const y of fl.slice(1)) fss.push(block(fx0 + fw / 2, y - 0.12, fz0 + fw / 2, fw - 0.4, 0.22, fw - 0.4));
   fss.push(block(fx0 + 3, (H + fl[fl.length - 1]) / 2, fz0 + 3, 2.6, fl[fl.length - 1] - H, 2.6));   // elevator shaft
   G('Fixed service structure', {
-    skin: true, material: 'Steel lattice tower', mass: null,
-    desc: 'The shuttle-era tower, 247 ft tall with 12 levels 20 ft apart. A 24 m fibreglass lightning mast on its roof carries a catenary wire anchored about 335 m north and south, protecting the whole pad.',
+    skin: true, material: 'Steel lattice tower, painted black', mass: null,
+    desc: 'The shuttle-era tower, 247 ft tall with 12 levels 20 ft apart, stripped of its rotating service structure and painted black by SpaceX in 2017. A 24 m fibreglass lightning mast on its roof carries a catenary wire anchored about 335 m north and south, protecting the whole pad.',
   }, mesh(merge(fss), FM.fssSteel()));
 
   const caaY = H + 66.1;
@@ -524,13 +566,29 @@ export function buildPad(A, site, base, bed) {
 
   const white = new THREE.MeshStandardMaterial({ color: 0xe7e8e4, roughness: 0.55, metalness: 0.1 });
   const steel = new THREE.MeshStandardMaterial({ color: 0x8b9096, metalness: 0.7, roughness: 0.5 });
-  const wt = [post(-110, -150, 70, 88, 9, 32), new THREE.ConeGeometry(9.4, 3.2, 32).translate(-110, 89.6, -150)];
+  // a 300,000-gallon (≈ 1,140 m³) sphere, ≈ 13 m across, with its top at 290 ft on a six-legged lattice
+  const WX = -110, WZ = -150, WR = 6.6, WY = 88.4 - WR;
+  const wt = [new THREE.SphereGeometry(WR, 40, 28).translate(WX, WY, WZ), post(WX, WZ, 0, WY, 0.45, 12),   // tank and riser pipe
+    post(WX, WZ, WY + WR - 0.2, WY + WR + 0.9, 0.5, 12), hoop(WR + 0.5, 0.08, WY - 0.6, { x: WX, z: WZ, seg: 48, tube: 6 })];   // vent, catwalk rail
   const legsW = [];
-  for (let k = 0; k < 6; k++) { const [x, z] = polar(10, k * 60); const [x1, z1] = polar(7, k * 60); legsW.push(beam([-110 + x, 0, -150 + z], [-110 + x1, 70, -150 + z1], 0.9, 0.9)); }
+  const wLevels = [0, 14, 28, 42, 56, 68, 77.0];
+  const wR = (y) => 10.5 - (10.5 - 5.9) * (y / 77.0);                   // legs lean in toward the tank
+  for (let k = 0; k < 6; k++) {
+    const a0 = k * 60, a1 = a0 + 60;
+    const [x0, z0] = polar(wR(0), a0), [x1, z1] = polar(wR(77), a0);
+    legsW.push(beam([WX + x0, 0, WZ + z0], [WX + x1, 77.0, WZ + z1], 0.55, 0.55));
+    for (let i = 1; i < wLevels.length; i++) {
+      const ya = wLevels[i - 1], yb = wLevels[i];
+      const A0 = polar(wR(ya), a0), A1 = polar(wR(ya), a1), B0 = polar(wR(yb), a0), B1 = polar(wR(yb), a1);
+      legsW.push(beam([WX + B0[0], yb, WZ + B0[1]], [WX + B1[0], yb, WZ + B1[1]], 0.3, 0.3));                       // ring at each level
+      legsW.push(beam([WX + A0[0], ya, WZ + A0[1]], [WX + B1[0], yb, WZ + B1[1]], 0.2, 0.2));                       // X bracing
+      legsW.push(beam([WX + A1[0], ya, WZ + A1[1]], [WX + B0[0], yb, WZ + B0[1]], 0.2, 0.2));
+    }
+  }
   G('Water tower', {
-    material: 'Elevated steel water tank on a braced tower', mass: null,
-    desc: 'Holds 300,000 gallons on a 290 ft tower (NASA LC-39 fact sheet), enough head for the deluge to reach full flow within seconds of ignition. Position compressed.',
-  }, [mesh(merge(wt), white, { cast: false }), mesh(merge(legsW), steel, { cast: false })]).traverse((o) => { if (o.isMesh) noFrame(o); });
+    material: 'Welded steel sphere on a six-legged braced lattice tower, central riser pipe', mass: null,
+    desc: 'Holds 300,000 gallons in a white sphere about 13 m across on a 290 ft tower (NASA LC-39 fact sheet), the tallest thing at the pad after the service structure; the head of water lets the deluge reach full flow within seconds of ignition. Position compressed.',
+  }, [mesh(merge(wt), white, { cast: false }), mesh(merge(legsW), white, { cast: false })]).traverse((o) => { if (o.isMesh) noFrame(o); });
 
   // kept behind the tower, on the right of the default view, so they never sit under the hero text
   const LOXS = [-30, -160, 9.33];
