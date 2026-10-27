@@ -311,7 +311,7 @@ export function buildInstruments(P, root) {
   ];
   const FX0 = 2.25, FX1 = 3.25, FW = 0.5;                   // 1.0 m along V1, centred 0.1 m ahead of the focus
   const FR0 = 0.45, FRT = 1.0, FR1 = 2.03;                  // radial: taper r 0.45 → 1.0, full box 1.0 → 2.03
-  const FXN = X_SI1 + 0.03;                                 // the taper starts just ahead of the axial bays
+  const FXN = X_SI1 + 0.05;                                 // the taper starts just ahead of the axial bays
   const FXM = (FX0 + FX1) / 2;
   out.fgs = [];
   for (const f of FGS) {
