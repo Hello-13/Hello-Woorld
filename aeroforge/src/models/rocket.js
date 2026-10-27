@@ -61,30 +61,35 @@ export function buildRocket() {
 
   // ----------------------------------------------------------------- exhaust (effects, not parts)
   const enginePos = [[0, 0], ...Array.from({ length: 8 }, (_, k) => polar(ENGINE_RING, 22.5 + k * 45))];
+  // per core: nine short jets with shock diamonds that merge within a few metres into one
+  // yellow-orange column, which browns with soot down its length and opens into a single fan as
+  // the air thins
   const corePlumes = (group) => {
-    const jetMat = plumeMaterial({ core: 0xfff6e2, outer: 0xffa03a, diamonds: 1.4 });
-    const bigMat = plumeMaterial({ core: 0xffe9c0, outer: 0xff7a1c, diamonds: 0.6, soot: 0.35 });
-    const jets = enginePos.map(([x, z]) => { const m = plumeMesh(0.44, 0.78, 7.5, jetMat, 20); m.position.set(x, 0, z); group.add(m); return m; });
-    const big = plumeMesh(1.75, 3.6, 36, bigMat, 32);
+    const jetMat = plumeMaterial({ core: 0xfff3cc, outer: 0xffa040, diamonds: 1.2, gain: 1.1 });
+    const bigMat = plumeMaterial({ core: 0xffe8a8, outer: 0xff7a22, diamonds: 0.5, soot: 0.4, gain: 1.3 });
+    const jets = enginePos.map(([x, z]) => { const m = plumeMesh(0.44, 0.7, 6, jetMat, 16); m.position.set(x, 0, z); group.add(m); return m; });
+    const big = plumeMesh(1.7, 3.0, 34, bigMat, 32);
     big.position.y = -0.4;
     group.add(big);
     return { jetMat, bigMat, meshes: [...jets, big] };
   };
   const plumes = { core: corePlumes(coreG), boosters: boosterG.map(corePlumes) };
-  const mvacMat = plumeMaterial({ core: 0xffd9b0, outer: 0xd86a4a, diamonds: 0.0 });
-  const mvacPlume = plumeMesh(1.6, 16, 70, mvacMat, 40);
+  // the Merlin Vacuum's plume: one wide translucent fan from the 3.3 m exit (expansion 2.6 puts the
+  // material in its vacuum look: the fan opens at the exit and the body is thin and faint)
+  const mvacMat = plumeMaterial({ core: 0xffd9b0, outer: 0xd86a4a, diamonds: 0.0, gain: 1.4 });
+  const mvacPlume = plumeMesh(1.6, 6.5, 60, mvacMat, 40);
   mvacPlume.position.y = Y.mvacExit;
   upperG.add(mvacPlume);
   const allPlumeMats = [plumes.core.jetMat, plumes.core.bigMat, ...plumes.boosters.flatMap((p) => [p.jetMat, p.bigMat]), mvacMat];
   const allPlumeMeshes = [...plumes.core.meshes, ...plumes.boosters.flatMap((p) => p.meshes), mvacPlume];
 
-  const engineGlow = glowSprite(0xffa04a, 30);
-  engineGlow.position.y = -3;
+  const engineGlow = glowSprite(0xffa04a, 22);
+  engineGlow.position.y = -2.5;
   stack.add(engineGlow);
   const padGlow = glowSprite(0xff9a50, 48);
   padGlow.position.set(0, PAD.hardstand + PAD.mountDeck - 2, 0);
   site.add(padGlow);
-  const smoke = padSmoke({ trenchEnd: 35, deck: pad.deckTop });
+  const smoke = padSmoke({ trenchEnd: pad.trenchEnd });
   ground.add(smoke.points);
 
   A.finalize();
@@ -297,22 +302,26 @@ export function buildRocket() {
         drive(p.jetMat, boostOn * (0.4 + 0.6 * amb), jetExp, amb * 1.4);
         drive(p.bigMat, boostOn, bigExp, amb * 0.6);
       }
-      drive(mvacMat, st.firing.upper ? 0.85 : 0, 1.0, 0);
+      drive(mvacMat, st.firing.upper ? 0.85 : 0, 2.6, 0);
       for (const m of allPlumeMeshes) m.visible = m.material.uniforms.intensity.value > 0.01;
 
-      // engine glow: smooth, no light source and no random flicker
+      // engine glow: smooth, no light source and no random flicker; it shrinks to the engine bay
+      // as the air thins, so the vacuum plume is the fan alone and not a sprite blob beside it
       const fire = Math.max(st.firing.core || st.firing.booster ? 1 : 0, ign);
-      const glowTarget = fire * Math.min(1, amb * 3 + 0.15) * 0.75;
+      const glowTarget = fire * Math.min(1, amb * 3 + 0.15) * 0.5;
       engineGlow.material.opacity += (glowTarget - engineGlow.material.opacity) * ease;
       engineGlow.visible = engineGlow.material.opacity > 0.01;
+      const glowSize = 8 + 14 * amb;
+      engineGlow.scale.set(glowSize, glowSize, 1);
       const nearPad = Math.max(0, 1 - st.altitudeVis / 300);
-      const padTarget = Math.max(ign, st.launching ? fire * nearPad : 0) * 0.85;
+      const padTarget = Math.max(ign, st.launching ? fire * nearPad : 0) * 0.6;
       padGlow.material.opacity += (padTarget - padGlow.material.opacity) * ease;
       padGlow.visible = padGlow.material.opacity > 0.01;
 
-      // steam and smoke out of the flame trench
+      // steam out of the flame-trench exits: from the deluge at ignition, in full once the engines
+      // are up, thinning as the vehicle climbs away
       const emit = (ign > 0.2 || (st.launching && fire > 0)) && st.altitudeVis < 900;
-      smoke.update(dt, emit, st.altitudeVis < 200 ? 1 : 0.5);
+      smoke.update(dt, emit, !st.launching ? 0.6 : st.altitudeVis < 200 ? 1 : 0.5);
     },
   };
   // The exploded offsets already raise every stage and subsystem clear of the launch mount, and

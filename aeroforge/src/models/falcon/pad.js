@@ -124,7 +124,7 @@ function moundHalf(s) {
   // metric UVs on the top so its concrete tile matches the lip
   const tp = top.attributes.position, tu = top.attributes.uv;
   for (let i = 0; i < tp.count; i++) tu.setXY(i, tp.getX(i), tp.getZ(i));
-  return { top: tint(top, concreteGrime), lip: tint(sweep(LIP_PROFILE), concreteGrime), slope: tint(sweep(SLOPE_PROFILE), grassWear) };
+  return { top, lip: sweep(LIP_PROFILE), slope: sweep(SLOPE_PROFILE) };
 }
 
 /** The trench wall under one half: the top edge, then down both ends along the mound profile. */
@@ -158,7 +158,7 @@ function faceAway(g, ref) {
   return g;
 }
 
-/** Give a geometry a vertex colour from fn(x, y, z) → [r, g, b] (materials with vertexColors). */
+/** Give a geometry a vertex colour from fn(x, y, z) → [r, g, b] (materials with vertexColors). Apply after merge(), which drops extra attributes. */
 function tint(g, fn) {
   const p = g.attributes.position;
   const col = new Float32Array(p.count * 3);
@@ -227,7 +227,7 @@ function truss(x0, z0, w, d, levels, { col = 0.5, hor = 0.35, diag = 0.25, mid =
  * Build the pad. bed: the hardstand and flame trench, shown in the launch-pad look in every render
  * mode so the vehicle always stands on it there. site: the towers, TE, deluge and scenery, shown
  * only in the launch-pad look's studio rendering. base: always shown (launch mount, clamps, tail
- * service masts). Returns { deckTop }.
+ * service masts). Returns { deckTop, trenchEnd } (deck height, z of the trench exits).
  */
 export function buildPad(A, site, base, bed) {
   const G = (name, info, objs, grp = site) => {
@@ -242,7 +242,7 @@ export function buildPad(A, site, base, bed) {
   const hs = G('Pad hardstand', {
     skin: true, material: 'Reinforced concrete pad on a raised, grassed earth-and-fill mound', mass: null,
     desc: 'LC-39A stands on a raised hardstand built for Saturn V: a long, gently sloped mound of fill with the concrete pad on top. Its surface is about 48 ft above sea level, high enough for the 42 ft-deep flame trench to drain at grade; the exhaust blackens the concrete beside the trench and scours the grass at its two exits. Footprint compressed here.',
-  }, [mesh(merge(halves.flatMap((h) => [h.top, h.lip])), FM.hardstandWeathered()), mesh(merge(halves.map((h) => h.slope)), FM.embankment())], bed);
+  }, [mesh(tint(merge(halves.flatMap((h) => [h.top, h.lip])), concreteGrime), FM.hardstandWeathered()), mesh(tint(merge(halves.map((h) => h.slope)), grassWear), FM.embankment())], bed);
   hs.children[1].traverse((o) => { if (o.isMesh) noFrame(o); });          // the long slopes are scenery for framing
 
   const lining = [trenchWall(1), trenchWall(-1)];
@@ -644,5 +644,5 @@ export function buildPad(A, site, base, bed) {
   }, mesh(merge(trunk), FM.water()));
   tl.traverse((o) => { if (o.isMesh) noFrame(o); });
 
-  return { deckTop: DECK };
+  return { deckTop: DECK, trenchEnd: TZ + RUN };
 }

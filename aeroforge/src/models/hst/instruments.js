@@ -297,38 +297,47 @@ export function buildInstruments(P, root) {
   }, [mesh(radPanel, HM.radiator()), mesh(merge(radFins), HM.al())]);
   rad.userData.part.thermalRole = 'radiator';
 
-  // three Fine Guidance Sensors at 90° intervals (units after SM4: FGS-1R, FGS-2R2, FGS-3); each a
-  // 0.5 × 1 × 1.6 m box (SM4 Fig. 4-12). The guide does not say which way each dimension runs; drawn
-  // long along V1, 1 m deep radially and 0.5 m wide, an assumption the desc states
+  // three Fine Guidance Sensors at 90° intervals (units after SM4: FGS-1R, FGS-2R2, FGS-3), each a
+  // 0.5 × 1 × 1.6 m enclosure (SM4 Fig. 4-12). The 1.6 m side runs radially: the KSC hoisting photos
+  // of FGS-2R2 (2008) show a tall box with the pie-slice taper at the inboard (pick-off) end and the
+  // connector plate at the outboard end, and the NASA FGS page sets the three guiders and WFC3 in the
+  // four radial bays around the focal plane with their pick-offs inboard. So: 1 m along V1 astride
+  // the focal plane (x 2.25–3.25), 0.5 m wide, from r 0.45 at the pick-off to r 2.03 under the doors.
+  // The taper sits ahead of the axial instruments' front faces (x > 2.55), where the beam is.
   const FGS = [
     { n: 1, phi: 90, side: '−V2', ama: true, note: 'FGS-1R (1997) is the most stable and serves as Hubble\'s astrometer, measuring star positions to about a milliarcsecond.' },
     { n: 2, phi: 0, side: '+V3', ama: true, note: 'The unit installed in 2009, FGS-2R2, is a refurbished sensor returned from an earlier mission.' },
     { n: 3, phi: 270, side: '+V2', ama: false, note: 'Two of the three guiders lock on stars for every observation; the third can do science.' },
   ];
-  const FX0 = 1.82, FX1 = 3.4, FW = 0.5;
+  const FX0 = 2.25, FX1 = 3.25, FW = 0.5;                   // 1.0 m along V1, centred 0.1 m ahead of the focus
+  const FR0 = 0.45, FRT = 1.0, FR1 = 2.03;                  // radial: taper r 0.45 → 1.0, full box 1.0 → 2.03
+  const FXN = X_SI1 + 0.03;                                 // the taper starts just ahead of the axial bays
+  const FXM = (FX0 + FX1) / 2;
   out.fgs = [];
   for (const f of FGS) {
     const phi = deg(f.phi);
-    const body = mesh(wedge(phi, 1.0, 2.02, FW, FW, FX0, FX1), new THREE.MeshStandardMaterial({ color: 0xb4b9be, roughness: 0.5, metalness: 0.45 }));
+    const body = mesh(merge([wedge(phi, FRT - 0.01, FR1, FW, FW, FX0, FX1), wedge(phi, FR0, FRT, 0.16, FW, FXN, FX1)]), new THREE.MeshStandardMaterial({ color: 0xb4b9be, roughness: 0.5, metalness: 0.45 }));
     body.userData.xrayWeight = 0.45;
-    const det = [rbox(phi, 0.24, 0.74, 0.16, OPT.xFocus + 0.15, 0.63)];                    // pick-off arm into the field
-    for (const x of [FX0 + 0.025, FX1 - 0.025]) det.push(rbox(phi, 0.05, 1.0, FW + 0.04, x, 1.51));
+    const det = [rbox(phi, 0.2, 0.36, 0.12, OPT.xFocus + 0.15, 0.32)];                      // pick-off arm from the taper tip into the field
+    for (const x of [FX0 + 0.025, FX1 - 0.025]) det.push(rbox(phi, 0.05, FR1 - FRT + 0.02, FW + 0.04, x, (FRT + FR1) / 2));   // end frames
+    det.push(rbox(phi, FX1 - FX0 - 0.1, 0.04, 0.06, FXM, FR1 - 0.03, FW / 2 + 0.03), rbox(phi, FX1 - FX0 - 0.1, 0.04, 0.06, FXM, FR1 - 0.03, -FW / 2 - 0.03));   // guide rails
     const hh = [];
-    for (const x of [2.2, 3.05]) hh.push(...cablePath([rpt(phi, x - 0.12, 2.02, -0.14), rpt(phi, x - 0.12, 2.07, -0.14), rpt(phi, x + 0.12, 2.07, -0.14), rpt(phi, x + 0.12, 2.02, -0.14)], 0.014, 6));
+    for (const x of [FX0 + 0.25, FX1 - 0.25]) hh.push(...cablePath([rpt(phi, x - 0.12, FR1, -0.14), rpt(phi, x - 0.12, FR1 + 0.045, -0.14), rpt(phi, x + 0.12, FR1 + 0.045, -0.14), rpt(phi, x + 0.12, FR1, -0.14)], 0.014, 6));
     const p = P(`Fine Guidance Sensor ${f.n}`, {
       system: 'Attitude control', material: 'Optical bench with star selectors, Koesters-prism interferometers and photomultipliers; 0.5 × 1 × 1.6 m', mass: 220, massSource: 'NASA SM4 Media Guide (485 lb)', temp: 292,
-      explode: az(phi, 1.8), xrayWeight: 0.45, desc: `Radial bay on the ${f.side} side. Its pick-off mirror takes a 90° arc at the edge of the field; it finds a guide star there and holds it to a few milliarcseconds, 40 times a second. It also houses one of the optical control (wavefront) sensors. ${f.note} NASA gives the box as 0.5 × 1 × 1.6 m without saying which way each side runs, so its orientation here (long along the telescope axis) is uncertain.`,
-      callout: f.n === 1, anchor: az(phi, 2.0, 2.6),
+      explode: az(phi, 1.8), xrayWeight: 0.45, desc: `Radial bay on the ${f.side} side. Its pick-off mirror takes a 90° arc at the edge of the field; it finds a guide star there and holds it to a few milliarcseconds, 40 times a second. It also houses one of the optical control (wavefront) sensors. ${f.note} The 1.6 m side of the 0.5 × 1 × 1.6 m box runs radially, its tapered pick-off end inboard at the focal plane and its connectors outboard under the bay doors, as the KSC hoisting photos of FGS-2R2 show; 1 m along the telescope axis.`,
+      callout: f.n === 1, anchor: az(phi, 2.0, FXM),
     }, [body, mesh(merge(det), HM.box()), mesh(merge(hh), HM.handrail())]);
     if (f.n === 1) p.userData.part.tourLabel = true;
     const tail = 'Part of the FGS; mass included.';
-    // optics train: pick-off → aspheric collimator → two star selectors → corrector group →
-    // deviation prism → two Koesters prisms → four pinhole/lens assemblies and photomultipliers
-    const bench = [rbox(phi, 1.4, 0.9, 0.025, 2.6, 1.5, -0.2)];
-    const optics = [rcyl(phi, 0.09, 0.03, 'r', 2.8, 1.08, 0, 20), rcyl(phi, 0.04, 0.12, 'x', 2.25, 1.45, 0, 12)];
-    const servos = [rbox(phi, 0.16, 0.16, 0.16, 2.75, 1.3, 0.04), rbox(phi, 0.16, 0.16, 0.16, 2.45, 1.3, 0.04), rcyl(phi, 0.05, 0.08, 't', 2.75, 1.3, 0.16, 14), rcyl(phi, 0.05, 0.08, 't', 2.45, 1.3, 0.16, 14)];
-    const prisms = [rbox(phi, 0.06, 0.06, 0.06, 2.12, 1.53, 0), rbox(phi, 0.08, 0.08, 0.08, 2.03, 1.63, -0.08), rbox(phi, 0.08, 0.08, 0.08, 2.03, 1.63, 0.08)];
-    const pmts = [-0.15, -0.05, 0.05, 0.15].map((t) => rcyl(phi, 0.025, 0.16, 'r', 1.97, 1.8, t, 12));
+    // optics train, inboard to outboard: pick-off → aspheric collimator → two star selectors →
+    // corrector group → deviation prism → two Koesters prisms → four pinhole/lens assemblies and
+    // photomultipliers at the outboard end, on a bench running the radial length of the box
+    const bench = [rbox(phi, 0.9, 0.95, 0.025, FXM, (FRT + FR1) / 2, -0.2)];
+    const optics = [rcyl(phi, 0.09, 0.03, 'r', OPT.xFocus + 0.15, 1.08, 0, 20), rcyl(phi, 0.04, 0.12, 'x', 2.55, 1.45, 0, 12)];
+    const servos = [rbox(phi, 0.16, 0.16, 0.16, 2.95, 1.3, 0.04), rbox(phi, 0.16, 0.16, 0.16, 2.65, 1.3, 0.04), rcyl(phi, 0.05, 0.08, 't', 2.95, 1.3, 0.16, 14), rcyl(phi, 0.05, 0.08, 't', 2.65, 1.3, 0.16, 14)];
+    const prisms = [rbox(phi, 0.06, 0.06, 0.06, 2.95, 1.55, 0), rbox(phi, 0.08, 0.08, 0.08, 3.05, 1.65, -0.08), rbox(phi, 0.08, 0.08, 0.08, 3.05, 1.65, 0.08)];
+    const pmts = [-0.15, -0.05, 0.05, 0.15].map((t) => rcyl(phi, 0.025, 0.16, 'r', 3.08, 1.86, t, 12));
     sub(p, {
       name: `FGS ${f.n} star selectors & interferometers`, system: 'Attitude control', material: 'Optics train on a graphite-epoxy bench: aspheric collimator, two star-selector servos with encoders, corrector group, deviation prism, two Koesters prisms, four pinhole/lens assemblies and photomultipliers', temp: 292, count: 2,
       desc: 'Each star selector is an optical gimbal, one servo moving north–south and one east–west, that steers a 5″ detector field across the 60 arcmin² field in a spiral search for the guide star. The Koesters prisms then split its wavefront; comparing the light in the photomultipliers measures the star\'s position to milliarcseconds. Layout inside the enclosure schematic.', tail,
@@ -340,11 +349,11 @@ export function buildInstruments(P, root) {
       }, az(phi, 0.35), [['box', [rbox(phi, 0.1, 0.1, 0.12, 2.6, 1.15, 0.13), rcyl(phi, 0.03, 0.06, 'x', 2.68, 1.15, 0.13, 10)]]]);
     }
     const conn = [];
-    for (const x of [1.98, 2.08]) for (const t of [-0.18, -0.06, 0.06, 0.18]) conn.push(rcyl(phi, 0.026, 0.06, 'r', x, 2.04, t, 12));
+    for (const x of [2.42, 2.52]) for (const t of [-0.18, -0.06, 0.06, 0.18]) conn.push(rcyl(phi, 0.026, 0.06, 'r', x, FR1 + 0.015, t, 12));
     sub(p, {
       name: `FGS ${f.n} connectors & ground strap`, system: 'Electrical', material: 'Eight circular connectors and a ground strap at the outboard end', temp: 290, count: 8,
-      desc: 'Each guider plugs in through eight connectors at its outboard end, under the bay door, plus a ground strap: the last steps of the 2009 FGS change after the A latch was driven home. Positions approximate.', tail,
-    }, az(phi, 0.3), [['box', conn], ['copper', [beam(rpt(phi, 2.45, 1.97, 0.25), rpt(phi, 2.58, 1.97, 0.28), 0.04, 0.006)]]]);
+      desc: 'Each guider plugs in through eight connectors on its outboard face, under the bay doors, plus a ground strap: the last steps of the 2009 FGS change after the A latch was driven home. Positions approximate.', tail,
+    }, az(phi, 0.3), [['box', conn], ['copper', [beam(rpt(phi, 2.85, FR1 + 0.005, 0.22), rpt(phi, 2.98, FR1 + 0.005, 0.28), 0.04, 0.006)]]]);
     out.fgs.push(p);
   }
 
