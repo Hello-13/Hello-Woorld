@@ -17,7 +17,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { solveTurbofan, DEFAULT_CYCLE, GE90, OPERATING_POINTS, SCHEDULE } from '../src/physics/turbofan.js';
-import { STAGES, FAN, ROWS, CORE, coreAt, bypassAt, STATIONS, PLUG_TIP, FAN_NOZZLE_Y, NACELLE, TCF, AGB, AGB_PADS, agbTrain } from '../src/models/ge90/layout.js';
+import { STAGES, FAN, ROWS, CORE, coreAt, bypassAt, cowlAt, STATIONS, PLUG_TIP, FAN_NOZZLE_Y, NACELLE, TCF, AGB, AGB_PADS, agbTrain, STRUT, strutAt, monotone, CRADLE } from '../src/models/ge90/layout.js';
 import { bladeRings, fanBladeSpec, FAN_BLADE_TIP_R } from '../src/models/ge90/blade.js';
 import TOUR from '../src/learn/tours/turbofan.js';
 
@@ -265,4 +265,54 @@ test('every guided-tour focus names a part declared in the model', () => {
     for (const name of step.focus || []) assert.ok(literals.has(name) || templates.some((re) => re.test(name)), `step ${i + 1}: no part named "${name}"`);
   }
   assert.equal(TOUR[TOUR.length - 1].demo, 'flow', 'the tour ends on the station-plane flow demo');
+});
+
+test('strut stub: a shaped pylon that sits on the nacelle and encloses its attachment points', () => {
+  // the sampler never overshoots its keys (a kink in the side lines would show as a bulge)
+  for (const line of [STRUT.top, STRUT.bottom, STRUT.width]) {
+    const lo = Math.min(...line.map((k) => k[1])), hi = Math.max(...line.map((k) => k[1]));
+    for (let y = STRUT.nose; y >= STRUT.tail; y -= 0.01) {
+      const v = monotone(line, y);
+      assert.ok(v >= lo - 1e-9 && v <= hi + 1e-9, `${v} outside the keys at y ${y}`);
+    }
+  }
+  let depthMax = 0;
+  for (let y = STRUT.nose; y >= STRUT.tail; y -= 0.01) {
+    const { top, bottom, w } = strutAt(y);
+    assert.ok(top >= bottom - 1e-9, `top below bottom at y ${y}`);
+    assert.ok(w >= -1e-9, `negative width at y ${y}`);
+    depthMax = Math.max(depthMax, top - bottom);
+  }
+  // nose and tail come to a point (rounded leading edge, tapered aft fairing)
+  assert.ok(strutAt(STRUT.nose).w < 0.01 && strutAt(STRUT.tail).w < 0.01, 'pointed nose and tail');
+  assert.ok(strutAt(STRUT.nose).top - strutAt(STRUT.nose).bottom < 0.01, 'the nose lies on the cowl');
+  // over the fan cowl the underside is just inside the 166 in skin: on the hinge line, not floating
+  for (const y of [-0.6, -0.95, -1.3]) {
+    const b = strutAt(y).bottom;
+    assert.ok(b < NACELLE.maxR && b > NACELLE.maxR - 0.06, `underside at y ${y}: ${b}`);
+    assert.ok(strutAt(y).w > 0.2, 'wide enough to hold both fan-cowl hinge rows (±0.14 rad at r 2.05)');
+  }
+  // the precooler (r up to 2.34, ±0.15 wide at y −2.9) and the forward mount (y −1.75) are inside
+  assert.ok(strutAt(-2.9).top > 2.35 && strutAt(-2.9).w > 0.16, 'precooler enclosed');
+  assert.ok(strutAt(-1.75).top > strutAt(-1.75).bottom + 0.25, 'depth over the forward mount');
+  // the aft fairing steps down onto the core cowl and sits over the aft mount (r 0.95–1.05 at y −5.27)
+  assert.ok(strutAt(-3.95).bottom < 1.6 && strutAt(-4.55).bottom < 1.1, 'aft fairing steps down behind the fan nozzle');
+  assert.ok(strutAt(-5.27).bottom <= 1.0 && strutAt(-5.27).top > 1.6, 'aft mount enclosed');
+  for (let y = -4.6; y >= -5.1; y -= 0.05) assert.ok(strutAt(y).bottom > cowlAt(y) - 0.02, `aft fairing base below the core cowl at y ${y}`);
+  // plan and depth taper: the box is deepest and widest amidships, not a constant slab
+  const mid = strutAt(-3.0);
+  assert.ok(mid.w > strutAt(-0.6).w && mid.w > strutAt(-5.8).w, 'plan taper');
+  assert.ok(depthMax > 1.2 && mid.top - mid.bottom < 0.6, 'depth varies along the strut');
+});
+
+test('display cradle: the aft saddle follows the core cowl and clears it', () => {
+  const { y0, y1, gap, t, arc } = CRADLE.aftSaddle;
+  assert.ok(gap > 0 && t > gap && arc > 0.3);
+  for (let f = 0; f <= 1; f += 0.1) {
+    const y = y0 + (y1 - y0) * f;
+    assert.ok(cowlAt(y) + gap > cowlAt(y), 'saddle inner face above the cowl');
+  }
+  // the cowl tapers 2 cm across the saddle's span, which a constant-radius saddle cut into
+  assert.ok(Math.abs(cowlAt(y0) - cowlAt(y1)) > 0.01);
+  assert.ok(y0 < FAN_NOZZLE_Y && y1 > PLUG_TIP, 'saddle under the core cowl, behind the fan nozzle');
 });

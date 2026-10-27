@@ -203,8 +203,9 @@ export const STRUT = {
   width: [[-0.3, 0.0], [-0.45, 0.17], [-0.7, 0.24], [-1.0, 0.26], [-3.0, 0.3], [-5.0, 0.3], [-5.6, 0.24], [-6.0, 0.14], [-6.35, 0.0]],
 };
 
-/** Monotone (Fritsch–Carlson) cubic through [x, v] keys: smooth, and it never overshoots a key. */
+/** Monotone (Fritsch–Carlson) cubic through [x, v] keys (in either x order): smooth, and it never overshoots a key. */
 export function monotone(keys, x) {
+  if (keys[0][0] > keys[keys.length - 1][0]) keys = keys.slice().reverse();
   const n = keys.length;
   if (x <= keys[0][0]) return keys[0][1];
   if (x >= keys[n - 1][0]) return keys[n - 1][1];
