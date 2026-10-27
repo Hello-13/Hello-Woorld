@@ -48,7 +48,7 @@ const LEG = {
   deployDeg: 115,                 // deployed: 25° below horizontal, foot pads ≈ 9.15 m from the axis (≈ 18.3 m across), ≈ 1.9 m below the nozzle exits
   // foot pad (radius) and its centre [short of the tip, out from the hinge line]: folded into the
   // tip for ascent, swung to the end of the leg for landing
-  foot: { r: 0.26, stowed: [0.55, 0.105], landed: [0.25, 0.15] },
+  foot: { r: 0.2, stowed: [0.9, 0.0], landed: [0.25, 0.15] },
   pistonB: [R + 0.13, 3.4],       // piston's stage fitting [r, y] at the top of the engine section
   pistonL: [6.6, 0.1],            // piston's leg fitting: distance along the leg, offset outward (inside the leg's fairing)
   tube: [3.0, 3.0, 3.0],          // nested piston sections (outer, middle, inner)
@@ -140,15 +140,19 @@ function engineGeometry() {
  */
 function legGeometry(len) {
   const rings = [];
-  const N = 22;
   const M = 14;
-  for (let i = 0; i <= N; i++) {
-    const t = i / N;
+  // a straight taper (1.02 m wide, 0.36 m deep at the hinge → 0.44 × 0.2 m) over all but the last
+  // 0.3 m, then a blunt semicircular nose
+  const tR = 1 - 0.3 / len;
+  const ts = [];
+  for (let i = 0; i <= 16; i++) ts.push((tR * i) / 16);
+  for (let j = 1; j <= 6; j++) ts.push(tR + (1 - tR) * Math.sin((j / 6) * (Math.PI / 2)));
+  for (const t of ts) {
     const y = t * len;
-    // straight taper to 85 % of the length, then an elliptical rounding to the tip
-    const k = t < 0.85 ? 1 : Math.sqrt(Math.max(0, 1 - ((t - 0.85) / 0.15) ** 2));
-    const w = Math.max(0.03, (1.02 - 0.42 * Math.min(t, 0.85) / 0.85) * k);
-    const th = Math.max(0.012, (0.36 - 0.16 * Math.min(t, 0.85) / 0.85) * k);
+    const u = Math.min(t, tR) / tR;
+    const k = t <= tR ? 1 : Math.sqrt(Math.max(0, 1 - ((t - tR) / (1 - tR)) ** 2));
+    const w = Math.max(0.03, (1.02 - 0.58 * u) * k);
+    const th = Math.max(0.012, (0.36 - 0.16 * u) * k);
     const ring = [];
     for (let j = 0; j < M; j++) {
       const a = (j / M) * Math.PI * 2;

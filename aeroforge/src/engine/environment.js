@@ -44,10 +44,15 @@ export const LOOKS = {
     exposure: 1.0, floor: 'pad', turntable: false, fog: [0x8a7f8c, 0.0011],
     key: { color: 0xffb27a, intensity: 2.0 }, hemi: [0x8a9ac8, 0x3a3228, 0.35], rim: 0.0, floods: true,
   },
+  // In orbit the only lights are the Sun, the Earth below (albedo ≈ 0.3, so the nadir side of a
+  // spacecraft gets up to a quarter of direct sunlight at local noon, blue-grey over ocean and
+  // cloud) and the faint starlight, so the fill is a hemisphere light from below scaled by the
+  // Earth's phase (earthshine) over an Earth-shine IBL, and the key is held where sunlit MLI stays
+  // below the bloom threshold.
   orbit: {
-    label: 'Low Earth orbit', hdri: null, background: 'space', sun: [0.55, 0.72, 0.42], envIntensity: 0.25,
-    exposure: 0.95, floor: null, turntable: false, earth: { altitude: 520 },
-    key: { color: 0xfffaf0, intensity: 4.2 }, hemi: [0x000000, 0x4a6a9a, 0.35], rim: 0.0,
+    label: 'Low Earth orbit', hdri: null, background: 'space', sun: [0.55, 0.72, 0.42], envIntensity: 0.4,
+    exposure: 0.82, floor: null, turntable: false, earth: { altitude: 520 },
+    key: { color: 0xfffaf0, intensity: 3.3 }, hemi: [0x0c1018, 0xa9bdd4, 0.6], rim: 0.0, earthshine: true,
   },
 };
 
@@ -412,12 +417,12 @@ export class Environment {
 
   spaceEnv() {
     if (this._spaceEnv) return this._spaceEnv;
-    // earthshine from below, black sky above
+    // earthshine from below (blue-grey ocean and cloud, warming toward the limb), faint starlight above
     const s = new THREE.Scene();
     const m = new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), new THREE.ShaderMaterial({
       side: THREE.BackSide,
       vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
-      fragmentShader: 'varying vec3 vP; void main(){ float y = normalize(vP).y; gl_FragColor = vec4(vec3(0.16,0.26,0.42) * smoothstep(0.1,-0.8,y) * 1.6, 1.); }',
+      fragmentShader: 'varying vec3 vP; void main(){ float y = normalize(vP).y; float e = smoothstep(0.12,-0.75,y); vec3 earth = mix(vec3(0.46,0.42,0.36), vec3(0.34,0.42,0.56), smoothstep(-0.1,-0.9,y)); gl_FragColor = vec4(earth * e * 1.2 + vec3(0.018,0.02,0.026), 1.); }',
     }));
     s.add(m);
     this._spaceEnv = this.pmrem.fromScene(s, 0).texture;
@@ -519,6 +524,9 @@ export class Environment {
     this.lights.hemi.color.set(L.hemi[0]);
     this.lights.hemi.groundColor.set(L.hemi[1]);
     this.lights.hemi.intensity = L.hemi[2];
+    // earthshine: the Earth below is lit in proportion to its phase, full at local noon (Sun overhead),
+    // half at the terminator; a floor keeps the night side's airglow and starlight
+    if (L.earthshine) this.lights.hemi.intensity = L.hemi[2] * (0.35 + 0.65 * (1 + dir.y) / 2);
     this.lights.rim.intensity = L.rim;
     this.lights.rim2.intensity = L.rim2 || 0;
     for (const f of this.floods) f.intensity = L.floods ? 140 : 0;

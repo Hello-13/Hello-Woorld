@@ -63,7 +63,7 @@ export function buildOTA(P) {
   }, mesh(merge(core), HM.ule()));
   const rear = axial([[OPT.rHole, xBack], [OPT.rPM, xBack], [OPT.rPM, xBack + fp], [OPT.rHole, xBack + fp], [OPT.rHole, xBack]], 96);
   P('Primary mirror rear faceplate', {
-    system: 'Optics', material: 'ULE glass plate, 25 mm', temp: 294, explode: [-1.2, 0, 0],
+    xrayWeight: 0.4, system: 'Optics', material: 'ULE glass plate, 25 mm', temp: 294, explode: [-1.2, 0, 0],
     desc: 'Closes the back of the sandwich. The 24 figure-control actuators and the three mounts push against it. Mass included in the primary mirror.',
   }, mesh(rear, HM.ule()));
 
@@ -178,7 +178,7 @@ export function buildOTA(P) {
   const mb = [tube(1.3, 4.12, 8.92, { seg: 72 })];
   for (let k = 0; k < 13; k++) mb.push(annulus(1.235, 1.3, 4.3 + k * 0.36, 72, 1));
   P('Main baffle', {
-    system: 'Optics', skin: true, material: 'Aluminium cylinder with internal stray-light fins, flat black', mass: 70, temp: 290, explode: [0.6, 0, 0],
+    xrayWeight: 0.35, system: 'Optics', skin: true, material: 'Aluminium cylinder with internal stray-light fins, flat black', mass: 70, temp: 290, explode: [0.6, 0, 0],
     desc: 'A 4.8 m aluminium cylinder, 2.7 m across, standing on the front face of the main ring inside the metering truss. Its sharp-edged fins trap light that enters the tube at an angle so it cannot scatter onto the mirror and fog the images.',
   }, mesh(merge(mb), HM.black()));
   // the cone stops where it would start to clip the innermost rays bound for the secondary
@@ -196,7 +196,7 @@ export function buildOTA(P) {
     desc: 'Five brackets on the reaction plate\'s central ring hold the root of the central baffle, so the cone rises through the hole in the primary without touching the glass. Bracket shape estimated.',
   }, mesh(merge(cbb), HM.al()));
   P('Central baffle', {
-    system: 'Optics', material: 'Aluminium cone, flat black with vanes', mass: 18, temp: 291, explode: [0.9, 0, 0],
+    xrayWeight: 0.4, system: 'Optics', material: 'Aluminium cone, flat black with vanes', mass: 18, temp: 291, explode: [0.9, 0, 0],
     desc: 'A cone about 3 m long, mounted on the reaction plate and rising through the 60 cm hole in the primary. With the secondary baffle it blocks every straight path from the sky to the focal plane, so only light that has bounced off both mirrors reaches the instruments.',
   }, mesh(merge(cb), HM.black()));
 
@@ -257,7 +257,7 @@ export function buildOTA(P) {
   const sb = [tube(OPT.rObsc, 8.3, OPT.xSM + 0.06, { seg: 48 }), annulus(0.22, OPT.rObsc, OPT.xSM + 0.06, 48, 1)];
   for (let k = 0; k < 4; k++) sb.push(annulus(OPT.rObsc - 0.05, OPT.rObsc, 8.42 + k * 0.17, 48, -1));
   P('Secondary baffle', {
-    system: 'Optics', material: 'Flat-black aluminium shroud', mass: 7, temp: 290, explode: [1.3, 0.5, 0],
+    xrayWeight: 0.4, system: 'Optics', material: 'Flat-black aluminium shroud', mass: 7, temp: 290, explode: [1.3, 0.5, 0],
     desc: 'A 0.79 m shroud around the secondary. Its shadow sets Hubble\'s central obscuration: 33 % of the aperture diameter, about 11 % of the area.',
   }, mesh(merge(sb), HM.black()));
 

@@ -100,7 +100,7 @@ export function buildSSM(P) {
   const lsLiner = mesh(tube(RAD.inner, ST.fwdShell, ST.front - 0.02, { seg: 96 }), HM.black());
   const lsRings = mesh(merge([flange(RAD.inner, RAD.shell + 0.04, ST.front - 0.1, ST.front), flange(RAD.shell - 0.02, RAD.shell + 0.025, ST.fwdShell - 0.04, ST.fwdShell + 0.04)]), HM.al());
   out.lightShield = P('Light shield', {
-    system: 'Skin & fairings', skin: true, material: 'Machined magnesium monocoque, stiffened corrugated barrel, under MLI (15 layers aluminised Kapton, aluminised-Teflon outer layer); flat-black interior', mass: 380, temp: 245, explode: [2.6, 2.4, 0],
+    xraySkinWeight: 0.5, system: 'Skin & fairings', skin: true, material: 'Machined magnesium monocoque, stiffened corrugated barrel, under MLI (15 layers aluminised Kapton, aluminised-Teflon outer layer); flat-black interior', mass: 380, temp: 245, explode: [2.6, 2.4, 0],
     desc: '4 m long with a 3 m bore, it shades the optics from sunlight, moonlight and earthshine. Its magnesium skin carries the aperture door, the forward low-gain antenna, two magnetometers, two coarse sun sensors, the high-gain antenna launch latches and a pair of scuff plates.',
   }, [...ls, lsLiner, lsRings]);
   out.lightShield.userData.part.thermalRole = 'blanket';
@@ -108,7 +108,7 @@ export function buildSSM(P) {
   const lb = [];
   for (let k = 0; k < 10; k++) lb.push(annulus(1.33, RAD.inner, 9.35 + k * 0.37, 96, 1));
   P('Light shield internal baffles', {
-    system: 'Optics', skin: true, material: 'Flat-black aluminium rings on the light-shield liner', mass: 40, count: 10, temp: 250, explode: [2.0, 0, 0],
+    xrayWeight: 0.3, system: 'Optics', skin: true, material: 'Flat-black aluminium rings on the light-shield liner', mass: 40, count: 10, temp: 250, explode: [2.0, 0, 0],
     desc: 'Ten sharp-edged rings inside the light shield catch light glancing in from bright sources off the axis, the first stage of Hubble\'s stray-light defence. Each is a knife edge 17 cm deep, so light that hits one is trapped between the rings.',
   }, mesh(merge(lb), HM.black()));
 
@@ -199,7 +199,7 @@ export function buildSSM(P) {
   const fsLiner = mesh(tube(RAD.inner, ST.equip, ST.fwdShell, { seg: 96 }), HM.black());
 
   out.fwdShell = P('Forward shell', {
-    system: 'Skin & fairings', skin: true, material: 'Machined aluminium plate, external reinforcing rings, internal stiffened panels; MLI outside', mass: 440, temp: 262, explode: [0, 3.9, 0],
+    xraySkinWeight: 0.5, system: 'Skin & fairings', skin: true, material: 'Machined aluminium plate, external reinforcing rings, internal stiffened panels; MLI outside', mass: 440, temp: 262, explode: [0, 3.9, 0],
     desc: 'The 4 m central barrel, 3 m across, around the main baffle and secondary mirror. Its reinforcing rings are on the outside so the telescope inside has clearance. The solar-array drives, antenna masts, magnetic torquers, grapple fixtures and the OTA equipment bays bolt to it.',
   }, [...fs, fsLiner]);
   out.fwdShell.userData.part.thermalRole = 'blanket';
@@ -552,7 +552,7 @@ export function buildSSM(P) {
   const shroud = sunShadowShell(RAD.big, ST.bulkhead, ST.aftShroud, [HM.mli(2), HM.mli(3)], 300, 215, { seg: 64, hs: 3 });
   const shroudRings = mesh(merge([flange(RAD.big - 0.02, RAD.big + 0.035, ST.bulkhead, ST.bulkhead + 0.09, 128), flange(RAD.big - 0.02, RAD.big + 0.035, ST.aftShroud - 0.09, ST.aftShroud, 128)]), HM.al());
   out.aftShroud = P('Aft shroud', {
-    system: 'Skin & fairings', skin: true, material: 'Stiffened aluminium skin and internal panels; silvered FOSR tape outside', mass: 730, temp: 270, explode: [-1.6, -4.0, 0],
+    xraySkinWeight: 0.5, system: 'Skin & fairings', skin: true, material: 'Stiffened aluminium skin and internal panels; silvered FOSR tape outside', mass: 730, temp: 270, explode: [-1.6, -4.0, 0],
     desc: 'The 3.5 m housing, 4.3 m across, around the focal plane: four axial instruments, the radial camera, three Fine Guidance Sensors, the gyros and the star trackers. Lights inside illuminate the bays for spacewalkers, and every vent is light-tight.',
   }, [...shroud, shroudRings]);
   out.aftShroud.userData.part.thermalRole = 'blanket';
@@ -567,17 +567,25 @@ export function buildSSM(P) {
   // access doors: a pair on each ±V2 side for the axial instruments, a pair on −V3 for the gyros and
   // star trackers either side of the WFC3 radiator, and three radial doors for the guiders
   const rD = RAD.big + 0.018;
+  const FGS_X0 = 2.2, FGS_X1 = 3.3;                   // the guider doors, 1.1 m astride the focal plane (x 2.65)
   const doorPair = (name, leaves, x0, x1, info) => {
-    const doors = [], frames = [];
+    const doors = [], frames = [], rails = [];
     for (const [a, b, hingeAt] of leaves) {
       doors.push(shellPatch(rD, x0, x1, deg(a), deg(b), { nphi: 10 }));
+      // an EVA handrail along each leaf (two across the wide ±V2 leaves), on stand-offs
+      const span = x1 - x0 - 0.4, mids = b - a > 30 ? [a + (b - a) * 0.3, a + (b - a) * 0.7] : [(a + b) / 2];
+      for (const m of mids) {
+        const hx0 = x0 + 0.2, hx1 = x0 + 0.2 + span, rr = rD + 0.075;
+        rails.push(...cablePath([az(deg(m), rD, hx0), az(deg(m), rr, hx0), az(deg(m), rr, hx1), az(deg(m), rD, hx1)], 0.014, 6));
+        if (span > 0.9) rails.push(rod(az(deg(m), rD, (hx0 + hx1) / 2), az(deg(m), rr, (hx0 + hx1) / 2), 0.012, 4));
+      }
       frames.push(...patchFrame(rD + 0.008, x0, x1, deg(a), deg(b), 0.014, rod));
       // hinge knuckles along the outer edge, axis parallel to the telescope; latch at the meeting edge
       for (let x = x0 + 0.25; x < x1 - 0.1; x += (x1 - x0 - 0.4) / 2) frames.push(new THREE.CylinderGeometry(0.03, 0.03, 0.2, 10).rotateZ(Math.PI / 2).translate(x, rD + 0.02, 0).rotateX(deg(hingeAt)));
       const latchAt = hingeAt === a ? b - 2.5 : a + 2.5;
       frames.push(new THREE.BoxGeometry(0.18, 0.05, 0.06).translate((x0 + x1) / 2, rD + 0.03, 0).rotateX(deg(latchAt)));
     }
-    return P(name, { system: 'Skin & fairings', skin: true, temp: 268, ...info }, [mesh(merge(doors), HM.bayDoor()), mesh(merge(frames), HM.al())]);
+    return P(name, { system: 'Skin & fairings', skin: true, temp: 268, ...info }, [mesh(merge(doors), HM.shroudDoor()), mesh(merge(frames), HM.al()), mesh(merge(rails), HM.handrail())]);
   };
   const AX0 = 0.3, AX1 = 1.75;
   doorPair('+V2 aft shroud doors (STIS, NICMOS)', [[226, 269, 226], [271, 314, 314]], AX0, AX1, {
@@ -592,9 +600,9 @@ export function buildSSM(P) {
     material: 'Hinged honeycomb doors with light-tight seals around the star-tracker openings', mass: 30, count: 2, explode: [-0.6, -4.6, 0],
     desc: 'Behind them, at the forward end of the aft shroud on the shadow side, sit the three rate sensor units and the fixed-head star trackers. In 2009 spacewalkers retracted the star-tracker door seals, opened these doors and swapped all three gyro units. Leaf sizes estimated.',
   });
-  doorPair('Radial bay doors (FGS)', [0, 90, 270].flatMap((c) => [[c - 14, c - 0.6, c - 14], [c + 0.6, c + 14, c + 14]]), 1.85, 3.38, {
+  doorPair('Radial bay doors (FGS)', [0, 90, 270].flatMap((c) => [[c - 14, c - 0.6, c - 14], [c + 0.6, c + 14, c + 14]]), FGS_X0, FGS_X1, {
     material: 'Three pairs of hinged honeycomb door leaves, hinged at their outer edges and latched where they meet', mass: 45, count: 6, explode: [-1.6, -4.0, 0],
-    desc: 'A pair of doors over each Fine Guidance Sensor bay near the joint with the equipment section (FGS-2 on +V3, FGS-1 and FGS-3 on the ±V2 sides). In 2009 the crew opened the +V3 FGS-2 doors and carried eight Aft Shroud Latch Repair kits in case a door latch ran stiff. The radial camera has no door: its own radiator forms that part of the skin.',
+    desc: 'A pair of doors, 1.1 m along the telescope, over each Fine Guidance Sensor bay at the forward end of the aft shroud, astride the focal plane (FGS-2 on +V3, FGS-1 and FGS-3 on the ±V2 sides). In 2009 the crew opened the +V3 FGS-2 doors and carried eight Aft Shroud Latch Repair kits in case a door latch ran stiff. The radial camera has no door: its own radiator forms that part of the skin.',
   });
 
   // retractable light seals around the star-tracker openings in the −V3 door, with their seal bolts
@@ -621,10 +629,10 @@ export function buildSSM(P) {
 
   // radiation shields inside the doors and blankets lining the shroud and bulkhead
   const shield = [];
-  for (const [a, b, x0, x1] of [[226, 314, AX0, AX1], [46, 134, AX0, AX1], [147, 218, 2.35, 3.42], [-14, 14, 1.85, 3.38], [76, 104, 1.85, 3.38], [256, 284, 1.85, 3.38]]) shield.push(shellPatch(RAD.big - 0.025, x0 + 0.04, x1 - 0.04, deg(a + 1), deg(b - 1), { nphi: 8, nx: 1 }));
+  for (const [a, b, x0, x1] of [[226, 314, AX0, AX1], [46, 134, AX0, AX1], [147, 218, 2.35, 3.42], [-14, 14, FGS_X0, FGS_X1], [76, 104, FGS_X0, FGS_X1], [256, 284, FGS_X0, FGS_X1]]) shield.push(shellPatch(RAD.big - 0.025, x0 + 0.04, x1 - 0.04, deg(a + 1), deg(b - 1), { nphi: 8, nx: 1 }));
   shield.push(annulus(0.95, RAD.big - 0.04, ST.bulkhead + 0.004, 72, 1));
   P('Aft shroud radiation shields & interior MLI', {
-    system: 'Thermal control', skin: true, material: 'Radiation shields behind the door leaves; MLI lining the bulkhead', mass: 25, temp: 285, explode: [-1.0, 0, 0],
+    xrayWeight: 0.3, system: 'Thermal control', skin: true, material: 'Radiation shields behind the door leaves; MLI lining the bulkhead', mass: 25, temp: 285, explode: [-1.0, 0, 0],
     desc: 'Shields inside the doors and blankets lining the shroud keep the instruments\' temperature steady while the outside swings between sunlight and shadow every 95 minutes. Shown ghosted.',
   }, mesh(merge(shield), HM.mli(5)));
 
@@ -633,7 +641,7 @@ export function buildSSM(P) {
   for (const p of [60, 180, 300]) bh.push(atPhi(deg(p), new THREE.BoxGeometry(0.1, 1.55, 0.12).translate(-0.05, 0.98, 0)));   // pin support beams
   bh.push(tube(0.42, -0.05, 0, { seg: 40, open: false }));
   out.bulkhead = P('Aft bulkhead', {
-    system: 'Structure', skin: true, material: '2 in (5 cm) honeycomb aluminium panels, three radial aluminium beams; silvered FOSR tape', mass: 250, temp: 262, explode: [-3.4, 0, 0],
+    xraySkinWeight: 0.4, system: 'Structure', skin: true, material: '2 in (5 cm) honeycomb aluminium panels, three radial aluminium beams; silvered FOSR tape', mass: 250, temp: 262, explode: [-3.4, 0, 0],
     desc: 'Closes the back of the telescope. Its three radial beams carry the berthing pins; it also holds the aft low-gain antenna, the umbilical connectors and, since 2009, the soft-capture mechanism.',
   }, mesh(merge(bh), new THREE.MeshStandardMaterial({ color: 0xaab0b6, roughness: 0.48, metalness: 0.75 })));
 
@@ -761,8 +769,8 @@ export function buildSSM(P) {
   }
   // along the outer edges of each pair of FGS doors
   for (const c of [0, 90, 270]) for (const s of [-1, 1]) {
-    rail(rails.aft, az(deg(c + s * 16), rR, 1.95), az(deg(c + s * 16), rR, 3.3));
-    for (const x of [2.0, 2.62, 3.25]) standoff(rails.aft, deg(c + s * 16), RAD.big + 0.02, x);
+    rail(rails.aft, az(deg(c + s * 16), rR, FGS_X0 + 0.05), az(deg(c + s * 16), rR, FGS_X1));
+    for (const x of [FGS_X0 + 0.1, (FGS_X0 + FGS_X1) / 2, FGS_X1 - 0.05]) standoff(rails.aft, deg(c + s * 16), RAD.big + 0.02, x);
   }
   // inside the shroud: a rail round its forward end on stand-offs from the forward flange, from the
   // COS bay over the −V3 side to the NICMOS cooler; the Cross Aft Shroud Harness is clamped to it

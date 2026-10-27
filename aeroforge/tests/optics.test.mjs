@@ -135,3 +135,22 @@ test('guided tour: every focus name is a Hubble part, valid modes and demos', ()
   // the 2002 aft-shroud cooling system was never flown (not in the SM3B or SM4 manifests)
   assert.ok(!literals.has('Aft shroud cooling system'), 'no ASCS part');
 });
+
+// ---- the Fine Guidance Sensor enclosures: the 1.6 m side runs radially, 1 m along V1, astride the focal plane
+test('FGS enclosures: 1.6 m radial, 1 m along the axis, 0.5 m wide, pick-off taper inboard, doors to suit', () => {
+  const src = readFileSync(new URL('../src/models/hst/instruments.js', import.meta.url), 'utf8');
+  const num = (name) => { const m = src.match(new RegExp(`\\b${name} = (-?[\\d.]+)`)); assert.ok(m, `${name} is defined`); return Number(m[1]); };
+  const FX0 = num('FX0'), FX1 = num('FX1'), FW = num('FW'), FR0 = num('FR0'), FRT = num('FRT'), FR1 = num('FR1');
+  assert.ok(Math.abs((FX1 - FX0) - 1.0) < 0.05, `1 m along V1, got ${(FX1 - FX0).toFixed(2)}`);
+  assert.ok(Math.abs((FR1 - FR0) - 1.6) < 0.1, `1.6 m radial, got ${(FR1 - FR0).toFixed(2)}`);
+  assert.equal(FW, 0.5, '0.5 m wide');
+  assert.ok(FX0 < 2.65 && FX1 > 2.65, 'astride the focal plane at x 2.65');
+  assert.ok(FR0 < FRT && FRT < FR1 && FR0 < 0.6, 'the taper is the inboard (pick-off) end');
+  assert.ok(FR1 < 2.1, 'inside the aft shroud (r 2.1)');
+  assert.ok(!/orientation here \(long along the telescope axis\) is uncertain/.test(src), 'the old orientation guess is gone from the desc');
+  const ssm = readFileSync(new URL('../src/models/hst/ssm.js', import.meta.url), 'utf8');
+  const d = ssm.match(/const FGS_X0 = ([\d.]+), FGS_X1 = ([\d.]+)/);
+  assert.ok(d, 'the FGS door stations are defined');
+  const len = Number(d[2]) - Number(d[1]);
+  assert.ok(Math.abs(len - 1.1) < 0.05 && Number(d[1]) <= FX0 && Number(d[2]) >= FX1, `the FGS doors (${len.toFixed(2)} m) cover the enclosure`);
+});

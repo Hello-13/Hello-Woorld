@@ -33,11 +33,12 @@ function canvasTex(w, h, draw, { repeat = [1, 1], srgb = true } = {}) {
  * spacing (panels roughly 1–1.5 m across), tie-down stitching along the seams and weathered patches.
  * The tile repeats only about twice around each half-shell, so no brickwork grid appears.
  */
-function mliAlbedo(seed, { base = [196, 200, 205], seamsU = [0.21, 0.58, 0.86], seamsV = [0.37], patches = 5 } = {}) {
+function mliAlbedo(seed, { base = [196, 200, 205], seamsU = [0.21, 0.58, 0.86], seamsV = [0.37], patches = 5, scale = 1 } = {}) {
   return (ctx, w, h) => {
     const r = rng(seed);
     ctx.fillStyle = `rgb(${base.join(',')})`;
     ctx.fillRect(0, 0, w, h);
+    ctx.lineCap = 'round';
     // broad, soft brightness variation between blanket panels
     const cols = [0, ...seamsU, 1], rows = [0, ...seamsV, 1];
     for (let i = 0; i < cols.length - 1; i++) for (let j = 0; j < rows.length - 1; j++) {
@@ -45,13 +46,31 @@ function mliAlbedo(seed, { base = [196, 200, 205], seamsU = [0.21, 0.58, 0.86], 
       ctx.fillStyle = k > 0 ? `rgba(255,255,255,${k / 120})` : `rgba(40,44,50,${-k / 120})`;
       ctx.fillRect(cols[i] * w, rows[j] * h, (cols[i + 1] - cols[i]) * w, (rows[j + 1] - rows[j]) * h);
     }
-    for (let i = 0; i < 3200; i++) {
-      const x = r() * w, y = r() * h, l = 6 + r() * 60, a = r() * Math.PI;
-      const v = r();
-      ctx.strokeStyle = v > 0.55 ? `rgba(250,252,255,${0.1 + r() * 0.28})` : `rgba(70,76,84,${0.07 + r() * 0.2})`;
-      ctx.lineWidth = 0.8 + r() * 2.4;
-      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); ctx.stroke();
+    // crinkle facets: soft blotches where the foil bulges, and short, slightly curved creases between
+    // them (the aluminised Teflon shows soft crinkles and tape seams, never long straight scratches)
+    const n = Math.round(420 / (scale * scale));
+    for (let i = 0; i < n; i++) {
+      const x = r() * w, y = r() * h, rr = (8 + r() * 30) * scale;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rr);
+      g.addColorStop(0, r() > 0.5 ? 'rgba(255,255,255,0.13)' : 'rgba(60,66,74,0.13)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.fill();
     }
+    const m = Math.round(2600 / scale);
+    for (let i = 0; i < m; i++) {
+      const x = r() * w, y = r() * h, l = (3 + r() * 12) * scale, a = r() * Math.PI, b = (r() - 0.5) * 1.4;
+      const v = r();
+      ctx.strokeStyle = v > 0.55 ? `rgba(250,252,255,${0.08 + r() * 0.2})` : `rgba(70,76,84,${0.06 + r() * 0.16})`;
+      ctx.lineWidth = (1.2 + r() * 2.8) * scale;
+      ctx.beginPath(); ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + Math.cos(a + b) * l * 0.5, y + Math.sin(a + b) * l * 0.5, x + Math.cos(a) * l, y + Math.sin(a) * l);
+      ctx.stroke();
+    }
+    // the tape over each seam: a slightly lighter, smoother strip
+    ctx.fillStyle = 'rgba(235,238,242,0.22)';
+    for (const u of seamsU) ctx.fillRect(u * w - 7 * scale, 0, 14 * scale, h);
+    for (const v of seamsV) ctx.fillRect(0, v * h - 7 * scale, w, 14 * scale);
     // blanket seams (slightly wavy) with tie-down buttons along them
     ctx.strokeStyle = 'rgba(60,64,70,0.55)';
     ctx.lineWidth = 3;
@@ -75,6 +94,17 @@ function mliAlbedo(seed, { base = [196, 200, 205], seamsU = [0.21, 0.58, 0.86], 
       ctx.fillRect(x, y, pw, ph);
     }
   };
+}
+
+/** Fine horizontal brushing streaks over a metal face: faint lighter and darker hairlines. */
+function brushed(ctx, w, h, seed, n) {
+  const r = rng(seed);
+  ctx.lineWidth = 1;
+  for (let i = 0; i < n; i++) {
+    const y = r() * h, x = r() * w, l = 20 + r() * 160;
+    ctx.strokeStyle = r() > 0.5 ? `rgba(255,255,255,${0.04 + r() * 0.1})` : `rgba(40,44,48,${0.04 + r() * 0.1})`;
+    ctx.beginPath(); ctx.moveTo(x, y + 0.5); ctx.lineTo(x + l, y + 0.5); ctx.stroke();
+  }
 }
 
 /** A material that shares `base`'s textures but shifts its albedo map, so neighbouring shells differ. */
@@ -105,31 +135,41 @@ export const HM = {
     const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(10, 3); roughnessMap.needsUpdate = true;
     return new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.25, 0.25), roughness: 0.62, metalness: 0.55, side: THREE.DoubleSide });
   })),
+  /** Aft shroud and guider doors: the same silvered Teflon MLI as the shroud, plain, over one tile per metre. */
+  shroudDoor: () => once('shroudDoor', () => {
+    const n = mliSurface({ seed: 41 });
+    const map = canvasTex(1024, 1024, mliAlbedo(13, { base: [192, 196, 201], seamsU: [0.5], seamsV: [], patches: 0, scale: 5 }));
+    const normalMap = n.normalMap.clone(); normalMap.repeat.set(1.7, 1.7); normalMap.needsUpdate = true;
+    const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(0.7, 0.7); roughnessMap.needsUpdate = true;
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.15, 0.15), roughness: 0.6, metalness: 0.55 });
+  }),
+  /** Dark radome of the conical log-spiral low-gain antennas. */
+  radome: () => once('radome', () => new THREE.MeshStandardMaterial({ color: 0x4e5257, roughness: 0.62, metalness: 0.25 })),
   /** New Outer Blanket Layer: stainless-framed white covers fitted over bay doors (2002, 2009). */
   nobl: () => once('nobl', () => {
     const map = canvasTex(256, 256, (ctx, w, h) => {
-      ctx.fillStyle = '#e6e8ea'; ctx.fillRect(0, 0, w, h);
-      const r = rng(17);
-      for (let i = 0; i < 160; i++) { ctx.fillStyle = `rgba(${r() > 0.5 ? '255,255,255' : '160,166,172'},0.12)`; ctx.fillRect(r() * w, r() * h, 4 + r() * 22, 2 + r() * 8); }
-      ctx.strokeStyle = 'rgba(120,126,132,0.7)'; ctx.lineWidth = 6; ctx.strokeRect(3, 3, w - 6, h - 6);
-      ctx.fillStyle = 'rgba(90,96,102,0.8)';
+      ctx.fillStyle = '#9ea3a7'; ctx.fillRect(0, 0, w, h);
+      brushed(ctx, w, h, 19, 900);
+      ctx.strokeStyle = 'rgba(70,74,80,0.7)'; ctx.lineWidth = 6; ctx.strokeRect(3, 3, w - 6, h - 6);
+      ctx.fillStyle = 'rgba(50,54,58,0.8)';
       for (let k = 0; k < 8; k++) for (const [x, y] of [[k * w / 8 + 16, 8], [k * w / 8 + 16, h - 8], [8, k * h / 8 + 16], [w - 8, k * h / 8 + 16]]) { ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill(); }
     });
-    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, roughness: 0.48, metalness: 0.3 });
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, roughness: 0.42, metalness: 0.75 });
   }),
   /** Equipment-section bay doors: radiator panels under silvered Teflon tape. */
   bayDoor: () => once('bayDoor', () => {
     const map = canvasTex(256, 256, (ctx, w, h) => {
-      ctx.fillStyle = '#c9cdd1'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#a2a6aa'; ctx.fillRect(0, 0, w, h);
       const r = rng(23);
-      for (let j = 0; j < 12; j++) {            // tape strips
-        const y = (j / 12) * h;
-        ctx.fillStyle = `rgba(${200 + Math.floor(r() * 40)},${204 + Math.floor(r() * 40)},${210 + Math.floor(r() * 40)},0.65)`;
+      for (let j = 0; j < 12; j++) {            // tape strips, each a slightly different grey
+        const y = (j / 12) * h, k = Math.floor(r() * 22);
+        ctx.fillStyle = `rgba(${150 + k},${154 + k},${160 + k},0.7)`;
         ctx.fillRect(0, y + 1, w, h / 12 - 2);
       }
-      ctx.strokeStyle = 'rgba(70,74,80,0.8)'; ctx.lineWidth = 5; ctx.strokeRect(2, 2, w - 4, h - 4);
+      brushed(ctx, w, h, 29, 700);
+      ctx.strokeStyle = 'rgba(60,64,70,0.8)'; ctx.lineWidth = 5; ctx.strokeRect(2, 2, w - 4, h - 4);
     });
-    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, roughness: 0.4, metalness: 0.62 });
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, roughness: 0.44, metalness: 0.7 });
   }),
   /** White thermal-control paint on instrument radiators. */
   radiator: () => once('radiator', () => new THREE.MeshStandardMaterial({ color: 0xeef0f1, roughness: 0.72, metalness: 0.0 })),

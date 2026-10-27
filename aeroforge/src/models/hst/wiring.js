@@ -102,8 +102,9 @@ export function buildWiring(P, { oes }) {
   run('ota', ota, [A(37.5, 1.47, 4.25), A(37.5, 1.41, 4.14), A(45, 1.41, 6.56), A(30, 1.41, 9.0), ...arcPts(1.41, 9.02, 30, 2, 7), A(2, 1.36, 9.11), A(2, 0.42, 9.11), A(2, 0.22, 9.13), A(2, 0.2, 9.2)], 0.012);
   run('ota', ota, [A(37.5, 1.47, 3.72), A(30, 1.52, 3.48), A(30, 1.9, 3.47)], 0.014);
   run('ota', ota, arcPts(1.9, 3.47, -90, 90, 8), 0.013);
-  // down the shroud wall to each guider, between the door's radiation shield and the skin, past the x 3.4 ring
-  for (const c of [0, 90, 270]) run('ota', ota, [A(c + 5, 1.9, 3.47), A(c + 5, 2.088, 3.44), A(c + 5, 2.088, 2.12), A(c + 5, 2.06, 2.1)], 0.008);
+  // down the shroud wall to each guider's outboard connector face (x 2.4–2.55), between the door's
+  // radiation shield and the skin, past the x 3.4 ring
+  for (const c of [0, 90, 270]) run('ota', ota, [A(c + 5, 1.9, 3.47), A(c + 5, 2.088, 3.44), A(c + 5, 2.088, 2.5), A(c + 5, 2.06, 2.47)], 0.008);
   P('OTA harness', {
     system: 'Electrical', material: 'Wire bundles from the OTA equipment section to the mirror actuators, heaters, secondary mirror and guiders', mass: 20, temp: 290, explode: [0, 0, 0], xrayWeight: 0.4,
     desc: 'The telescope\'s own wiring. The actuator control electronics pick which of the 24 primary and 6 secondary actuators to move; the three fine guidance electronics boxes power and command their guiders and pass guide-star errors to the pointing system; the EP/TCE\'s thermostats keep the mirrors near 21 °C. Routing simplified.',

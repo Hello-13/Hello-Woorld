@@ -174,21 +174,25 @@ const hash2 = (x, z) => { const v = Math.sin(x * 12.9898 + z * 78.233) * 43758.5
  * Weathered concrete: soot fanning out of the trench (darkest at its two exits, where the exhaust
  * comes out), rain streaks running down the slopes (along z on the top) and faded patches.
  */
+// (smooth functions of position, not per-cell noise: the ramp ribbons have only two columns of
+// vertices, and a per-vertex random value would zigzag across their long triangles)
+const wave = (a, b) => 0.5 + 0.5 * Math.sin(a) * Math.cos(b);
 function concreteGrime(x, y, z) {
   const dTrench = Math.max(0, Math.abs(x) - W);
-  const exit = Math.max(0, (Math.abs(z) - (TZ - 10)) / 14);                   // 0 inside, ≈ 1 past the ends
-  const soot = (0.5 * Math.exp(-dTrench / 4) + 0.35 * exit * Math.exp(-dTrench / 9)) * (0.75 + 0.25 * hash2(Math.floor(x / 3), Math.floor(z / 3)));
-  const patch = 0.9 + 0.1 * hash2(Math.floor(x / 6), Math.floor(z / 6));
-  const streak = 1 - 0.08 * hash2(Math.floor(x / 1.5), 0);
+  // the exhaust fans out of the two trench exits, over the pad's end and a little way down the ramp
+  const exit = Math.min(1, Math.max(0, (Math.abs(z) - (TZ - 10)) / 14)) * Math.exp(-Math.max(0, Math.abs(z) - (TZ + RUN + 5)) / 12);
+  const soot = (0.6 * Math.exp(-dTrench / 5) + 0.3 * exit * Math.exp(-dTrench / 9)) * (0.8 + 0.2 * wave(x * 1.7 + z * 0.4, z * 1.3));
+  const patch = 0.9 + 0.1 * wave(x * 0.37 + z * 0.23, z * 0.41 - x * 0.11);
+  const streak = 1 - 0.06 * wave(x * 2.1, x * 0.7 + 1.0);
   const k = patch * streak;
   return [k * (1 - soot * 0.85), k * (1 - soot * 0.87), k * (1 - soot * 0.9)];
 }
-/** The mound's grass: worn to sand beside the trench exits, browner and patchier toward the toe. */
+/** The mound's grass: worn to sand in a fan below each trench exit, browner and patchier toward the toe. */
 function grassWear(x, y, z) {
-  const exit = Math.max(0, (Math.abs(z) - TZ) / 8) * Math.exp(-Math.max(0, Math.abs(x) - W - 4) / 10);
-  const sand = Math.min(1, exit * 1.3);
-  const dry = 0.25 * (1 - y / H) + 0.2 * hash2(Math.floor(x / 5), Math.floor(z / 5));
-  const g = [0.95 + 0.1 * hash2(Math.floor(x / 4) + 7, Math.floor(z / 4)), 1, 0.9];
+  const exit = Math.min(1, Math.max(0, (Math.abs(z) - TZ) / 6)) * Math.exp(-Math.max(0, Math.abs(x) - W - 3) / 6);
+  const sand = Math.min(1, exit * 1.2);
+  const dry = 0.25 * (1 - y / H) + 0.2 * wave(x * 0.29 + 2.0, z * 0.33);
+  const g = [0.95 + 0.1 * wave(x * 0.5 + 1.0, z * 0.45), 1, 0.9];
   const sandCol = [1.75, 1.5, 1.05];                                           // × the material's green → sand
   const dryCol = [1.3, 1.05, 0.7];
   const out = [];

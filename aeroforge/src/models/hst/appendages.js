@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
 import { rod, lathe, mergeGeometries } from '../../engine/geometry.js';
-import { RAD, ST, az, deg, ix, cablePath } from './layout.js';
+import { RAD, ST, az, deg, ix, cablePath, radialBox } from './layout.js';
 import { HM } from './materials.js';
 
 const merge = (list) => mergeGeometries(list.map(ix));
@@ -207,17 +207,26 @@ export function buildAppendages(P, body) {
       for (let i = 0; i < rs.length - 1; i++) back.push(rod([Math.cos(a) * rs[i], backY(rs[i]), Math.sin(a) * rs[i]], [Math.cos(a) * rs[i + 1], backY(rs[i + 1]), Math.sin(a) * rs[i + 1]], 0.012, 5));
     }
     back.push(new THREE.CylinderGeometry(0.07, 0.07, 0.06, 16).translate(0, s * (0.3 - DISH_T - 0.03), 0));   // hub on the gimbal
-    const feed = [new THREE.CylinderGeometry(0.05, 0.08, 0.16, 16).translate(0, s * (0.3 + 0.38), 0)];
-    for (let k = 0; k < 3; k++) {
-      const a = (k / 3) * Math.PI * 2 + 0.4;
-      feed.push(rod([Math.cos(a) * HGA.dish * 0.85, s * (0.3 + sag(HGA.dish * 0.85)), Math.sin(a) * HGA.dish * 0.85], [0, s * (0.3 + 0.36), 0], 0.01, 5));
+    // feed: the S-band horn 0.38 m in front of the vertex, its mouth toward the reflector, on a central
+    // post from the vertex and braced by four symmetric struts from the dish face; a stiffening ring
+    // round the rim. Built for the +V3 dish (opening toward +y) and turned over for the −V3 one.
+    const FEED = 0.38, feedList = [
+      rod([0, 0.3, 0], [0, 0.3 + FEED - 0.08, 0], 0.02, 10),                                                // central post
+      new THREE.CylinderGeometry(0.035, 0.07, 0.14, 18).translate(0, 0.3 + FEED - 0.01, 0),               // horn, flaring toward the dish
+      new THREE.CylinderGeometry(0.04, 0.04, 0.03, 18).translate(0, 0.3 + FEED + 0.07, 0),                // horn back / connector
+      new THREE.TorusGeometry(HGA.dish - 0.005, 0.012, 6, 48).rotateX(Math.PI / 2).translate(0, 0.3 + sag(HGA.dish), 0),   // rim stiffener
+    ];
+    for (let k = 0; k < 4; k++) {
+      const a = (k / 4) * Math.PI * 2 + Math.PI / 4, rs = HGA.dish * 0.78;
+      feedList.push(rod([Math.cos(a) * rs, 0.3 + sag(rs) + 0.008, Math.sin(a) * rs], [0, 0.3 + FEED - 0.1, 0], 0.008, 5));
     }
-    // RF line from the inner rotary joint into the hub, out along the face and up one feed strut
-    const a0 = 0.4, rS = HGA.dish * 0.85;
-    const rf = cablePath([[0.19, s * (Y1 + Y2), 0], [0.06, s * 0.25, 0], [0, s * 0.3, 0], ...[0.12, 0.3, 0.45].map((r) => [Math.cos(a0) * r, s * (0.3 + sag(r) + 0.012), Math.sin(a0) * r]), [Math.cos(a0) * rS, s * (0.3 + sag(rS) + 0.015), Math.sin(a0) * rS], [0.012, s * (0.3 + 0.35), 0.005]], 0.008, 6);
-    dishG.add(mesh(dish, HM.dishShell()), mesh(merge(back), HM.grEp()), mesh(merge(feed), HM.al()), mesh(merge(rf), HM.kapton()));
+    const feed = merge(feedList);
+    if (s < 0) feed.rotateX(Math.PI);
+    // RF line from the inner rotary joint into the hub behind the vertex; the central post carries it to the horn
+    const rf = cablePath([[0.19, s * (Y1 + Y2), 0], [0.08, s * 0.22, 0], [0.02, s * (0.3 - DISH_T - 0.02), 0]], 0.008, 6);
+    dishG.add(mesh(dish, HM.dishShell()), mesh(merge(back), HM.grEp()), mesh(feed, HM.al()), mesh(merge(rf), HM.kapton()));
     const hp = P(`High-gain antenna (${side})`, {
-      system: 'Communications', material: 'Parabolic reflector of aluminium honeycomb with graphite-epoxy facesheets (General Electric), S-band feed 0.38 m in front of the vertex', mass: 28, temp: 250,
+      system: 'Communications', material: 'Parabolic reflector of aluminium honeycomb with graphite-epoxy facesheets (General Electric), S-band feed horn 0.38 m in front of the vertex on a central post and four struts', mass: 28, temp: 250,
       explode: [0, s * 0.8, 0],
       desc: 'Steerable dish (≈1.3 m, estimated) that sends science data at 2255.5 or 2287.5 MHz (±10 MHz) to NASA\'s Tracking and Data Relay Satellites 36,000 km up, which relay it to White Sands. Its beam is just over 4° wide, so the gimbal aims it to within 1° as Hubble circles the Earth.',
       callout: s > 0, anchor: [0.4, s * 0.5, 0.4],
@@ -245,22 +254,37 @@ export function buildAppendages(P, body) {
   }
 
   // ------------------------------------------------------------------ low-gain antennas
+  // conical log-spiral antennas: a blunt 0.26 m cone on a 0.2 m base housing with the two spiral arms
+  // wound round it. Built along +y with the base at the origin, then turned to look along ±x.
   const lga = (dir) => {
-    const g = [new THREE.CylinderGeometry(0.035, 0.035, 0.32, 10).translate(0, 0.16, 0), new THREE.ConeGeometry(0.11, 0.24, 20, 1, true).translate(0, 0.42, 0), new THREE.CylinderGeometry(0.11, 0.11, 0.02, 20).translate(0, 0.31, 0)];
-    const m = merge(g);
-    if (dir > 0) m.rotateZ(-Math.PI / 2); else m.rotateZ(Math.PI / 2);
-    return m;
+    const body = [new THREE.CylinderGeometry(0.1, 0.1, 0.07, 24).translate(0, 0.035, 0), new THREE.CylinderGeometry(0.03, 0.1, 0.26, 24, 1, false).translate(0, 0.2, 0), new THREE.SphereGeometry(0.03, 12, 8).translate(0, 0.33, 0)];
+    const arms = [];
+    for (const off of [0, Math.PI]) {
+      const pts = [];
+      for (let i = 0; i <= 36; i++) { const u = i / 36, rr = 0.104 - 0.072 * u, a = off + u * Math.PI * 5; pts.push([Math.cos(a) * rr, 0.075 + 0.245 * u, Math.sin(a) * rr]); }
+      arms.push(...cablePath(pts, 0.006, 5));
+    }
+    const rz = dir > 0 ? -Math.PI / 2 : Math.PI / 2;
+    return { body: merge(body).rotateZ(rz), arms: merge(arms).rotateZ(rz) };
   };
-  const fwd = lga(1).translate(ST.front - 0.12, ...az(deg(200), RAD.shell + 0.2).slice(1));
+  const LGA_PHI = deg(200), LGA_X = ST.front - 0.22, LGA_R = RAD.shell + 0.3;
+  const fwd = lga(1);
+  for (const g of [fwd.body, fwd.arms]) g.translate(LGA_X, ...az(LGA_PHI, LGA_R).slice(1));
+  // boom from a bracket on the light shield skin, with a diagonal brace aft of it
+  const boom = [radialBox(LGA_PHI, RAD.shell + 0.035, LGA_X, { radial: 0.05, tangential: 0.18, axialLen: 0.32 }),
+    rod(az(LGA_PHI, RAD.shell + 0.05, LGA_X), az(LGA_PHI, LGA_R, LGA_X), 0.025, 10),
+    rod(az(LGA_PHI, RAD.shell + 0.05, LGA_X - 0.3), az(LGA_PHI, LGA_R - 0.04, LGA_X), 0.012, 6),
+    radialBox(LGA_PHI, RAD.shell + 0.035, LGA_X - 0.3, { radial: 0.05, tangential: 0.1, axialLen: 0.1 })];
   P('Low-gain antenna (forward)', {
-    system: 'Communications', material: 'Conical spiral antenna on a bracket', mass: 4, temp: 245, explode: [1.6, -0.6, 0],
+    system: 'Communications', material: 'Conical log-spiral antenna (two copper arms on a cone in a dark radome) on a short boom off the light shield', mass: 4, temp: 245, explode: [1.6, -0.6, 0],
     desc: 'One of two spiral-cone antennas (2.1–2.3 GHz), this one on the light shield looking forward. Between them they see almost the whole sky: every command sent to Hubble arrives through them, and they keep a link alive if the telescope loses attitude.',
-  }, [mesh(fwd, HM.dish()), mesh(new THREE.BoxGeometry(0.4, 0.06, 0.12).translate(ST.front - 0.25, ...az(deg(200), RAD.shell + 0.1).slice(1)).rotateX(0), HM.al())]);
-  const aft = lga(-1).translate(-0.02, ...az(deg(270), 1.75).slice(1));
+  }, [mesh(fwd.body, HM.radome()), mesh(fwd.arms, HM.copper()), mesh(merge(boom), HM.al())]);
+  const aft = lga(-1);
+  for (const g of [aft.body, aft.arms]) g.translate(-0.02, ...az(deg(270), 1.75).slice(1));
   P('Low-gain antenna (aft)', {
-    system: 'Communications', material: 'Conical spiral antenna', mass: 4, temp: 255, explode: [-3.8, 0, -0.6],
+    system: 'Communications', material: 'Conical log-spiral antenna on the aft bulkhead', mass: 4, temp: 255, explode: [-3.8, 0, -0.6],
     desc: 'The aft-looking twin on the aft bulkhead, set 180° from the forward antenna; between them the two cover nearly the whole sky at low data rates through the multiple-access transponders.',
-  }, mesh(aft, HM.dish()));
+  }, [mesh(aft.body, HM.radome()), mesh(aft.arms, HM.copper())]);
 
   // ------------------------------------------------------------------ magnetic torquer bars (forward shell, 90° apart)
   const MT0 = 6.3, MT1 = MT0 + 2.5;
