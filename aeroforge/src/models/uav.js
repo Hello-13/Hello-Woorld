@@ -8,7 +8,7 @@
 
 import * as THREE from 'three';
 import { Assembly, mesh } from '../engine/assembly.js';
-import { wingPanel, hingedMesh, lathe, loftRings, naca00 } from '../engine/geometry.js';
+import { wingPanel, hingedMesh, lathe, loftRings, naca00, orientOutward } from '../engine/geometry.js';
 import { M, SKIN } from '../engine/materials.js';
 import { decal, danger } from '../engine/decals.js';
 import { decalTexture } from '../engine/surface.js';
@@ -39,7 +39,10 @@ function materials() {
   return {
     skin, skinDouble: skin2,
     // radomes: same light grey paint over a dielectric shell; satin, never mirror-glossy
-    radome: new THREE.MeshPhysicalMaterial({ color: 0xa8aeb4, roughness: 0.46, metalness: 0.02, clearcoat: 0.25, clearcoatRoughness: 0.38 }),
+    radome: new THREE.MeshPhysicalMaterial({ color: 0xa8aeb4, roughness: 0.52, metalness: 0.02, clearcoat: 0.06, clearcoatRoughness: 0.55 }),
+    // flush grey fittings on the paint: blade antennas and filler caps are painted the airframe grey, a shade darker
+    antenna: std({ color: 0x9aa1a8, roughness: 0.62, metalness: 0.08 }),
+    cap: std({ color: 0x8e959c, roughness: 0.66, metalness: 0.08 }),
     dark: M.uavDark(),
     frame: std({ color: 0x9aa3ab, roughness: 0.5, metalness: 0.65 }),
     primer: std({ color: 0x7d8a6a, roughness: 0.6, metalness: 0.2 }),
@@ -60,7 +63,9 @@ function materials() {
     glass: new THREE.MeshPhysicalMaterial({ color: 0x0c161e, roughness: 0.12, metalness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.14 }),
     olive: M.munition(), seeker: std({ color: 0xc9ccc6, roughness: 0.45, metalness: 0.15 }),
     yellow: std({ color: 0xd8a51f, roughness: 0.5, metalness: 0.1 }), brown: std({ color: 0x6a4527, roughness: 0.6, metalness: 0.1 }),
-    navRed: M.navRed(), navGreen: M.navGreen(),
+    // position lights: the shared lens materials, cloned so this aircraft can switch them off on the ground
+    navRed: Object.assign(M.navRed().clone(), { color: new THREE.Color(0x4a0c08), emissiveIntensity: 0 }),
+    navGreen: Object.assign(M.navGreen().clone(), { color: new THREE.Color(0x0a3a16), emissiveIntensity: 0 }),
     beacon: std({ color: 0x3a0606, emissive: 0xff2a1a, emissiveIntensity: 0.4, roughness: 0.35 }),
     lamp: std({ color: 0xdedede, emissive: 0xfff3dc, emissiveIntensity: 0.4, roughness: 0.2 }),
     laser: M.laser().clone(),
@@ -91,14 +96,6 @@ const wideStencil = (text, ink) => decalTexture(`mq9.st.${text}`, 1024, 128, (ct
   ctx.font = '700 84px "Barlow Semi Condensed", "Arial Narrow", sans-serif';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(text, w / 2, h / 2 + 4, w * 0.94);
-});
-
-/** Exhaust staining: a soft streak that fades aft (u runs forward → aft). */
-const sootStreak = () => decalTexture('mq9.soot', 512, 128, (ctx, w, h) => {
-  const g = ctx.createLinearGradient(0, 0, w, 0);
-  g.addColorStop(0, 'rgba(28,24,22,0.55)'); g.addColorStop(0.35, 'rgba(36,32,30,0.32)'); g.addColorStop(1, 'rgba(40,36,34,0)');
-  ctx.fillStyle = g;
-  ctx.beginPath(); ctx.ellipse(w * 0.05, h / 2, w * 0.98, h * 0.42, 0, -Math.PI / 2, Math.PI / 2); ctx.fill();
 });
 
 /** Section angle from the keel (0) round to the side (π/2) of the point (s, y, z), either side. */
@@ -192,7 +189,16 @@ export function buildUAV() {
   const slotBreaks = Array.from({ length: 33 }, (_, k) => +(4.87 + k * 0.05).toFixed(2));
   // over the main wells, the ring vertices nearest each door's hinge line and outer edge are moved onto them, so the cut
   // follows both exactly
+  // the radome / forward-skin joint runs along the side 2 cm below the section's mid-height; the side vertex of every ring ahead of
+  // s 2.05 is set exactly on that line, so the joint is a straight mesh edge (classified by corner below) instead of a sawtooth
+  const RADOME_DY = 0.02;
+  const radomeTheta = (s) => { const { top, bot } = prof(s); return -Math.asin(Math.min(1, RADOME_DY / ((top - bot) / 2)) ** 1.2); };
   const onHinge = (s, r) => {
+    if (s < 2.05 + 1e-6) {
+      r[24] = fusePoint(s, radomeTheta(s));                   // starboard side vertex (θ = 0 is j = 24 on a 96-point ring)
+      r[72] = fusePoint(s, Math.PI - radomeTheta(s));         // port side vertex
+      return r;
+    }
     if (s < 4.87 - 1e-6 || s > 6.5 + 1e-6) return null;
     for (const th of new Set([hingeAngle(s), edgeAngle(s, false), edgeAngle(s, true)])) {
       const j = Math.round(th / ((2 * Math.PI) / 96));
@@ -206,7 +212,12 @@ export function buildUAV() {
     const s = 5.5 - cx;
     const cut = opening(s, cy, cz, pos, t);
     if (cut) return cut;
-    if (s < 2.05 && cy > prof(Math.max(0, s)).yc - 0.02) return 'radome';
+    if (s < 2.05 - 1e-6) {
+      // radome if every corner lies on or above the joint line (the side vertices sit exactly on it)
+      let above = true;
+      for (let j = t; j < t + 9; j += 3) if (pos[j + 1] < prof(Math.max(0, 5.5 - pos[j])).yc - RADOME_DY - 1e-4) above = false;
+      if (above) return 'radome';
+    }
     if (s < 0.95) return 'lynx';
     if (s < 4.0) return 'fwd';
     if (s < 6.3) return 'ctr';
@@ -214,11 +225,11 @@ export function buildUAV() {
     return 'cowl';
   });
   P('SATCOM radome', {
-    system: 'Skin & fairings', skin: true, material: 'Dielectric composite shell, painted', mass: 22, explode: [1.3, 2.1, -1.3],
+    system: 'Skin & fairings', skin: true, xraySkinWeight: 0.5, material: 'Dielectric composite shell, painted', mass: 22, explode: [1.3, 2.1, -1.3],
     desc: 'The bulbous upper nose is a radome over the Ku-band satellite dish. It is transparent to the 12–18 GHz link signal, which is why the nose shape is set by a 0.7 m-class dish rather than by aerodynamics.',
   }, L(panels.get('radome'), m.radome));
   P('Lynx radome', {
-    system: 'Skin & fairings', skin: true, material: 'Dielectric composite shell, painted', mass: 7, explode: [1.9, 0.5, -1.3],
+    system: 'Skin & fairings', skin: true, xraySkinWeight: 0.5, material: 'Dielectric composite shell, painted', mass: 7, explode: [1.9, 0.5, -1.3],
     desc: 'Lower nose fairing over the AN/APY-8 Lynx radar antenna. Ku-band radar energy passes through it with little loss, so it carries no metal structure.',
   }, L(panels.get('lynx'), m.radome));
   const fwdSkin = P('Forward fuselage skin', {
@@ -331,16 +342,27 @@ export function buildUAV() {
   }, L(merge(bays), m.primer));
 
   // wing carry-through: the two spars continue across the body; the wings bolt to fittings at its ends
+  // the box sits under the root fairings (z 0.15–0.66) and the fuselage top: its webs and plates keep at least 3 cm inside the wing
+  // section at the root, and the plates follow the section's curve instead of lying flat, so nothing shows through the skins
   const carry = [], fittings = [];
+  const CT_HW = 0.39, CT_IN = 0.032;
   for (const cf of [0.15, 0.69]) {
     const x = W_ROOT.le[0] - cf * W_ROOT.chord;
-    const top = wpt(WING.zRoot, cf, 1, 0.01)[1], bot = wpt(WING.zRoot, cf, -1, 0.01)[1];
-    carry.push(box(0.05, top - bot, 0.8, [x, (top + bot) / 2, 0]));
+    const dcf = 0.025 / W_ROOT.chord;
+    const top = Math.min(wpt(WING.zRoot, cf - dcf, 1, CT_IN)[1], wpt(WING.zRoot, cf + dcf, 1, CT_IN)[1]);
+    const bot = Math.max(wpt(WING.zRoot, cf - dcf, -1, CT_IN)[1], wpt(WING.zRoot, cf + dcf, -1, CT_IN)[1]);
+    carry.push(box(0.05, top - bot, 2 * CT_HW, [x, (top + bot) / 2, 0]));
     for (const zs of [1, -1]) for (const yy of [top - 0.02, bot + 0.02]) fittings.push(box(0.09, 0.04, 0.07, [x, yy, 0.425 * zs]), cylX(x - 0.06, x + 0.06, 0.012, 0.012, yy, 0.425 * zs, 8));
   }
-  const xa = W_ROOT.le[0] - 0.15 * W_ROOT.chord, xb = W_ROOT.le[0] - 0.69 * W_ROOT.chord;
-  carry.push(box(xa - xb, 0.012, 0.78, [(xa + xb) / 2, wpt(WING.zRoot, 0.4, 1, 0.02)[1], 0]));
-  carry.push(box(xa - xb, 0.012, 0.78, [(xa + xb) / 2, wpt(WING.zRoot, 0.4, -1, 0.02)[1], 0]));
+  for (const side of [1, -1]) {
+    const rings = [];
+    for (let k = 0; k <= 10; k++) {
+      const cf = 0.15 + (0.54 * k) / 10;
+      const p = wpt(WING.zRoot, cf, side, CT_IN), y1 = p[1] - side * 0.012;
+      rings.push([[p[0], p[1], -CT_HW], [p[0], p[1], CT_HW], [p[0], y1, CT_HW], [p[0], y1, -CT_HW]]);
+    }
+    carry.push(orientOutward(loftRings(rings, { capStart: true, capEnd: true, uvMode: 'metric' })));
+  }
   P('Wing carry-through box', {
     system: 'Structure', material: 'Carbon composite box (est.)', mass: 70, explode: [0, 0.75, 0],
     desc: 'Continues the two wing spars through the fuselage so the wings’ bending loads meet in the middle instead of passing through the fuselage skin. The wings come off at its ends for shipping: the USAF notes the aircraft can be taken apart and loaded into a single container.',
@@ -440,22 +462,25 @@ export function buildUAV() {
     }, L(f(merge(brk)), m.alu));
     const harnessPts = [[0.45, 0.705], [1.5, 0.705], [3.0, 0.705], [4.5, 0.705], [6.0, 0.705], [7.0, 0.704], [7.8, 0.703], [8.6, 0.703], [9.25, 0.70], [9.6, 0.6], [9.85, 0.4], [9.95, 0.08], [10.01, 0.045]].map(([z, cf]) => wpt(z, cf, 0));
     // the radio antenna's coax leaves the bundle in the tip and runs out to the pod's inboard face
-    const podAt = wpt(10.05, 0.45, 0);
-    branch.push(pipe([wpt(9.85, 0.4, 0), wpt(9.97, 0.42, 0), [podAt[0] - 0.05, podAt[1], WING.semi - 0.028]], 0.006, 5, 12));
+    const podAt = wpt(9.9, 0.4, 0);
+    branch.push(pipe([wpt(9.72, 0.4, 0), wpt(9.82, 0.4, 0), [podAt[0] + 0.05, podAt[1], podAt[2] - 0.016]], 0.006, 5, 12));
     P(`Wing wiring (${sn})`, {
       system: 'Electrical', material: 'Shielded harness in conduit (est.)', mass: 4, xrayWeight: 0.5, explode: [0, 1.0, 1.9 * side],
       desc: 'Power and signal runs along the rear spar, outside the fuel bays, with a branch to each of the four surface servos, then round the tip to the navigation light, with the coax for the wingtip V/UHF antenna leaving it for the antenna pod.',
     }, L(f(merge([pipe(harnessPts, 0.008, 5, 120), ...branch])), m.harness));
-    const lens = new THREE.SphereGeometry(0.03, 12, 8).scale(1.4, 0.8, 1).translate(...wpt(10.0, 0.04, 0)).translate(0.02, 0, 0.03);
+    // a 4 cm teardrop lens on the tip cap's outer face, just behind the leading edge; lit only in flight (update())
+    const lensAt = wpt(W_TIP.le[2], 0.1, 0);
+    const lens = new THREE.SphereGeometry(0.014, 12, 8).scale(1.6, 0.9, 0.8).translate(lensAt[0] - 0.02, lensAt[1] + 0.002, WING.semi - 0.004);
     P(`Navigation light (${sn})`, {
-      system: 'Electrical', material: 'LED position light', mass: 0.5, explode: [0, 1.5, 2.1 * side],
+      system: 'Electrical', material: 'LED position light, 4 cm lens', mass: 0.3, explode: [0, 1.5, 2.1 * side],
       desc: side > 0 ? 'Green position light on the starboard wingtip, red on the port one: other pilots can tell which way the aircraft is heading at night.' : 'Red position light on the port wingtip. The MQ-9 flies in shared airspace, so it carries the same lights as a crewed aircraft.',
     }, L(f(lens), side > 0 ? m.navGreen : m.navRed, { cast: false }));
-    const pod = latheX([[0.001, -0.4], [0.02, -0.33], [0.024, -0.1], [0.022, 0.05], [0.001, 0.12]], 12);
-    pod.translate(wpt(10.05, 0.45, 0)[0], wpt(10.05, 0.45, 0)[1], WING.semi - 0.01);
+    // the antenna element lies inside the composite tip, which is transparent to radio: nothing shows outside
+    const pod = latheX([[0.001, -0.2], [0.012, -0.15], [0.014, 0], [0.012, 0.1], [0.001, 0.14]], 12);
+    pod.translate(podAt[0], podAt[1], podAt[2]);
     P(`Wingtip V/UHF antenna (${sn})`, {
-      system: 'Communications', material: 'Dielectric fairing (shape approximate)', mass: 1, explode: [0, 1.5, 2.2 * side],
-      desc: 'Block 5 aircraft carry VHF/UHF voice-radio antennas at the wingtips for the two ARC-210 radios, so ground forces and air traffic control can talk to the crew through the aircraft (fairing shape approximate).',
+      system: 'Communications', material: 'Dipole element inside the dielectric wingtip (shape approximate)', mass: 1, explode: [0, 1.5, 2.2 * side],
+      desc: 'Block 5 aircraft carry VHF/UHF voice-radio antennas in the wingtips for the two ARC-210 radios, so ground forces and air traffic control can talk to the crew through the aircraft. The element sits inside the composite tip, which radio waves pass through, so the tip stays clean outside (shape approximate).',
     }, L(f(pod), m.dark));
 
     // pylons and stores
@@ -661,7 +686,7 @@ export function buildUAV() {
   // ============================================================== flight-control electronics and tail servos
   const fcc = [-0.24, -0.08, 0.08].map((z) => lru(0.42, 0.2, 0.14, [X(2.175), NFLOOR + 0.107, z]));
   P('Flight control computers', {
-    system: 'Flight controls', material: 'Redundant flight computers', mass: 12, count: 3, explode: [0.9, 0.9, -0.3],
+    system: 'Flight controls', material: 'Redundant flight computers', mass: 12, xrayWeight: 0.6, count: 3, explode: [0.9, 0.9, -0.3],
     desc: 'Triple-redundant computers (GA-ASI, Block 5) fly the aircraft: a stability augmentation system and hold modes keep attitude, altitude and airspeed, and they mix the ruddervator commands. Stall protection pushes the nose down, to about −15°, as speed nears the stall. If the link is lost they fly an uploaded profile: a climb for 51 s at 105 kt, then preset waypoints (USAF and NTSB investigations).',
   }, L(merge(fcc), m.lru));
   A.root.updateMatrixWorld(true);
@@ -975,7 +1000,7 @@ export function buildUAV() {
     callout: true, anchor: [X(1.08) + 0.038, 0.752, 0.24],   // the starboard side of the ball, just above its equator
   }, turret);
   P('MTS-B electronics unit', {
-    system: 'Sensors', material: 'Electronics unit', mass: 15, explode: [0.55, 0.3, 0.75],
+    system: 'Sensors', material: 'Electronics unit', mass: 15, xrayWeight: 0.6, explode: [0.55, 0.3, 0.75],
     desc: 'Processes the turret’s video, drives the gimbal and fires the laser; the turret and this unit are bought and upgraded as a pair (location estimated).',
   }, L(lru(0.6, 0.17, 0.12, [X(2.4), 1.255, 0.26]), m.lruOlive));
   // Lynx SAR gimbal assembly, radar electronics and cables: see mq9/sensors.js
@@ -1021,43 +1046,43 @@ export function buildUAV() {
   ]), m.darkMetal));
   dishG.add(L(merge([new THREE.CylinderGeometry(0.03, 0.05, 0.42, 12).translate(0, -0.24, 0), new THREE.CylinderGeometry(0.12, 0.12, 0.09, 20).translate(0, -0.455, 0)]), m.darkMetal));   // the pedestal stands on the ballast tray
   P('Ku-band SATCOM antenna', {
-    system: 'Communications', material: 'Steerable reflector on a two-axis pedestal', mass: 30, explode: [1.45, 2.05, 0],
+    system: 'Communications', material: 'Steerable reflector on a two-axis pedestal', mass: 30, xrayWeight: 0.3, explode: [1.45, 2.05, 0],
     desc: 'Tracks a geostationary satellite to carry control and sensor video beyond line of sight. The satellite hops alone add about half a second of delay (up to geostationary orbit and back twice, 4 × 35,786 km ÷ c ≈ 0.48 s); with the ground relays the control loop takes over a second, so crews in the US can fly aircraft overseas, but not land them.',
     callout: true, anchor: [X(1.15) + 0.18, 1.832, -0.045],   // the upper rim of the dish
   }, dishG);
   P('Ku-band SATCOM modem', {
-    system: 'Communications', material: 'Modem and RF unit', mass: 8, explode: [1.0, 1.0, -0.4],
+    system: 'Communications', material: 'Modem and RF unit', mass: 8, xrayWeight: 0.6, explode: [1.0, 1.0, -0.4],
     desc: 'Encodes the command uplink and the high-rate sensor downlink for the satellite channel, next to the dish to keep the RF runs short (location estimated).',
   }, L(lru(0.3, 0.2, 0.28, MODEM), m.lru));
   P('Air data computer', {
-    system: 'Avionics', material: 'Air data computer', mass: 3, explode: [1.0, 0.95, 0.45],
+    system: 'Avionics', material: 'Air data computer', mass: 3, xrayWeight: 0.6, explode: [1.0, 0.95, 0.45],
     desc: 'Turns the pitot and static pressures into airspeed, altitude and vertical speed for the flight computers.',
   }, L(lru(0.24, 0.12, 0.2, ADC), m.lru));
   P('Mission control module (payload computer)', {
-    system: 'Avionics', material: 'Payload and weapons computer', mass: 9, explode: [0.75, 0.9, 0.55],
+    system: 'Avionics', material: 'Payload and weapons computer', mass: 9, xrayWeight: 0.6, explode: [0.75, 0.9, 0.55],
     desc: 'GA-ASI’s Block 5 has a separate payload computer, the Mission Control Module, which manages the sensors, weapons and data links apart from the flight-critical computers, so a payload fault cannot affect control.',
   }, L(lru(0.42, 0.2, 0.14, [X(2.175), NFLOOR + 0.107, 0.24]), m.lru));
   P('Embedded GPS/INS', {
-    system: 'Avionics', material: 'Ring-laser-gyro inertial units with GPS receivers', mass: 10, count: 2, explode: [0.55, 1.0, 0],
+    system: 'Avionics', material: 'Ring-laser-gyro inertial units with GPS receivers', mass: 10, xrayWeight: 0.6, count: 2, explode: [0.55, 1.0, 0],
     desc: 'Embedded GPS/inertial units give position, velocity and attitude (two shown; the count is estimated). The inertial half keeps navigating if GPS is jammed; the GPS half stops the inertial drift.',
   }, L(merge([lru(0.28, 0.16, 0.18, [X(2.64), NFLOOR + 0.087, 0.2]), lru(0.28, 0.16, 0.18, [X(2.64), NFLOOR + 0.087, -0.2])]), m.lru));
   P('IFF transponder', {
-    system: 'Communications', material: 'Identification friend-or-foe / ATC transponder', mass: 4, explode: [0.45, 1.15, 0],
+    system: 'Communications', material: 'Identification friend-or-foe / ATC transponder', mass: 4, xrayWeight: 0.6, explode: [0.45, 1.15, 0],
     desc: 'Answers air-traffic and military interrogations with the aircraft’s identity and altitude, the same as a crewed aircraft in controlled airspace.',
   }, L(lru(0.26, 0.12, 0.13, IFFP), m.lru));
   P('C-band datalink transceiver', {
-    system: 'Communications', material: 'Line-of-sight datalink radio', mass: 10, explode: [0.3, 1.0, -0.55],
+    system: 'Communications', material: 'Line-of-sight datalink radio', mass: 10, xrayWeight: 0.6, explode: [0.3, 1.0, -0.55],
     desc: 'The line-of-sight C-band link used by the launch-and-recovery crew at the airfield: short delay for hand-flown take-offs and landings, but only to the radio horizon.',
   }, L(lru(0.26, 0.22, 0.22, CBAND), m.lru));
   P('ARC-210 V/UHF radios', {
-    system: 'Communications', material: 'Two software-defined VHF/UHF radios', mass: 11, count: 2, explode: [0.3, 1.05, 0.55],
+    system: 'Communications', material: 'Two software-defined VHF/UHF radios', mass: 11, xrayWeight: 0.6, count: 2, explode: [0.3, 1.05, 0.55],
     desc: 'Two ARC-210 radios relay voice between the crew and air-traffic control or troops on the ground, through the wingtip antennas (Block 5 fit).',
   }, L(merge([lru(0.26, 0.12, 0.16, [X(3.26), NFLOOR + 0.067, 0.14]), lru(0.26, 0.12, 0.16, [X(3.26), NFLOOR + 0.192, 0.14])]), m.lruOlive));
   const cband = [bladeAntenna(0.2, 0.24).translate(X(2.5), prof(2.5).top - 0.01, 0), bladeAntenna(0.18, 0.22).rotateX(Math.PI).translate(X(3.3), prof(3.3).bot + 0.01, 0)];
   P('C-band LOS antennas', {
     system: 'Communications', material: 'Blade antennas (positions approximate)', mass: 2, count: 2, explode: [0.4, 0.5, 0],
     desc: 'Upper and lower blades so the line-of-sight link keeps contact whichever way the aircraft banks near the airfield.',
-  }, L(merge(cband), m.dark));
+  }, L(merge(cband), m.antenna));
   const gps = [3.0, 5.05].map((s) => lru(0.12, 0.025, 0.12, [X(s), prof(s).top + 0.005, 0], 0.04));
   P('GPS antennas', {
     system: 'Communications', material: 'Patch antennas', mass: 1, count: 2, explode: [0, 1.95, 0],
@@ -1067,7 +1092,7 @@ export function buildUAV() {
   P('IFF antennas', {
     system: 'Communications', material: 'Small blade antennas', mass: 1, count: 2, explode: [0, 1.0, 0],
     desc: 'Upper and lower transponder antennas so interrogators above and below can always reach the IFF set.',
-  }, L(merge(iff), m.dark));
+  }, L(merge(iff), m.antenna));
   // pitot, static, OAT and AoA lines to the air data computer; antenna cables; Iridium; ELT (mq9/sensors.js)
   buildAirData({ P, L, m }, ADC);
   buildLinks({ P, L, m }, { modem: MODEM, cband: CBAND, egi: [[X(2.64), NFLOOR + 0.087, 0.2], [X(2.64), NFLOOR + 0.087, -0.2]], iff: IFFP, floor: NFLOOR });
@@ -1083,12 +1108,12 @@ export function buildUAV() {
   // the starter-generator and backup generator are on the engine's accessory pads (mq9/propulsion.js);
   // the power electronics sit in the accessory bay between the aft fuel cell and the firewall
   role(P('Main batteries', {
-    system: 'Electrical', material: 'Sealed rechargeable batteries (est.)', mass: 28, count: 2, explode: [0.3, -0.6, 0.45],
+    system: 'Electrical', material: 'Sealed rechargeable batteries (est.)', mass: 28, xrayWeight: 0.6, count: 2, explode: [0.3, -0.6, 0.45],
     desc: 'Run the flight-critical systems if the generators fail and power the avionics before engine start. They last only as long as the load is kept down: when the engine stopped in 2006 the Predator B shed the transponder and the Iridium link to stretch battery life, and in December 2014 an MQ-9 ran its batteries too low to lower the landing gear after a generator failure (type and capacity not published).',
   }, L(merge([lru(0.24, 0.17, 0.16, [X(3.26), 1.21, 0.18]), lru(0.24, 0.17, 0.16, [X(3.26), 1.21, -0.18])]), m.lruOlive)), 'battery');
   const PDU_S = 7.6, GCU_S = 7.95;
   P('Power distribution units', {
-    system: 'Electrical', material: 'Solid-state power controllers', mass: 12, count: 2, explode: [0, 0.8, 0.6],
+    system: 'Electrical', material: 'Solid-state power controllers', mass: 12, xrayWeight: 0.6, count: 2, explode: [0, 0.8, 0.6],
     desc: 'Switch and protect each electrical load, one unit per bus (flight data logs record “Bus 1” voltage), and shed non-essential loads automatically when a generator drops out. The Block 5 adds a redundant flight-critical bus fed by the backup generator.',
   }, L(merge([lru(0.22, 0.14, 0.16, [X(PDU_S), 1.62, 0.2]), lru(0.22, 0.14, 0.16, [X(PDU_S), 1.62, -0.2])]), m.lru));
   // harness runs, each its own part so a student can follow power and data from source to load
@@ -1291,7 +1316,6 @@ export function buildUAV() {
     cowl.add(decal(cowlMesh, danger('PROPELLER'), { at: fusePoint(10.0, side > 0 ? 0.05 : Math.PI - 0.05), dir: [0, 0, side], size: [0.7, 0.22, 0.4], roughness: 0.5 }));
     aftSkin.add(decal(aftMesh, insignia(), { at: fusePoint(7.1, side > 0 ? 0.12 : Math.PI - 0.12), dir: [0, 0.1, side], size: [0.95, 0.48, 0.4] }));
     fwdSkin.add(decal(fwdMesh, wideStencil('U.S. AIR FORCE', 'rgba(52,58,64,0.88)'), { at: fusePoint(3.0, side > 0 ? 0.25 : Math.PI - 0.25), dir: [0, 0.25, side], size: [1.1, 0.14, 0.3] }));
-    cowl.add(decal(cowlMesh, sootStreak(), { at: fusePoint(10.17, side > 0 ? 0.62 : Math.PI - 0.62), dir: [0, 0.75, 0.65 * side], size: [0.48, 0.16, 0.3], angle: side > 0 ? Math.PI : 0, roughness: 0.8 }));
   }
 
   A.finalize();
@@ -1333,6 +1357,13 @@ export function buildUAV() {
     // a raised front quarter: the planform reads, and the nose sensors' and the tail's labels stack
     // without covering one another's dots (anchors and this view were laid out together)
     view: { dir: [1.19, 1.05, 1], fill: 0.75 },
+    // Showroom fill for this aircraft: the look's hemisphere is near black below the horizon, so the thin wing and the belly read
+    // solid black from the side. A grey bounce from the floor and a slightly softer key keep the light-grey paint grey all round,
+    // as in daylight ramp photographs, without washing the lit tops out.
+    lighting: {
+      showroom: { hemi: [0x4a5460, 0x7a838b, 1.7], key: { color: 0xfff8f0, intensity: 1.9 }, rim: 1.5 },
+      hangar: { hemi: [0xbfd2ff, 0x66645f, 0.5] },
+    },
     displaySize: 11.5,
     thermalRange: [230, 560],
     state,
@@ -1401,7 +1432,9 @@ export function buildUAV() {
       lynxG.roll.rotation.x = Math.sin(t * 0.9) * 0.05;          // the inner gimbal holds the beam level as the aircraft rolls
       dishAz.rotation.y = Math.sin(t * 0.07) * 0.5;
       beamMat.opacity = state.laser ? 0.5 : 0;
-      m.laser.emissiveIntensity = state.laser ? 6 : 0.8;
+      m.laser.emissiveIntensity = state.laser ? 6 : 0.3;
+      // position lights: off on the ground, on from the start of the take-off roll
+      m.navRed.emissiveIntensity = m.navGreen.emissiveIntensity = 4.5 * smooth(0.01, 0.12, a);
       // controls: ailerons antisymmetric, ruddervators mix pitch and yaw, flaps out during the transition
       const roll = state.roll, pitch = state.pitch, yaw = state.yaw;
       for (const { h } of surf.ail) h.setAngle(-roll * 18 * deg);

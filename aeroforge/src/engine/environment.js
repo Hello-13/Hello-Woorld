@@ -52,7 +52,7 @@ export const LOOKS = {
   orbit: {
     label: 'Low Earth orbit', hdri: null, background: 'space', sun: [0.55, 0.72, 0.42], envIntensity: 0.4,
     exposure: 0.82, floor: null, turntable: false, earth: { altitude: 520 },
-    key: { color: 0xfffaf0, intensity: 3.3 }, hemi: [0x0c1018, 0xa9bdd4, 0.6], rim: 0.0, earthshine: true,
+    key: { color: 0xfffaf0, intensity: 3.3 }, hemi: [0x0c1018, 0xa9bdd4, 0.7], rim: 0.0, earthshine: true,
   },
 };
 

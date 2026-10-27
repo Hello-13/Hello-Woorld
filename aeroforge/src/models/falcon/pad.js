@@ -191,8 +191,8 @@ function concreteGrime(x, y, z) {
 function grassWear(x, y, z) {
   const exit = Math.min(1, Math.max(0, (Math.abs(z) - TZ) / 6)) * Math.exp(-Math.max(0, Math.abs(x) - W - 3) / 6);
   const sand = Math.min(1, exit * 1.2);
-  const dry = 0.25 * (1 - y / H) + 0.2 * wave(x * 0.29 + 2.0, z * 0.33);
-  const g = [0.95 + 0.1 * wave(x * 0.5 + 1.0, z * 0.45), 1, 0.9];
+  const dry = 0.15 * (1 - y / H) + 0.12 * wave(x * 0.29 + 2.0, z * 0.33);
+  const g = [0.88 + 0.1 * wave(x * 0.5 + 1.0, z * 0.45), 1, 0.82];
   const sandCol = [1.75, 1.5, 1.05];                                           // × the material's green → sand
   const dryCol = [1.3, 1.05, 0.7];
   const out = [];

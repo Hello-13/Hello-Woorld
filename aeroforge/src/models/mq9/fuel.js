@@ -239,12 +239,13 @@ export function buildFuelLines({ P, L, m }, fu, prop) {
     desc: 'Capacitance probes in every tank (two in each long inboard tank): fuel and air have different dielectric constants, so each probe’s capacitance tells how deep the fuel is around it. The readings give fuel remaining and, tank by tank, the centre of gravity (counts estimated). In a 2020 loss the gauges showed fuel “well short” of what was expected before the sensor operator turned the camera on the aircraft and saw it leaking; the investigation named the design of the fuel detection system as a factor (USAF).',
   }, L(merge(FQ), m.alu));
   const caps = [];
-  for (const zs of [1, -1]) for (const z of [3.2, 6.6]) caps.push(new THREE.CylinderGeometry(0.045, 0.045, 0.006, 16).translate(...W(z, 0.42, 1, -0.002, zs)));
-  for (const s of [3.75, 6.9]) { const p = fusePoint(s, Math.PI / 2 - 0.45); caps.push(new THREE.CylinderGeometry(0.045, 0.045, 0.006, 16).translate(X(s), p[1] + 0.001, p[2])); }
+  // flush caps: a 4 mm disc set 1 mm proud, painted the airframe grey (the real caps sit flush under a quarter-turn ring)
+  for (const zs of [1, -1]) for (const z of [3.2, 6.6]) caps.push(new THREE.CylinderGeometry(0.045, 0.045, 0.004, 20).translate(...W(z, 0.42, 1, -0.001, zs)));
+  for (const s of [3.75, 6.9]) { const p = fusePoint(s, Math.PI / 2 - 0.45); caps.push(new THREE.CylinderGeometry(0.045, 0.045, 0.004, 20).translate(X(s), p[1] - 0.001, p[2])); }
   P('Gravity refuel ports', {
     system: 'Fuel', material: 'Flush filler caps', mass: 1.5, count: 6, explode: [0, 1.7, 0],
     desc: 'Flush filler caps over each wing tank and the forward and aft fuselage cells, for gravity refuelling where no pressure-refuelling equipment is available; the header fills from the others (positions estimated).',
-  }, L(merge(caps), m.darkMetal));
+  }, L(merge(caps), m.cap));
   const dv = [X(4.66), fu.pumpY + 0.055, -0.06];            // above the port motive-manifold pipe
   // the line drops under the selector block, lies on the keel skin in the channel between the main-gear wells, under the feed line,
   // and ends in a mast on the centreline just aft of the wells, behind the doors' aft edges (s 6.5) and clear of their swing

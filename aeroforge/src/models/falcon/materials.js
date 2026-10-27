@@ -207,6 +207,6 @@ export const FM = {
     const c = concrete({ seed: 11 });
     const n = c.normalMap.clone(); n.repeat.set(1 / 6, 1 / 6); n.needsUpdate = true;
     const r = c.roughnessMap.clone(); r.repeat.set(1 / 6, 1 / 6); r.needsUpdate = true;
-    return new THREE.MeshStandardMaterial({ color: 0x6e7456, normalMap: n, roughnessMap: r, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 1, metalness: 0, vertexColors: true });
+    return new THREE.MeshStandardMaterial({ color: 0x5f6e4b, normalMap: n, roughnessMap: r, normalScale: new THREE.Vector2(1.6, 1.6), roughness: 1, metalness: 0, vertexColors: true });
   }),
 };

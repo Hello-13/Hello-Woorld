@@ -41,7 +41,7 @@ export function buildLynx({ P, L, m }) {
   const ringG = [new THREE.TorusGeometry(0.17, 0.011, 8, 36).rotateY(Math.PI / 2).scale(1, 0.62, 1)];
   for (const zs of [1, -1]) ringG.push(new THREE.CylinderGeometry(0.014, 0.014, 0.03, 10).rotateX(Math.PI / 2).translate(0, 0, 0.185 * zs));
   const gimbal = P('Lynx three-axis gimbal', {
-    system: 'Sensors', material: 'Machined aluminium gimbal with torque motors and resolvers, on a nose deck', mass: 14, count: 3, explode: [1.35, 0, 0],
+    system: 'Sensors', material: 'Machined aluminium gimbal with torque motors and resolvers, on a nose deck', mass: 14, xrayWeight: 0.6, count: 3, explode: [1.35, 0, 0],
     desc: 'Sandia’s three-axis gimbal for Lynx: azimuth, elevation and an inner gimbal about the beam axis, hanging from a deck in the lower nose. It points the antenna anywhere from 5° to 60° below the horizon, all the way round (±180°), inside a swept volume 0.43 m high and 0.50 m across (GA-ASI datasheet).',
   }, lynx);
   lynx.add(L(merge(deck), m.darkMetal));
@@ -61,7 +61,7 @@ export function buildLynx({ P, L, m }) {
     tubeBetween([v0 + 0.05, -0.083, 0], [-0.02, -0.07, 0], 0.009, 4),
   ]);
   P('AN/APY-8 Lynx SAR antenna', {
-    system: 'Sensors', material: 'Horn-fed reflector dish on the inner gimbal', mass: 4, explode: [0.35, 0, 0],
+    system: 'Sensors', material: 'Horn-fed reflector dish on the inner gimbal', mass: 4, xrayWeight: 0.5, explode: [0.35, 0, 0],
     desc: 'A vertically polarised, horn-fed dish 0.40 m wide and 0.18 m tall (estimated), with a 3.2° by 7° beam at 15.2–18.2 GHz (Sandia). By recording echoes as the aircraft flies, Lynx makes images of the ground through cloud, smoke and darkness down to 0.1 m resolution in spotlight mode, and in GMTI mode picks out vehicles moving at 6 knots or more.',
     callout: true, anchor: [0.03, -0.04, 0.07],   // on the dish face near the azimuth axis (inner-gimbal frame), so the dot barely moves
   }, [L(dish, m.dish), L(merge([back, horn]), m.darkMetal)], roll);
@@ -80,7 +80,7 @@ export function buildLynx({ P, L, m }) {
   for (const zs of [1, -1]) for (let k = 0; k < 6; k++) rea.push(box(0.012, 0.22, 0.008, [REA[0] - 0.24 + k * 0.096, REA[1], 0.163 * zs]));
   for (const z of [-0.08, 0, 0.08]) rea.push(cylX(REA[0] + 0.31, REA[0] + 0.33, 0.018, 0.018, REA[1] + 0.05, z, 10));
   P('Lynx radar electronics', {
-    system: 'Sensors', material: 'Sealed, conduction-cooled VME chassis', mass: 30, explode: [0.9, -0.2, 0.6],
+    system: 'Sensors', material: 'Sealed, conduction-cooled VME chassis', mass: 30, xrayWeight: 0.6, explode: [0.9, -0.2, 0.6],
     desc: 'The radar electronics assembly, 0.60 × 0.27 × 0.32 m (GA-ASI): exciter, receiver, digital waveform synthesis and the image processors on VME boards in a sealed chassis cooled through its walls. The whole radar weighs under 62 kg and draws 1.4 kW on average (1.9 kW peak) from the 28 V bus, one of the largest electrical loads on the aircraft.',
   }, L(merge(rea), m.lruOlive));
   const cab = [];
@@ -134,7 +134,7 @@ export function buildAirData({ P, L, m }, adc) {
 export function buildLinks({ P, L, m }, at) {
   const rj = [X(1.15), 1.225, 0];
   P('SATCOM rotary joint & RF run', {
-    system: 'Communications', material: 'RF rotary joint on the azimuth axis, low-loss waveguide run (est.)', mass: 1.5, explode: [1.2, 1.15, -0.65],
+    system: 'Communications', material: 'RF rotary joint on the azimuth axis, low-loss waveguide run (est.)', mass: 1.5, xrayWeight: 0.5, explode: [1.2, 1.15, -0.65],
     desc: 'The rotary joint on the pedestal’s azimuth axis lets the dish turn continuously while its signal passes through; a short, low-loss run takes it to the modem. Ku-band signals fade fast in cable, which is why the modem sits right beside the dish. USAF investigators call this the Predator Primary Satellite Link (PPSL).',
   }, L(merge([
     new THREE.CylinderGeometry(0.056, 0.056, 0.05, 20).translate(...rj),
