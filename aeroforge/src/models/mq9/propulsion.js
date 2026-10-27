@@ -1,0 +1,358 @@
+// MQ-9A powerplant parts: the TPE331-10 and everything bolted to it or serving it in the engine
+// bay (s 8.95–10.4), the propeller, and the engine's own controls, lubrication and fuel metering.
+// Positions follow the Honeywell TPE331-10 installation drawing (N61-1491) scaled into the aft
+// body; the installation inside the MQ-9 cowling is estimated from USAF engine-change photographs.
+
+import * as THREE from 'three';
+import { loftRings, orientTubeOutward } from '../../engine/geometry.js';
+import { X, prof, fusePoint, merge, box, lru, cylX, tubeBetween, pipe, bulkhead } from './shape.js';
+import {
+  ENGINE_Y, SHAFT_Y, PROP_X, PROP_R, STATIONS, GEARBOX, PADS, FRONT_MOUNT_S, REAR_MOUNT_S, REAR_MOUNT_R, REAR_MOUNT_Z, STACK_S,
+  combustorGeo, turbineGeo, manifoldGeo, startManifoldGeo, ignitersGeo, exhaustDuctGeo, exhaustStackGeo, compressorGeo, impellersGeo,
+  mainShaftGeo, screenGeo, plenumGeo, gearboxGeo, padsGeo, bladesGeo, hubGeo, pitchGeo, spinnerGeo,
+} from './powerplant.js';
+
+export const FIREWALL_S = 8.95;
+const XS = (s) => X(s);
+const E = (dy, dz) => [ENGINE_Y + dy, dz];
+
+/** Rounded-rectangle duct along a path in the x–y plane (centre z given per point). */
+export function duct(points, w, h, n = 16) {
+  const P = points.map((p) => new THREE.Vector3(...p));
+  const rings = P.map((p, i) => {
+    const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)];
+    const t = b.clone().sub(a).normalize();
+    const nrm = new THREE.Vector3(-t.y, t.x, 0).normalize();
+    const ring = [];
+    for (let j = 0; j < n; j++) {
+      const th = (j / n) * Math.PI * 2, c = Math.cos(th), s = Math.sin(th);
+      const u = Math.sign(c) * Math.abs(c) ** 0.6 * (w / 2), v = Math.sign(s) * Math.abs(s) ** 0.6 * (h / 2);
+      ring.push([p.x + nrm.x * v, p.y + nrm.y * v, p.z + u]);
+    }
+    return ring;
+  });
+  return orientTubeOutward(loftRings(rings, { uvMode: 'metric' }));
+}
+
+/**
+ * Build the propulsion parts. ctx: { P, L, m, role, air }. Returns the spinning groups for update()
+ * and a few attachment points other systems route to.
+ */
+export function buildPropulsion({ P, L, m, role }) {
+  const XT0 = XS(STATIONS.turbine0);
+  const cb = combustorGeo();
+  // the lower pair of rear mount pads (Honeywell: 7.8 in below and 7.2 in either side of the centreline, so 0.27 m out at about
+  // 47° from the bottom): cast bosses on the hot-end case that the truss's isolators bolt to
+  const PAD_R = Math.hypot(REAR_MOUNT_R, REAR_MOUNT_Z);
+  const padAt = (zs, r) => [XS(REAR_MOUNT_S), ENGINE_Y - (REAR_MOUNT_R / PAD_R) * r, (REAR_MOUNT_Z / PAD_R) * r * zs];
+  const bosses = [1, -1].map((zs) => tubeBetween(padAt(zs, 0.21), padAt(zs, 0.249), 0.02, 12));
+  role(P('TPE331 turbine case', {
+    system: 'Propulsion', material: 'Steel case, nickel-alloy hot section', mass: 22, explode: [0.55, 1.25, 0],
+    desc: 'The hot section of the Honeywell TPE331-10. USAF lists the MQ-9A’s engine as the TPE331-10GD at 900 shp; NASA gives Ikhana’s as a -10T and the NTSB the 2006 aircraft’s as a -10Y. Honeywell rates the basic engine at 940 shp (1,000 shp thermodynamic). The whole engine, gearbox included, is only 1.09 m long and 175 kg (385 lb) dry, because the reverse-flow combustor folds the gas path back around the turbine.',
+    callout: true, anchor: [X(9.3), ENGINE_Y - 0.197, 0.114],   // on the case, 60° below the starboard side
+  }, L(merge([cb.casing, ...bosses]), m.hot)), 'turbine');
+  role(P('Annular combustor liner', {
+    system: 'Propulsion', material: 'Nickel-alloy liner with cooling holes', mass: 6, explode: [0.55, 0.55, 0.55],
+    desc: 'Compressed air runs toward the hot end outside the liner, turns 180° into it, burns with the fuel and turns again into the first turbine nozzle. Folding the flow this way is what keeps the TPE331 short.',
+  }, L(cb.liner, m.hot)), 'turbine');
+  const tg = turbineGeo();
+  const rotors = role(P('Three-stage axial turbine', {
+    system: 'Propulsion', material: 'Nickel-superalloy discs and cast blades', mass: 18, count: 3, xrayWeight: 0.5, explode: [0.55, 0.55, -0.55],
+    desc: 'Three bladed discs on the single shaft extract the gas energy that drives both the two-stage compressor and, through the gearbox, the propeller. About 40 blades per disc are shown (the real counts are not published). After the 2006 Nogales crash Honeywell’s borescope check named the first-stage turbine nozzle and the third-stage turbine.',
+  }, [L(tg.discs, m.hot), L(tg.blades, m.hot)]), 'turbine');
+  rotors.children[1].userData.xrayWeight = 0.35;
+  role(P('Turbine nozzle rings', {
+    system: 'Propulsion', material: 'Cast nickel-alloy vane rings', mass: 6, count: 3, xrayWeight: 0.5, explode: [0.8, 0.3, -0.75],
+    desc: 'Ahead of each turbine disc a fixed ring of vanes (about 25 shown per stage) speeds up the gas and turns it onto the blades: a turbine stage is a nozzle ring and the bladed disc it drives. The first-stage nozzle sees the hottest gas in the engine.',
+  }, [L(tg.nozzles, m.darkMetal), L(tg.vanes, m.darkMetal)]), 'turbine');
+  role(P('Main fuel manifolds & nozzles', {
+    system: 'Propulsion', material: 'Stainless manifolds, atomising nozzles', mass: 3, count: 10, explode: [0.75, 1.3, 0.4],
+    desc: 'Two manifolds round the hot end of the combustor (Honeywell’s drawing labels them “fuel manifolds”) feed the atomising nozzles that spray metered fuel into the liner. Ten nozzles are shown; the real count is not published.',
+  }, L(manifoldGeo(10), m.pipe)), 'turbine');
+  role(P('Starting fuel manifold', {
+    system: 'Propulsion', material: 'Stainless manifold with small starting nozzles', mass: 0.6, count: 3, explode: [0.6, -0.55, 0.5],
+    desc: 'A separate manifold on the lower case with a few small nozzles. The engine lights on these during the start; once the flame holds, the main manifolds take over.',
+  }, L(startManifoldGeo(), m.pipe)), 'turbine');
+  role(P('Igniter plugs', {
+    system: 'Propulsion', material: 'Surface-discharge igniters', mass: 0.6, count: 2, explode: [0.75, 1.3, -0.4],
+    desc: 'Two igniters, one on top of the combustor case and one on its left side (the NTSB names “the top igniter” and “the left side igniter”). The TPE331-10 has dual continuous ignition, so it can also be left on in heavy rain or turbulence.',
+  }, L(ignitersGeo(), m.darkMetal)), 'turbine');
+  role(P('Exhaust duct', {
+    system: 'Propulsion', material: 'Inconel, flattened to fit between the engine case and the cowling', mass: 8, explode: [0.95, 0.8, 0],
+    desc: 'The engine exhausts through one round outlet, 0.277 m across, at its hot end, which in this pusher faces forward. A collector bell turns the flow back into a single flattened duct that runs aft along the upper starboard side of the engine, under the access door, and climbs over the front of the gearbox into the stack (routing inside the cowling estimated).',
+  }, L(exhaustDuctGeo(), m.hot)), 'exhaust');
+  const hotDouble = m.hot.clone(); hotDouble.side = THREE.DoubleSide;
+  role(P('Exhaust stack', {
+    system: 'Propulsion', material: 'Inconel, sooted inside', mass: 5, explode: [0.2, 0.75, 0],
+    desc: 'One large rectangular stack on top of the cowling, on the centreline just behind the V-tail and directly above the spinner, throws the exhaust aft over the propeller disc (USAF tail-on photographs show it sooted black inside). Little jet thrust is left at that point: the propeller does the work.',
+  }, L(exhaustStackGeo(), hotDouble)), 'exhaust');
+  role(P('TPE331 compressor housing', {
+    system: 'Propulsion', material: 'Aluminium and steel housings, diffusers and crossover ducts', mass: 26, explode: [0, 1.05, 0],
+    desc: 'Houses the two centrifugal stages in series: crossover ducts carry the air from the first stage to the second. Honeywell gives the TPE331-10 a 10.55:1 pressure ratio and 3.5 kg/s (7.7 lb/s) of airflow, for a specific fuel consumption of 0.534 lb per equivalent shaft horsepower per hour.',
+  }, L(compressorGeo(), m.titanium)), 'compressor');
+  role(P('Centrifugal impellers', {
+    system: 'Propulsion', material: 'Titanium impellers', mass: 9, count: 2, xrayWeight: 0.5, explode: [0, 0.55, 0.55],
+    desc: 'Two centrifugal impellers on the main shaft fling the air outward into their diffusers. A centrifugal stage does the work of several axial stages in a short, rugged package that tolerates dust and ingested debris.',
+  }, L(impellersGeo(), m.titanium)), 'compressor');
+  P('Main shaft & bearings', {
+    system: 'Propulsion', material: 'Steel shaft, three rolling-element bearings', mass: 6, count: 3, explode: [0, 0.55, -0.55],
+    desc: 'One shaft carries the turbine, both impellers and the gearbox input pinion, turning at 41,730 rpm at 100 % speed (Honeywell). A 2018 MQ-9 loss began with a failing compressor bearing: metal particles in an oil sample taken the day before flagged it, but the result reached the crew too late (USAF investigation).',
+  }, L(mainShaftGeo(), m.pipe));
+  P('Inlet screen', {
+    system: 'Propulsion', material: 'Stainless wire screen', mass: 1, explode: [-0.25, 0.8, 0],
+    desc: 'A mesh drum between the gearbox and the first compressor stage that keeps debris drawn through the inlet duct out of the impellers.',
+  }, L(screenGeo(), m.darkMetal));
+  // dorsal ram-air scoop at the front of the engine hump, a flat duct over the accessory bay and the
+  // engine, and the annular plenum round the compressor inlet (routing estimated)
+  const inletPath = [[XS(7.92), 1.882, 0], [XS(8.1), 1.89, 0], [XS(8.45), 1.935, 0], [XS(8.95), 1.99, 0], [XS(9.4), 2.025, 0], [XS(9.68), 2.03, -0.015], [XS(9.78), 2.0, -0.025], [XS(9.83), 1.93, -0.025]];   // its end eases 2 cm to port, away from the exhaust duct's climb
+  const scoop = lru(0.34, 0.075, 0.25, [XS(8.02), 1.895, 0], 0.04);
+  P('Engine air inlet & plenum', {
+    system: 'Propulsion', material: 'Composite scoop and duct, aluminium plenum (routing approximate)', mass: 8, explode: [0, 1.6, 0],
+    desc: 'A dorsal ram-air scoop at the front of the engine hump feeds a flat duct over the accessory bay and the engine to a plenum round the inlet screen, just ahead of the gearbox, where the TPE331 draws its 3.5 kg of air a second. Fed from above, the plenum wraps the screen round the top and sides and has a flat floor underneath, where it sits on the accessory drive case. The NTSB checked this “inlet assembly ducting” for debris after the 2006 loss (scoop position from photographs; duct routing and plenum shape estimated).',
+  }, [L(merge([scoop, duct(inletPath, 0.24, 0.055), plenumGeo()]), m.skin), L(box(0.004, 0.055, 0.21, [XS(8.02) + 0.171, 1.895, 0]), m.intake)]);
+
+  // ---- reduction gearbox and accessory drives
+  const gb = gearboxGeo();
+  role(P('Propeller reduction gearbox', {
+    system: 'Propulsion', material: 'Cast gearbox case, steel gears (an aluminium case is a Honeywell option)', mass: 50, explode: [-0.55, 1.05, 0],
+    desc: 'The largest part of the engine, 0.53 m wide and 0.68 m tall, with the front mount on top. It steps 41,730 engine rpm down to 1,591 propeller rpm (26.2:1, for counter-clockwise rotation; 2,000 rpm for clockwise). Its output sits 0.090 m above the engine centreline, which is why the propeller shaft is higher than the turbine.',
+  }, L(gb.housing, m.gun)), 'gearbox');
+  role(P('Accessory drive case', {
+    system: 'Propulsion', material: 'Cast case with splined drive pads', mass: 6, count: 4, explode: [0.2, -0.75, 0],
+    desc: 'The lower, engine-side face of the gearbox carries the accessory drive pads (Honeywell): starter-generator 10,887 rpm (300 lb·in continuous), aircraft accessory 3,959 rpm, tachometer-generator 4,187 rpm, plus the propeller-governor pad at 3,754 rpm. The case fills the space below the inlet screen, and the air plenum’s flat floor rests on its top face.',
+  }, [L(gb.accessory, m.gun), L(padsGeo(), m.darkMetal)]), 'gearbox');
+  P('Propeller shaft & flange', {
+    system: 'Propulsion', material: 'Steel output shaft and propeller flange', mass: 7, explode: [-1.05, 0.45, 0],
+    desc: 'The gearbox output shaft ends in the propeller flange the hub bolts to; the beta tube that sets reverse pitch runs through its bore. Up to 900 shp (671 kW) passes through it at about 1,590 rpm, a torque near 4 kN·m.',
+  }, L(gb.output, m.titanium));
+  const tachX0 = XS(GEARBOX.s0 - 0.07);
+  P('Tachometer-generator', {
+    system: 'Propulsion', material: 'Small engine-driven generator', mass: 0.8, explode: [0.3, -0.95, 0.15],
+    desc: 'Driven from its own pad at 4,187 rpm, it makes a voltage proportional to engine speed for the rpm indication and the engine control (Honeywell pad table).',
+  }, L(merge([cylX(tachX0, tachX0 + 0.11, 0.032, 0.032, PADS.tach.y, 0.03, 14), cylX(tachX0, tachX0 + 0.012, 0.04, 0.04, PADS.tach.y, 0.03, 14)]), m.darkMetal));
+  const starterX0 = XS(GEARBOX.s0 - 0.075);
+  // its terminal box is on the outboard side, where the harness comes down the starboard wall (on top it would sit in the compressor housing)
+  const sgBox = [starterX0 + 0.12, PADS.starter.y, PADS.starter.z + 0.072 + 0.013];
+  role(P('Starter-generator', {
+    system: 'Electrical', material: 'Air-cooled starter-generator (GA-ASI: “high-capacity starter generator”; machine type not public)', mass: 18, explode: [-0.45, -0.75, 0.75],
+    desc: 'An air-cooled machine on the starter-generator pad (GA-ASI calls it a “high-capacity starter generator”): it spins the engine for starting, then becomes the main generator. Block 5 aircraft have a higher-capacity unit (45 kVA main power). In a 2015 loss its air temperature climbed and its output fell from 156 A to 0 (USAF investigation); the NTSB found debris in the cooling duct of the 2006 aircraft’s unit.',
+  }, L(merge([cylX(starterX0, starterX0 + 0.25, 0.072, 0.072, PADS.starter.y, PADS.starter.z, 20), cylX(starterX0 + 0.25, starterX0 + 0.27, 0.05, 0.05, PADS.starter.y, PADS.starter.z, 14), box(0.06, 0.05, 0.026, sgBox)]), m.darkMetal)), 'generator');
+  role(P('Backup generator', {
+    system: 'Electrical', material: 'Direct-drive brushless alternator (USAF)', mass: 9, explode: [-0.45, -0.75, -0.75],
+    desc: 'A second, independent source on the aircraft-accessory pad. Block 1 aircraft first had none: after a generator failure only the battery remained, so the Electrical Safety Improvement Program added a “direct drive brushless alternator” (USAF) for the flight-critical avionics. The GA-ASI Block 5 sheet gives 4 kW of backup power.',
+  }, L(merge([cylX(starterX0, starterX0 + 0.2, 0.06, 0.06, PADS.accessory.y, PADS.accessory.z, 18), box(0.06, 0.04, 0.03, [XS(9.68), PADS.accessory.y + 0.01, PADS.accessory.z - 0.07])]), m.darkMetal)), 'generator');
+  const fanEnd = [starterX0 + 0.27, PADS.starter.y, PADS.starter.z];
+  const coolIn = fusePoint(9.49, -0.7, 0.03), scoopAt = fusePoint(9.49, -0.7, 0.006);
+  // outlet louvre on the lower starboard cowling beside the generator's drive end, ahead of the gearbox face
+  const louvre = [];
+  for (let k = 0; k < 3; k++) {
+    const a = new THREE.Vector3(...fusePoint(9.76 + k * 0.03, -0.62, -0.004)), b = new THREE.Vector3(...fusePoint(9.76 + k * 0.03, -0.86, -0.004));
+    louvre.push(tubeBetween(a.toArray(), b.toArray(), 0.005, 5));
+  }
+  louvre.push(tubeBetween(fusePoint(9.745, -0.6, -0.002), fusePoint(9.745, -0.88, -0.002), 0.004, 4), tubeBetween(fusePoint(9.835, -0.6, -0.002), fusePoint(9.835, -0.88, -0.002), 0.004, 4));
+  P('Starter-generator cooling duct', {
+    system: 'Electrical', material: 'Flexible ducting from a flush cowling inlet, louvred outlet', mass: 0.6, explode: [-0.2, -0.9, 1.0],
+    desc: 'Ram air from a small inlet on the lower starboard cowling, just ahead of the generator, is ducted into its fan end and blows through the windings; the warm air leaves the cowling through a louvred outlet beside the drive end, ahead of the gearbox. A blocked duct overheats the generator: debris was found in it after the 2006 loss (routing estimated).',
+  }, [L(pipe([coolIn, [XS(9.495), 1.458, 0.205], [XS(9.505), 1.455, 0.165], fanEnd], 0.024, 8, 16), m.harness), L(lru(0.07, 0.028, 0.06, scoopAt), m.intake), L(merge(louvre), m.darkMetal)]);
+
+  // ---- propeller control
+  const govP = [XS(9.815), ENGINE_Y - 0.095, 0.245], govArm = [XS(9.79), govP[1] + 0.06, govP[2] + 0.02];
+  P('Propeller governor', {
+    system: 'Propulsion', material: 'Woodward flyweight governor and oil pump', mass: 3, explode: [-0.75, 0.85, 0.3],
+    desc: 'A Woodward unit on the governor pad (3,754 rpm): flyweights sense propeller speed and meter gearbox oil to the pitch-change piston, coarsening the blades when the engine speeds up. The speed-lever servo sets it through a cable to the arm on its side. If propeller speed falls below 1,488 rpm an automatic air restart begins (NTSB; its pad here, on the engine-side face of the gearbox, is estimated).',
+  }, L(merge([cylX(XS(GEARBOX.s0) + 0.002, XS(9.755), 0.03, 0.03, govP[1], govP[2], 14), cylX(XS(GEARBOX.s0) + 0.014, XS(GEARBOX.s0) - 0.002, 0.038, 0.038, govP[1], govP[2], 14),
+    box(0.012, 0.045, 0.012, [govArm[0], govArm[1] - 0.022, govArm[2]]), box(0.03, 0.01, 0.012, [govArm[0] - 0.01, govArm[1], govArm[2]])]), m.gun));
+  P('NTS & beta-pressure switch', {
+    system: 'Propulsion', material: 'Negative-torque-sensing valve and pressure switch with oil lines', mass: 0.8, count: 2, explode: [-0.9, 0.2, 0.55],
+    desc: 'Two small units on the gearbox (Honeywell basic engine). The negative-torque-sensing (NTS) system notices when a windmilling propeller starts to drive the engine and moves the blades toward feather to cut the drag; the beta-pressure switch reports that the blades are in the ground (beta) range.',
+  }, L(merge([cylX(XS(10.245), XS(10.215), 0.026, 0.026, ENGINE_Y - 0.09, 0.15, 12), cylX(XS(10.24), XS(10.215), 0.02, 0.02, ENGINE_Y - 0.09, -0.15, 12),
+    pipe([[XS(10.23), ENGINE_Y - 0.09, 0.15], [XS(10.24), ENGINE_Y - 0.02, 0.12], [XS(10.23), SHAFT_Y - 0.08, 0.06]], 0.005, 5, 10)]), m.darkMetal));
+
+  // ---- engine-mounted fuel metering
+  const fcuP = [XS(9.55), ENGINE_Y + 0.268, 0];
+  role(P('Fuel control unit', {
+    system: 'Propulsion', material: 'Hydromechanical fuel control with underspeed governor', mass: 5, explode: [-0.2, 1.3, 0.5],
+    desc: 'On top of the engine over the compressor (Honeywell drawing), the hydromechanical fuel control meters fuel for the power lever’s setting. In the beta range its underspeed governor holds rpm with fuel flow. After the 2006 crash investigators found the power lever at 90°, the propeller pitch control at 89° and the underspeed governor at 32°. In 2025 a chafed wire inside an FCU fired the electrical shutoff valve and an MQ-9 was lost.',
+  }, L(merge([lru(0.2, 0.06, 0.13, [fcuP[0], fcuP[1], 0], 0.02), box(0.03, 0.03, 0.03, [fcuP[0] + 0.06, fcuP[1] + 0.02, 0.07]), cylX(fcuP[0] - 0.05, fcuP[0] - 0.02, 0.012, 0.012, fcuP[1] + 0.038, -0.04, 8)]), m.darkMetal)), 'compressor');
+  const pumpP = [XS(9.7025), ENGINE_Y + 0.23, 0.04], PUMP_H = 0.0475;
+  role(P('Engine-driven fuel pump', {
+    system: 'Propulsion', material: 'Gear-type high-pressure pump on a drive from the gearbox', mass: 3, explode: [-0.45, 1.25, 0.3],
+    desc: 'Raises the boost-pump pressure to the several hundred psi the nozzles need to atomise the fuel, and hands it to the fuel control. The NTSB found its drive shaft still connected after the 2006 crash.',
+  }, L(merge([cylX(pumpP[0] - PUMP_H, pumpP[0] + PUMP_H, 0.04, 0.04, pumpP[1], pumpP[2], 16), cylX(pumpP[0] - PUMP_H - 0.028, pumpP[0] - PUMP_H, 0.018, 0.018, pumpP[1], pumpP[2], 10)]), m.darkMetal)), 'compressor');
+  const msovP = [XS(9.44), ENGINE_Y + 0.27, -0.05];
+  P('Mechanical fuel shutoff valve (MSOV)', {
+    system: 'Propulsion', material: 'Lever-operated shutoff valve at the fuel-control outlet', mass: 0.5, explode: [0.35, 1.45, -0.35],
+    desc: 'The engine’s own fuel shutoff valve. The condition lever has three positions: Run; Stop, which closes this mechanical valve; and Stop & Feather, which also feathers the propeller. The MQ-9A has a second, electrical valve (the FSOV) at the firewall.',
+  }, L(merge([cylX(msovP[0] - 0.03, msovP[0] + 0.03, 0.022, 0.022, msovP[1], msovP[2], 12), box(0.012, 0.032, 0.012, [msovP[0], msovP[1] + 0.02, msovP[2] - 0.02])]), m.lruOlive));
+  const xMan = XS(STATIONS.turbine0) - 0.035;
+  P('Metered fuel line', {
+    system: 'Propulsion', material: 'Stainless tube, fire-sleeved', mass: 0.5, explode: [0.55, 1.6, -0.2],
+    desc: 'Carries metered fuel from the fuel-control outlet, past the MSOV, forward along the top of the combustor to the main manifolds at the hot end.',
+  }, L(merge([pipe([[fcuP[0] + 0.1, fcuP[1], 0], [msovP[0] - 0.02, msovP[1], msovP[2]]], 0.006, 6, 8),
+    pipe([[msovP[0] + 0.03, msovP[1], msovP[2]], [XS(9.35), ENGINE_Y + 0.255, -0.06], [xMan + 0.02, ENGINE_Y + 0.25, -0.05], [xMan, ENGINE_Y + 0.236, -0.03]], 0.006, 6, 24)]), m.pipe));
+  P('Fuel purge system', {
+    system: 'Propulsion', material: 'Small accumulator and valve on the main manifold', mass: 0.4, explode: [0.6, -0.8, 0.2],
+    desc: 'At shutdown it blows the fuel left in the manifolds and nozzles into the combustor so it cannot cook into carbon in the hot nozzle tips (Honeywell basic engine).',
+  }, L(merge([cylX(xMan - 0.04, xMan + 0.04, 0.024, 0.024, ENGINE_Y - 0.27, 0.07, 12), tubeBetween([xMan, ENGINE_Y - 0.25, 0.07], [xMan, ENGINE_Y - 0.236, 0.02], 0.005, 5)]), m.alu));
+  const heatP = [XS(9.39), ENGINE_Y - 0.22, -0.2], HEAT_HL = 0.06;        // just aft of the port rear mount pad
+  P('Engine fuel heater', {
+    system: 'Propulsion', material: 'Oil-to-fuel heat exchanger (fuel anti-ice)', mass: 1.5, explode: [0.3, -0.5, -0.8],
+    desc: 'The TPE331-10’s own fuel anti-ice heating: warm engine oil heats the fuel before the high-pressure pump so that water in it cannot freeze into filter-blocking ice crystals at altitude (Honeywell basic engine; position estimated).',
+  }, L(merge([cylX(heatP[0] - HEAT_HL, heatP[0] + HEAT_HL, 0.038, 0.038, heatP[1], heatP[2], 14), cylX(heatP[0] + 0.02, heatP[0] + 0.04, 0.044, 0.044, heatP[1], heatP[2], 14)]), m.alu));
+
+  // ---- lubrication
+  const tankP = [XS(9.3925), ENGINE_Y - 0.21, 0.2], TANK_HL = 0.0525, TANK_R = 0.052;   // just aft of the starboard rear mount pad
+  role(P('Oil tank', {
+    system: 'Propulsion', material: 'Aluminium tank with filler and sight gauge', mass: 4, explode: [0, -0.55, 0.95],
+    desc: 'Holds the engine and gearbox oil (capacity, size and position estimated); it sits just aft of the starboard rear mount pad. The same oil cools the bearings, lubricates the gears, heats the fuel and works the propeller’s pitch-change piston.',
+  }, L(merge([cylX(tankP[0] - TANK_HL, tankP[0] + TANK_HL, TANK_R, TANK_R, tankP[1], tankP[2], 16), cylX(tankP[0] - 0.045, tankP[0] - 0.015, 0.016, 0.016, tankP[1] + TANK_R - 0.002, tankP[2], 8)]), m.alu)), 'oil');
+  const filtX = XS(GEARBOX.s0 - 0.07);
+  role(P('Oil filter & chip detector', {
+    system: 'Propulsion', material: 'Filter canister with a magnetic chip detector plug', mass: 0.8, explode: [0.35, -1.0, -0.3],
+    desc: 'On the gearbox sump: the filter catches debris and a magnetic plug collects iron particles shed by wearing gears and bearings, the early warning that oil sampling also gives. In 2018 metal in an oil sample flagged a failing compressor bearing a day before it failed.',
+  }, L(merge([cylX(filtX, filtX + 0.12, 0.028, 0.028, PADS.tach.y + 0.01, -0.065, 14), cylX(filtX + 0.12, filtX + 0.135, 0.01, 0.01, PADS.tach.y + 0.01, -0.065, 8)]), m.alu)), 'oil');
+  P('Oil pressure & temperature sensors', {
+    system: 'Propulsion', material: 'Pressure transmitter and temperature bulb', mass: 0.3, count: 2, explode: [-0.3, -0.3, -1.05],
+    desc: 'A pressure transmitter and the oil temperature-sensing bulb (Honeywell basic engine) on the gearbox report to the engine control and the ground station; low pressure or high temperature is often the first sign of a lubrication fault.',
+  }, L(merge([tubeBetween([XS(10.0), ENGINE_Y - 0.05, -0.255], [XS(10.0), ENGINE_Y - 0.05, -0.29], 0.013, 8), tubeBetween([XS(10.06), ENGINE_Y - 0.13, -0.235], [XS(10.06), ENGINE_Y - 0.13, -0.27], 0.01, 8)]), m.darkMetal));
+  // ventral oil cooler ahead of the ventral fin (scoop position from photographs)
+  const coolS = 7.95, coolY = prof(coolS).bot;
+  role(P('Oil cooler & scoop', {
+    system: 'Propulsion', material: 'Aluminium matrix cooler, composite scoop (position approximate)', mass: 8, explode: [0, -0.8, 0],
+    desc: 'Engine and gearbox oil rejects its heat to ram air through a ventral scoop and cooler matrix just ahead of the ventral fin. At 15 km the air is thin, so the cooler is sized for climbing slowly at high power.',
+  }, [L(merge([lru(0.5, 0.075, 0.22, [X(coolS), coolY - 0.012, 0], 0.03), box(0.13, 0.12, 0.22, [X(coolS - 0.1), coolY + 0.1, 0])]), m.skin), L(box(0.004, 0.05, 0.18, [X(coolS) + 0.252, coolY - 0.015, 0]), m.intake)]), 'oil');
+  const tcvP = [X(coolS - 0.24), coolY + 0.11, -0.09];
+  role(P('Oil temperature control valve', {
+    system: 'Propulsion', material: 'Thermostatic bypass valve', mass: 0.6, explode: [0.3, -0.55, -0.6],
+    desc: 'At the cooler inlet: cold oil bypasses the matrix and hot oil is sent through it, so the oil warms quickly and then holds its temperature. A 2009 MQ-9 was lost when an improperly assembled temperature control valve caused a severe oil-flow imbalance and engine failure (USAF investigation).',
+  }, L(merge([cylX(tcvP[0] - 0.04, tcvP[0] + 0.04, 0.026, 0.026, tcvP[1], tcvP[2], 12), box(0.03, 0.03, 0.03, [tcvP[0], tcvP[1] + 0.03, tcvP[2]])]), m.alu)), 'oil');
+  // supply from the filter to the temperature control valve, return from the cooler matrix to the sump: both run under the
+  // generators and the engine, close to the keel; a third line joins the tank to the pump in the accessory case
+  const oilLines = [
+    pipe([[filtX + 0.07, PADS.tach.y - 0.025, -0.07], [XS(9.66), 1.385, -0.075], [XS(9.5), 1.37, -0.085], [XS(9.2), 1.365, -0.09], [XS(FIREWALL_S), 1.37, -0.1], [XS(8.4), 1.385, -0.14], [XS(7.95), 1.35, -0.15], [XS(7.76), tcvP[1], -0.14], [tcvP[0], tcvP[1], tcvP[2] - 0.026]], 0.008, 6, 60),
+    pipe([[XS(7.91), 1.34, -0.05], [XS(8.0), 1.37, -0.06], [XS(8.4), 1.378, -0.09], [XS(FIREWALL_S), 1.362, -0.055], [XS(9.2), 1.358, -0.045], [XS(9.5), 1.362, -0.04], [XS(9.76), 1.372, -0.03], [XS(9.84), 1.405, -0.02]], 0.008, 6, 60),
+    pipe([[tankP[0] - TANK_HL - 0.004, tankP[1] - 0.022, tankP[2] - 0.01], [XS(9.49), 1.40, 0.13], [XS(9.6), 1.372, 0.06], [XS(9.76), 1.366, 0.03], [XS(9.835), 1.385, 0.025], [XS(9.85), 1.405, 0.025]], 0.007, 6, 24),
+  ];
+  role(P('Engine oil lines', {
+    system: 'Propulsion', material: 'Stainless tube and fire-sleeved hose', mass: 2, count: 3, explode: [0, -0.3, -0.75],
+    desc: 'Supply and return lines between the gearbox sump and the ventral oil cooler, low along the keel under the generators and the engine and through the firewall in fire-resistant fittings, and a line from the oil tank to the pump in the accessory case (routing estimated).',
+  }, L(merge(oilLines), m.pipe)), 'oil');
+
+  // ---- ignition and engine sensors
+  const excP = [XS(9.36), ENGINE_Y - 0.06, -0.26];             // inboard of the V-tail spar frame's side arc
+  role(P('Ignition exciter', {
+    system: 'Propulsion', material: 'Capacitor-discharge ignition unit', mass: 2, explode: [0.3, 0.2, -1.0],
+    desc: 'Charges capacitors from the 24 V supply and fires the two igniter plugs through shielded leads, during starts and whenever continuous ignition is selected.',
+  }, L(merge([lru(0.13, 0.05, 0.05, excP), pipe([excP, [XS(9.29), ENGINE_Y + 0.05, -0.27], [XS(9.27), ENGINE_Y + 0.2, -0.15], [XS(9.285), ENGINE_Y + 0.27, -0.01], [XS(9.298), ENGINE_Y + 0.276, 0]], 0.004, 5, 18), pipe([excP, [XS(9.28), ENGINE_Y, -0.27]], 0.004, 5, 8)]), m.lruOlive)), 'generator');
+  const egtX = XT0 - 0.022;
+  const egt = [new THREE.TorusGeometry(0.2, 0.005, 5, 40).rotateY(Math.PI / 2).translate(egtX, ENGINE_Y, 0)];
+  for (let k = 0; k < 8; k++) {
+    const a = ((k + 0.5) / 8) * Math.PI * 2;
+    egt.push(tubeBetween([egtX, ENGINE_Y + Math.cos(a) * 0.14, Math.sin(a) * 0.14], [egtX, ENGINE_Y + Math.cos(a) * 0.205, Math.sin(a) * 0.205], 0.005, 5));
+  }
+  egt.push(pipe([[egtX, ENGINE_Y + 0.14, 0.14], [XS(9.1), 1.82, 0.24], [XS(FIREWALL_S), 1.78, 0.25], [XS(8.8), 1.765, 0.236], [XS(8.75), 1.757, 0.23]], 0.005, 5, 24));   // joins the engine-bay harness at s 8.75
+  role(P('EGT thermocouple harness', {
+    system: 'Propulsion', material: 'Chromel-alumel thermocouples on a ring harness', mass: 1, count: 8, xrayWeight: 0.5, explode: [0.95, 0.55, 0.5],
+    desc: 'Probes in the gas path average the exhaust gas temperature, the TPE331’s key limit. The single red-line (SRL) limiting in the engine control keeps it below its maximum (probe count and position estimated).',
+  }, L(merge(egt), m.copper)), 'turbine');
+  P('Torque & speed pickups', {
+    system: 'Propulsion', material: 'Torque sensor and magnetic speed pickup', mass: 1, count: 2, explode: [-0.55, 1.35, 0.3],
+    desc: 'Torque measured inside the gearbox and engine speed from a magnetic pickup are what the crew’s power gauges show: shaft power = torque × rpm. The heads-down display warns of a torque loss (positions estimated).',
+  }, L(merge([cylX(XS(9.87), XS(9.83), 0.02, 0.02, ENGINE_Y + 0.17, -0.17, 10), cylX(XS(9.87), XS(9.84), 0.014, 0.014, ENGINE_Y + 0.17, 0.17, 10)]), m.darkMetal));
+
+  // ---- engine electronics and control linkage, on the accessory-bay rack ahead of the firewall
+  const DEEC_P = [XS(8.66), 1.65, 0.2], ESM_P = [XS(8.66), 1.61, -0.205];
+  P('DEEC engine control', {
+    system: 'Propulsion', material: 'Digital electronic engine control unit', mass: 4, explode: [0.4, 0.75, 0.75],
+    desc: 'The digital electronic engine control, developed by Honeywell and GA-ASI. NASA’s Ikhana was the first production Predator B to carry it, and it made the aircraft 5–10 % more fuel-efficient (NASA fact sheet). It trims fuel and propeller pitch for the commanded power and guards the temperature and torque limits, ahead of the firewall where it stays cool.',
+  }, L(lru(0.1, 0.2, 0.19, DEEC_P), m.lruOlive));
+  P('Engine start module & SRL', {
+    system: 'Propulsion', material: 'Start sequencer and single red-line EGT limiter', mass: 2, explode: [0.4, 0.75, -0.75],
+    desc: 'Sequences an automatic start (starter, ignition, fuel, then cut-out) and holds the single red-line exhaust-temperature limit. The TPE331-10’s basic control is a “Single Red Line / Auto-Start Controller”; USAF investigators list an Engine Start Module beside the DEEC.',
+  }, L(lru(0.1, 0.12, 0.15, ESM_P), m.lruOlive));
+  const servoX = [8.66, 8.74, 8.82].map(XS);
+  const servoG = [box(0.3, 0.012, 0.36, [XS(8.74), 1.78, 0])];
+  servoX.forEach((x, i) => servoG.push(lru(0.06, 0.08, 0.1, [x, 1.83, -0.12 + i * 0.12], 0.01), box(0.012, 0.04, 0.012, [x - 0.03, 1.86, -0.12 + i * 0.12])));
+  P('Engine control servos', {
+    system: 'Propulsion', material: 'Three electromechanical servos on a bracket', mass: 3, count: 3, explode: [0.35, 1.25, 0],
+    desc: 'With no cockpit, servos move the engine’s own levers: power lever, speed lever (propeller governor) and condition lever (stop & feather). After the 2006 crash every cable was still attached to its servo (NTSB). Positions estimated.',
+  }, L(merge(servoG), m.lruOlive));
+  const cabStart = (i) => [servoX[i] - 0.035, 1.86, -0.12 + i * 0.12];
+  const cables = [
+    pipe([cabStart(0), [XS(8.95), 1.9, -0.1], [XS(9.3), 1.94, -0.08], [fcuP[0] + 0.08, fcuP[1] + 0.03, -0.06]], 0.003, 4, 24),       // power lever → FCU
+    pipe([cabStart(1), [XS(8.95), 1.88, 0.0], [XS(9.3), 1.94, -0.04], [msovP[0], msovP[1] + 0.034, msovP[2] - 0.02]], 0.003, 4, 24),       // condition lever → MSOV lever
+    pipe([cabStart(2), [XS(8.9), 1.83, 0.17], [XS(8.95), 1.7, 0.22], [XS(9.05), 1.6, 0.27], [XS(9.2), 1.58, 0.28], [XS(9.55), 1.605, 0.29], [XS(9.72), 1.64, 0.28], [govArm[0], govArm[1] + 0.003, govArm[2] + 0.002]], 0.003, 4, 48),  // speed lever, low through the firewall clear of the exhaust duct → governor arm
+  ];
+  P('Engine control cables', {
+    system: 'Propulsion', material: 'Push-pull control cables in conduit', mass: 0.8, count: 3, explode: [0.1, 1.55, 0.2],
+    desc: 'Push-pull cables from the servos through the firewall to the fuel control’s power lever, the condition lever on the shutoff valve and the governor’s speed lever. A chafed propeller-governor cable was found at a 3,000-hour engine inspection in 2025 (routing estimated).',
+  }, L(merge(cables), m.darkMetal));
+
+  // ---- engine mounting
+  P('Firewall', {
+    system: 'Structure', material: 'Titanium sheet (est.)', mass: 9, explode: [0.15, 0.95, 0],
+    desc: 'Fireproof bulkhead between the engine bay and the accessory bay ahead of it, with fire-sealed pass-throughs for the fuel, oil, control cables and harnesses. Titanium keeps its strength at flame temperatures where aluminium would melt.',
+  }, L(bulkhead(FIREWALL_S), m.titanium));
+  // Welded tube truss on Honeywell's three mount points (tube layout estimated). Rear: the two lower hot-end pads (the starboard
+  // upper one sits where the exhaust duct runs in this installation), each braced by a V of tubes to the firewall. Front: the pad
+  // on top of the gearbox, which only a bracket from forward can reach (the gearbox top is 2 cm under the cowling, the exhaust duct
+  // climbs past its starboard side): an A-frame of two tubes from the port side of the V-tail rear spar frame runs aft over the
+  // engine, outboard of the inlet duct, to a knee ahead of the gearbox, and a short tube carries the load to a plate on an isolator
+  // on the pad.
+  const mt = [];
+  const FW = FIREWALL_S + 0.022;                                   // aft face of the firewall root fittings
+  for (const zs of [1, -1]) {
+    const pad = padAt(zs, PAD_R);
+    mt.push(cylX(pad[0] - 0.035, pad[0] + 0.035, 0.021, 0.021, pad[1], pad[2], 14));            // rear mount isolator on its pad
+    for (const [th, inset] of [[-0.25, 0.06], [-1.15, 0.055]]) {         // one up the side, one down toward the keel
+      const t = zs > 0 ? th : Math.PI - th;
+      const root = fusePoint(FW, t, inset);
+      mt.push(box(0.02, 0.045, 0.045, [XS(FIREWALL_S + 0.016), root[1], root[2]]), tubeBetween(root, pad, 0.012, 8));
+    }
+  }
+  const KNEE = [XS(9.78), 2.05, -0.14];
+  const fmY = ENGINE_Y + GEARBOX.top + 0.002;                      // top face of the gearbox's front mount pad
+  mt.push(new THREE.CylinderGeometry(0.026, 0.026, 0.004, 16).translate(XS(FRONT_MOUNT_S), fmY + 0.002, 0));   // isolator
+  mt.push(box(0.05, 0.004, 0.08, [XS(FRONT_MOUNT_S), fmY + 0.006, 0]));                                             // bracket plate
+  for (const [t, inset] of [[Math.PI - 1.1, 0.042], [Math.PI - 0.55, 0.05]]) {   // upper and lower roots on the port side of the frame
+    const root = fusePoint(9.335, t, inset);
+    mt.push(box(0.03, 0.03, 0.03, [XS(9.335), root[1], root[2]]), tubeBetween(root, KNEE, 0.0115, 8));
+  }
+  mt.push(new THREE.SphereGeometry(0.016, 10, 8).translate(...KNEE));
+  mt.push(tubeBetween(KNEE, [XS(FRONT_MOUNT_S) + 0.012, fmY + 0.008, -0.03], 0.009, 8));     // onto the plate's forward port corner
+  P('Engine mount truss', {
+    system: 'Structure', material: 'Welded steel tube with elastomeric isolators (est.)', mass: 13, explode: [0, 1.15, 0],
+    desc: 'The TPE331 hangs from Honeywell’s mount points: a front mount on top of the gearbox and, at the hot end, pads 7.8 in (0.198 m) above and below the centreline and 7.2 in (0.183 m) to either side of it, with rubber isolators to keep engine vibration out of the airframe and the sensors. This truss uses the lower pair, each braced by two tubes to the firewall, clear of the exhaust duct on the upper starboard side; the front mount is picked up by a bracket whose A-frame runs forward over the port side of the engine, outboard of the inlet duct, to the rear V-tail spar frame, leaving the starboard side to the exhaust duct (which pads the MQ-9 uses and the tube layout are estimated).',
+  }, L(merge(mt), m.darkMetal));
+
+  // ---- propeller (rotating groups)
+  const propSpin = new THREE.Group(); propSpin.position.set(PROP_X, SHAFT_Y, 0);
+  const hubSpin = new THREE.Group(); hubSpin.position.copy(propSpin.position);
+  const domeSpin = new THREE.Group(); domeSpin.position.copy(propSpin.position);
+  const bl = bladesGeo(3);
+  P('Three-blade propeller', {
+    system: 'Propulsion', material: 'Aluminium-alloy scimitar blades, matte black with yellow tips', mass: 45, count: 3, explode: [-2.3, -1.0, 0],
+    desc: 'A McCauley 3GFR36C606 propeller with three 110GFA-0 aluminium-alloy scimitar blades, full-feathering and reversing. The blade number gives the disc: 110 in (2.79 m) across, so each tip is 1.40 m (55 in) from the shaft; about 1.2 m of each blade shows outboard of the hub clamps, and it is about 0.23 m (9 in) wide at its widest (NTSB; McCauley designation; blade width from a blade removed at overhaul). The yellow tip stripes mark the tip arc for ground crews. Behind the wing and sensors it never blocks the view.',
+    callout: true, anchor: [PROP_X + 0.03, SHAFT_Y - 0.58, -0.98],   // near the blade tips, lower port quadrant of the disc
+  }, propSpin);
+  propSpin.add(L(bl.black, m.blade), L(bl.yellow, m.bladeTip));
+  const hub = hubGeo(3);
+  P('Propeller hub & blade clamps', {
+    system: 'Propulsion', material: 'Forged aluminium hub, steel clamps and counterweights', mass: 22, count: 3, explode: [-1.75, -1.0, 0],
+    desc: 'The hub holds the three blade shanks in clamps that let each blade turn about its own axis. Counterweights on the clamps swing the blades toward feather if oil pressure is lost, so a failed engine’s propeller stops windmilling and adding drag.',
+  }, hubSpin);
+  hubSpin.add(L(hub.body, m.alu), L(hub.weights, m.darkMetal));
+  const pc = pitchGeo();
+  P('Pitch-change dome & feather spring', {
+    system: 'Propulsion', material: 'Aluminium cylinder, steel piston, spring and stops', mass: 8, explode: [-2.25, -0.55, 0],
+    desc: 'Governor oil pushes a piston in the dome toward low pitch and reverse; the feather spring and counterweights push the other way. Stops set flight idle and full reverse (beta). Reverse pitch is the MQ-9A’s main way of stopping: in 2018, when the propeller failed to reverse, the brakes could not absorb the energy and the aircraft left the runway.',
+  }, domeSpin);
+  domeSpin.add(L(pc.dome, m.alu), L(pc.piston, m.darkMetal), L(pc.spring, m.titanium), L(pc.stops, m.darkMetal));
+  domeSpin.children[0].userData.xrayWeight = 0.6;
+  P('Spinner', {
+    system: 'Skin & fairings', skin: true, material: 'Polished aluminium spinner', mass: 5, explode: [-2.85, -1.0, 0],
+    desc: 'A large polished spinner, about 0.6 m across, fairs the hub and the pitch-change dome into the end of the cowling so that the flow into the propeller roots stays smooth.',
+  }, L(spinnerGeo().translate(PROP_X, SHAFT_Y, 0), m.spinner));
+
+  return { propSpin, hubSpin, domeSpin, fanEnd, fcuP, pumpP, pumpH: PUMP_H, heatP, heatHL: HEAT_HL, govP, sgBox };
+}
