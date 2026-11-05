@@ -103,12 +103,12 @@ export function buildFuel({ P, L, m }) {
     const inb = wingTankGeo(...WTANK.inb), outb = wingTankGeo(...WTANK.outb);
     litres.inb = volume(inb) * 1000 * 0.97; litres.outb = volume(outb) * 1000 * 0.97;
     P(`Inboard wing tank (${sn})`, {
-      system: 'Fuel', material: 'Sealed bay between the spars (est.)', mass: 10, explode: [0, -0.35, 1.9 * side],
+      system: 'Fuel', material: 'Sealed bay between the spars (est.)', mass: 10, xrayWeight: 0.5, explode: [0, -0.35, 1.9 * side],
       desc: `The inboard of the two tanks in each wing (NTSB), between the spars from the root to 4.4 m out (${lt(litres.inb)} in this model). Wing fuel sits where the lift is, so it relieves wing bending; a jet pump at its low point empties it into the header tank.`,
       callout: side > 0, anchor: W(4.25, 0.5, 1, 0, side),   // upper skin near the outboard end of the tank, clear of the stores labels
     }, L(f(inb), m.fuel));
     P(`Outboard wing tank (${sn})`, {
-      system: 'Fuel', material: 'Sealed bay between the spars (est.)', mass: 7, explode: [0, -0.35, 2.6 * side],
+      system: 'Fuel', material: 'Sealed bay between the spars (est.)', mass: 7, xrayWeight: 0.5, explode: [0, -0.35, 2.6 * side],
       desc: `The outboard tank, 4.5–8.4 m out, behind a closing rib (${lt(litres.outb)} here). Weight this far out relieves the most wing bending, so it is usually emptied last; a jet pump by its inboard end transfers it.`,
     }, L(f(outb), m.fuel));
     P(`Tank closing rib (${sn})`, {
