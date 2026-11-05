@@ -1,14 +1,55 @@
-// Render modes: STUDIO (PBR), X-RAY (fresnel hologram; skins faint so the interior reads),
+// Render modes: STUDIO (PBR), X-RAY (fresnel hologram; skins faint so the interior reads, crowded
+// parts dimmed and layers screen-blended so dense views do not wash out),
 // BLUEPRINT (edges on drafting blue), SYSTEMS (cutaway-poster colours by subsystem, skins
 // ghosted), THERMAL (per-part temperature on an inferno scale) and PRESSURE (live pressure
 // coefficient on lifting surfaces). A ghost overlay fades every part except the ones in focus.
 
 import * as THREE from 'three';
-import { xrayMaterial, inferno } from './effects.js';
+import { inferno } from './effects.js';
 import { systemColor } from './systems.js';
 import { clipMaterial } from './section.js';
 
 export const MODES = ['studio', 'xray', 'blueprint', 'systems', 'thermal', 'pressure'];
+
+/**
+ * Fresnel hologram for X-ray, the Systems view's skins and the ghost overlay: a rim glow at
+ * grazing angles over a faint base. Layers combine with a screen blend, out = src + dst·(1 − src),
+ * instead of plain addition: a few layers add up almost exactly as before, but a stack of many
+ * (a bus full of boxes seen end-on, a fuselage nose-on) saturates toward the hologram colour and
+ * never overshoots the HDR range into bloom, so dense views stay readable instead of washing out
+ * to a white blob. The output is premultiplied and clamped to [0, 1] for that blend; gain dims a
+ * layer for crowded spots (see density()).
+ */
+export function holoMaterial(color, power, base, gain = 1) {
+  return new THREE.ShaderMaterial({
+    uniforms: { color: { value: new THREE.Color(color) }, power: { value: power }, base: { value: base }, gain: { value: gain } },
+    vertexShader: /* glsl */`
+      varying vec3 vN; varying vec3 vV;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vN = normalize(normalMatrix * normal);
+        vV = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 color; uniform float power; uniform float base; uniform float gain;
+      varying vec3 vN; varying vec3 vV;
+      void main() {
+        float f = pow(max(1.0 - abs(dot(normalize(vN), normalize(vV))), 0.0), power);
+        float a = clamp(f + base, 0.0, 1.0);
+        vec3 c = clamp(color * (f * 1.6 + base) * a * gain, 0.0, 1.0);
+        gl_FragColor = vec4(c, a * gain);
+      }`,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    blending: THREE.CustomBlending, blendEquation: THREE.AddEquation,
+    blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcColorFactor,
+    blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
+  });
+}
+
+/** A mesh with this many or fewer other meshes enclosing its centre keeps its full X-ray glow;
+ *  beyond it the glow falls as the square root of the count (see density()). */
+const DENSE_N = 6;
 
 function partOf(obj) {
   for (let o = obj; o; o = o.parent) if (o.userData.part) return o;
@@ -82,13 +123,13 @@ export class RenderModes {
     this.stage = stage;
     this.mode = 'studio';
     this.focus = null;
-    this.xray = xrayMaterial(0x5fd4ff, 1.8, 0.06);
-    this.xraySkin = xrayMaterial(0x5fd4ff, 3.2, 0.006);
-    this.sysSkin = xrayMaterial(0x9fc3e6, 2.6, 0.008);
+    this.xray = holoMaterial(0x5fd4ff, 1.8, 0.06);
+    this.xraySkin = holoMaterial(0x5fd4ff, 3.2, 0.006);
+    this.sysSkin = holoMaterial(0x9fc3e6, 2.6, 0.008);
     this.sysMats = new Map();
     this.sysSel = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.6, roughness: 0.5 });
-    this.xraySel = xrayMaterial(0xffb000, 1.5, 0.1);
-    this.ghostMat = xrayMaterial(0x8fb6d8, 2.6, 0.012);
+    this.xraySel = holoMaterial(0xffb000, 1.5, 0.1);
+    this.ghostMat = holoMaterial(0x8fb6d8, 2.6, 0.012);
     this.bpFill = new THREE.MeshBasicMaterial({ color: 0x0f3d6e, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide });
     this.bpFillSel = new THREE.MeshBasicMaterial({ color: 0xffb000, transparent: true, opacity: 0.25, depthWrite: false, side: THREE.DoubleSide });
     this.bpLine = new THREE.LineBasicMaterial({ color: 0xd4ecff, transparent: true, opacity: 0.8 });
@@ -101,15 +142,14 @@ export class RenderModes {
     this.clippingPlanes = null;
   }
 
-  /** X-ray material dimmed to weight w (0..1): dense rows of blades or vanes set a low weight so the
-   *  additive glow of many stacked layers does not wash the view out. */
+  /** X-ray material dimmed to weight w (0..1): dense rows of blades or vanes set a low weight, and
+   *  density() lowers it for crowded spots, so the glow of many stacked layers stays readable. */
   xrayWeighted(w) {
     if (!(w < 1)) return this.xray;
     const k = Math.max(0.05, Math.round(w * 20) / 20);
     let mat = this.xrayDim?.get(k);
     if (!mat) {
-      mat = xrayMaterial(0x5fd4ff, 1.8, 0.06);
-      mat.uniforms.color.value.multiplyScalar(k);
+      mat = holoMaterial(0x5fd4ff, 1.8, 0.06, k);
       (this.xrayDim || (this.xrayDim = new Map())).set(k, mat);
     }
     return mat;
@@ -121,11 +161,42 @@ export class RenderModes {
     const k = Math.max(0.05, Math.round(w * 20) / 20);
     let mat = this.xraySkinDim?.get(k);
     if (!mat) {
-      mat = xrayMaterial(0x5fd4ff, 3.2, 0.006);
-      mat.uniforms.color.value.multiplyScalar(k);
+      mat = holoMaterial(0x5fd4ff, 3.2, 0.006, k);
       (this.xraySkinDim || (this.xraySkinDim = new Map())).set(k, mat);
     }
     return mat;
+  }
+
+  /**
+   * How crowded each mesh's surroundings are, as an X-ray weight per mesh (cached on the vehicle):
+   * the number n of other meshes whose world-space bounding boxes enclose the mesh's centre is
+   * about how many surfaces a ray through that spot crosses, so the mesh's glow is scaled by
+   * min(1, √(DENSE_N / (n + 1))). A box deep in a crowded bus or fuselage draws at a quarter of
+   * the glow of an isolated panel or blade, and the sum over a dense stack grows as √n rather than n.
+   * Skins keep their own faint weight: they are single surfaces that give the silhouette.
+   */
+  density(vehicle) {
+    if (vehicle._xrayDensity) return vehicle._xrayDensity;
+    const list = this.meshes(vehicle);
+    vehicle.root.updateMatrixWorld(true);
+    const boxes = [], centres = [], all = new THREE.Box3();
+    for (const m of list) {
+      if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+      const bb = m.geometry.boundingBox.clone().applyMatrix4(m.matrixWorld);
+      boxes.push(bb);
+      centres.push(bb.getCenter(new THREE.Vector3()));
+      all.union(bb);
+    }
+    const pad = all.getSize(new THREE.Vector3()).length() * 0.004;
+    for (const bb of boxes) bb.expandByScalar(pad);
+    const w = new Map();
+    for (let i = 0; i < list.length; i++) {
+      let n = 0;
+      for (let j = 0; j < boxes.length; j++) if (j !== i && boxes[j].containsPoint(centres[i])) n++;
+      w.set(list[i], Math.min(1, Math.sqrt(DENSE_N / (n + 1))));
+    }
+    vehicle._xrayDensity = w;
+    return w;
   }
 
   meshes(vehicle) {
@@ -190,6 +261,7 @@ export class RenderModes {
     const sel = selected;
     const inSel = (m) => sel && partOf(m) === sel;
     const focus = this.focus;
+    const dens = mode === 'xray' ? this.density(vehicle) : null;
     for (const m of this.meshes(vehicle)) {
       const edges = m.userData.edges;
       const ghosted = focus && !focus.has(partOf(m));
@@ -207,7 +279,8 @@ export class RenderModes {
         m.castShadow = true;
       } else if (mode === 'xray') {
         const info = partOf(m)?.userData.part;
-        m.material = inSel(m) ? this.xraySel : info?.skin ? this.xraySkinWeighted(info.xraySkinWeight) : this.xrayWeighted(m.userData.xrayWeight ?? info?.xrayWeight ?? 1);
+        const w = (m.userData.xrayWeight ?? info?.xrayWeight ?? 1) * (dens.get(m) ?? 1);
+        m.material = inSel(m) ? this.xraySel : info?.skin ? this.xraySkinWeighted(info.xraySkinWeight) : this.xrayWeighted(w);
         if (edges) edges.visible = false;
         m.castShadow = false;
       } else if (mode === 'systems') {

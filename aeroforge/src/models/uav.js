@@ -189,12 +189,15 @@ export function buildUAV() {
   const slotBreaks = Array.from({ length: 33 }, (_, k) => +(4.87 + k * 0.05).toFixed(2));
   // over the main wells, the ring vertices nearest each door's hinge line and outer edge are moved onto them, so the cut
   // follows both exactly
-  // the radome / forward-skin joint runs along the side 2 cm below the section's mid-height; the side vertex of every ring ahead of
-  // s 2.05 is set exactly on that line, so the joint is a straight mesh edge (classified by corner below) instead of a sawtooth
-  const RADOME_DY = 0.02;
+  // the radome / forward-skin joint runs along the side 2 cm below the section's mid-height; the side vertex of every ring from
+  // s 0.18 to 2.05 is set exactly on that line, so the joint is a straight mesh edge (classified by corner below) instead of a
+  // sawtooth. Ahead of s 0.18 the rings are too small for the offset to keep their vertex order, and the joint there is between
+  // the two radomes, in the same material, so it is left to the triangle split.
+  const RADOME_DY = 0.02, RADOME_SNAP_S = 0.18;
   const radomeTheta = (s) => { const { top, bot } = prof(s); return -Math.asin(Math.min(1, RADOME_DY / ((top - bot) / 2)) ** 1.2); };
   const onHinge = (s, r) => {
     if (s < 2.05 + 1e-6) {
+      if (s < RADOME_SNAP_S - 1e-6) return null;
       r[24] = fusePoint(s, radomeTheta(s));                   // starboard side vertex (θ = 0 is j = 24 on a 96-point ring)
       r[72] = fusePoint(s, Math.PI - radomeTheta(s));         // port side vertex
       return r;
