@@ -1,0 +1,261 @@
+// Hubble-specific materials: the silvered Teflon multi-layer insulation that gives the telescope
+// its crinkled-foil look, the white NOBL covers added on servicing missions, Z-93-style white
+// radiator paint, flat-black baffles, the aluminised mirrors, graphite-epoxy, gold-iridite
+// electronics boxes, yellow EVA handrails and the SA3 solar-cell panels.
+//
+// Glossy surfaces stay at roughness ≥ 0.08 (only the real mirrors go that low) so the render
+// core's specular antialiasing has something to work with; nothing here emits light.
+
+import * as THREE from 'three';
+import { mliSurface } from '../../engine/surface.js';
+import { rng } from '../../engine/materials.js';
+
+const cache = new Map();
+const once = (key, make) => {
+  if (!cache.has(key)) cache.set(key, make());
+  return cache.get(key);
+};
+
+function canvasTex(w, h, draw, { repeat = [1, 1], srgb = true } = {}) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(...repeat);
+  t.anisotropy = 8;
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/**
+ * Silvered-Teflon blanket over one large tile: crinkle streaks, blanket seams at irregular real
+ * spacing (panels roughly 1–1.5 m across), tie-down stitching along the seams and weathered patches.
+ * The tile repeats only about twice around each half-shell, so no brickwork grid appears.
+ */
+function mliAlbedo(seed, { base = [196, 200, 205], seamsU = [0.21, 0.58, 0.86], seamsV = [0.37], patches = 5, scale = 1 } = {}) {
+  return (ctx, w, h) => {
+    const r = rng(seed);
+    ctx.fillStyle = `rgb(${base.join(',')})`;
+    ctx.fillRect(0, 0, w, h);
+    ctx.lineCap = 'round';
+    // broad, soft brightness variation between blanket panels
+    const cols = [0, ...seamsU, 1], rows = [0, ...seamsV, 1];
+    for (let i = 0; i < cols.length - 1; i++) for (let j = 0; j < rows.length - 1; j++) {
+      const k = (r() - 0.5) * 22;
+      ctx.fillStyle = k > 0 ? `rgba(255,255,255,${k / 120})` : `rgba(40,44,50,${-k / 120})`;
+      ctx.fillRect(cols[i] * w, rows[j] * h, (cols[i + 1] - cols[i]) * w, (rows[j + 1] - rows[j]) * h);
+    }
+    // crinkle facets: soft blotches where the foil bulges, and short, slightly curved creases between
+    // them (the aluminised Teflon shows soft crinkles and tape seams, never long straight scratches)
+    const n = Math.round(420 / (scale * scale));
+    for (let i = 0; i < n; i++) {
+      const x = r() * w, y = r() * h, rr = (8 + r() * 30) * scale;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rr);
+      g.addColorStop(0, r() > 0.5 ? 'rgba(255,255,255,0.13)' : 'rgba(60,66,74,0.13)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, rr, 0, Math.PI * 2); ctx.fill();
+    }
+    const m = Math.round(2600 / scale);
+    for (let i = 0; i < m; i++) {
+      const x = r() * w, y = r() * h, l = (3 + r() * 12) * scale, a = r() * Math.PI, b = (r() - 0.5) * 1.4;
+      const v = r();
+      ctx.strokeStyle = v > 0.55 ? `rgba(250,252,255,${0.08 + r() * 0.2})` : `rgba(70,76,84,${0.06 + r() * 0.16})`;
+      ctx.lineWidth = (1.2 + r() * 2.8) * scale;
+      ctx.beginPath(); ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + Math.cos(a + b) * l * 0.5, y + Math.sin(a + b) * l * 0.5, x + Math.cos(a) * l, y + Math.sin(a) * l);
+      ctx.stroke();
+    }
+    // the tape over each seam: a slightly lighter, smoother strip
+    ctx.fillStyle = 'rgba(235,238,242,0.22)';
+    for (const u of seamsU) ctx.fillRect(u * w - 7 * scale, 0, 14 * scale, h);
+    for (const v of seamsV) ctx.fillRect(0, v * h - 7 * scale, w, 14 * scale);
+    // blanket seams (slightly wavy) with tie-down buttons along them
+    ctx.strokeStyle = 'rgba(60,64,70,0.55)';
+    ctx.lineWidth = 3;
+    ctx.fillStyle = 'rgba(80,84,90,0.6)';
+    for (const u of seamsU) {
+      const x0 = u * w;
+      ctx.beginPath(); ctx.moveTo(x0, 0);
+      for (let y = 0; y <= h; y += h / 16) ctx.lineTo(x0 + Math.sin(y * 0.02 + u * 9) * 3, y);
+      ctx.stroke();
+      for (let y = h / 24; y < h; y += h / 12) { ctx.beginPath(); ctx.arc(x0 + 9, y, 2.4, 0, Math.PI * 2); ctx.fill(); }
+    }
+    for (const v of seamsV) {
+      const y0 = v * h;
+      ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(w, y0 + 4); ctx.stroke();
+      for (let x = w / 24; x < w; x += w / 12) { ctx.beginPath(); ctx.arc(x, y0 + 9, 2.4, 0, Math.PI * 2); ctx.fill(); }
+    }
+    // weathered / patched areas (the original outer layer cracked after years of UV and atomic oxygen)
+    for (let k = 0; k < patches; k++) {
+      const x = r() * w, y = r() * h, pw = 40 + r() * 160, ph = 30 + r() * 110;
+      ctx.fillStyle = `rgba(${r() > 0.5 ? '150,146,132' : '220,224,228'},0.3)`;
+      ctx.fillRect(x, y, pw, ph);
+    }
+  };
+}
+
+/** Fine horizontal brushing streaks over a metal face: faint lighter and darker hairlines. */
+function brushed(ctx, w, h, seed, n) {
+  const r = rng(seed);
+  ctx.lineWidth = 1;
+  for (let i = 0; i < n; i++) {
+    const y = r() * h, x = r() * w, l = 20 + r() * 160;
+    ctx.strokeStyle = r() > 0.5 ? `rgba(255,255,255,${0.04 + r() * 0.1})` : `rgba(40,44,48,${0.04 + r() * 0.1})`;
+    ctx.beginPath(); ctx.moveTo(x, y + 0.5); ctx.lineTo(x + l, y + 0.5); ctx.stroke();
+  }
+}
+
+/** A material that shares `base`'s textures but shifts its albedo map, so neighbouring shells differ. */
+function variant(base, key, offset) {
+  return once(key, () => {
+    const m = base.clone();
+    m.map = base.map.clone();
+    m.map.offset.set(...offset);
+    m.map.needsUpdate = true;
+    return m;
+  });
+}
+
+export const HM = {
+  /** Silvered Teflon MLI on the light shield, forward shell and aft shroud. */
+  mli: (v = 0) => (v ? variant(HM.mli(), `mli${v}`, [0.37 * v, 0.23 * v]) : once('mli', () => {
+    const n = mliSurface({ seed: 41 });
+    const map = canvasTex(1024, 1024, mliAlbedo(5), { repeat: [2, 1] });
+    const normalMap = n.normalMap.clone(); normalMap.repeat.set(14, 4); normalMap.needsUpdate = true;
+    const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(9, 3); roughnessMap.needsUpdate = true;
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.22, 0.22), roughness: 0.6, metalness: 0.55, side: THREE.DoubleSide });
+  })),
+  /** Light shield blanket: panel seams run lengthwise, more weathering toward the aperture. */
+  mliShield: (v = 0) => (v ? variant(HM.mliShield(), `mliShield${v}`, [0.41 * v, 0.17 * v]) : once('mliShield', () => {
+    const n = mliSurface({ seed: 41 });
+    const map = canvasTex(1024, 1024, mliAlbedo(9, { base: [190, 194, 199], seamsU: [0.14, 0.47, 0.79], seamsV: [0.62], patches: 8 }), { repeat: [2, 1] });
+    const normalMap = n.normalMap.clone(); normalMap.repeat.set(16, 4); normalMap.needsUpdate = true;
+    const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(10, 3); roughnessMap.needsUpdate = true;
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.25, 0.25), roughness: 0.62, metalness: 0.55, side: THREE.DoubleSide });
+  })),
+  /** Aft shroud and guider doors: the same silvered Teflon MLI as the shroud, plain, over one tile per metre. */
+  shroudDoor: () => once('shroudDoor', () => {
+    const n = mliSurface({ seed: 41 });
+    const map = canvasTex(1024, 1024, mliAlbedo(13, { base: [192, 196, 201], seamsU: [0.5], seamsV: [], patches: 0, scale: 5 }));
+    const normalMap = n.normalMap.clone(); normalMap.repeat.set(1.7, 1.7); normalMap.needsUpdate = true;
+    const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(0.7, 0.7); roughnessMap.needsUpdate = true;
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.15, 0.15), roughness: 0.6, metalness: 0.55 });
+  }),
+  /** Dark radome of the conical log-spiral low-gain antennas. */
+  radome: () => once('radome', () => new THREE.MeshStandardMaterial({ color: 0x4e5257, roughness: 0.62, metalness: 0.25 })),
+  /** New Outer Blanket Layer: stainless-framed white covers fitted over bay doors (2002, 2009). */
+  nobl: () => once('nobl', () => {
+    const map = canvasTex(256, 256, (ctx, w, h) => {
+      ctx.fillStyle = '#9ea3a7'; ctx.fillRect(0, 0, w, h);
+      brushed(ctx, w, h, 19, 900);
+      ctx.strokeStyle = 'rgba(70,74,80,0.7)'; ctx.lineWidth = 6; ctx.strokeRect(3, 3, w - 6, h - 6);
+      ctx.fillStyle = 'rgba(50,54,58,0.8)';
+      for (let k = 0; k < 8; k++) for (const [x, y] of [[k * w / 8 + 16, 8], [k * w / 8 + 16, h - 8], [8, k * h / 8 + 16], [w - 8, k * h / 8 + 16]]) { ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill(); }
+    });
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, roughness: 0.42, metalness: 0.75 });
+  }),
+  /** Equipment-section bay doors: radiator panels under silvered Teflon tape. */
+  bayDoor: () => once('bayDoor', () => {
+    const map = canvasTex(256, 256, (ctx, w, h) => {
+      ctx.fillStyle = '#a2a6aa'; ctx.fillRect(0, 0, w, h);
+      const r = rng(23);
+      for (let j = 0; j < 12; j++) {            // tape strips, each a slightly different grey
+        const y = (j / 12) * h, k = Math.floor(r() * 22);
+        ctx.fillStyle = `rgba(${150 + k},${154 + k},${160 + k},0.7)`;
+        ctx.fillRect(0, y + 1, w, h / 12 - 2);
+      }
+      brushed(ctx, w, h, 29, 700);
+      ctx.strokeStyle = 'rgba(60,64,70,0.8)'; ctx.lineWidth = 5; ctx.strokeRect(2, 2, w - 4, h - 4);
+    });
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, roughness: 0.44, metalness: 0.7 });
+  }),
+  /** White thermal-control paint on instrument radiators. */
+  radiator: () => once('radiator', () => new THREE.MeshStandardMaterial({ color: 0xeef0f1, roughness: 0.72, metalness: 0.0 })),
+  /** Flat black stray-light paint on the baffles and the inside of the light shield. */
+  black: () => once('black', () => new THREE.MeshStandardMaterial({ color: 0x060607, roughness: 0.95, metalness: 0.0, side: THREE.DoubleSide })),
+  /** Aluminium + MgF₂ mirror coating (a real mirror, so it may be glossy). */
+  mirror: () => once('mirror', () => new THREE.MeshStandardMaterial({ color: 0xe8edf2, roughness: 0.08, metalness: 1.0, side: THREE.DoubleSide })),
+  /** Corning ULE glass seen at the cut edges and the egg-crate core. */
+  ule: () => once('ule', () => new THREE.MeshStandardMaterial({ color: 0xb9c7cf, roughness: 0.34, metalness: 0.05, side: THREE.DoubleSide })),
+  /** Graphite-epoxy tubes and frames. */
+  grEp: () => once('grEp', () => new THREE.MeshStandardMaterial({ color: 0x24272b, roughness: 0.46, metalness: 0.35 })),
+  /** Titanium fittings and the main ring. */
+  ti: () => once('ti', () => new THREE.MeshStandardMaterial({ color: 0x9da4ab, roughness: 0.34, metalness: 0.92 })),
+  /** Matte titanium end fittings (small parts stay rough so they cannot sparkle). */
+  fitting: () => once('fitting', () => new THREE.MeshStandardMaterial({ color: 0x8a9096, roughness: 0.62, metalness: 0.6 })),
+  /** Bare aluminium structure. */
+  al: () => once('al', () => new THREE.MeshStandardMaterial({ color: 0xbcc2c8, roughness: 0.4, metalness: 0.9 })),
+  /** Gold chromate-conversion (Iridite) electronics boxes. */
+  iridite: () => once('iridite', () => new THREE.MeshStandardMaterial({ color: 0xb59a5c, roughness: 0.42, metalness: 0.75 })),
+  /** Black-anodised electronics boxes. */
+  box: () => once('box', () => new THREE.MeshStandardMaterial({ color: 0x33373c, roughness: 0.55, metalness: 0.45 })),
+  /** Science-instrument enclosures: painted aluminium under grey blankets. */
+  siGrey: () => once('siGrey', () => new THREE.MeshStandardMaterial({ color: 0xa7acb1, roughness: 0.55, metalness: 0.35 })),
+  /** Gold Kapton blankets (antenna dishes, some instrument faces). */
+  kapton: () => once('kapton', () => new THREE.MeshStandardMaterial({ color: 0xc9953f, roughness: 0.4, metalness: 0.8, side: THREE.DoubleSide })),
+  /** Copper radiator plates and ground-strap braid. */
+  copper: () => once('copper', () => new THREE.MeshStandardMaterial({ color: 0xb87a4b, roughness: 0.4, metalness: 0.9 })),
+  /** Wire harness bundles (Teflon-insulated wire under tape and lacing). */
+  harness: () => once('harness', () => new THREE.MeshStandardMaterial({ color: 0x6a6258, roughness: 0.7, metalness: 0.2 })),
+  /** Heavy power cables. */
+  powerCable: () => once('powerCable', () => new THREE.MeshStandardMaterial({ color: 0x7a4b2c, roughness: 0.6, metalness: 0.35 })),
+  /** White Teflon-insulated data cable. */
+  dataCable: () => once('dataCable', () => new THREE.MeshStandardMaterial({ color: 0xcfcac0, roughness: 0.62, metalness: 0.1 })),
+  /** Yellow EVA handrails and foot-restraint sockets. */
+  handrail: () => once('handrail', () => new THREE.MeshStandardMaterial({ color: 0xe1b12c, roughness: 0.5, metalness: 0.1 })),
+  /** Battery cells: NiH₂ pressure vessels. */
+  cell: () => once('cell', () => new THREE.MeshStandardMaterial({ color: 0x8f969c, roughness: 0.38, metalness: 0.85 })),
+  /** Reaction-wheel rotors (seen in cutaway). */
+  rotor: () => once('rotor', () => new THREE.MeshStandardMaterial({ color: 0x8c6a45, roughness: 0.34, metalness: 0.95 })),
+  /** Magnetic torquer bar covers. */
+  mtb: () => once('mtb', () => new THREE.MeshStandardMaterial({ color: 0xd6d9dc, roughness: 0.5, metalness: 0.4 })),
+  /** SA3 front: gallium-arsenide cells behind cover glass, silver interconnects. */
+  sa3Cells: () => once('sa3Cells', () => {
+    const map = canvasTex(512, 1024, (ctx, w, h) => {
+      ctx.fillStyle = '#9aa1a8'; ctx.fillRect(0, 0, w, h);
+      const r = rng(31);
+      const cols = 8, rows = 22, gap = 2;
+      const cw = w / cols, ch = h / rows;
+      for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+        const t = 26 + r() * 10;
+        const g = ctx.createLinearGradient(i * cw, j * ch, (i + 1) * cw, (j + 1) * ch);
+        g.addColorStop(0, `rgb(${t * 0.9},${t * 0.75},${t * 2.3})`);
+        g.addColorStop(1, `rgb(${t * 0.6},${t * 0.55},${t * 1.8})`);
+        ctx.fillStyle = g;
+        ctx.fillRect(i * cw + gap, j * ch + gap, cw - gap * 2, ch - gap * 2);
+        ctx.fillStyle = 'rgba(200,206,214,0.35)';
+        ctx.fillRect(i * cw + gap, j * ch + ch * 0.5, cw - gap * 2, 1);
+      }
+      ctx.strokeStyle = '#c6cbd0'; ctx.lineWidth = 10; ctx.strokeRect(5, 5, w - 10, h - 10);
+    });
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, roughness: 0.26, metalness: 0.4 });
+  }),
+  /** SA3 back: white-painted honeycomb substrate. */
+  sa3Back: () => once('sa3Back', () => new THREE.MeshStandardMaterial({ color: 0xd9dcdf, roughness: 0.62, metalness: 0.15 })),
+  /** Antenna reflector front: white-painted graphite. */
+  dish: () => once('dish', () => new THREE.MeshStandardMaterial({ color: 0xe9e3d6, roughness: 0.55, metalness: 0.08, side: THREE.DoubleSide })),
+  /** The same paint on the closed high-gain reflector shell: single-sided, so it casts no shadow acne. */
+  dishShell: () => once('dishShell', () => new THREE.MeshStandardMaterial({ color: 0xe9e3d6, roughness: 0.55, metalness: 0.08 })),
+  /** Black-and-white rendezvous target pattern on the soft-capture mechanism. */
+  target: () => once('target', () => {
+    const map = canvasTex(256, 256, (ctx, w, h) => {
+      ctx.fillStyle = '#f2f2f2'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, 0, w / 2, h / 2); ctx.fillRect(w / 2, h / 2, w / 2, h / 2);
+    });
+    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, roughness: 0.6, metalness: 0.0 });
+  }),
+  /**
+   * Light-path visualisation: additive, unlit annotation drawn in two passes. The bright pass is
+   * depth-tested (no depth write), so solid parts in front of the beam hide it and the depth cue
+   * survives; the faint ghost pass ignores depth, so hidden stretches still read as lying behind.
+   * X-ray, Blueprint and the ghosted skins write no depth, so there the bright pass shows in full.
+   */
+  ray: () => once('ray', () => new THREE.MeshBasicMaterial({ color: 0xffc56a, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, toneMapped: false })),
+  rayGhost: () => once('rayGhost', () => new THREE.MeshBasicMaterial({ color: 0xffc56a, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, toneMapped: false })),
+  beam: () => once('beam', () => new THREE.MeshBasicMaterial({ color: 0xffb648, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, side: THREE.DoubleSide, toneMapped: false })),
+  focus: () => once('focus', () => new THREE.MeshBasicMaterial({ color: 0xfff1c8, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, toneMapped: false })),
+  focusGhost: () => once('focusGhost', () => new THREE.MeshBasicMaterial({ color: 0xfff1c8, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, toneMapped: false })),
+};
