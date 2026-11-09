@@ -43,7 +43,10 @@ export function buildFan(ctx) {
 
   // ------------------------------------------------------------------ spinner (turns with N1)
   const spinnerGeo = lathe([[0.001, 0.8], [0.05, 0.765], [0.12, 0.68], [0.2, 0.57], [0.28, 0.45], [0.35, 0.33], [0.41, 0.21], [0.45, 0.11], [0.468, 0.03], [0.47, 0.0]], 72);
-  const spinner = mesh(spinnerGeo, M.spinner());
+  // a little rougher than the shared spinner: the key light's glint on the rim bloomed like a lamp
+  const spinnerMat = M.spinner().clone();
+  spinnerMat.roughness = 0.45;
+  const spinner = mesh(spinnerGeo, spinnerMat);
   const spinSpinner = new THREE.Group();
   spinSpinner.add(spinner);
   ctx.spin.n1.push({ g: spinSpinner });

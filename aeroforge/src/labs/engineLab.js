@@ -160,8 +160,11 @@ export function mountEngineLab(root, ctx) {
   };
 
   let flowBefore = null;
+  // The cycle drives the exhibit (spool speeds, combustor glow) only while the lab is on screen: with
+  // the dossier closed, or another tab in front of it, the engine is a cold museum cutaway again.
+  const onScreen = () => document.body.classList.contains('has-dossier') && root.getClientRects().length > 0;
   return {
-    update() { if (dirty) { dirty = false; compute(); } },
+    update() { if (dirty) { dirty = false; compute(); } v.state.fromLab = onScreen(); },
     dispose() { v.setStationPlanes(false); v.setReverser?.(false); v.state.fromLab = false; },
     api: {
       setDisplay({ flow, stations, cutaway } = {}) {
