@@ -43,9 +43,10 @@ export function buildFan(ctx) {
 
   // ------------------------------------------------------------------ spinner (turns with N1)
   const spinnerGeo = lathe([[0.001, 0.8], [0.05, 0.765], [0.12, 0.68], [0.2, 0.57], [0.28, 0.45], [0.35, 0.33], [0.41, 0.21], [0.45, 0.11], [0.468, 0.03], [0.47, 0.0]], 72);
-  // a little rougher than the shared spinner: the key light's glint on the rim bloomed like a lamp
-  const spinnerMat = M.spinner().clone();
-  spinnerMat.roughness = 0.45;
+  // The GE90 spinner is painted composite, not bare metal: a dielectric with a lowered grazing-angle
+  // reflectance, so the key light's glint on its rim no longer blooms like a lamp (it is the
+  // silhouette Fresnel that did it, which roughness alone cannot damp)
+  const spinnerMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: M.spinner().map, roughness: 0.5, metalness: 0.05, specularIntensity: 0.35 });
   const spinner = mesh(spinnerGeo, spinnerMat);
   const spinSpinner = new THREE.Group();
   spinSpinner.add(spinner);
