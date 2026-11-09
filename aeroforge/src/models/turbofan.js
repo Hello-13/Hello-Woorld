@@ -206,10 +206,22 @@ export function buildTurbofan() {
   // and the big casings, so the shafts, bearings and sumps inside read through them
   const CASES = /^(Fan containment case|Fan case rub strip|Booster casing|HPC casing|Combustion case|HPT casing|LPT casing|Turbine rear frame|Core exhaust nozzle)/;
   for (const p of A.parts) { const i = p.userData.part; if (CASES.test(i.name)) i.xrayWeight = 0.4; }
-  // the HP spool, combustor and turbine-centre-frame solids stack inside those casings and rows and
-  // washed the core out to a white mass: dim them too, so the region keeps its structure
-  const HOT = /^(HPC stage|HP shaft|Rotating CDP seal|Forward HPT rotor seal|Interstage HPT rotor seal|HPT stage \d disk|HPT active clearance|Compressor rear frame|Combustor (outer|inner) liner|Combustor centerbody|Dual annular combustor|Fuel manifolds|Igniters|VSV actuators|Turbine center frame|TCF (sump|bearing)|Borescope ports)/;
-  for (const p of A.parts) { const i = p.userData.part; if (HOT.test(i.name) && !(i.xrayWeight < 1)) i.xrayWeight = 0.55; }
+  // The core between the fan hub frame and the turbine centre frame (HP compressor, combustor and HP
+  // turbine, their frames, seals, fuel system and the plumbing and ducts round them) packs about a
+  // hundred parts into 2.5 m, and even with the rows dimmed their layers summed to a white mass in
+  // X-ray. Every non-skin part whose centre lies in that span draws at 0.15 (tested against the
+  // side view: at 0.3 the span still washed out, at 0.05 it went dark), so its structure reads.
+  const box = new THREE.Box3(), c = new THREE.Vector3();
+  A.root.updateMatrixWorld(true);
+  for (const p of A.parts) {
+    const i = p.userData.part;
+    if (i.skin) continue;
+    box.makeEmpty();
+    p.traverse((o) => { if (o.isMesh && !o.userData.fx) { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld)); } });
+    if (box.isEmpty()) continue;
+    box.getCenter(c);                                   // world x is the lathe frame's axial station
+    if (c.x < -1.7 && c.x > -4.3) i.xrayWeight = 0.15;
+  }
 
   // Part masses are estimates from size and material; scale the engine's so they add up to the
   // published dry mass (massSource stays unset, so the UI still marks each one as an estimate)
