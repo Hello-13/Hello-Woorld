@@ -34,9 +34,10 @@ export const LOOKS = {
     exposure: 1.05, bgRotation: -2.45, floor: 'studio', turntable: true, maxDistance: 26,
     key: { color: 0xffffff, intensity: 2.8 }, hemi: [0xffffff, 0x202020, 0.15], rim: 1.1,
   },
-  // In flight: the sky dome draws the 8K / 4K plate of the same pure-sky HDRI above the horizon and
-  // the cloud deck below it; the key light is the plate's sun, the hemisphere light is sky above
-  // and cloud-top bounce below, and the altitude set on the environment grades all of it (sky.js).
+  // In flight: the volumetric sky (skyvol.js) draws the atmosphere, the clouds and the sea for the
+  // aircraft's altitude and the sun the viewer has placed; the key light, the fill and the
+  // image-based lighting are taken from it each frame. With ?sky=classic the earlier dome (sky.js)
+  // draws the pure-sky HDRI's plate above a cloud deck, lit by the HDRI, as the entries below say.
   sky: {
     label: 'Open sky', hdri: 'sky', hdriSun: [0.631, 42.9], background: 'sky', plate: 'sky', plateGain: 1.0, bgRotation: -0.28, envIntensity: 0.85,
     exposure: 1.0, floor: null, turntable: false, fog: [0xa9bbd4, 0.0004], envBelow: 0xd9d3c9,
@@ -684,6 +685,15 @@ export class Environment {
     this.stars.material.uniforms.dpr.value = this.renderer.getPixelRatio();
     this.stars.visible = this.stars.material.uniforms.opacity.value > 0.005;
     this.turn.ringMat.emissiveIntensity = 2.4 + Math.sin(this.stage.time * 1.4) * 0.35;
+    if (this.sky.failed === 'sky') {
+      // this GPU would not compile the volumetric sky: put the earlier dome in its place
+      const was = this.sky.visible;
+      this.scene.remove(this.sky);
+      this.sky.dispose();
+      this.sky = new SkyDome();
+      this.scene.add(this.sky);
+      if (was) this.applyLook(this.look);
+    }
     if (this.sky.visible) {
       // the flight sky: the deck's budget by preset (sky.js SKY_TIERS), then the altitude grading
       // carried to the fog and lights

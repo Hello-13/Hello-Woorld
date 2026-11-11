@@ -109,3 +109,50 @@ test('ATM constants are physical', () => {
   assert.ok(ATM.HR > ATM.HM, 'aerosol sits lower than the air');
   assert.ok(ATM.g > 0.7 && ATM.g < 0.95, 'forward-peaked Mie');
 });
+
+// ------------------------------------------------------------------ the volumetric sky's atmosphere
+import { ATM2, inscatter2, skyRadiance2, sunTransmittance } from '../src/engine/skymath.js';
+
+const lum2 = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+const sunAt2 = (deg, az = 0.4) => { const e = deg * Math.PI / 180; return { x: Math.cos(e) * Math.cos(az), y: Math.sin(e), z: Math.cos(e) * Math.sin(az) }; };
+
+test('second atmosphere: blue zenith that deepens with altitude, a bright pale horizon', () => {
+  const sun = sunAt2(40);
+  let last = Infinity;
+  for (const alt of [0, 3000, 9000, 18000]) {
+    const z = skyRadiance2({ x: 0, y: 1, z: 0 }, sun, alt);
+    assert.ok(z[2] > z[1] && z[1] > z[0], `zenith is blue at ${alt} m`);
+    assert.ok(lum2(z) < last, `zenith darkens by ${alt} m`);
+    last = lum2(z);
+    const h = skyRadiance2({ x: -0.9998, y: 0.02, z: 0 }, sun, alt);
+    assert.ok(lum2(h) > 4 * lum2(z), `the horizon band outshines the zenith at ${alt} m`);
+    assert.ok(h.every((v) => Number.isFinite(v) && v > 0 && v < 3));
+  }
+  const z0 = skyRadiance2({ x: 0, y: 1, z: 0 }, sun, 0);
+  assert.ok(lum2(z0) > 0.06 && lum2(z0) < 0.25, `sea-level zenith luminance ${lum2(z0).toFixed(3)}`);
+});
+
+test('second atmosphere: aerial perspective grows with distance and conserves energy', () => {
+  const sun = sunAt2(40), d = { x: -0.9903, y: -0.139, z: 0 };
+  const near = inscatter2(d, sun, 9000, { tEnd: 2000 }), far = inscatter2(d, sun, 9000, { tEnd: 60000 });
+  assert.ok(near.transm.every((t) => t > 0.97), 'two kilometres of thin air barely veil');
+  assert.ok(far.transm[2] < far.transm[1] && far.transm[1] < far.transm[0], 'blue is scattered out first');
+  assert.ok(lum2(far.light) > 10 * lum2(near.light));
+  assert.ok(far.transm.every((t) => t > 0 && t < 1));
+});
+
+test('the sun reddens and dims toward the horizon, less so at altitude', () => {
+  const high = sunTransmittance(Math.sin(60 * Math.PI / 180), 0), low = sunTransmittance(Math.sin(5 * Math.PI / 180), 0);
+  assert.ok(high[0] > 0.9 && high[2] > 0.6, 'a high sun is nearly white');
+  assert.ok(low[0] > low[1] && low[1] > low[2], 'a low sun is red over green over blue');
+  assert.ok(low[2] < 0.15 && low[0] > 0.4);
+  const lowUp = sunTransmittance(Math.sin(5 * Math.PI / 180), 12000);
+  assert.ok(lowUp.every((v, i) => v > low[i]), 'less air above a high aircraft');
+});
+
+test('ATM2: standard coefficients', () => {
+  assert.ok(ATM2.betaR[2] > ATM2.betaR[1] && ATM2.betaR[1] > ATM2.betaR[0], 'Rayleigh scattering rises toward the blue');
+  assert.ok(Math.abs(ATM2.betaR[1] / ATM2.betaR[0] - Math.pow(680 / 550, 4)) < 0.25, 'about the fourth power of the wavelength ratio');
+  assert.ok(ATM2.betaMe > ATM2.betaMs, 'aerosol absorbs a little');
+  assert.equal(ATM2.R, 6371000);
+});

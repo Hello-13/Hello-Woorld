@@ -638,6 +638,13 @@ export class VolumetricSky extends THREE.Mesh {
     /** Clouds on or off (off: the sky, sun and sea only). */
     this.clouds = true;
     this.ready = false;
+    /** 'sky' or 'clouds' when that shader failed to compile on this GPU (see onBeforeRender). */
+    this.failed = null;
+    /** Lower the march budget by itself when the frame rate sags in flight, and restore it after. */
+    this.adaptive = true;
+    this.level = 0;                 // 0 = the preset's full budget … 3 = half of it
+    this._frames = 0;
+    this._slow = 0; this._fast = 0;
     this._dirty = false;
     this._sunWorld = new THREE.Vector3();
     this._tmp = new THREE.Vector3();
@@ -652,6 +659,18 @@ export class VolumetricSky extends THREE.Mesh {
     // The cloud pass is rendered from inside the dome's own draw (as a mirror renders its
     // reflection), once per frame, with the camera the frame is drawn with.
     this.onBeforeRender = (renderer, scene, camera) => {
+      // a shader this GPU's driver rejects must not leave a black sky: after a few frames, read the
+      // compile results; environment.js falls back to the earlier dome, or the clouds switch off
+      if (!this._checked && ++this._frames > 3) {
+        const bad = (m) => renderer.properties.get(m).currentProgram?.diagnostics?.runnable === false;
+        const ran = (m) => !!renderer.properties.get(m).currentProgram;
+        if (ran(this.material) && (world.cloudsOn.value < 0.5 || ran(this._quad.material))) {
+          this._checked = true;
+          if (bad(this.material)) this.failed = 'sky';
+          else if (bad(this._quad.material)) { this.failed = 'clouds'; this.clouds = false; }
+          if (this.failed) console.warn(`AEROFORGE: the volumetric ${this.failed} shader did not compile on this GPU; using the fallback`);
+        }
+      }
       const rt = renderer.getRenderTarget();
       if (rt) uniforms.resolution.value.set(rt.width, rt.height);
       else uniforms.resolution.value.copy(renderer.getDrawingBufferSize(this._size));
@@ -688,7 +707,8 @@ export class VolumetricSky extends THREE.Mesh {
   update(dt, camera, { altitude = 11000, speed = 0, unitMetres = 1.7, pixels = 1080, width = 1920 } = {}) {
     const u = this.uniforms, cu = this.cloudUniforms;
     if (!u.weatherTex.value) u.weatherTex.value = cloudNoise();
-    dt = Math.min(Math.max(dt || 0, 0), 0.25);
+    const rawDt = dt || 0;
+    dt = Math.min(Math.max(rawDt, 0), 0.25);
     this.position.copy(camera.position);
     const camAlt = Math.max(altitude + camera.position.y * unitMetres, 3);
     u.camAlt.value = camAlt;
@@ -704,8 +724,15 @@ export class VolumetricSky extends THREE.Mesh {
     const inLayer = THREE.MathUtils.smoothstep(camAlt, CLOUD_BASE - 500, CLOUD_BASE + 200) * (1 - THREE.MathUtils.smoothstep(camAlt, CLOUD_TOP - 200, CLOUD_TOP + 700));
     u.clearR.value = inLayer > 0.01 ? 2600 * inLayer : 0;
 
-    // budget
-    const vt = VOL_TIERS[this.quality] || VOL_TIERS.high;
+    // budget: the preset's, less when this GPU cannot hold the frame rate with it
+    if (this.adaptive && this.ready && this.clouds && rawDt > 0) {
+      if (rawDt > 1 / 40) { this._slow++; this._fast = 0; } else if (rawDt < 1 / 72) { this._fast++; this._slow = Math.max(this._slow - 1, 0); } else { this._fast = 0; this._slow = Math.max(this._slow - 1, 0); }
+      if (this._slow > 45 && this.level < 3) { this.level++; this._slow = 0; }
+      if (this._fast > 600 && this.level > 0) { this.level--; this._fast = 0; }
+    }
+    const k = [1, 0.82, 0.66, 0.5][this.adaptive ? this.level : 0];
+    const base = VOL_TIERS[this.quality] || VOL_TIERS.high;
+    const vt = { steps: Math.round(base.steps * (0.5 + 0.5 * k)), light: base.light, full: k < 0.7 ? 1 : base.full, scale: base.scale * k };
     cu.steps.value = vt.steps;
     cu.lightSteps.value = vt.light;
     cu.lightFull.value = vt.full;

@@ -283,6 +283,8 @@ export const GRADES = {
   // open sky: clean daylight; the atmosphere supplies the haze, so the grade adds none (a little
   // contrast, warm cloud highlights against the blue, a shoulder that keeps the cloud tops' detail)
   sky: { contrast: 0.16, split: 0.03, vignette: 0.2, shadowTint: [-0.15, 0.03, 0.35], highTint: [0.25, 0.14, -0.05], lift: [0.004, 0.005, 0.008], saturation: 1.06, shoulder: 0.1, toe: 0 },
+  // the earlier sky dome (?sky=classic): cool, high-key, airy shadows
+  skyClassic: { contrast: 0.08, split: 0.03, vignette: 0.18, shadowTint: [-0.15, 0.05, 0.4], highTint: [0.1, 0.15, 0.35], lift: [0.02, 0.025, 0.035], saturation: 0.95, shoulder: 0.05, toe: 0 },
   // launch pad at dawn: golden low sun, violet shadows
   pad: { contrast: 0.14, split: 0.06, vignette: 0.26, shadowTint: [-0.2, -0.05, 0.45], highTint: [0.7, 0.3, -0.35], lift: [0.012, 0.008, 0.012], saturation: 1.06, shoulder: 0.1, toe: 0 },
   // orbit: hard sun, true blacks (only the deepest tones, so shadowed MLI keeps its earthshine)
@@ -596,7 +598,8 @@ export class Stage {
   /** Ease the final grade toward the current look's preset (~0.4 s), or hold the neutral one. */
   stepGrade(dt) {
     const env = this.env;
-    const name = !FX.grade ? 'neutral' : env?.overlay ? 'neutral' : env?.space ? 'orbit' : env?.look;
+    let name = !FX.grade ? 'neutral' : env?.overlay ? 'neutral' : env?.space ? 'orbit' : env?.look;
+    if (name === 'sky' && !env.sky.isVolumetricSky) name = 'skyClassic';
     const target = GRADES[name] || GRADES.neutral;
     const u = this.grade.uniforms;
     const k = this._gradeInit ? 1 - Math.exp(-dt * 6) : 1;
