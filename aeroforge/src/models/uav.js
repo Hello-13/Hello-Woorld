@@ -762,7 +762,8 @@ export function buildUAV() {
     desc: 'An electric servo on a collar turns the nose leg. The pilot steers through the rudder pedals and the wheel centres itself; differential braking helps on tight turns. When a nosewheel servo driver failed in May 2015 the wheel could neither centre nor follow the pedals, and the aircraft ran off the runway ($6.7 million damage, USAF investigation).',
   }, L(merge([new THREE.TorusGeometry(0.058, 0.014, 6, 20).rotateX(Math.PI / 2).translate(0, -0.1, 0), lru(0.06, 0.05, 0.12, [-0.07, -0.1, 0.05]), cylX(-0.16, -0.1, 0.022, 0.022, -0.1, 0.09, 10)]), m.lruOlive), noseLeg);
   // 0.28 m across: scaled against the fuselage depth in side views of USAF MQ-9As (AF 20-409 at Kunsan) and a GA-ASI MQ-9A (N428HK)
-  const nwheel = [new THREE.TorusGeometry(0.095, 0.045, 12, 28), new THREE.CylinderGeometry(0.068, 0.068, 0.08, 20).rotateX(Math.PI / 2)];
+  // (tessellated for 4K close-ups: 96 round the tread, 28 round the section, 72 round the hub)
+  const nwheel = [new THREE.TorusGeometry(0.095, 0.045, 28, 96), new THREE.CylinderGeometry(0.068, 0.068, 0.08, 72).rotateX(Math.PI / 2)];
   P('Nose wheel & tyre', {
     system: 'Landing gear', material: 'Aluminium wheel, tubeless tyre', mass: 5, explode: [0.2, -0.3, 0.45],
     desc: 'A single small nose wheel, about 0.28 m across: scaled from side views of USAF and GA-ASI MQ-9As it measures 0.27–0.30 m, and the size is not published, so take it as ±10 %. It takes only a small share of the weight but all of the steering loads.',
@@ -864,7 +865,7 @@ export function buildUAV() {
       desc: 'Runs down the leg to the brake servo on the trailing arm and carries the wheel-speed and weight-on-wheels signals back up; the automatic landing system uses them (routing estimated; brake actuation type not public).',
     }, L(pipe(brakeLine, 0.007, 5, 40), m.harness), piv);
     // wheel, tyre and brake (wheel frame: axle along z, outboard toward +z on the starboard side)
-    const w = [new THREE.TorusGeometry(0.135, 0.055, 14, 32), merge([new THREE.CylinderGeometry(0.1, 0.1, 0.1, 24).rotateX(Math.PI / 2), new THREE.CylinderGeometry(0.03, 0.03, 0.1, 12).rotateX(Math.PI / 2).translate(0, 0, -0.02 * side)]), new THREE.CylinderGeometry(0.085, 0.085, 0.025, 20).rotateX(Math.PI / 2).translate(0, 0, -0.055 * side)];
+    const w = [new THREE.TorusGeometry(0.135, 0.055, 32, 96), merge([new THREE.CylinderGeometry(0.1, 0.1, 0.1, 72).rotateX(Math.PI / 2), new THREE.CylinderGeometry(0.03, 0.03, 0.1, 28).rotateX(Math.PI / 2).translate(0, 0, -0.02 * side)]), new THREE.CylinderGeometry(0.085, 0.085, 0.025, 48).rotateX(Math.PI / 2).translate(0, 0, -0.055 * side)];
     const wheel = P(`Main wheel & brake (${sd})`, {
       system: 'Landing gear', material: 'Parker Hannifin wheel and multi-disc brake, tubeless tyre', mass: 16, explode: [0, -0.15, 0.4 * side],
       desc: 'Parker Hannifin wheel and brake, about 0.38 m in diameter (estimated from photographs), with provisions for anti-lock braking. It retracts with its leg, rolling about 50° on the way up, and lies tilted at the aft end of the well, just above the door’s blister. The brakes work only with the gear down and are commanded from the ground station or the automatic landing system; reverse propeller pitch does most of the stopping (GA-ASI; USAF).',

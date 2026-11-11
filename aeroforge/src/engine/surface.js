@@ -402,73 +402,103 @@ const decalFields = new WeakMap();    // texture.source → { sdf, width, height
 export const decalSdf = (texture) => (texture && decalFields.get(texture.source)) || null;
 
 /**
- * Signed distance (in texels, clamped to ±SDF_SPREAD) from each texel centre to the outline where the
- * alpha channel crosses `half`. The outline is traced through the canvas's antialiased coverage
- * (marching squares), so it sits at sub-texel accuracy. Returns bytes, 128 = on the edge, bottom row first.
+ * Signed distance (in texels, clamped to ±SDF_SPREAD) from each texel centre to the outline of the ink in an
+ * alpha channel (`ink` = the alpha of solid ink). The outline is recovered from the canvas's antialiased
+ * coverage at sub-texel accuracy: a partly covered texel fixes the edge's distance from its centre along the
+ * coverage gradient (Gustavson, "Anti-aliased Euclidean distance transform", 2011), and that short piece of
+ * edge is what nearby texels measure their distance to. Returns bytes, 128 = on the edge, bottom row first.
  */
-function alphaSdf(px, W, H, half) {
-  const S = SDF_SPREAD, d2 = new Float32Array(W * H).fill(S * S);
+function alphaSdf(px, W, H, ink) {
+  const S = SDF_SPREAD, S2 = S * S, d2 = new Float32Array(W * H).fill(S2);
   const seg = (x0, y0, x1, y1) => {
     const xa = Math.max(0, Math.ceil(Math.min(x0, x1) - S)), xb = Math.min(W - 1, Math.floor(Math.max(x0, x1) + S));
     const ya = Math.max(0, Math.ceil(Math.min(y0, y1) - S)), yb = Math.min(H - 1, Math.floor(Math.max(y0, y1) + S));
-    const dx = x1 - x0, dy = y1 - y0, l2 = dx * dx + dy * dy || 1e-9;
+    const dx = x1 - x0, dy = y1 - y0, il2 = 1 / (dx * dx + dy * dy);
     for (let y = ya; y <= yb; y++) for (let x = xa, i = y * W + xa; x <= xb; x++, i++) {
-      let t = ((x - x0) * dx + (y - y0) * dy) / l2;
+      let t = ((x - x0) * dx + (y - y0) * dy) * il2;
       t = t < 0 ? 0 : t > 1 ? 1 : t;
       const ex = x0 + t * dx - x, ey = y0 + t * dy - y, q = ex * ex + ey * ey;
       if (q < d2[i]) d2[i] = q;
     }
   };
-  const p = new Float64Array(8);
-  for (let y = 0; y < H - 1; y++) for (let x = 0, i = y * W; x < W - 1; x++, i++) {
-    const a = px[i * 4 + 3] - half, b = px[i * 4 + 7] - half, c = px[(i + W) * 4 + 3] - half, d = px[(i + W) * 4 + 7] - half;
-    const A = a > 0, B = b > 0, C = c > 0, D = d > 0;
-    if (A === B && B === C && C === D) continue;
-    let n = 0;
-    if (A !== B) { p[n++] = x + a / (a - b); p[n++] = y; }
-    if (B !== D) { p[n++] = x + 1; p[n++] = y + b / (b - d); }
-    if (C !== D) { p[n++] = x + c / (c - d); p[n++] = y + 1; }
-    if (A !== C) { p[n++] = x; p[n++] = y + a / (a - c); }
-    seg(p[0], p[1], p[2], p[3]);
-    if (n === 8) seg(p[4], p[5], p[6], p[7]);
+  const cov = (x, y) => { const a = px[((y < 0 ? 0 : y >= H ? H - 1 : y) * W + (x < 0 ? 0 : x >= W ? W - 1 : x)) * 4 + 3]; return a >= ink ? 1 : a / ink; };
+  const HALF = 0.56;       // half-length of each texel's piece of edge: neighbouring pieces overlap a little
+  for (let y = 0; y < H; y++) for (let x = 0, i = y * W; x < W; x++, i++) {
+    const a = px[i * 4 + 3];
+    if (a > 0 && a < ink) {
+      // partly covered: the edge passes through this texel, at right angles to the coverage gradient
+      let gx = cov(x + 1, y - 1) + 2 * cov(x + 1, y) + cov(x + 1, y + 1) - cov(x - 1, y - 1) - 2 * cov(x - 1, y) - cov(x - 1, y + 1);
+      let gy = cov(x - 1, y + 1) + 2 * cov(x, y + 1) + cov(x + 1, y + 1) - cov(x - 1, y - 1) - 2 * cov(x, y - 1) - cov(x + 1, y - 1);
+      const gl = Math.hypot(gx, gy);
+      if (gl < 1e-6) continue;
+      gx /= gl; gy /= gl;
+      const c = a / ink, ax = Math.abs(gx), ay = Math.abs(gy), hi = ax > ay ? ax : ay, lo = ax > ay ? ay : ax;
+      const a1 = 0.5 * lo / hi;
+      // distance from the texel centre to the edge for this coverage (positive: the centre is outside the ink)
+      const df = lo < 1e-4 ? 0.5 - c : c < a1 ? 0.5 * (hi + lo) - Math.sqrt(2 * hi * lo * c) : c < 1 - a1 ? (0.5 - c) * hi : -0.5 * (hi + lo) + Math.sqrt(2 * hi * lo * (1 - c));
+      const fx = x + gx * df, fy = y + gy * df;
+      seg(fx + gy * HALF, fy - gx * HALF, fx - gy * HALF, fy + gx * HALF);
+      continue;
+    }
+    // a clean step between two texels (a shape drawn on the texel grid): the edge is their shared border
+    const on = a > 0;
+    if (x + 1 < W) { const b = px[i * 4 + 7]; if (on ? b === 0 : b >= ink) seg(x + 0.5, y - 0.5, x + 0.5, y + 0.5); }
+    if (y + 1 < H) { const b = px[(i + W) * 4 + 3]; if (on ? b === 0 : b >= ink) seg(x - 0.5, y + 0.5, x + 0.5, y + 0.5); }
   }
-  const out = new Uint8Array(W * H);
+  const out = new Uint8Array(W * H), half = ink / 2, k = 127.5 / S;
   for (let y = 0; y < H; y++) for (let x = 0, i = y * W, o = (H - 1 - y) * W; x < W; x++, i++, o++) {
-    const dist = Math.sqrt(d2[i]) / (2 * S);
-    out[o] = Math.round(255 * (px[i * 4 + 3] > half ? 0.5 + dist : 0.5 - dist));
+    const q = d2[i], inside = px[i * 4 + 3] > half;
+    out[o] = q >= S2 ? (inside ? 255 : 0) : Math.round(127.5 + (inside ? k : -k) * Math.sqrt(q));
   }
   return out;
 }
 
 /**
- * Straight-alpha decal pixels with the ink's colour carried into every transparent texel (each takes the
- * colour of the nearest inked texel), so bilinear filtering and the mip chain blend ink with ink instead of
- * with transparent black: no dark fringe round light lettering. Returns RGBA bytes, bottom row first.
+ * Straight-alpha decal pixels with the ink's colour carried into every transparent texel, so bilinear
+ * filtering and the mip chain blend ink with ink instead of with transparent black: no dark fringe round
+ * light lettering. One ink: its colour everywhere. Several inks: each clear texel takes the colour of the
+ * nearest inked one. Returns RGBA bytes, bottom row first.
  */
 function bleedInk(px, W, H, half) {
-  const N = W * H, dist = new Float32Array(N), out = new Uint8Array(N * 4), src = new Int32Array(N);
-  for (let i = 0; i < N; i++) { const ink = px[i * 4 + 3] > half; dist[i] = ink ? 0 : 1e9; src[i] = ink ? i : -1; }
-  const pass = (y0, y1, dy, x0, x1, dx) => {
-    for (let y = y0; y !== y1; y += dy) for (let x = x0; x !== x1; x += dx) {
-      const i = y * W + x;
-      if (dist[i] === 0) continue;
-      const yy = y - dy, xx = x - dx, rowOk = yy >= 0 && yy < H;
-      let best = dist[i], from = src[i];
-      if (xx >= 0 && xx < W && dist[i - dx] + 1 < best) { best = dist[i - dx] + 1; from = src[i - dx]; }
-      if (rowOk) {
-        const j = yy * W + x;
-        if (dist[j] + 1 < best) { best = dist[j] + 1; from = src[j]; }
-        if (xx >= 0 && xx < W && dist[j - dx] + 1.4142 < best) { best = dist[j - dx] + 1.4142; from = src[j - dx]; }
-        if (x + dx >= 0 && x + dx < W && dist[j + dx] + 1.4142 < best) { best = dist[j + dx] + 1.4142; from = src[j + dx]; }
+  const N = W * H, out = new Uint8Array(N * 4);
+  let r = 0, g = 0, b = 0, n = 0, r0 = 255, r1 = 0, g0 = 255, g1 = 0, b0 = 255, b1 = 0;
+  for (let i = 0, k = 0; i < N; i++, k += 4) {
+    if (px[k + 3] <= half) continue;
+    const R = px[k], G = px[k + 1], B = px[k + 2];
+    r += R; g += G; b += B; n++;
+    if (R < r0) r0 = R; if (R > r1) r1 = R; if (G < g0) g0 = G; if (G > g1) g1 = G; if (B < b0) b0 = B; if (B > b1) b1 = B;
+  }
+  let src = null;
+  if (r1 - r0 > 6 || g1 - g0 > 6 || b1 - b0 > 6) {
+    // several inks: chamfer distance sweeps, carrying the index of the nearest inked texel
+    const dist = new Float32Array(N);
+    src = new Int32Array(N);
+    for (let i = 0; i < N; i++) { const ink = px[i * 4 + 3] > half; dist[i] = ink ? 0 : 1e9; src[i] = ink ? i : -1; }
+    const pass = (y0, y1, dy, x0, x1, dx) => {
+      for (let y = y0; y !== y1; y += dy) for (let x = x0; x !== x1; x += dx) {
+        const i = y * W + x;
+        if (dist[i] === 0) continue;
+        const yy = y - dy, xx = x - dx, rowOk = yy >= 0 && yy < H;
+        let best = dist[i], from = src[i];
+        if (xx >= 0 && xx < W && dist[i - dx] + 1 < best) { best = dist[i - dx] + 1; from = src[i - dx]; }
+        if (rowOk) {
+          const j = yy * W + x;
+          if (dist[j] + 1 < best) { best = dist[j] + 1; from = src[j]; }
+          if (xx >= 0 && xx < W && dist[j - dx] + 1.4142 < best) { best = dist[j - dx] + 1.4142; from = src[j - dx]; }
+          if (x + dx >= 0 && x + dx < W && dist[j + dx] + 1.4142 < best) { best = dist[j + dx] + 1.4142; from = src[j + dx]; }
+        }
+        dist[i] = best; src[i] = from;
       }
-      dist[i] = best; src[i] = from;
-    }
-  };
-  pass(0, H, 1, 0, W, 1);
-  pass(H - 1, -1, -1, W - 1, -1, -1);
+    };
+    pass(0, H, 1, 0, W, 1);
+    pass(H - 1, -1, -1, W - 1, -1, -1);
+  } else if (n) { r = Math.round(r / n); g = Math.round(g / n); b = Math.round(b / n); }
   for (let y = 0; y < H; y++) for (let x = 0, i = y * W, o = (H - 1 - y) * W * 4; x < W; x++, i++, o += 4) {
-    const k = (src[i] < 0 ? i : src[i]) * 4;
-    out[o] = px[k]; out[o + 1] = px[k + 1]; out[o + 2] = px[k + 2]; out[o + 3] = px[i * 4 + 3];
+    const a = px[i * 4 + 3];
+    if (src) { const k = (src[i] < 0 ? i : src[i]) * 4; out[o] = px[k]; out[o + 1] = px[k + 1]; out[o + 2] = px[k + 2]; }
+    else if (a > half) { out[o] = px[i * 4]; out[o + 1] = px[i * 4 + 1]; out[o + 2] = px[i * 4 + 2]; }
+    else { out[o] = r; out[o + 1] = g; out[o + 2] = b; }
+    out[o + 3] = a;
   }
   return out;
 }
@@ -483,7 +513,7 @@ export function decalTexture(key, w, h, draw) {
   return once(`decal.${key}`, () => {
     const W = w * DETAIL, H = h * DETAIL;
     const c = canvas(W, H);
-    const ctx = c.getContext('2d');
+    const ctx = c.getContext('2d', { willReadFrequently: true });      // read straight back: keep it off the GPU
     ctx.scale(DETAIL, DETAIL);
     draw(ctx, w, h);
     const px = ctx.getImageData(0, 0, W, H).data;
@@ -507,7 +537,7 @@ export function decalTexture(key, w, h, draw) {
     t.generateMipmaps = true;
     t.anisotropy = 16;
     t.needsUpdate = true;
-    const sdf = new THREE.DataTexture(alphaSdf(px, W, H, ink / 2), W, H, THREE.RedFormat, THREE.UnsignedByteType);
+    const sdf = new THREE.DataTexture(alphaSdf(px, W, H, ink), W, H, THREE.RedFormat, THREE.UnsignedByteType);
     sdf.magFilter = sdf.minFilter = THREE.LinearFilter;
     sdf.needsUpdate = true;
     decalFields.set(t.source, { sdf, width: W, height: H, ink: ink / 255 });

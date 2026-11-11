@@ -42,7 +42,13 @@ export function buildFan(ctx) {
   const { P, T, lt, cut } = ctx;
 
   // ------------------------------------------------------------------ spinner (turns with N1)
-  const spinnerGeo = lathe([[0.001, 0.8], [0.05, 0.765], [0.12, 0.68], [0.2, 0.57], [0.28, 0.45], [0.35, 0.33], [0.41, 0.21], [0.45, 0.11], [0.468, 0.03], [0.47, 0.0]], 72);
+  // The cone's ten design points, joined by a smooth curve (six steps to a span, so the painted spiral, which the lathe
+  // maps by point index, stays where it was) and turned in 128 segments: with ten straight spans and 72 segments the
+  // highlight broke into beads at 4K. A mirrored point ahead of the tip rounds the nose instead of leaving a cone point.
+  const spinnerPts = [[0.001, 0.8], [0.05, 0.765], [0.12, 0.68], [0.2, 0.57], [0.28, 0.45], [0.35, 0.33], [0.41, 0.21], [0.45, 0.11], [0.468, 0.03], [0.47, 0.0]];
+  const SPIN_STEPS = 6;
+  const spinnerCurve = new THREE.CatmullRomCurve3([[-0.05, 0.765], ...spinnerPts].map(([r, y]) => new THREE.Vector3(r, y, 0)), false, 'centripetal');
+  const spinnerGeo = lathe(spinnerCurve.getPoints(spinnerPts.length * SPIN_STEPS).slice(SPIN_STEPS).map((p) => [Math.min(0.47, Math.max(0.001, p.x)), Math.min(0.8, Math.max(0, p.y))]), 128);
   // The GE90 spinner is painted composite, not bare metal: a dielectric with a lowered grazing-angle
   // reflectance, so the key light's glint on its rim no longer blooms like a lamp (it is the
   // silhouette Fresnel that did it, which roughness alone cannot damp)
@@ -76,7 +82,7 @@ export function buildFan(ctx) {
   const platform = [[0.455, 0.03], [0.47, 0.03], [0.47, -0.47], [0.455, -0.47]];
   // booster spool cone bolted to the disk's aft face
   const cone = [[0.43, -0.46], [0.455, -0.46], [0.565, -0.74], [0.545, -0.74]];
-  const disk = cut(cutLathe([diskProf, platform, cone], GM.titanium(), { seg: 72 }));
+  const disk = cut(cutLathe([diskProf, platform, cone], GM.titanium(), { seg: 128 }));
   P('Fan disk', {
     system: 'Propulsion', material: 'Forged titanium alloy', mass: 420,
     explode: [0, 1.85, 0], temp: 300,
@@ -188,7 +194,7 @@ export function buildFan(ctx) {
     const h = coreAt(y)[0];
     drum.push([[h - 0.005, y + 0.035], [h, y + 0.035], [h, y - 0.035], [h - 0.005, y - 0.035], [h - 0.04, y - 0.015], [0.47, y - 0.012], [0.47, y + 0.012], [h - 0.04, y + 0.015]]);
   }
-  const spool = cut(cutLathe(drum, GM.titanium(), { seg: 72 }));
+  const spool = cut(cutLathe(drum, GM.titanium(), { seg: 128 }));
   P('Booster spool', {
     system: 'Propulsion', material: 'Titanium drum and disks', mass: 160,
     explode: [0, 0.9, 0], temp: 320,
@@ -205,7 +211,7 @@ export function buildFan(ctx) {
     system: 'Structure', material: `${FRAME} hub ring`, mass: 140,
     explode: [0, 0, 0], temp: 330,
     desc: 'The inner ring of the engine\'s forward backbone. The cones of the forward sump hang from it, carrying the #1, #2 and #3 bearings, so the fan\'s whole weight and thrust come into the frame here.',
-  }, cut(cutLathe([[0.3, fr0], [0.4, fr0], [0.4, fr1], [0.3, fr1]], GM.casingDark(), { seg: 64 })));
+  }, cut(cutLathe([[0.3, fr0], [0.4, fr0], [0.4, fr1], [0.3, fr1]], GM.casingDark(), { seg: 128 })));
   P('Gooseneck duct', {
     system: 'Structure', material: `${FRAME} duct walls`, mass: 90,
     explode: [0, 0, 0], temp: 360,

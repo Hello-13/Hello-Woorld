@@ -47,7 +47,7 @@ export function selector(cut = 'engine', rest = false) {
  * part it removes — so switching the cutaway off costs no extra triangles. Section caps (the
  * red cut faces) show only with the cutaway on. Returns a Group with userData.cutaway.
  */
-export function cutLathe(profile, material, { seg = 64, caps = true, closed = true, cut = 'engine', capMat = null } = {}) {
+export function cutLathe(profile, material, { seg = 128, caps = true, closed = true, cut = 'engine', capMat = null } = {}) {
   // closed loops are made counter-clockwise in (r, y) so LatheGeometry's faces point out of the material
   let profiles = typeof profile[0][0] === 'number' ? [profile] : profile;
   if (closed) profiles = profiles.map(ccw);
