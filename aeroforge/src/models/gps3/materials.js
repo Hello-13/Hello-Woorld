@@ -57,7 +57,7 @@ const cellTexture = () => decalTexture('gps3.cells', 512, 512, (ctx, w) => {
 
 export const G = {
   /** Multi-layer insulation with a black carbon-loaded Kapton outer layer. */
-  blackMLI: (r = 0.8) => once(`blackMLI${r}`, () => {      // r: crinkle tiles per metre (the blankets carry metric UVs)
+  blackMLI: (r = 1.6) => once(`blackMLI${r}`, () => {      // r: crinkle tiles per metre (the blankets carry metric UVs)
     const s = mliSurface();   // the engine's default crinkle (shared with SKIN.mli): one procedural surface for all three blankets
     return new THREE.MeshStandardMaterial({
       color: 0x2a2c31, normalMap: tile(s.normalMap, r), roughnessMap: tile(s.roughnessMap, r),
@@ -69,7 +69,7 @@ export const G = {
    *  mid-grey base at roughness ≈ 0.5 so the orbit sun (intensity 4.2) lights the face silver-grey
    *  with bright creases where the normal map catches it, instead of clipping the whole face to
    *  white (the shared roughness map of mliSurface runs 0.18–0.42 and would make it a mirror). */
-  silverMLI: (r = 0.8) => once(`silverMLI${r}`, () => {
+  silverMLI: (r = 1.6) => once(`silverMLI${r}`, () => {
     const s = mliSurface();
     return new THREE.MeshStandardMaterial({
       color: 0x9da2a8, normalMap: tile(s.normalMap, r),

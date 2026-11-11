@@ -11,7 +11,7 @@ import { tankSkin, carbonWeave, concrete, closeUpDetailOn, closeUpDetailKey, app
 import { rng } from '../../engine/materials.js';
 
 const cache = new Map();
-const once = (k, make) => { if (!cache.has(k)) { const t0 = performance.now(); cache.set(k, make()); (globalThis.__texMs ??= {})['falcon.' + k] = Math.round(performance.now() - t0); } return cache.get(k); };   // TEMP-TIMING
+const once = (k, make) => { if (!cache.has(k)) cache.set(k, make()); return cache.get(k); };
 
 // White exterior finishes. The launch-pad look adds three floodlights to the dawn sky and sun, which
 // lift the lower white skins past the renderer's bloom threshold (diffuse HDR luminance ≈ 2.1

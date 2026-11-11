@@ -7,7 +7,7 @@ import { rng } from './materials.js';
 
 const cache = new Map();
 const once = (key, make) => {
-  if (!cache.has(key)) { const t0 = performance.now(); cache.set(key, make()); (globalThis.__texMs ??= {})[key] = Math.round(performance.now() - t0); }   // TEMP-TIMING
+  if (!cache.has(key)) cache.set(key, make());
   return cache.get(key);
 };
 
@@ -492,10 +492,11 @@ const microDetail = (kind) => once(`micro.${kind}`, () => {
 });
 
 // strengths per family: x seam slope, y fastener-edge slope (both scaled by the material's normalScale),
-// z micro normal slope, w micro roughness swing; tone: micro albedo swing
+// z micro normal slope, w micro roughness swing; tone: micro albedo swing; scaled: the micro normal follows the
+// material's normalScale too (a blanket's fine creases are as deep as its coarse ones are)
 const MICRO = {
   paint: { q: [1.1, 1.0, 0.1, 0.12], tone: 0.03 },       // micro normal: rms slope 0.035 (matte paint, not a textured coating)
-  foil: { q: [1.1, 1.0, 0.5, 0.3], tone: 0.06 },
+  foil: { q: [1.1, 1.0, 0.7, 0.15], tone: 0.04, scaled: true },   // rms slope 0.42 × normalScale (0.09 on Hubble's blankets)
 };
 
 const DETAIL_PARS = /* glsl */`
@@ -574,7 +575,7 @@ export function applyCloseUpDetail(material, shader) {
   const mx = m ? m[0] : 1 / (rep.x * MICRO_TILE), my = m ? m[1] : 1 / (rep.y * MICRO_TILE);
   shader.uniforms.crispMicro = { value: microDetail(d.micro) };
   shader.uniforms.crispP = { value: new THREE.Vector4(d.width, d.height, mx, my) };
-  shader.uniforms.crispQ = { value: new THREE.Vector4(...fam.q) };
+  shader.uniforms.crispQ = { value: new THREE.Vector4(fam.q[0], fam.q[1], fam.q[2] * (fam.scaled ? material.normalScale.x : 1), fam.q[3]) };
   shader.uniforms.crispTone = { value: fam.tone };
   if (d.field) shader.uniforms.crispField = { value: d.field };
   shader.fragmentShader = (d.field ? '#define CRISP_FIELD\n' : '') + shader.fragmentShader

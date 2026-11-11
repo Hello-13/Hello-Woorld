@@ -23,7 +23,7 @@ function canvasTex(w, h, draw, { repeat = [1, 1], srgb = true, hires = false } =
   c.width = w * k; c.height = h * k;
   const ctx = c.getContext('2d');
   ctx.scale(k, k);
-  const t0 = performance.now(); draw(ctx, w, h); (globalThis.__texMs ??= {})[`hst.${w}x${h}x${k}.${Object.keys(globalThis.__texMs).length}`] = Math.round(performance.now() - t0);   // TEMP-TIMING
+  draw(ctx, w, h);
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(...repeat);

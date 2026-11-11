@@ -219,7 +219,7 @@ export function buildStructure(P) {
     }
     return g;
   };
-  const MLI_PER_M = 0.8;      // crinkle tile 1.25 m
+  const MLI_PER_M = 1.6;      // crinkle tile 0.63 m (about the finer of the two scales the stretched mapping used to show)
   for (const s of [1, -1]) {
     const sun = s > 0, g = [];
     // flush over the closeout strips (and the web ends), recessed across the tank bay, with returns along the webs
