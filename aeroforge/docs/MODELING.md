@@ -118,40 +118,58 @@ vehicle's lab, tour and the app already call on it.
 
 ## The open-sky look (in flight)
 
-`engine/sky.js` draws the flight backdrop in one pass on a camera-centred dome. Above the
-horizon it is a computed atmosphere (`engine/skymath.js`: Rayleigh + Mie single scattering on
-the spherical Earth, marched in ten steps, soft-clipped and lifted for the higher orders) that is
-as dark, blue and clear as the altitude makes it, with the pale band the dense air below lays
-along the limb, the sun's limb-darkened disc at its true 0.53°, a Mie aureole, a thin cirrus veil
-while the aircraft flies under 12.6 km, and a gentle veiling glare when the sun nears the frame
-edge. Below 7 km the 8K / 4K Poly Haven plate (a ground-level photograph) blends back in. Below
-the dipped horizon (acos(R / (R + h))) is a real-scale cloud deck: a top-height field in metres
-(`engine/clouds.js`: Worley convection cells at 1.5 km and 300 m, fbm between them, cauliflower
-at 60 m and 12 m, rare towering cumulus) that the shader ray-marches where the pixel resolves it,
-shades with a soft terminator, hollow darkening, a self-shadow march toward the sun, silver lining
-and blue-grey undersides, then sees through the same scattering model (transmittance plus
-in-scatter to the hit), so the far deck dissolves into the horizon band without a seam.
+`engine/skyvol.js` draws the flight backdrop as a real place: a spherical Earth with an ocean at
+sea level, a layer of volumetric cumulus between 1.2 and 4.6 km, a cirrus veil at 12.6 km and an
+atmosphere computed for the aircraft's altitude. Nothing follows the aircraft: climb, and the
+clouds fall away, the horizon dips (acos(R / (R + h))) and the sky darkens; descend into the layer
+and the field opens around the aircraft; lower still and it flies under the bases, over the sea.
 
-A lab that flies its vehicle sets three things on `stage.env` every frame: `altitude` (m, from
-the lab's own state: it grades the sky, the fog, the lights and places the cloud tops about 3 km
-below the aircraft), `cloudSpeed` (true airspeed, m/s: the deck scrolls aft at it, nose toward +x)
-and optionally `unitMetres` (metres per scene unit, i.e. `1 / v._fitScale`). The look's lighting on
-the vehicle (key = the sun, hemisphere = computed sky above / cloud bounce below, IBL = the HDR
-over a lit deck) follows the same altitude, so a vehicle's `lighting.sky` override is only needed
-for paint that misbehaves.
+- **Atmosphere** (`skymath.js` `ATM2`, `inscatter2`; the shader's `inscatter()` is the same
+  arithmetic): Rayleigh and Mie single scattering and ozone absorption with the standard sea-level
+  coefficients, integrated along the view ray, the sun's optical depth from the Kasten-Young
+  airmass, and the higher orders as an isotropic source in proportion to the local scattering.
+  Nothing is clipped or tinted. The same function gives the aerial perspective over every distance
+  (to the clouds, to the sea).
+- **Clouds**: density from two tileable 3-D noise volumes (`assets/sky`, made by
+  `tools/make-cloud-noise.py`) and the 2-D weather map of `clouds.js`, after Schneider's Horizon
+  Zero Dawn cloudscapes: a Perlin-Worley base shape cut by local coverage and a height profile
+  (flat bases, domed tops, taller at the convection cells' cores), eroded at the edges by lobes a
+  few hundred metres across and by fine cellular detail. The march through the layer's shell
+  strides through clear air by the distance the field implies, finds each cloud face by bisection
+  (so silhouettes are the field's, not the sampling's), reads the field at the pixel's own
+  footprint for the first samples behind a face, and integrates each step's in-scattering exactly.
+  Light: a second short march toward the sun for Beer's law, three octaves of a dual-lobe
+  Henyey-Greenstein phase for the multiple scattering, sky light from above and the sea's bounce
+  from below. The pass renders at a fraction of the frame (`VOL_TIERS`: steps, sun steps, scale by
+  preset) from inside the dome's own draw, and the dome composites it bicubically, so the horizon,
+  sun and sea stay at full resolution.
+- **Sea**: Fresnel reflection of the sky, the sun's glitter path (Cox-Munk slopes for a 7 m/s
+  wind), deep-water blue between, the clouds' shadows, wind streaks.
+- **Sun**: `stage.env.setFlightSun({ elevation, azimuth })` (degrees; the Film menu's sliders;
+  saved as `aeroforge.sun`). Its colour at the aircraft, the clouds and the sea comes from the
+  path through the air (`sunTransmittance`). Each frame `environment.js` takes the key light (the
+  sun as it reaches the aircraft), the hemisphere fill (the mean sky above) and the image-based
+  lighting (`sky.environment(pmrem)`: the same sky rendered to a PMREM map, without the sun's disc
+  and with the cloud field as its average) from the sky, so a vehicle's `lighting.sky` override is
+  only needed for paint that misbehaves.
+
+A lab that flies its vehicle sets three things on `stage.env` every frame: `altitude` (m),
+`cloudSpeed` (true airspeed, m/s: the world passes aft at it, nose toward +x) and optionally
+`unitMetres` (metres per scene unit, i.e. `1 / v._fitScale`).
+
+Safety nets: the sky checks its shaders' compile results after a few frames (`sky.failed`); if the
+dome's failed, `environment.js` swaps in the earlier dome, and if only the cloud pass failed the
+clouds switch off. With `sky.adaptive` (on by default) the march budget steps down when frames
+take longer than 1/40 s in flight and back up when they are short again. `?sky=classic` or the
+Film menu's "Volumetric clouds" keeps the earlier dome (`engine/sky.js`: the Poly Haven plate
+above a ray-marched cloud-deck height field, budgeted by `SKY_TIERS`, with its own `simple`
+fallback).
 
 Contrails: `effects.js` exports `contrailMesh()` (a ribbon in the vehicle's metres, aft along −x
 from its origin: add it to a nozzle group at the exit plane) and `contrailFactor(altitude,
 { running })` (0 below 7.6 km, 1 above 9.6 km). Call `mesh.setContrail({ strength, dt, speed })`
 each frame with the lab's altitude and airspeed; pass `light` / `ambient` (the key and hemisphere
 light colours) so the trail is lit like the aircraft.
-
-Quality: `SKY_TIERS` (skymath.js) budgets the deck per preset: 4K / Ultra march 6 relief and 4
-shadow steps with the 12 m octave (about 45 noise fetches per deck pixel), High 4 + 3, Balanced
-no relief march (2 shadow steps, ~20 fetches), Performance a flat lit deck (~10 fetches). The
-proven fallback `stage.env.sky.simple = true` (or `localStorage aeroforge.simplesky = 1`) compiles
-the dome without the march, self-shadow, computed sky, cirrus and flare: the plate and a flat
-shaded deck.
 
 ## Film mode, lens and grade
 
@@ -171,16 +189,16 @@ in focus is an exact copy of the beauty frame; its depth render is full resoluti
 that carry it. The blur follows a thin-lens 42 mm-equivalent at the shot's f-number using the
 vehicle's real scale (`1 / _fitScale`). It is off unless Film mode or a tour step with focus parts
 asks for it, and absent on Balanced / Performance. The final grade (`GRADES` in `stage.js`) has a
-small tone curve per look — showroom neutral with a soft shoulder, hangar warm, sky cool and
-high-key, pad golden, orbit with a true-black toe — eased between looks; AgX is untouched, shadows
+small tone curve per look — showroom neutral with a soft shoulder, hangar warm, sky clean
+daylight (the atmosphere supplies the haze), pad golden, orbit with a true-black toe — eased between looks; AgX is untouched, shadows
 are only lifted, never crushed, and the grain is held at one 8-bit step as a dither. The showroom's
 mirror floor blurs each reflection by the reflected part's height above the floor (read from the
 Reflector's oblique depth) and the studio IBL has a feathered key softbox, a cool rim and a fill.
 
-Switches: URL flags `?film=0`, `?dof=0`, `?grade=0`, `?sweep=0`, `?drift=0`, `?studio=classic`
-(fixed-blur floor), the Film button's menu (depth of field, light sweep, handheld drift; saved as
-`aeroforge.fx`), and `__aeroforge.stage.fx` in the console. Off, each reverts to the earlier
-behaviour.
+Switches: URL flags `?film=0`, `?dof=0`, `?grade=0`, `?sweep=0`, `?drift=0`, `?tourDof=1`,
+`?studio=1` (the depth-blurred floor; off by default, as is depth of field in tours, until both
+are confirmed on real GPUs), `?sky=classic`, the Film button's menu (saved as `aeroforge.fx`), and
+`__aeroforge.stage.fx` in the console. Off, each reverts to the earlier behaviour.
 
 ## Checking your work
 

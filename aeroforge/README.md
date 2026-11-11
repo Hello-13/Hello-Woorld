@@ -84,7 +84,8 @@ estimates unless a published figure is cited, and the inspector says which.
   Balanced, Performance) also scale MSAA, ambient occlusion, mirror reflections and shadow maps;
   Ultra is the default on desktops with 8+ cores, automatic mode steps up to 4K when the GPU has
   headroom, and steps down if the frame rate drops.
-- **Environments** — showroom, hangar, open sky above a cloud deck, a dawn launch pad with
+- **Environments** — showroom, hangar, open sky (volumetric clouds over the sea in a computed
+  atmosphere, with a sun you can place from the Film menu), a dawn launch pad with
   floodlights, and orbit (low Earth orbit for Hubble, medium Earth orbit for GPS III, with the
   Earth at its true angular size for the altitude). During a launch the sky darkens with altitude, the stars come
   out and the curved Earth (NASA Blue Marble by day, city lights by night, clouds and an
