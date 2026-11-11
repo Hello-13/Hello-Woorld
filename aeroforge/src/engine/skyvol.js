@@ -198,7 +198,7 @@ const WORLD_GLSL = /* glsl */`
     float cov = smoothstep(thr - 0.09, thr + 0.11, m);
     // tops: low over most of the field, towering where a region is convective and at its cells' cores
     float region = smoothstep(0.34, 0.68, a.b * 0.65 + b.r * 0.35);
-    float top = (0.3 + 0.7 * region * (0.25 + 0.75 * cell)) * mix(0.7, 1.0, cov);
+    float top = min((0.3 + 0.95 * region * (0.15 + 0.85 * cell * cell)) * mix(0.7, 1.0, cov), 1.0);
     // flying inside the layer: the field opens around the aircraft
     if (clearR > 0.0) cov *= smoothstep(clearR * 0.3, clearR, length(p - camXZ));
     return vec2(cov, top);
