@@ -133,6 +133,15 @@ export function inscatter2(dir, sunDir, camAlt, { sunColor = [1, 1, 1], tEnd = I
   return { light: L.map((v, k) => v * A.E * sc[k]), transm: tau.map((v) => Math.exp(-v)) };
 }
 
+/** The sun's transmittance (rgb) down to an altitude (m) for a sun elevation whose sine is sinE:
+ *  white overhead, amber then red as the path through the air lengthens. */
+export function sunTransmittance(sinE, alt = 0) {
+  const A = ATM2, xs = airmass(sinE);
+  const rhoR = Math.exp(-alt / A.HR), rhoM = Math.exp(-alt / A.HM);
+  const colO = A.ozoneHalf * Math.min(Math.max((A.ozoneAlt + A.ozoneHalf - alt) / (2 * A.ozoneHalf), 0), 1);
+  return A.betaR.map((b, k) => Math.exp(-(b * A.HR * rhoR + A.betaMe * A.HM * rhoM + A.betaO[k] * colO) * xs));
+}
+
 export function skyRadiance2(dir, sunDir, camAlt, sunColor = [1, 1, 1], n = 12) {
   return inscatter2(dir, sunDir, camAlt, { sunColor, n }).light;
 }

@@ -25,7 +25,7 @@
 // The class has SkyDome's interface (sky.js), so environment.js can use either.
 
 import * as THREE from 'three';
-import { SKY_TIERS, ATM2, skyRadiance2 as skyRadiance, WRAP } from './skymath.js';
+import { SKY_TIERS, ATM2, skyRadiance2 as skyRadiance, sunTransmittance, WRAP } from './skymath.js';
 import { cloudNoise } from './clouds.js';
 import { skyGrade, CIRRUS_ALT } from './sky.js';
 
@@ -269,7 +269,7 @@ const cloudVert = /* glsl */`
 const cloudFrag = /* glsl */`
   ${WORLD_GLSL}
   uniform int steps; uniform int lightSteps; uniform int lightFull; uniform float pixAngle;
-  uniform vec3 ambTop; uniform vec3 ambBot; uniform float cloudSun;
+  uniform vec3 ambTop; uniform vec3 ambBot; uniform float cloudSun; uniform vec3 sunAtCloud;
   varying vec3 vRay;
 
   const float PI = 3.14159265;
@@ -315,7 +315,7 @@ const cloudFrag = /* glsl */`
 
     float cosT = dot(rd, sunDir);
     float ph0 = phase(cosT, 1.0), ph1 = phase(cosT, 0.5), ph2 = phase(cosT, 0.25);
-    vec3 sunL = sunColor * cloudSun;
+    vec3 sunL = sunAtCloud * cloudSun;
     float jitter = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
     float t = tA + jitter * max(24.0, tA * 0.0062);
     float T = 1.0; vec3 L = vec3(0.0);
@@ -394,6 +394,7 @@ const domeFrag = /* glsl */`
   uniform sampler2D cloudTex; uniform vec2 resolution; uniform vec2 cloudSize;
   uniform float pixAngle; uniform vec3 skyZen0; uniform vec3 skyHor0; uniform float sunGain;
   uniform float cirrus; uniform float flare; uniform vec3 sunNdc; uniform float seaWind;
+  uniform vec3 sunAtCam; uniform vec3 sunAtSea; uniform vec3 envCloud; uniform vec3 envBase; uniform float envCover;
   varying vec3 vDir;
 
   const float PI = 3.14159265;
@@ -410,7 +411,7 @@ const domeFrag = /* glsl */`
     float limb = 1.0 - 0.55 * (1.0 - sqrt(max(1.0 - u * u, 0.0)));
     float r = ang / 0.012;
     float aureole = 0.9 / (1.0 + r * r) + 0.12 / (1.0 + 0.1 * r * r);
-    return sunColor * (disc * limb * 60.0 + aureole * (1.0 - disc));
+    return sunAtCam * (disc * limb * 60.0 + aureole * (1.0 - disc));
   }
 
   // The cirrus veil far above: fibrous, streaked along the wind, patchy, bright toward the sun.
@@ -430,7 +431,7 @@ const domeFrag = /* glsl */`
     float fwd = pow(max(dot(d, sunDir), 0.0), 8.0);
     vec3 tr;
     vec3 air = inscatter(d, t, 4, tr);
-    vec3 cc = (sunColor * (0.8 + 0.9 * fwd) + skyZen0 * 0.6) * tr + air;
+    vec3 cc = (sunAtCam * (0.8 + 0.9 * fwd) + skyZen0 * 0.6) * tr + air;
     return mix(col, cc, a);
   }
 
@@ -472,7 +473,7 @@ const domeFrag = /* glsl */`
       over = weatherAt(pw, max(foot, 400.0)).x;
     }
     // the water body: what comes back up out of deep ocean water
-    vec3 E = sunColor * (sunGain * sunDir.y * shade) + skyZen0 * 2.2;
+    vec3 E = sunAtSea * (sunGain * sunDir.y * shade) + skyZen0 * 2.2;
     vec3 body = vec3(0.0035, 0.016, 0.034) * E;
     // overcast patches reflect cloud base, not blue sky
     skyR = mix(skyR, vec3(dot(skyR, vec3(0.3333))) * 0.8, over * 0.6);
@@ -483,8 +484,8 @@ const domeFrag = /* glsl */`
     float s2w = 0.003 + 0.00512 * seaWind;
     float P = exp(-tan2 / s2w) / (PI * s2w);
     float Fh = 0.02 + 0.98 * pow(1.0 - max(dot(-d, h), 0.0), 5.0);
-    vec3 glint = sunColor * (sunGain * Fh * P / (4.0 * max(cosV, 0.06) * zh * zh * zh * zh)) * shade;
-    vec3 col = body * (1.0 - F) + skyR * F + min(glint, vec3(40.0));
+    vec3 glint = sunAtSea * (sunGain * Fh * P / (4.0 * max(cosV, 0.06) * zh * zh * zh * zh)) * shade;
+    vec3 col = body * (1.0 - F) + skyR * F + min(glint, vec3(14.0));
     vec3 tr;
     vec3 air = inscatter(d, t, 8, tr);
     return col * tr + air;
@@ -518,7 +519,7 @@ const domeFrag = /* glsl */`
     vec2 fc = gl_FragCoord.xy / res * 2.0 - 1.0;
     float aspect = res.x / res.y;
     vec2 dv = (fc - sunNdc.xy) * vec2(aspect, 1.0);
-    col += sunColor * k * 0.09 / (1.0 + 2.5 * dot(dv, dv));
+    col += sunAtCam * k * 0.09 / (1.0 + 2.5 * dot(dv, dv));
     vec2 g = (fc + sunNdc.xy * 0.55) * vec2(aspect, 1.0);
     col += vec3(0.85, 0.93, 1.0) * k * 0.05 * smoothstep(0.17, 0.02, length(g));
     return col;
@@ -534,13 +535,36 @@ const domeFrag = /* glsl */`
       vec3 tr;
       col = inscatter(d, 1e9, 12, tr);
       col = cirrusLayer(d, col);
+#ifndef ENV
       col += sunDisc(d);
+#endif
     }
+#ifdef ENV
+    // For image-based lighting (the key light is the sun, so no disc here) the cloud field is its
+    // average: lit tops spread below the aircraft, grey bases overhead when it flies under them.
+    float topAlt = cloudBase + (cloudTop - cloudBase) * 0.4;
+    if (envCover > 0.0 && camAlt > topAlt) {
+      vec2 c = hitAlt(topAlt, d.y);
+      if (c.x <= c.y && c.x > 0.0) {
+        float sinV = clamp((camAlt - topAlt) / c.x, 0.06, 1.0);
+        vec3 tr;
+        vec3 air = inscatter(d, c.x, 4, tr);
+        col = mix(col, envCloud * tr + air, 1.0 - pow(1.0 - envCover, 1.0 / sinV));
+      }
+    } else if (envCover > 0.0 && camAlt < cloudBase && d.y > 0.0) {
+      float t = hitAlt(cloudBase, d.y).y;
+      float sinV = clamp((cloudBase - camAlt) / max(t, 1.0), 0.06, 1.0);
+      vec3 tr;
+      vec3 air = inscatter(d, t, 4, tr);
+      col = mix(col, envBase * tr + air, 1.0 - pow(1.0 - envCover, 1.0 / sinV));
+    }
+#else
     if (cloudsOn > 0.5) {
       vec4 c = clouds(gl_FragCoord.xy / max(resolution, vec2(1.0)));
       col = col * c.a + c.rgb;
     }
     col = lensFlare(col);
+#endif
     gl_FragColor = vec4(max(col, 0.0), 1.0);
   }`;
 
@@ -563,6 +587,8 @@ export class VolumetricSky extends THREE.Mesh {
       cloudTex: { value: null }, resolution: { value: new THREE.Vector2(1920, 1080) }, cloudSize: { value: new THREE.Vector2(960, 540) },
       pixAngle: { value: 5e-4 }, skyZen0: { value: new THREE.Color(0.1, 0.2, 0.45) }, skyHor0: { value: new THREE.Color(0.6, 0.7, 0.8) },
       cirrus: { value: 1 }, flare: { value: 1 }, sunNdc: { value: new THREE.Vector3() }, seaWind: { value: 7 },
+      sunAtCam: { value: new THREE.Color(1, 0.96, 0.9) }, sunAtSea: { value: new THREE.Color(1, 0.9, 0.75) },
+      envCloud: { value: new THREE.Color(0.9, 0.9, 0.9) }, envBase: { value: new THREE.Color(0.3, 0.32, 0.35) }, envCover: { value: 0.45 },
       plateGain: { value: 1 },                       // SkyDome's interface; unused here
     };
     const mat = new THREE.ShaderMaterial({
@@ -584,7 +610,7 @@ export class VolumetricSky extends THREE.Mesh {
       invProj: { value: new THREE.Matrix4() }, camWorld: { value: new THREE.Matrix4() },
       steps: { value: 96 }, lightSteps: { value: 6 }, lightFull: { value: 3 }, pixAngle: { value: 1e-3 },
       ambTop: { value: new THREE.Color(0.3, 0.4, 0.6) }, ambBot: { value: new THREE.Color(0.1, 0.12, 0.15) },
-      cloudSun: { value: 16 },      // the sun on the clouds: calibrates the scattering approximation so thick sunlit cloud is about as bright as white paint
+      cloudSun: { value: 16 }, sunAtCloud: { value: new THREE.Color(1, 0.95, 0.85) },      // the sun on the clouds: calibrates the scattering approximation so thick sunlit cloud is about as bright as white paint
     };
     const tri = new THREE.BufferGeometry();
     tri.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
@@ -698,8 +724,31 @@ export class VolumetricSky extends THREE.Mesh {
     // lights that depend on the sun and the altitude: the sky's colours for the clouds and the sea
     const sun = u.sunDir.value, sc = u.sunColor.value;
     const key = `${sun.x.toFixed(3)},${sun.y.toFixed(3)},${sun.z.toFixed(3)},${sc.getHex()}`;
+    // the sun at the camera, and the sky as a light on the aircraft: redone when the sun moves or
+    // the altitude changes by 250 m
+    const altKey = `${key},${Math.round(camAlt / 250)}`;
+    if (altKey !== this._altKey) {
+      this._altKey = altKey;
+      const tc = sunTransmittance(sun.y, camAlt);
+      this.sunAtCam = [sc.r * tc[0], sc.g * tc[1], sc.b * tc[2]];
+      u.sunAtCam.value.setRGB(...this.sunAtCam);
+      const acc = [0, 0, 0];
+      const sa = Math.atan2(sun.z, sun.x);
+      const dirs = [[1.45, 0], [0.8, sa + 2.1], [0.8, sa - 2.1], [0.8, sa + Math.PI], [0.3, sa + 1.6], [0.3, sa - 1.6], [0.3, sa + Math.PI], [0.3, sa]];
+      for (const [e, az] of dirs) {
+        const r = skyRadiance(this._tmp.set(Math.cos(e) * Math.cos(az), Math.sin(e), Math.cos(e) * Math.sin(az)), sun, camAlt, sc);
+        for (let i = 0; i < 3; i++) acc[i] += r[i] / dirs.length;
+      }
+      /** Mean radiance of the sky above the aircraft (linear rgb): the colour of its fill light. */
+      this.skyAmbient = acc;
+      /** Changes whenever the image-based lighting should be rebuilt (environment()). */
+      this.envKey = altKey + `,${this.coverage.toFixed(2)},${u.cloudsOn.value}`;
+    }
     if (key !== this._ambKey) {
       this._ambKey = key;
+      const t1 = sunTransmittance(sun.y, 2500), t0 = sunTransmittance(sun.y, 0);
+      cu.sunAtCloud.value.setRGB(sc.r * t1[0], sc.g * t1[1], sc.b * t1[2]);
+      u.sunAtSea.value.setRGB(sc.r * t0[0], sc.g * t0[1], sc.b * t0[2]);
       const at = (alt, e, az) => skyRadiance(this._tmp.set(Math.cos(e) * Math.cos(az), Math.sin(e), Math.cos(e) * Math.sin(az)), sun, alt, sc);
       const sa = Math.atan2(sun.z, sun.x);
       const mean = (alt) => {
@@ -716,7 +765,12 @@ export class VolumetricSky extends THREE.Mesh {
       const z0 = at(0, 1.5, 0), h0 = at(0, 0.06, sa + Math.PI * 0.6);
       u.skyZen0.value.setRGB(z0[0], z0[1], z0[2]);
       u.skyHor0.value.setRGB(h0[0], h0[1], h0[2]);
+      // the cloud field as image-based lighting sees it: sunlit tops, sky-lit bases
+      const lit = 0.9 * (0.3 + 0.7 * Math.sqrt(Math.max(sun.y, 0)));
+      u.envCloud.value.setRGB(sc.r * t1[0] * lit + top[0] * 0.5, sc.g * t1[1] * lit + top[1] * 0.5, sc.b * t1[2] * lit + top[2] * 0.5);
+      u.envBase.value.setRGB(lum * 0.5, lum * 0.52, lum * 0.56);
     }
+    u.envCover.value = this.clouds ? THREE.MathUtils.clamp(this.coverage * 0.95, 0, 0.9) : 0;
 
     // the grade carried to the scene: fog toward the horizon's colour, the lights on the aircraft
     const g = this.grade = skyGrade(altitude);
@@ -729,8 +783,31 @@ export class VolumetricSky extends THREE.Mesh {
     u.sunNdc.value.set(front ? s.x : 0, front ? s.y : 0, front ? 1 : 0);
   }
 
+  /**
+   * Image-based lighting from this sky as it is now (sun, altitude, cloud cover): the aircraft is
+   * lit by, and reflects, the sky it flies in. Returns a PMREM texture; the previous one is freed.
+   */
+  environment(pmrem) {
+    if (!this._envScene) {
+      this._envScene = new THREE.Scene();
+      this._envMat = new THREE.ShaderMaterial({
+        uniforms: this.uniforms, vertexShader: 'varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: domeFrag, defines: { ENV: 1 }, side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
+      });
+      const m = new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), this._envMat);
+      m.frustumCulled = false;
+      this._envScene.add(m);
+    }
+    const rt = pmrem.fromScene(this._envScene, 0, 0.1, 100);
+    this._envTarget?.dispose();
+    this._envTarget = rt;
+    return rt.texture;
+  }
+
   dispose() {
     this.cloudTarget.dispose();
+    this._envTarget?.dispose();
+    this._envMat?.dispose();
     this.geometry.dispose();
     this.material.dispose();
     this._quad.material.dispose();

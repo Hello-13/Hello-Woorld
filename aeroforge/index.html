@@ -43,6 +43,11 @@
         <label title="Pulls focus to each tour step's parts"><input type="checkbox" data-fx="tourDof"> Depth of field in tours</label>
         <label title="Reflections blur with height above the floor. Applies after a reload."><input type="checkbox" data-fx="studio"> Depth-blurred floor (reload)</label>
         <label title="Volumetric clouds over the sea in flight. Off: the earlier, lighter sky. Applies after a reload."><input type="checkbox" data-fx="sky"> Volumetric clouds (reload)</label>
+        <div class="film-sun" id="film-sun">
+          <span class="film-menu-title">Sun in flight</span>
+          <label class="film-range" title="Height of the sun above the horizon: low for golden light and long shadows across the cloud tops">Height <input type="range" id="sun-el" min="4" max="70" step="1"> <output id="sun-el-out"></output></label>
+          <label class="film-range" title="Where the sun stands around the aircraft, clockwise from the nose">Direction <input type="range" id="sun-az" min="0" max="355" step="5"> <output id="sun-az-out"></output></label>
+        </div>
       </div>
     </div>
     <button type="button" class="nav-full" id="fullscreen" aria-pressed="false" title="Full screen (Shift+F)" hidden>Full screen</button>

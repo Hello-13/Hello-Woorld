@@ -13,6 +13,8 @@ import { Showroom, showroomEnvironment } from './showroom.js';
 import { SkyDome, SKY_TIERS, skyEnvironment } from './sky.js';
 import { VolumetricSky } from './skyvol.js';
 
+const WHITE = new THREE.Color(1, 1, 1);
+
 const R_EARTH_KM = 6371;
 
 /** Per-look settings. Sun directions are world-space (y up). */
@@ -318,6 +320,13 @@ export class Environment {
     // backdrops: the flight sky. Volumetric clouds over the sea in a computed atmosphere (skyvol.js);
     // ?sky=classic or the Film menu keeps the earlier dome (a photographic plate above a cloud deck).
     this.sky = stage.fx?.sky === false ? new SkyDome() : new VolumetricSky();
+    /** The sun in flight (volumetric sky): elevation above the horizon and azimuth, in degrees
+     *  (azimuth from the aircraft's nose, +x, toward its right wing, +z). Kept between visits. */
+    this.flightSun = { elevation: 30, azimuth: 150 };
+    try {
+      const s = JSON.parse(localStorage.getItem('aeroforge.sun') || 'null');
+      if (s && Number.isFinite(s.elevation) && Number.isFinite(s.azimuth)) this.flightSun = { elevation: THREE.MathUtils.clamp(s.elevation, 3, 75), azimuth: ((s.azimuth % 360) + 360) % 360 };
+    } catch { /* storage blocked or malformed */ }
     scene.add(this.sky);
     /** Flight state for the sky look, set by the labs each frame: altitude (m) grades the sky and
      *  places the cloud deck; cloudSpeed (m/s, the airspeed) scrolls the deck aft; unitMetres is
@@ -400,6 +409,7 @@ export class Environment {
   async showBackdrop(name) {
     const L = LOOKS[name];
     if (L.background === 'sky') {
+      if (this.sky.isVolumetricSky) return;          // computed, no plate
       // the plate goes to the sky dome, which draws it above the dipped horizon and the deck below
       const plate = L.plate ? await this.loadPlate(L.plate, { mipmaps: false }) : null;
       if (this.look !== name) return;
@@ -489,6 +499,23 @@ export class Environment {
    *  LOOKS by applyLook. A vehicle that sets none (null) gets the look exactly as defined above. */
   setVehicleLighting(over) { this.vehicleLighting = over || null; }
 
+  /** Direction to the flight sun (unit vector). */
+  flightSunDir(out = new THREE.Vector3()) {
+    const el = THREE.MathUtils.degToRad(this.flightSun.elevation), az = THREE.MathUtils.degToRad(this.flightSun.azimuth);
+    return out.set(Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el));
+  }
+
+  /** Move the sun of the flight look (volumetric sky): { elevation, azimuth } in degrees. The sky,
+   *  the clouds' light, the key light and the image-based lighting all follow. */
+  setFlightSun({ elevation = this.flightSun.elevation, azimuth = this.flightSun.azimuth } = {}) {
+    this.flightSun = { elevation: THREE.MathUtils.clamp(elevation, 3, 75), azimuth: ((azimuth % 360) + 360) % 360 };
+    try { localStorage.setItem('aeroforge.sun', JSON.stringify(this.flightSun)); } catch { /* storage blocked */ }
+    if (this.look === 'sky' && this.sky.isVolumetricSky && !this.overlay) {
+      this.flightSunDir(this.sunDir);
+      this.lights.key.position.copy(this.sunDir).multiplyScalar(40);
+    }
+  }
+
   applyLook(name) {
     if (!LOOKS[name]) return;
     const L = { ...LOOKS[name], ...(this.vehicleLighting?.[name] || {}) };
@@ -520,6 +547,7 @@ export class Environment {
     } else dir = new THREE.Vector3(...L.sun).normalize();
     if (dir.y < 0.12) dir.y = 0.12;     // keep shadows on the ground for a sun on the horizon
     dir.normalize();
+    if (L.background === 'sky' && this.sky.isVolumetricSky) this.flightSunDir(dir);      // the flight sun is the viewer's to place
     this.sunDir.copy(dir);
     key.position.copy(dir).multiplyScalar(40);
     key.target.position.set(0, 0, 0);
@@ -546,7 +574,11 @@ export class Environment {
     // image-based lighting
     this.scene.environmentIntensity = L.envIntensity;
     if (L.background === 'hdri' || L.background === 'sky') this.showBackdrop(name);
-    if (L.hdri) {
+    if (L.background === 'sky' && this.sky.isVolumetricSky) {
+      // lit by the sky it flies in: rebuilt from the volumetric sky in update(), as the sun and altitude change
+      this._skyEnvKey = null;
+      this.scene.environmentRotation.set(0, 0, 0);
+    } else if (L.hdri) {
       const req = name;
       this.loadHDRI(L.hdri).then((h) => {
         if (!h || this.look !== req) return;
@@ -664,9 +696,30 @@ export class Environment {
         this.scene.fog.color.setRGB(g.haze[0], g.haze[1], g.haze[2]);
         this.scene.fog.density = (LOOKS.sky.fog?.[1] || 0.0004) * (1 - 0.6 * THREE.MathUtils.smoothstep(this.altitude, 2000, 16000));
       }
-      if (!this.vehicleLighting?.sky?.hemi) this.lights.hemi.color.copy(g.skyLight);
-      if (!this.vehicleLighting?.sky?.key) this.lights.key.color.copy(g.key);
-      this.sky.setSun(this.sunDir, g.key);
+      if (this.sky.isVolumetricSky) {
+        const s = this.sky, over = this.vehicleLighting?.sky;
+        s.setSun(this.sunDir, 0xfff8f0);
+        if (s.sunAtCam) {
+          // the key light is the sun as it reaches the aircraft: amber and weaker when it is low
+          const m = Math.max(...s.sunAtCam, 1e-3);
+          this.lights.key.color.setRGB(s.sunAtCam[0] / m, s.sunAtCam[1] / m, s.sunAtCam[2] / m);
+          this.lights.key.intensity = (over?.key?.intensity ?? LOOKS.sky.key.intensity) * m;
+          // the fill is the sky above, in its own colour, and the cloud and sea light from below
+          const a = s.skyAmbient, am = Math.max(...a, 1e-3);
+          this.lights.hemi.color.setRGB(a[0] / am, a[1] / am, a[2] / am).lerp(WHITE, 0.35);
+          this.lights.hemi.groundColor.setRGB(s.sunAtCam[0] / m, s.sunAtCam[1] / m, s.sunAtCam[2] / m).lerp(WHITE, 0.4).multiplyScalar(0.85);
+          this.lights.hemi.intensity = (over?.hemi?.[2] ?? LOOKS.sky.hemi[2]) * (0.35 + 0.65 * Math.sqrt(Math.max(this.sunDir.y, 0)));
+        }
+        if (s.envKey && s.envKey !== this._skyEnvKey && !this.overlay && (this._skyEnvKey == null || this.stage.time - (this._skyEnvAt || 0) > 0.2)) {
+          this._skyEnvKey = s.envKey;
+          this._skyEnvAt = this.stage.time;
+          this.scene.environment = s.environment(this.pmrem);
+        }
+      } else {
+        if (!this.vehicleLighting?.sky?.hemi) this.lights.hemi.color.copy(g.skyLight);
+        if (!this.vehicleLighting?.sky?.key) this.lights.key.color.copy(g.key);
+        this.sky.setSun(this.sunDir, g.key);
+      }
     }
     if (this.earth && this.earth.group.visible) {
       // keep the Earth's angular radius right for the current altitude: sin ρ = R / (R + h)

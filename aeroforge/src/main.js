@@ -536,6 +536,21 @@ async function start() {
     box.checked = !!FX[box.dataset.fx];
     box.addEventListener('change', () => { setEffect(box.dataset.fx, box.checked); log.push('VIEW', `Film: ${box.parentElement.textContent.trim()} ${box.checked ? 'on' : 'off'}`); });
   }
+  // the flight sun (volumetric sky only)
+  const sunBox = $('film-sun'), sunEl = $('sun-el'), sunAz = $('sun-az');
+  if (!stage.env.sky.isVolumetricSky) sunBox.hidden = true;
+  else {
+    const show = () => {
+      const s = stage.env.flightSun;
+      sunEl.value = String(Math.round(s.elevation)); sunAz.value = String(Math.round(s.azimuth / 5) * 5 % 360);
+      $('sun-el-out').textContent = `${Math.round(s.elevation)}°`; $('sun-az-out').textContent = `${Math.round(s.azimuth)}°`;
+    };
+    show();
+    sunEl.addEventListener('input', () => { stage.env.setFlightSun({ elevation: +sunEl.value }); show(); });
+    sunAz.addEventListener('input', () => { stage.env.setFlightSun({ azimuth: +sunAz.value }); show(); });
+    const said = () => { const s = stage.env.flightSun; log.push('VIEW', `Flight sun ${Math.round(s.elevation)}° above the horizon, ${Math.round(s.azimuth)}° from the nose`); };
+    sunEl.addEventListener('change', said); sunAz.addEventListener('change', said);
+  }
   if (!stage.bokeh) { const d = filmGroup.querySelector('input[data-fx="dof"]'); if (d) { d.disabled = true; d.parentElement.title = 'Depth of field needs the High, Ultra or 4K graphics preset'; } }
   stage.onQualityChange = ((prev) => (k, manual, up, info) => {
     prev?.(k, manual, up, info);
