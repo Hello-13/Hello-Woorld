@@ -139,20 +139,24 @@ class LensPass extends BokehPass {
       uniform float maxblur, aperture, nearClip, farClip, focus, aspect;
       #include <packing>
       const vec2 TAPS[40] = vec2[](${BOKEH_TAPS});
-      float blurAt(vec2 uv) {
+      // blur of the pixel at uv, with a dead zone: a disc under ~half a pixel is no blur at all, so
+      // everything near the focal plane is an exact, unfiltered copy (px = one pixel in uv height)
+      float blurAt(vec2 uv, float px) {
         float z = perspectiveDepthToViewZ(unpackRGBAToDepth(texture2D(tDepth, uv)), nearClip, farClip);
-        return clamp((focus + z) * aperture, -maxblur, maxblur);
+        float b = clamp((focus + z) * aperture, -maxblur, maxblur);
+        return b * smoothstep(0.5, 1.5, abs(b) * 0.4 / px);
       }
       void main() {
         vec2 aspectcorrect = vec2(1.0, aspect);
-        float dofblur = blurAt(vUv);
+        float px = max(fwidth(vUv.y), 1e-6);
+        float dofblur = blurAt(vUv, px);
         vec4 col = texture2D(tColor, vUv);
         float wsum = 1.0;
         if (abs(dofblur) > 1e-6) {
           for (int i = 0; i < 40; i++) {
             vec2 o = TAPS[i] * aspectcorrect * dofblur;
             vec2 uv = vUv + o;
-            float reach = abs(blurAt(uv)) * 0.4;                 // the tap's own disc radius, in uv
+            float reach = abs(blurAt(uv, px)) * 0.4;             // the tap's own disc radius, in uv
             float w = smoothstep(length(o) * 0.85, length(o) * 1.05, reach + 1e-5);
             col += texture2D(tColor, uv) * w;
             wsum += w;

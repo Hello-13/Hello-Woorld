@@ -500,6 +500,7 @@ async function start() {
       return { id: app.entry.id, root: v.root, parts: v.parts, view: v.view, floor: !!LOOKS[app.look]?.floor, unitMetres: 1 / (v._fitScale || 1) };
     },
     settings: FX,
+    onNote: (what) => { if (what === 'dof-dropped') log.push('VIEW', 'Film: depth of field switched off to hold the frame rate (Graphics → High, or untick it in the Film menu)', 'warn'); },
     onStart: () => {
       document.body.classList.add('is-filming');
       pressed(filmBtn, true);

@@ -104,7 +104,7 @@ function cyclorama() {
       }`,
     side: THREE.BackSide, depthWrite: false,
   });
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(1500, 48, 24), m);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(1500, 96, 48), m);   // fine enough that the interpolated direction never facets the gradient
   dome.renderOrder = -10;
   dome.frustumCulled = false;
   dome.userData.fx = true;

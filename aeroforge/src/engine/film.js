@@ -299,15 +299,16 @@ export function drift(t, slow = 0.0011, fast = 0.00014) {
  * Drives the stage camera through a program. Injected helpers keep this file free of three.js:
  *   boundsOf(object) → { min:[3], max:[3] } | null        (world space, solid meshes only)
  *   subject() → { id, root, parts, view: { dir, fill, targetY }, floor: bool, unitMetres } | null
- *   onStart(), onStop(reason), settings: { dof, drift, sweep } (live object)
+ *   onStart(), onStop(reason), onNote(what), settings: { dof, drift, sweep } (live object)
  */
 export class Film {
-  constructor(stage, { boundsOf, subject, onStart, onStop, settings } = {}) {
+  constructor(stage, { boundsOf, subject, onStart, onStop, onNote, settings } = {}) {
     this.stage = stage;
     this.boundsOf = boundsOf;
     this.subject = subject;
     this.onStart = onStart;
     this.onStop = onStop;
+    this.onNote = onNote;
     this.settings = settings || { dof: true, drift: true, sweep: true };
     this.active = false;
     this.speed = 1;
@@ -338,6 +339,8 @@ export class Film {
     this.floor = s.floor !== false;
     this.unitMetres = s.unitMetres || 1;
     this.t = 0;
+    this.dofDropped = false;
+    this._slow = 0;
     this.blend = 0;                                     // eases from the camera's current place into the program
     this.p0 = [stage.camera.position.x, stage.camera.position.y, stage.camera.position.z];
     this.t0 = [stage.controls.target.x, stage.controls.target.y, stage.controls.target.z];
@@ -404,8 +407,13 @@ export class Film {
     }
     stage.camera.position.set(pos[0], pos[1], pos[2]);
     stage.controls.target.set(tgt[0], tgt[1], tgt[2]);
-    // the lens: focus pulled to the shot's subject, the aperture opening up for close-ups
-    if (this.settings.dof) stage.setFocus?.(cam.focusDist, lerp(4.0, 1.5, cam.coc), { unitMetres: this.unitMetres });
+    // the lens: focus pulled to the shot's subject, the aperture opening up for close-ups. Under
+    // automatic quality, 4 s below 50 fps with the lens on drops it for the rest of this run.
+    if (this.settings.dof && !this.dofDropped && stage.autoQuality && stage.bokeh?.enabled) {
+      this._slow = stage.fps < 50 ? (this._slow || 0) + dt : 0;
+      if (this._slow > 4) { this.dofDropped = true; this.onNote?.('dof-dropped'); }
+    }
+    if (this.settings.dof && !this.dofDropped) stage.setFocus?.(cam.focusDist, lerp(4.0, 1.5, cam.coc), { unitMetres: this.unitMetres });
     else stage.setFocus?.(null);
     stage.env?.showroom?.sweep?.(!!this.settings.sweep, this.t);
   }
