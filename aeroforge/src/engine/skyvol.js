@@ -160,6 +160,10 @@ const WORLD_GLSL = /* glsl */`
 
   float sat(float x) { return clamp(x, 0.0, 1.0); }
 
+  // how fast the density rises behind a cloud's face: the march lowers it with distance, so a
+  // far cloud's edge spans a pixel or two of the cloud pass and does not stair-step
+  float edgeGain = 2.6;
+
   // altitude at distance t along a ray whose vertical direction cosine is dy (exact on the sphere,
   // arranged so nothing cancels: the altitudes are metres on a 6371 km radius)
   float rayAlt(float t, float dy) {
@@ -241,7 +245,7 @@ const WORLD_GLSL = /* glsl */`
     } else {
       d = (d - 0.2) / 0.8;
     }
-    return sat(d * 2.6) * SIGMA * mix(0.75, 1.0, hr);
+    return sat(d * edgeGain) * SIGMA * mix(0.75, 1.0, hr);
   }
 
   // extinction at p. cheap: the erosion's mean in place of its noise (one texture read), for the
@@ -252,7 +256,7 @@ const WORLD_GLSL = /* glsl */`
     if (raw <= 0.0) return 0.0;
     if (!cheap) return erodeAt(p, raw, wx, foot, hr);
     float d = (min(raw / (wx.x * 0.62 * 0.8), 1.0) - 0.42) / 0.58;
-    return sat(d * 2.6) * SIGMA * mix(0.75, 1.0, hr);
+    return sat(d * edgeGain) * SIGMA * mix(0.75, 1.0, hr);
   }
 `;
 
@@ -320,19 +324,27 @@ const cloudFrag = /* glsl */`
     float t = tA + jitter * max(24.0, tA * 0.0062);
     float T = 1.0; vec3 L = vec3(0.0);
     float tw = 0.0, ww = 0.0;
-    bool prevEmpty = true; float last = 0.0;
+    bool prevEmpty = true; float last = 0.0; int age = 3;
     for (int k = 0; k < 160; k++) {
       if (k >= steps || t >= tB || T < 0.012) break;
-      // the stride inside cloud grows with distance, and again as the budget runs out
-      float df = max(24.0, t * 0.0062) * (1.0 + 3.0 * smoothstep(0.7, 1.0, float(k) / float(steps)));
-      float foot = max(df * 0.5, t * pixAngle);
+      // Two strides. Inside cloud: one that grows with distance (and again as the budget runs
+      // out), reading the field no finer than the stride. At a cloud's face (looking for it, and
+      // for the first samples behind it, which are what the eye sees): a few pixels of the cloud
+      // pass, reading the field at the pixel's own footprint, so the detail there is the field's.
+      float footS = max(t * pixAngle, 10.0);
+      float dfN = max(24.0, t * 0.0062) * (1.0 + 3.0 * smoothstep(0.7, 1.0, float(k) / float(steps)));
+      float dsS = clamp(footS * 3.0, 24.0, dfN);
+      bool face = prevEmpty || age < 3;
+      float df = face ? dsS : dfN;
+      float foot = face ? footS : max(dfN * 0.5, footS);
+      edgeGain = 2.6 / (1.0 + footS / 40.0);
       vec3 p = posAt(rd, t);
       vec2 wx = weatherAt(p.xz, foot);
       float hr;
       float raw = shapeAt(p, wx, foot, hr);
       if (raw <= 0.0) {
         // clear air: stride by the distance to the nearest cloud the field implies
-        last = clamp(-raw * 600.0, df, max(700.0, t * 0.05));
+        last = clamp(-raw * 600.0, max(dsS, dfN * 0.5), max(700.0, t * 0.05));
         t += last; prevEmpty = true;
         continue;
       }
@@ -350,6 +362,7 @@ const cloudFrag = /* glsl */`
         p = posAt(rd, t);
         wx = weatherAt(p.xz, foot);
         d = densityAt(p, wx, foot, false);
+        age = 0;
       }
       prevEmpty = d <= 0.0;
       if (d > 0.0) {
@@ -367,6 +380,7 @@ const cloudFrag = /* glsl */`
         float wgt = T * (1.0 - Tr);
         tw += wgt * t; ww += wgt;
         T *= Tr;
+        age++;
       }
       last = df;
       t += df;
@@ -458,6 +472,8 @@ const domeFrag = /* glsl */`
     vec3 R = reflect(d, nw);
     float ry = abs(dot(R, up));
     vec3 skyR = mix(skyHor0, skyZen0, pow(ry, 0.42));
+    // wind streaks and gust patches kilometres across: rougher water reflects a little more sky
+    skyR *= 0.9 + 0.2 * textureLod(weatherTex, q.yx / 9000.0 + 0.4, max(l - 4.1, 0.0)).r;
     // the clouds' shadow, and their reflection's share of the sky
     float shade = 1.0, over = 0.0;
     if (cloudsOn > 0.5) {
