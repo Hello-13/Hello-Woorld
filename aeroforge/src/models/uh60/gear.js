@@ -65,9 +65,9 @@ export function buildGear({ A, P }) {
     // tyre (the fuselage side is vertical here, so the strut clears it only by leaning)
     const top = V3(2.22, 1.26, 1.3 * s), bot = V3(AXLE.x - 0.02, AXLE.y + 0.07, 1.145 * s);
     const holder = new THREE.Group();
-    const cylG = merge([tube(top, top.clone().lerp(bot, 0.35), 0.075, 16), box(0.11, 0.12, 0.16, [2.235, top.y, 1.25 * s])]);
+    const cylG = merge([tube(top, top.clone().lerp(bot, 0.35), 0.075, 44), box(0.11, 0.12, 0.16, [2.235, top.y, 1.25 * s])]);
     const pistonGroup = new THREE.Group();
-    const pistonG = tube(top.clone().lerp(bot, 0.3), bot, 0.05, 14);
+    const pistonG = tube(top.clone().lerp(bot, 0.3), bot, 0.05, 36);
     pistonGroup.add(mesh(pistonG, MAT.hydraulic()));
     holder.add(mesh(cylG, MAT.paintDark()), pistonGroup);
     P(`Main gear oleo ${R}`, {
@@ -97,7 +97,7 @@ export function buildGear({ A, P }) {
   P('Tail gear shock strut', {
     system: 'Landing gear', material: 'Steel cylinder and chromed piston, oil and nitrogen', mass: 18, explode: [0, -0.5, 0.5],
     desc: 'Its own two-stage oleo, mounted to a fitting in the tail cone. It protects the tail cone and tail rotor in a tail-low landing and strokes in a crash like the main struts.',
-  }, [mesh(merge([tube(tTop, tTop.clone().lerp(tBot, 0.6), 0.075, 16), box(0.2, 0.12, 0.2, [tTop.x, tTop.y, 0])]), MAT.paintDark()), mesh(tube(tTop.clone().lerp(tBot, 0.5), tBot, 0.05, 14), MAT.hydraulic())]);
+  }, [mesh(merge([tube(tTop, tTop.clone().lerp(tBot, 0.6), 0.075, 44), box(0.2, 0.12, 0.2, [tTop.x, tTop.y, 0])]), MAT.paintDark()), mesh(tube(tTop.clone().lerp(tBot, 0.5), tBot, 0.05, 36), MAT.hydraulic())]);
   P('Tail wheel yoke & axle', {
     system: 'Landing gear', material: 'Forged steel fork and axle on a swivel', mass: 10, explode: [0, -0.9, 0],
     desc: 'The fork swivels a full 360° below the strut so the tail follows the main wheels when taxiing or turning on the spot.',

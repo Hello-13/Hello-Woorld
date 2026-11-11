@@ -72,7 +72,7 @@ function engineGeometry() {
   if (ENGINE_GEO) return ENGINE_GEO;
   const midKit = merlinKit({ level: 'mid' });
   const fullKit = merlinKit({ level: 'full' });
-  const bellGeo = merlinBell(28);
+  const bellGeo = merlinBell(72);   // (28 left a 13° polygon on each 0.92 m exit; 72 is what the triangle budget allows for 24 bells)
   const placeFor = (kit, a) => {
     const f = engineFrame(a);
     const o = {};
@@ -124,7 +124,7 @@ function engineGeometry() {
   ENGINE_GEO = {
     bells: merge(ring.bells), pump: merge(ring.pump), gg: merge(ring.gg), duct: merge(ring.duct),
     lines: merge([...ring.line, ...ring.ign]), valves: merge(ring.valve), act: merge(ring.act),
-    chamber: merlinChamber(48), inj: merge(pintleInjector()), nozzle: merlinNozzle(56),
+    chamber: merlinChamber(48), inj: merge(pintleInjector()), nozzle: merlinNozzle(96),
     cePump: merge(ce.pump), ceGG: merge(ce.gg), ceDuct: merge(ce.duct), ceLines: merge([...ce.line, ...ce.ign]), ceValves: merge(ce.valve), ceAct: merge(ce.act),
     tvc: merge(tvcLines), bleed: merge(bleeds), tea: merge([bottle(...at(1.58, 112.5, 2.62), 0.12, 0.42, 14)]), relight: merge(relight),
     pb: merge(pb), legHe: merge(legHe), ec: merge(ec), ecb: merge(ecb),
@@ -804,18 +804,18 @@ export function buildCore(A, parent, { kind, prefix, explodeBase = [0, 0, 0], pa
     const grp = new THREE.Group();
     grp.position.copy(B);
     const [t1, t2, t3] = LEG.tube;
-    const tube = (rad, len, mat) => { const gg = new THREE.CylinderGeometry(rad, rad, len, 14); return mesh(gg, mat); };
+    const tube = (rad, len, mat) => { const gg = new THREE.CylinderGeometry(rad, rad, len, 32); return mesh(gg, mat); };
     const m1 = tube(0.075, t1, FM.steelLine()); m1.position.y = t1 / 2;
     const m2 = tube(0.06, t2, FM.alu());
     const m3 = tube(0.045, t3, FM.steelLine());
-    const eye = mesh(new THREE.SphereGeometry(0.07, 12, 8), FM.aluDark());
+    const eye = mesh(new THREE.SphereGeometry(0.07, 24, 14), FM.aluDark());
     const crush = mesh(new THREE.CylinderGeometry(0.062, 0.062, 1.0, 14).translate(0, 0.75, 0), FM.crushCore());
     crush.userData.xrayWeight = 1;
     grp.add(m1, m2, m3, eye, crush);
     pistonParts.tubes.push(grp);
     const cgrp = new THREE.Group();
     cgrp.position.copy(B);
-    const col = mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.25, 16), FM.gold());
+    const col = mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.25, 48), FM.gold());
     cgrp.add(col);
     pistonParts.colletMeshes.push(cgrp);
     pistons.push({ B, L0, H, axis: hm.axis, grp, m2, m3, eye, cgrp, col });

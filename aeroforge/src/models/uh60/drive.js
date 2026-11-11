@@ -370,8 +370,8 @@ export function buildDrive({ A, P, roofY }) {
     const cst = [];
     const keys = [[-2.02, 0.3], [-1.85, 0.35], [-1.5, 0.39], [-1.0, 0.4], [-0.5, 0.4], [-0.32, 0.39], [-0.26, 0.37]];
     for (const [x, r] of keys) cst.push({ c: [x, ENG.y, z], w: r, h: r * 0.98, e: 2.3 });
-    const cow = duct(cst, 36);
-    const lip = new THREE.TorusGeometry(0.365, 0.022, 8, 40).rotateY(Math.PI / 2).translate(-0.26, ENG.y, z);
+    const cow = duct(cst, 72);
+    const lip = new THREE.TorusGeometry(0.365, 0.022, 12, 72).rotateY(Math.PI / 2).translate(-0.26, ENG.y, z);
     const aftRing = new THREE.RingGeometry(0.26, 0.31, 32).rotateY(-Math.PI / 2).translate(-2.02, ENG.y, z);
     const inner = cyl(0.35, 0.32, 0.3, [-0.4, ENG.y, z], 'x', 32, true);
     P(`Engine cowling ${R}`, {

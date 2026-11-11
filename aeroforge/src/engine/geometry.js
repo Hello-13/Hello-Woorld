@@ -249,11 +249,14 @@ export function beam(p0, p1, w = 0.05, h = w) {
   return g;
 }
 
-/** Cylinder between two points. */
+/**
+ * Cylinder between two points: a round rod, strut or pipe. It gets at least `seg` segments and enough to stay within
+ * 0.45 mm of a circle (a rod shows its count only at its ends); four or fewer is a square bar and is kept.
+ */
 export function rod(p0, p1, r = 0.03, seg = 10) {
   const a = new THREE.Vector3(...p0), b = new THREE.Vector3(...p1);
   const len = a.distanceTo(b);
-  const g = new THREE.CylinderGeometry(r, r, len, seg);
+  const g = new THREE.CylinderGeometry(r, r, len, seg <= 4 ? seg : Math.max(seg, roundSegments(r, { tol: 0.00045 })));
   const dir = new THREE.Vector3().subVectors(b, a).normalize();
   g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir));
   const mid = a.add(b).multiplyScalar(0.5);

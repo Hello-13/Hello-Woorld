@@ -27,7 +27,9 @@ const outerLine = (line) => line.map(([y, r]) => [y, r + grow(y)]);
 export function buildNacelle(ctx) {
   const { P, cut } = ctx;
   const nac = GM.nacelle();
-  const N = { cut: 'nacelle', seg: 96 };
+  // 192 segments round the cowls: at their 1.7–2.1 m radius 96 left corners of 3.75° and a millimetre of sag on the
+  // inlet lip's outline in a 4K close-up; 192 brings that to 0.3 mm (every cowl takes the same count, so their joints match)
+  const N = { cut: 'nacelle', seg: 192 };
 
   // ------------------------------------------------------------------ inlet
   const lip = [[1.535, 1.56], [1.538, 1.7], [1.556, 1.77], [1.588, 1.803], [1.63, 1.814], [1.672, 1.806], [1.714, 1.784], [1.762, 1.738], [1.802, 1.66], [1.828, 1.58],

@@ -401,9 +401,11 @@ export function pitchGeo() {
 export function spinnerGeo() {
   const x0 = X(10.385) - PROP_X;                        // base, just inside the end of the cowling
   const prof = [];
-  for (let i = 0; i <= 12; i++) {
-    const t = i / 12, x = x0 - t * (X(10.385) - X(11.0));
+  // (the same curve in 48 steps and 96 segments: on the polished spinner 12 × 40 broke the highlight into facets at 4K;
+  // the steps crowd toward the tip, where the curve turns fastest)
+  for (let i = 0; i <= 48; i++) {
+    const t = 1 - (1 - i / 48) ** 2, x = x0 - t * (X(10.385) - X(11.0));
     prof.push([Math.max(0.001, 0.298 * Math.sqrt(1 - t ** 1.7) * (1 - 0.06 * t)), x]);
   }
-  return latheX(prof.reverse(), 40);
+  return latheX(prof.reverse(), 96);
 }

@@ -9,7 +9,7 @@
 // of the pusher propeller. Section shapes are estimates.
 
 import * as THREE from 'three';
-import { loftRings, orientOutward, interpKeys, naca00, mergeGeometries } from '../../engine/geometry.js';
+import { loftRings, orientOutward, interpKeys, naca00, mergeGeometries, roundSegments } from '../../engine/geometry.js';
 
 export const X = (s) => 5.5 - s;
 
@@ -167,6 +167,9 @@ export function lru(w, h, d, c = [0, 0, 0], r = 0.012) {
 
 /** Cylinder of radius r0 → r1 along the x axis from x0 to x1, centred at (y, z). */
 export function cylX(x0, x1, r0, r1, y = 0, z = 0, seg = 20, open = false) {
+  // (a round part gets at least the segments its radius needs to stay within 0.3 mm of a circle in a 4K close-up;
+  // six or fewer is a deliberate prism, a hexagonal nut or a square boss, and is kept)
+  if (seg > 6) seg = Math.max(seg, roundSegments(Math.max(r0, r1), { tol: 0.0003 }));
   const g = new THREE.CylinderGeometry(r1, r0, Math.abs(x1 - x0), seg, 1, open);
   g.rotateZ(-Math.PI / 2);             // +y → +x : r0 at x0 (low x), r1 at x1
   if (x1 < x0) g.rotateY(Math.PI);
@@ -176,7 +179,8 @@ export function cylX(x0, x1, r0, r1, y = 0, z = 0, seg = 20, open = false) {
 /** Cylinder between two points. */
 export function tubeBetween(p0, p1, r = 0.02, seg = 10) {
   const a = new THREE.Vector3(...p0), b = new THREE.Vector3(...p1);
-  const g = new THREE.CylinderGeometry(r, r, a.distanceTo(b), seg, 1);
+  // (a round rod: at least the segments that keep it within 0.45 mm of a circle; four or fewer is a square bar)
+  const g = new THREE.CylinderGeometry(r, r, a.distanceTo(b), seg <= 4 ? seg : Math.max(seg, roundSegments(r, { tol: 0.00045 })), 1);
   g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize()));
   const m = a.add(b).multiplyScalar(0.5);
   return g.translate(m.x, m.y, m.z);
@@ -205,6 +209,8 @@ export function pipe(points, r = 0.012, seg = 6, tubular = null, caps = null) {
 
 /** Lathe about the x axis: profile [[r, x], …] with x increasing toward the nose. */
 export function latheX(profile, seg = 24) {
+  // (at least the segments that keep the largest radius within 0.3 mm of a circle; eight or fewer is a deliberate polygon)
+  if (seg > 8) seg = Math.max(seg, roundSegments(Math.max(...profile.map(([r]) => r)), { tol: 0.0003 }));
   const g = new THREE.LatheGeometry(profile.map(([r, x]) => new THREE.Vector2(Math.max(r, 1e-4), x)), seg);
   g.rotateZ(-Math.PI / 2);             // lathe axis +y → +x
   return g;

@@ -167,7 +167,7 @@ export function buildTail({ A, P, air, roofY }) {
     desc: 'Covers the oil cooler, APU and the start of the tail drive shaft between the engine nacelles; the grille on top lets the oil-cooler blower breathe.',
   }, [mesh(aftF, paint), mesh(merge(grille), MAT.black())]);
   const cover = fairing([[-8.45, 0.13, roofY(-8.45) + 0.18], [-6.0, 0.15, roofY(-6.0) + 0.2], [-3.6, 0.17, roofY(-3.6) + 0.18]], roofY, { nu: 50, nv: 16 });
-  const igbFair = new THREE.SphereGeometry(1, 20, 14).scale(0.36, 0.2, 0.2).translate(TAIL.igb[0] + 0.05, TAIL.igb[1] + 0.02, 0);
+  const igbFair = new THREE.SphereGeometry(1, 48, 28).scale(0.36, 0.2, 0.2).translate(TAIL.igb[0] + 0.05, TAIL.igb[1] + 0.02, 0);
   P('Tail drive shaft cover', {
     system: 'Skin & fairings', skin: true, material: 'Hinged aluminium/composite covers', mass: 16, explode: [-2.4, 1.8, 0],
     desc: 'A hinged cover over the tail drive shaft along the top of the tail cone, ending in the fairing over the 42° intermediate gearbox. From there the pylon drive shaft cover runs up the pylon over the last shaft section to the tail gearbox fairing; the operator\'s manual puts a VHF-FM antenna inside its leading-edge fairing. (Pylon cover shape approximate.)',
@@ -189,7 +189,7 @@ export function buildTail({ A, P, air, roofY }) {
     return g;
   };
   lean(pyl);
-  const tgbBulge = new THREE.SphereGeometry(1, 20, 14).scale(0.42, 0.26, 0.22).translate(TAIL.tgb[0] + 0.02, TAIL.tgb[1] + 0.02, TAIL.tgb[2] + 0.035);   // round the 90° box's case
+  const tgbBulge = new THREE.SphereGeometry(1, 48, 28).scale(0.42, 0.26, 0.22).translate(TAIL.tgb[0] + 0.02, TAIL.tgb[1] + 0.02, TAIL.tgb[2] + 0.035);   // round the 90° box's case
   const pylonPart = P('Tail pylon', {
     system: 'Skin & fairings', skin: true, material: 'Aluminium skins, cambered NACA 0021 (mod) section, Kevlar leading edge', mass: 70, explode: [-2.9, 0.5, 0],
     desc: 'The swept vertical fin (41° at the quarter chord) is cambered so that in forward flight it makes a side force that unloads the tail rotor. Above the tail cone it leans 20° to port, which tilts the tail-rotor shaft and lets the tail rotor help lift the tail.',
@@ -279,7 +279,7 @@ export function buildTail({ A, P, air, roofY }) {
   // the 42° box's case: round, with a flat mounting face 7 cm below the shaft line that sits on the
   // tail cone's top skin over its frames and longerons
   const igbCase = () => {
-    const g = new THREE.SphereGeometry(0.16, 18, 14), p = g.attributes.position;
+    const g = new THREE.SphereGeometry(0.16, 48, 32), p = g.attributes.position;
     for (let i = 0; i < p.count; i++) if (p.getY(i) < -0.07) p.setY(i, -0.07);
     g.computeVertexNormals();
     return g;
@@ -404,8 +404,8 @@ export function buildTail({ A, P, air, roofY }) {
   P('Anti-collision beacons', {
     system: 'Electrical', material: 'Red LED anti-collision beacons', mass: 2, count: 2, explode: [-2.0, 1.6, 0],
     desc: 'A red beacon on the pylon tip and one under the belly flash about once a second so other aircraft see the helicopter from any direction; they can be dimmed or switched to infrared for night-vision operations.',
-  }, [mesh(new THREE.SphereGeometry(0.05, 12, 8).translate(tip.le[0] - 0.3, 4.05, pylonLean(4.05)), strobe, { cast: false }),
-    mesh(new THREE.SphereGeometry(0.045, 12, 8).translate(-0.8, 0.45, 0), strobe, { cast: false })]);
+  }, [mesh(new THREE.SphereGeometry(0.05, 32, 20).translate(tip.le[0] - 0.3, 4.05, pylonLean(4.05)), strobe, { cast: false }),
+    mesh(new THREE.SphereGeometry(0.045, 32, 20).translate(-0.8, 0.45, 0), strobe, { cast: false })]);
   // the side lights on the outboard face of each main gear's upper support fitting (its box:
   // x 2.18–2.29, y 1.20–1.32, outboard face at |z| 1.33), in a small housing above the strut
   const navSide = (s) => [box(0.07, 0.045, 0.024, [2.245, 1.295, 1.341 * s]), new THREE.SphereGeometry(0.02, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(s * Math.PI / 2).translate(2.245, 1.295, 1.352 * s)];

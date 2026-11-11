@@ -49,6 +49,8 @@ let DETAIL = 1;
 let CRISP = true;
 export function setTextureDetail(k, { crisp = true } = {}) { DETAIL = k; CRISP = !!crisp; }
 export const crispOn = () => CRISP;
+// the close-up extras are built on the presets that paint at the higher detail (Ultra, 4K): nothing extra on the others
+const FINE = () => CRISP && DETAIL >= 2;
 
 function canvas(w, h = w) {
   const c = document.createElement('canvas');
@@ -74,22 +76,22 @@ function fieldToCanvas(field, size, fn = (v) => v) {
 export function heightToNormal(src, strength = 2) {
   const w = src.width, h = src.height;
   const data = src.getContext('2d').getImageData(0, 0, w, h).data;
-  const H = (x, y) => data[(((y + h) % h) * w + ((x + w) % w)) * 4] / 255;
   const c = canvas(w, h);
   const ctx = c.getContext('2d');
   const img = ctx.createImageData(w, h);
+  const out = img.data, k = strength / 255;
   for (let y = 0; y < h; y++) {
+    const r0 = ((y + h - 1) % h) * w * 4, r1 = y * w * 4, r2 = ((y + 1) % h) * w * 4;
     for (let x = 0; x < w; x++) {
-      const dx = (H(x + 1, y - 1) + 2 * H(x + 1, y) + H(x + 1, y + 1)) - (H(x - 1, y - 1) + 2 * H(x - 1, y) + H(x - 1, y + 1));
-      const dy = (H(x - 1, y + 1) + 2 * H(x, y + 1) + H(x + 1, y + 1)) - (H(x - 1, y - 1) + 2 * H(x, y - 1) + H(x + 1, y - 1));
-      let nx = -dx * strength, ny = dy * strength, nz = 1;
-      const l = Math.hypot(nx, ny, nz);
-      nx /= l; ny /= l; nz /= l;
-      const i = (y * w + x) * 4;
-      img.data[i] = (nx * 0.5 + 0.5) * 255;
-      img.data[i + 1] = (ny * 0.5 + 0.5) * 255;
-      img.data[i + 2] = (nz * 0.5 + 0.5) * 255;
-      img.data[i + 3] = 255;
+      const xl = ((x + w - 1) % w) * 4, xr = ((x + 1) % w) * 4, xc = x * 4;
+      const a = data[r0 + xl], b = data[r0 + xc], cc = data[r0 + xr], d = data[r1 + xl], f = data[r1 + xr], g = data[r2 + xl], hh = data[r2 + xc], ii = data[r2 + xr];
+      let nx = -((cc + 2 * f + ii) - (a + 2 * d + g)) * k, ny = ((g + 2 * hh + ii) - (a + 2 * b + cc)) * k;
+      const l = 1 / Math.sqrt(nx * nx + ny * ny + 1);
+      const i = r1 + xc;
+      out[i] = (nx * l * 0.5 + 0.5) * 255;
+      out[i + 1] = (ny * l * 0.5 + 0.5) * 255;
+      out[i + 2] = (l * 0.5 + 0.5) * 255;
+      out[i + 3] = 255;
     }
   }
   ctx.putImageData(img, 0, 0);
@@ -109,23 +111,24 @@ function tex(c, { srgb = false, repeat = [1, 1], aniso = 8 } = {}) {
 
 /** Build a { map, roughnessMap, normalMap } set from albedo/height/roughness painters.
  *  hires: paint albedo and height at the DETAIL multiple (painters keep logical coordinates). */
-function mapSet(key, size, { albedo, height, rough, normalStrength = 2, repeat = [1, 1], hires = false }) {
+function mapSet(key, size, { albedo, height, rough, normalStrength = 2, repeat = [1, 1], hires = false, detail = null }) {
   return once(key, () => {
     const k = hires ? DETAIL : 1;
-    const paint = (fn, scale) => {
+    const paint = (fn, scale, readBack = false) => {
       const c = canvas(size * scale);
-      const ctx = c.getContext('2d');
+      const ctx = c.getContext('2d', readBack ? { willReadFrequently: true } : undefined);   // read back: keep it off the GPU
       ctx.scale(scale, scale);
       fn?.(ctx, size);
       return c;
     };
-    const a = paint(albedo, k), hgt = paint(height, k), rg = paint(rough, 1);
+    const a = paint(albedo, k), hgt = paint(height, k, true), rg = paint(rough, 1);
     const set = {
       map: albedo ? tex(a, { srgb: true, repeat }) : null,
       roughnessMap: tex(rg, { repeat }),
       // the Sobel gradient is per pixel, so a finer canvas needs a proportionally stronger filter
       normalMap: tex(heightToNormal(hgt, normalStrength * k), { repeat }),
     };
+    if (detail) closeUpDetail(set.normalMap, hgt, detail);
     return set;
   });
 }
@@ -142,6 +145,8 @@ const grime = (size, seed, lo, hi) => fieldToCanvas(fbm(size, { seed, octaves: 6
 export function aircraftSkin({ seed = 7, tile = 512, sawtooth = true, rivets = true } = {}) {
   return mapSet(`skin.${seed}.${sawtooth}.${rivets}`, tile, {
     hires: true,
+    // close-ups: the seams (#5e on #80) and fastener heads (#94 / #9a) are redrawn sharp from a distance field
+    detail: { micro: 'paint', cut: 0x80 - 0x5e, raised: 0x94 - 0x80 },
     albedo(ctx, s) {
       ctx.drawImage(grime(s, seed, 0.9, 1.0), 0, 0);
       // a second, broader mottle (weathering, overspray) at low contrast
@@ -202,6 +207,7 @@ export function aircraftSkin({ seed = 7, tile = 512, sawtooth = true, rivets = t
 export function tankSkin({ seed = 21, tile = 512 } = {}) {
   return mapSet(`tank.${seed}`, tile, {
     hires: true,
+    detail: { micro: 'paint' },
     height(ctx, s) {
       ctx.drawImage(grime(s, seed, 0.47, 0.53), 0, 0);
       ctx.strokeStyle = 'rgba(255,255,255,0.55)';
@@ -223,6 +229,7 @@ export function tankSkin({ seed = 21, tile = 512 } = {}) {
 /** Crinkled multi-layer insulation blanket. */
 export function mliSurface({ seed = 33, tile = 512 } = {}) {
   return mapSet(`mli.${seed}`, tile, {
+    detail: { micro: 'foil' },
     height(ctx, s) {
       const f = fbm(s, { seed, octaves: 6, base: 6, gain: 0.62 });
       ctx.drawImage(fieldToCanvas(f, s, (v) => Math.abs(v - 0.5) * 2.2), 0, 0);
@@ -394,6 +401,172 @@ export function floorMarkings(size = 2048, worldSize = 80, { geometric = true } 
   });
 }
 
+// ------------------------------------------------------------------------------- close-up detail
+// A painted map is as sharp as its texels: once one texel covers several pixels (a 1 m close-up on a 4K
+// screen), seams and fasteners in a skin's normal map turn into soft blobs and the paint between them into a
+// featureless gradient. Two things are added for that range only, both in the shader of any built-in lit
+// material whose normal map came from this library (found by the map's image, so clones keep it):
+//   1. seams and fastener heads redrawn from a distance field painted with the map (edges one pixel wide at
+//      any magnification), replacing the blurred normal map as it is magnified;
+//   2. a tiling micro-detail layer (paint orange-peel, foil micro-crinkle; 1024² over MICRO_TILE metres):
+//      fine normal, roughness and tone variation between the seams.
+// Both are weighted by how far the map is magnified (0 when a texel is a pixel or smaller), so a view in
+// which the painted maps are already sharp is drawn exactly as before. Built on the Ultra / 4K presets only;
+// FX.crisp = false (?crisp=0) leaves every material and shader untouched.
+const MICRO_TILE = 0.25;              // metres covered by one repeat of a micro-detail texture
+const skinDetail = new WeakMap();     // normalMap.source → { field, width, height, micro }
+const dataTex = (data, w, h, format) => {
+  const t = new THREE.DataTexture(data, w, h, format, THREE.UnsignedByteType);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.magFilter = THREE.LinearFilter;
+  t.needsUpdate = true;
+  return t;
+};
+
+/** Register the close-up detail of a map set: detail = { micro, cut?, raised? } (grey levels of full cut / raised relief). */
+function closeUpDetail(normalMap, hgt, detail) {
+  if (!FINE()) return;
+  let field = null;
+  const W = hgt.width, H = hgt.height;
+  if (detail.cut || detail.raised) {
+    // the height canvas is mid-grey with seams cut darker and fastener heads raised lighter: one field each
+    const px = hgt.getContext('2d').getImageData(0, 0, W, H).data, N = W * H;
+    const cut = new Uint8Array(N), up = new Uint8Array(N);
+    for (let i = 0, k = 0; i < N; i++, k += 4) { const v = px[k]; if (v < 128) cut[i] = 128 - v; else up[i] = v - 128; }
+    const a = alphaSdf(cut, W, H, detail.cut || 255), b = alphaSdf(up, W, H, detail.raised || 255);
+    const rg = new Uint8Array(N * 2);
+    for (let i = 0; i < N; i++) { rg[i * 2] = a[i]; rg[i * 2 + 1] = b[i]; }
+    field = dataTex(rg, W, H, THREE.RGFormat);
+    field.minFilter = THREE.LinearFilter;
+  }
+  skinDetail.set(normalMap.source, { field, width: W, height: H, micro: detail.micro });
+  installDetailShader();
+}
+
+/**
+ * Micro-detail texture of a material family (RG: tangent-space normal slope, ±1 → 0..1; B: roughness
+ * variation; A: tone variation, both centred on 0.5). Only fine features (a few texels to a few dozen), so it
+ * tiles without a visible pattern and its mip chain fades to flat.
+ */
+const microDetail = (kind) => once(`micro.${kind}`, () => {
+  const N = 1024, out = new Uint8Array(N * N * 4);
+  let hgt, slope;
+  if (kind === 'foil') {
+    // creased film: ridged noise, sharp folds a few millimetres to a centimetre apart
+    hgt = fbm(N, { seed: 97, octaves: 4, base: 20, gain: 0.55 });
+    for (let i = 0; i < hgt.length; i++) hgt[i] = Math.abs(hgt[i] - 0.5) * 2;
+    slope = 26;
+  } else {
+    // sprayed paint: orange-peel ripple, 0.6 to 2.5 mm
+    hgt = fbm(N, { seed: 91, octaves: 3, base: 96, gain: 0.6 });
+    slope = 2.6;
+  }
+  const var1 = fbm(N, { seed: 93, octaves: 2, base: 64, gain: 0.6 }), var2 = fbm(N, { seed: 95, octaves: 2, base: 160, gain: 0.5 });
+  const byte = (v) => (v < 0 ? 0 : v > 1 ? 255 : v * 255 + 0.5) | 0;
+  for (let y = 0; y < N; y++) {
+    const ya = ((y + N - 1) % N) * N, yb = ((y + 1) % N) * N, o = (N - 1 - y) * N * 4;      // bottom row first
+    for (let x = 0; x < N; x++) {
+      const dx = hgt[y * N + (x + 1) % N] - hgt[y * N + (x + N - 1) % N], dy = hgt[yb + x] - hgt[ya + x];
+      const k = o + x * 4;
+      out[k] = byte(0.5 - dx * slope);
+      out[k + 1] = byte(0.5 + dy * slope);
+      out[k + 2] = byte(0.5 + (var1[y * N + x] - 0.5) * 2.4);
+      out[k + 3] = byte(0.5 + (var2[y * N + x] - 0.5) * 2.4);
+    }
+  }
+  const t = dataTex(out, N, N, THREE.RGBAFormat);
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.generateMipmaps = true;
+  t.anisotropy = 16;
+  return t;
+});
+
+// strengths per family: x seam slope, y fastener-edge slope (both scaled by the material's normalScale),
+// z micro normal slope, w micro roughness swing; tone: micro albedo swing
+const MICRO = {
+  paint: { q: [0.9, 0.8, 0.5, 0.16], tone: 0.045 },
+  foil: { q: [0.9, 0.8, 0.5, 0.3], tone: 0.06 },
+};
+
+const DETAIL_PARS = /* glsl */`
+uniform sampler2D crispMicro;      // RG micro normal slope, B roughness, A tone
+uniform vec4 crispP;               // xy: painted map size in texels, zw: micro tiles per unit of the map's UV
+uniform vec4 crispQ;               // seam slope, fastener slope, micro normal slope, micro roughness swing
+uniform float crispTone;           // micro albedo swing
+#ifdef CRISP_FIELD
+uniform sampler2D crispField;      // R: signed distance to seam grooves, G: to fastener heads (0.5 = edge, +-4 texels)
+#endif
+float crispW;                      // 0: the painted maps are sharp enough (texel <= pixel) ... 1: magnified
+vec2 crispN;                       // tangent-space normal slope to add (seams and fasteners, then micro)
+float crispKeep;                   // share of the painted normal map kept
+float crispRough;
+float crispAlbedo;
+`;
+// before the albedo map: weights and the detail terms for this fragment (all texture reads unconditional)
+const DETAIL_BEGIN = /* glsl */`
+	{
+		vec2 crispT = vNormalMapUv * crispP.xy;
+		float crispTpp = max( max( length( dFdx( crispT ) ), length( dFdy( crispT ) ) ), 1e-4 );   // map texels per screen pixel
+		crispW = 1.0 - smoothstep( 0.5, 1.0, crispTpp );
+		vec4 crispM = texture2D( crispMicro, vNormalMapUv * crispP.zw );
+		crispN = ( crispM.rg * 2.0 - 1.0 ) * crispQ.z * crispW;
+		crispRough = 1.0 + ( crispM.b - 0.5 ) * crispQ.w * crispW;
+		crispAlbedo = 1.0 + ( crispM.a - 0.5 ) * crispTone * crispW;
+		crispKeep = 1.0;
+		#ifdef CRISP_FIELD
+			vec2 crispE = 0.5 / crispP.xy;
+			vec2 crispF = ( texture2D( crispField, vNormalMapUv ).rg - 0.5 ) * 8.0;            // distance in texels, inside > 0
+			vec2 crispFx = ( texture2D( crispField, vNormalMapUv + vec2( crispE.x, 0.0 ) ).rg - texture2D( crispField, vNormalMapUv - vec2( crispE.x, 0.0 ) ).rg ) * 8.0;
+			vec2 crispFy = ( texture2D( crispField, vNormalMapUv + vec2( 0.0, crispE.y ) ).rg - texture2D( crispField, vNormalMapUv - vec2( 0.0, crispE.y ) ).rg ) * 8.0;
+			// seam: a groove over the painted line's width, its walls sloping in along the field's gradient
+			float crispIn = clamp( crispF.r / crispTpp + 0.5, 0.0, 1.0 );
+			// fastener: a flat head, its rim a narrow sloped band at the outline
+			float crispRim = clamp( ( crispF.g + 0.45 ) / crispTpp + 0.5, 0.0, 1.0 ) * ( 1.0 - clamp( ( crispF.g - 0.45 ) / crispTpp + 0.5, 0.0, 1.0 ) );
+			vec2 crispS = crispQ.x * crispIn * vec2( crispFx.r, crispFy.r ) - crispQ.y * crispRim * vec2( crispFx.g, crispFy.g );
+			#ifdef USE_NORMALMAP_TANGENTSPACE
+				crispS *= normalScale;
+			#endif
+			crispN += crispS * crispW;
+			crispKeep = 1.0 - crispW;
+			crispAlbedo *= 1.0 - 0.12 * crispW * crispIn;
+		#endif
+	}
+`;
+
+let detailShader = false;
+/** Hook the built-in lit materials once: those whose normal map carries close-up detail get the extra shader code. */
+function installDetailShader() {
+  if (detailShader) return;
+  detailShader = true;
+  const proto = THREE.MeshStandardMaterial.prototype;      // MeshPhysicalMaterial inherits
+  const own = (m) => Object.prototype.hasOwnProperty.call(m, 'onBeforeCompile');
+  const find = (m) => (m.normalMap && !own(m) ? skinDetail.get(m.normalMap.source) : undefined);
+  const stock = proto.customProgramCacheKey;
+  proto.customProgramCacheKey = function () {
+    const d = find(this);
+    return d ? (d.field ? 'crisp-skin-field' : 'crisp-skin') : own(this) ? stock.call(this) : '';
+  };
+  proto.onBeforeCompile = function (shader) {
+    const d = find(this);
+    if (!d) return;
+    const maps = THREE.ShaderChunk.normal_fragment_maps, scale = /mapN\.xy\s*\*=\s*normalScale\s*;/;
+    if (!scale.test(maps)) { console.warn('AEROFORGE surface: ShaderChunk.normal_fragment_maps has changed; close-up detail not applied'); return; }
+    const fam = MICRO[d.micro] || MICRO.paint, rep = this.normalMap.repeat, m = this.userData.microTiles;
+    // micro tiles per unit of the map's UV: the map's UVs are metric unless the material says otherwise (userData.microTiles)
+    const mx = m ? m[0] : 1 / (rep.x * MICRO_TILE), my = m ? m[1] : 1 / (rep.y * MICRO_TILE);
+    shader.uniforms.crispMicro = { value: microDetail(d.micro) };
+    shader.uniforms.crispP = { value: new THREE.Vector4(d.width, d.height, mx, my) };
+    shader.uniforms.crispQ = { value: new THREE.Vector4(...fam.q) };
+    shader.uniforms.crispTone = { value: fam.tone };
+    if (d.field) shader.uniforms.crispField = { value: d.field };
+    shader.fragmentShader = (d.field ? '#define CRISP_FIELD\n' : '') + shader.fragmentShader
+      .replace('#include <normalmap_pars_fragment>', '#include <normalmap_pars_fragment>\n' + DETAIL_PARS)
+      .replace('#include <map_fragment>', DETAIL_BEGIN + '\n#include <map_fragment>\n\tdiffuseColor.rgb *= crispAlbedo;')
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n\troughnessFactor = clamp( roughnessFactor * crispRough, 0.0, 1.0 );')
+      .replace('#include <normal_fragment_maps>', maps.replace(scale, 'mapN.xy = mapN.xy * normalScale * crispKeep + crispN;'));
+  };
+}
+
 // ------------------------------------------------------------------------------- decals
 const SDF_SPREAD = 4;                 // texels either side of the edge covered by a decal's distance field
 const decalFields = new WeakMap();    // texture.source → { sdf, width, height, ink }
@@ -402,13 +575,13 @@ const decalFields = new WeakMap();    // texture.source → { sdf, width, height
 export const decalSdf = (texture) => (texture && decalFields.get(texture.source)) || null;
 
 /**
- * Signed distance (in texels, clamped to ±SDF_SPREAD) from each texel centre to the outline of the ink in an
- * alpha channel (`ink` = the alpha of solid ink). The outline is recovered from the canvas's antialiased
+ * Signed distance (in texels, clamped to ±SDF_SPREAD) from each texel centre to the outline of the ink in a
+ * coverage channel `al` (one byte per texel, top row first; `ink` = the value of solid ink). The outline is recovered from the canvas's antialiased
  * coverage at sub-texel accuracy: a partly covered texel fixes the edge's distance from its centre along the
  * coverage gradient (Gustavson, "Anti-aliased Euclidean distance transform", 2011), and that short piece of
  * edge is what nearby texels measure their distance to. Returns bytes, 128 = on the edge, bottom row first.
  */
-function alphaSdf(px, W, H, ink) {
+function alphaSdf(al, W, H, ink) {
   const S = SDF_SPREAD, S2 = S * S, d2 = new Float32Array(W * H).fill(S2);
   const seg = (x0, y0, x1, y1) => {
     const xa = Math.max(0, Math.ceil(Math.min(x0, x1) - S)), xb = Math.min(W - 1, Math.floor(Math.max(x0, x1) + S));
@@ -421,10 +594,10 @@ function alphaSdf(px, W, H, ink) {
       if (q < d2[i]) d2[i] = q;
     }
   };
-  const cov = (x, y) => { const a = px[((y < 0 ? 0 : y >= H ? H - 1 : y) * W + (x < 0 ? 0 : x >= W ? W - 1 : x)) * 4 + 3]; return a >= ink ? 1 : a / ink; };
+  const cov = (x, y) => { const a = al[(y < 0 ? 0 : y >= H ? H - 1 : y) * W + (x < 0 ? 0 : x >= W ? W - 1 : x)]; return a >= ink ? 1 : a / ink; };
   const HALF = 0.56;       // half-length of each texel's piece of edge: neighbouring pieces overlap a little
   for (let y = 0; y < H; y++) for (let x = 0, i = y * W; x < W; x++, i++) {
-    const a = px[i * 4 + 3];
+    const a = al[i];
     if (a > 0 && a < ink) {
       // partly covered: the edge passes through this texel, at right angles to the coverage gradient
       let gx = cov(x + 1, y - 1) + 2 * cov(x + 1, y) + cov(x + 1, y + 1) - cov(x - 1, y - 1) - 2 * cov(x - 1, y) - cov(x - 1, y + 1);
@@ -442,12 +615,12 @@ function alphaSdf(px, W, H, ink) {
     }
     // a clean step between two texels (a shape drawn on the texel grid): the edge is their shared border
     const on = a > 0;
-    if (x + 1 < W) { const b = px[i * 4 + 7]; if (on ? b === 0 : b >= ink) seg(x + 0.5, y - 0.5, x + 0.5, y + 0.5); }
-    if (y + 1 < H) { const b = px[(i + W) * 4 + 3]; if (on ? b === 0 : b >= ink) seg(x - 0.5, y + 0.5, x + 0.5, y + 0.5); }
+    if (x + 1 < W) { const b = al[i + 1]; if (on ? b === 0 : b >= ink) seg(x + 0.5, y - 0.5, x + 0.5, y + 0.5); }
+    if (y + 1 < H) { const b = al[i + W]; if (on ? b === 0 : b >= ink) seg(x - 0.5, y + 0.5, x + 0.5, y + 0.5); }
   }
   const out = new Uint8Array(W * H), half = ink / 2, k = 127.5 / S;
   for (let y = 0; y < H; y++) for (let x = 0, i = y * W, o = (H - 1 - y) * W; x < W; x++, i++, o++) {
-    const q = d2[i], inside = px[i * 4 + 3] > half;
+    const q = d2[i], inside = al[i] > half;
     out[o] = q >= S2 ? (inside ? 255 : 0) : Math.round(127.5 + (inside ? k : -k) * Math.sqrt(q));
   }
   return out;
@@ -517,8 +690,8 @@ export function decalTexture(key, w, h, draw) {
     ctx.scale(DETAIL, DETAIL);
     draw(ctx, w, h);
     const px = ctx.getImageData(0, 0, W, H).data;
-    const hist = new Uint32Array(256);
-    for (let i = 3; i < px.length; i += 4) hist[px[i]]++;
+    const hist = new Uint32Array(256), al = new Uint8Array(W * H);
+    for (let i = 0, k = 3; i < al.length; i++, k += 4) hist[al[i] = px[k]]++;
     if (hist[255] === W * H || hist[0] === W * H) {
       const t = new THREE.CanvasTexture(c);
       t.colorSpace = THREE.SRGBColorSpace;
@@ -537,10 +710,12 @@ export function decalTexture(key, w, h, draw) {
     t.generateMipmaps = true;
     t.anisotropy = 16;
     t.needsUpdate = true;
-    const sdf = new THREE.DataTexture(alphaSdf(px, W, H, ink), W, H, THREE.RedFormat, THREE.UnsignedByteType);
-    sdf.magFilter = sdf.minFilter = THREE.LinearFilter;
-    sdf.needsUpdate = true;
-    decalFields.set(t.source, { sdf, width: W, height: H, ink: ink / 255 });
+    if (FINE()) {
+      const sdf = new THREE.DataTexture(alphaSdf(al, W, H, ink), W, H, THREE.RedFormat, THREE.UnsignedByteType);
+      sdf.magFilter = sdf.minFilter = THREE.LinearFilter;
+      sdf.needsUpdate = true;
+      decalFields.set(t.source, { sdf, width: W, height: H, ink: ink / 255 });
+    }
     return t;
   });
 }

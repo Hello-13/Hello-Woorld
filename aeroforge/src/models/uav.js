@@ -8,7 +8,7 @@
 
 import * as THREE from 'three';
 import { Assembly, mesh } from '../engine/assembly.js';
-import { wingPanel, hingedMesh, lathe, loftRings, naca00, orientOutward } from '../engine/geometry.js';
+import { wingPanel, hingedMesh, lathe, loftRings, naca00, orientOutward, roundSegments } from '../engine/geometry.js';
 import { M, SKIN } from '../engine/materials.js';
 import { decal, danger } from '../engine/decals.js';
 import { decalTexture } from '../engine/surface.js';
@@ -716,7 +716,7 @@ export function buildUAV() {
   // Retraction kinematics are estimated (GA-ASI publishes none). Each leg swings about its trunnion into
   // its well; members whose ends move independently (actuators) are re-placed every frame by update().
   const Yup = new THREE.Vector3(0, 1, 0);
-  const member = (r, material, seg = 10) => L(new THREE.CylinderGeometry(r, r, 1, seg, 1).translate(0, 0.5, 0), material);
+  const member = (r, material, seg = 10) => L(new THREE.CylinderGeometry(r, r, 1, Math.max(seg, roundSegments(r)), 1).translate(0, 0.5, 0), material);
   const placeMember = (mm, a, b) => {
     const d = b.clone().sub(a); const len = Math.max(1e-4, d.length());
     mm.position.copy(a); mm.quaternion.setFromUnitVectors(Yup, d.divideScalar(len)); mm.scale.set(1, len, 1);
@@ -740,12 +740,12 @@ export function buildUAV() {
   const noseLeg = new THREE.Group();
   noseLeg.position.set(X(NG.s), NG.y, 0);
   const ngStrut = [
-    new THREE.CylinderGeometry(0.035, 0.035, 0.2, 14).rotateX(Math.PI / 2),                 // trunnion
+    new THREE.CylinderGeometry(0.035, 0.035, 0.2, 28).rotateX(Math.PI / 2),                 // trunnion
     tubeBetween([0, 0.01, 0], [0, -0.52, 0], 0.045, 14),                                       // outer cylinder
     tubeBetween([0, -0.5, 0], [0.025, -0.8, 0], 0.03, 12),                                     // sliding piston
     box(0.06, 0.05, 0.15, [0.03, -0.81, 0]),                                                   // fork crown
     box(0.05, 0.2, 0.018, [0.035, -0.91, 0.062]), box(0.05, 0.2, 0.018, [0.035, -0.91, -0.062]),
-    new THREE.CylinderGeometry(0.035, 0.035, 0.065, 14).rotateX(Math.PI / 2).translate(0, 0, 0.1325),   // trunnion stub carrying the horn
+    new THREE.CylinderGeometry(0.035, 0.035, 0.065, 28).rotateX(Math.PI / 2).translate(0, 0, 0.1325),   // trunnion stub carrying the horn
     box(0.035, 0.1, 0.03, [0, 0.05, 0.15]),                                                     // actuator horn, outboard of the steering unit
   ];
   P('Nose gear oleo strut', {
@@ -760,7 +760,7 @@ export function buildUAV() {
   P('Nose gear steering actuator', {
     system: 'Landing gear', material: 'Electric steering motor on a collar (est.)', mass: 2.5, explode: [0.3, -0.5, 0.45],
     desc: 'An electric servo on a collar turns the nose leg. The pilot steers through the rudder pedals and the wheel centres itself; differential braking helps on tight turns. When a nosewheel servo driver failed in May 2015 the wheel could neither centre nor follow the pedals, and the aircraft ran off the runway ($6.7 million damage, USAF investigation).',
-  }, L(merge([new THREE.TorusGeometry(0.058, 0.014, 6, 20).rotateX(Math.PI / 2).translate(0, -0.1, 0), lru(0.06, 0.05, 0.12, [-0.07, -0.1, 0.05]), cylX(-0.16, -0.1, 0.022, 0.022, -0.1, 0.09, 10)]), m.lruOlive), noseLeg);
+  }, L(merge([new THREE.TorusGeometry(0.058, 0.014, 12, 40).rotateX(Math.PI / 2).translate(0, -0.1, 0), lru(0.06, 0.05, 0.12, [-0.07, -0.1, 0.05]), cylX(-0.16, -0.1, 0.022, 0.022, -0.1, 0.09, 10)]), m.lruOlive), noseLeg);
   // 0.28 m across: scaled against the fuselage depth in side views of USAF MQ-9As (AF 20-409 at Kunsan) and a GA-ASI MQ-9A (N428HK)
   // (tessellated for 4K close-ups: 96 round the tread, 28 round the section, 72 round the hub)
   const nwheel = [new THREE.TorusGeometry(0.095, 0.045, 28, 96), new THREE.CylinderGeometry(0.068, 0.068, 0.08, 72).rotateX(Math.PI / 2)];
@@ -773,7 +773,7 @@ export function buildUAV() {
     system: 'Electrical', material: 'LED lamp on the nose leg', mass: 1, explode: [0.35, -0.1, 0],
     desc: 'Lights the runway on approach and taxi and makes the aircraft visible to tower controllers; the pilot sees the runway through the nose camera.',
   }, [L(lampG, m.darkMetal)], noseLeg);
-  lampPart.add(L(new THREE.CircleGeometry(0.028, 16).rotateY(Math.PI / 2).translate(0.046, 0, 0), m.lamp, { cast: false }));
+  lampPart.add(L(new THREE.CircleGeometry(0.028, 32).rotateY(Math.PI / 2).translate(0.046, 0, 0), m.lamp, { cast: false }));
   lampPart.position.set(0.05, -0.33, 0);
   // retraction actuator: from the well roof to the horn above the trunnion; it also braces the leg fore and aft when locked down
   const ngAct = makeActuator(0.024, 0.014, 0.32, m.darkMetal);
@@ -843,7 +843,7 @@ export function buildUAV() {
     P(`Main gear trailing arm (${sd})`, {
       system: 'Landing gear', material: 'Forged steel arm with axle', mass: 9, explode: [-0.3, -1.2, 0.9 * side],
       desc: 'Pivots at the foot of the strut and trails the wheel behind it, so bumps swing the wheel up and back into the shock absorber instead of jarring the strut.',
-    }, L(merge([tubeBetween(K.toArray(), Ax.toArray(), 0.042, 12), new THREE.CylinderGeometry(0.03, 0.03, 0.12, 10).rotateX(Math.PI / 2).translate(K.x, K.y, K.z), new THREE.SphereGeometry(0.045, 12, 8).translate(Ax.x, Ax.y, Ax.z)]), m.alu), piv);
+    }, L(merge([tubeBetween(K.toArray(), Ax.toArray(), 0.042, 12), new THREE.CylinderGeometry(0.03, 0.03, 0.12, 28).rotateX(Math.PI / 2).translate(K.x, K.y, K.z), new THREE.SphereGeometry(0.045, 32, 20).translate(Ax.x, Ax.y, Ax.z)]), m.alu), piv);
     const s0 = at(0.5).add(new THREE.Vector3(-0.07, 0, 0)), s1 = K.clone().lerp(Ax, 0.6).add(new THREE.Vector3(0, 0.04, 0));
     P(`Main gear shock absorber (${sd})`, {
       system: 'Landing gear', material: 'Taylor Devices sealed shock absorber', mass: 5, explode: [-0.35, -0.8, 1.1 * side],
@@ -979,16 +979,16 @@ export function buildUAV() {
   turret.position.set(X(1.08), 0.995, 0);
   const tAz = new THREE.Group();
   turret.add(tAz);
-  tAz.add(L(merge([new THREE.CylinderGeometry(0.19, 0.19, 0.06, 28).translate(0, -0.03, 0), new THREE.CylinderGeometry(0.17, 0.19, 0.1, 28).translate(0, -0.1, 0)]), m.turret));
+  tAz.add(L(merge([new THREE.CylinderGeometry(0.19, 0.19, 0.06, 72).translate(0, -0.03, 0), new THREE.CylinderGeometry(0.17, 0.19, 0.1, 72).translate(0, -0.1, 0)]), m.turret));
   const tEl = new THREE.Group();
   tEl.position.y = -0.36;
   tAz.add(tEl);
-  tEl.add(L(new THREE.SphereGeometry(0.27, 40, 28), m.turret));
+  tEl.add(L(new THREE.SphereGeometry(0.27, 88, 56), m.turret));   // (within 0.2 mm of a true ball: its outline is what a close-up shows)
   const win = [];
   // apertures on the ball face (layout approximate): IR camera, daylight TV, image-intensified TV, laser rangefinder/designator, laser illuminator
   const onBall = (y, z, r, lift = 0.002) => {
     const n = new THREE.Vector3(Math.sqrt(Math.max(0, 0.27 * 0.27 - y * y - z * z)), y, z).normalize();
-    return new THREE.CircleGeometry(r, 24).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n)).translate(n.x * (0.27 + lift), n.y * (0.27 + lift), n.z * (0.27 + lift));
+    return new THREE.CircleGeometry(r, 56).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n)).translate(n.x * (0.27 + lift), n.y * (0.27 + lift), n.z * (0.27 + lift));
   };
   for (const [y, z, r] of [[0.07, 0.07, 0.085], [-0.06, 0.1, 0.055], [0.08, -0.12, 0.045], [-0.07, -0.06, 0.035], [-0.14, 0.02, 0.025]]) win.push(onBall(y, z, r));
   tEl.add(L(merge(win), m.glass, { cast: false }));
