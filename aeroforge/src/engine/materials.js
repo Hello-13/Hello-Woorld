@@ -1,7 +1,7 @@
 // Shared PBR materials and procedurally painted canvas textures.
 
 import * as THREE from 'three';
-import { aircraftSkin, mliSurface, carbonWeave, tubeWall, perforated } from './surface.js';
+import { aircraftSkin, mliSurface, carbonWeave, tubeWall, perforated, textureDetail } from './surface.js';
 
 const cache = new Map();
 const once = (key, make) => {
@@ -151,7 +151,7 @@ export const solarTexture = () => once('tex.solar', () => texture(canvas(512, 10
 })));
 
 /** Jet-engine spinner: the classic white spiral that tells ground crew the fan is turning. */
-export const spinnerTexture = () => once('tex.spinner', () => texture(canvas(512, 512, (ctx, w, h) => {
+export const spinnerTexture = () => once('tex.spinner', () => texture(canvas(textureDetail() > 1 ? 1536 : 512, textureDetail() > 1 ? 1536 : 512, (ctx, w, h) => {   // Ultra / 4K: 1200 texels per metre of spinner
   ctx.fillStyle = '#1c1f23';
   ctx.fillRect(0, 0, w, h);
   ctx.fillStyle = '#f2f2f2';
@@ -160,7 +160,7 @@ export const spinnerTexture = () => once('tex.spinner', () => texture(canvas(512
   ctx.moveTo(0, h); ctx.lineTo(w * 0.22, h); ctx.lineTo(w, h * 0.12); ctx.lineTo(w, 0); ctx.lineTo(w * 0.9, 0);
   ctx.closePath();
   ctx.fill();
-}), { repeat: [1, 1] }));
+}), { repeat: [1, 1], aniso: 16 }));
 
 /** Generic radial glow sprite. */
 export const glowTexture = () => once('tex.glow', () => {
@@ -232,7 +232,11 @@ export const SKIN = {
   }),
   nacelle: () => once('s.nacelle', () => {
     const t = tiled(aircraftSkin({ seed: 41, sawtooth: false }), 2.5, 1);
-    return new THREE.MeshPhysicalMaterial({ color: 0xdfe3e7, normalMap: t.normalMap, normalScale: new THREE.Vector2(0.35, 0.35), roughness: 0.38, metalness: 0.2, clearcoat: 0.6, clearcoatRoughness: 0.25, side: THREE.DoubleSide });
+    const m = new THREE.MeshPhysicalMaterial({ color: 0xdfe3e7, normalMap: t.normalMap, normalScale: new THREE.Vector2(0.35, 0.35), roughness: 0.38, metalness: 0.2, clearcoat: 0.6, clearcoatRoughness: 0.25, side: THREE.DoubleSide });
+    // the cowl's UVs are not metric: one tile of this map covers about 2.3 m round by 1.6 m along, so the
+    // 0.25 m micro-detail tile repeats 9 × 6.5 times in it (engine/surface.js, close-up detail)
+    m.userData.microTiles = [9, 6.5];
+    return m;
   }),
   liner: () => once('s.liner', () => {
     const t = tiled(perforated(), 60, 8);

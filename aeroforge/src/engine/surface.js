@@ -49,6 +49,8 @@ let DETAIL = 1;
 let CRISP = true;
 export function setTextureDetail(k, { crisp = true } = {}) { DETAIL = k; CRISP = !!crisp; }
 export const crispOn = () => CRISP;
+/** The resolution multiple the large maps are painted at (1, or 2 on Ultra / 4K). */
+export const textureDetail = () => DETAIL;
 // the close-up extras are built on the presets that paint at the higher detail (Ultra, 4K): nothing extra on the others
 const FINE = () => CRISP && DETAIL >= 2;
 
@@ -57,11 +59,14 @@ function canvas(w, h = w) {
   c.width = w; c.height = h;
   return c;
 }
+// The map canvases are painted once, read back (normal maps, distance fields) and drawn into one another, so
+// they are kept in main memory: a GPU-backed canvas would cost a synchronous read-back at each of those steps.
+const CPU = { willReadFrequently: true };
 
 /** Write a scalar field into a canvas as grey (0..1 → 0..255), optionally mapped through fn. */
 function fieldToCanvas(field, size, fn = (v) => v) {
   const c = canvas(size);
-  const ctx = c.getContext('2d');
+  const ctx = c.getContext('2d', CPU);
   const img = ctx.createImageData(size, size);
   for (let i = 0; i < field.length; i++) {
     const v = Math.max(0, Math.min(255, fn(field[i]) * 255));
@@ -77,7 +82,7 @@ export function heightToNormal(src, strength = 2) {
   const w = src.width, h = src.height;
   const data = src.getContext('2d').getImageData(0, 0, w, h).data;
   const c = canvas(w, h);
-  const ctx = c.getContext('2d');
+  const ctx = c.getContext('2d', CPU);
   const img = ctx.createImageData(w, h);
   const out = img.data, k = strength / 255;
   for (let y = 0; y < h; y++) {
@@ -114,14 +119,14 @@ function tex(c, { srgb = false, repeat = [1, 1], aniso = 8 } = {}) {
 function mapSet(key, size, { albedo, height, rough, normalStrength = 2, repeat = [1, 1], hires = false, detail = null }) {
   return once(key, () => {
     const k = hires ? DETAIL : 1;
-    const paint = (fn, scale, readBack = false) => {
+    const paint = (fn, scale) => {
       const c = canvas(size * scale);
-      const ctx = c.getContext('2d', readBack ? { willReadFrequently: true } : undefined);   // read back: keep it off the GPU
+      const ctx = c.getContext('2d', CPU);
       ctx.scale(scale, scale);
-      fn?.(ctx, size);
+      fn?.(ctx, size, scale);
       return c;
     };
-    const a = paint(albedo, k), hgt = paint(height, k, true), rg = paint(rough, 1);
+    const a = paint(albedo, k), hgt = paint(height, k), rg = paint(rough, 1);
     const set = {
       map: albedo ? tex(a, { srgb: true, repeat }) : null,
       roughnessMap: tex(rg, { repeat }),
@@ -229,10 +234,12 @@ export function tankSkin({ seed = 21, tile = 512 } = {}) {
 /** Crinkled multi-layer insulation blanket. */
 export function mliSurface({ seed = 33, tile = 512 } = {}) {
   return mapSet(`mli.${seed}`, tile, {
+    hires: true,
     detail: { micro: 'foil' },
-    height(ctx, s) {
-      const f = fbm(s, { seed, octaves: 6, base: 6, gain: 0.62 });
-      ctx.drawImage(fieldToCanvas(f, s, (v) => Math.abs(v - 0.5) * 2.2), 0, 0);
+    height(ctx, s, k) {
+      // painted at the canvas's real size (not scaled up), with one finer octave of creases when it is doubled
+      const n = s * k, f = fbm(n, { seed, octaves: k > 1 ? 7 : 6, base: 6, gain: 0.62 });
+      ctx.drawImage(fieldToCanvas(f, n, (v) => Math.abs(v - 0.5) * 2.2), 0, 0, s, s);
       ctx.strokeStyle = 'rgba(0,0,0,0.55)';
       ctx.lineWidth = s / 140;
       ctx.strokeRect(s * 0.02, s * 0.02, s * 0.96, s * 0.96);
@@ -410,8 +417,9 @@ export function floorMarkings(size = 2048, worldSize = 80, { geometric = true } 
 //      any magnification), replacing the blurred normal map as it is magnified;
 //   2. a tiling micro-detail layer (paint orange-peel, foil micro-crinkle; 1024² over MICRO_TILE metres):
 //      fine normal, roughness and tone variation between the seams.
-// Both are weighted by how far the map is magnified (0 when a texel is a pixel or smaller), so a view in
-// which the painted maps are already sharp is drawn exactly as before. Built on the Ultra / 4K presets only;
+// Each is weighted by magnification (the seams: 0 while a texel of the painted map is a pixel or smaller; the
+// micro layer: 0 beyond its third mip level), so a view in which the painted maps are already sharp, any
+// whole-vehicle framing included, is drawn exactly as before. Built on the Ultra / 4K presets only;
 // FX.crisp = false (?crisp=0) leaves every material and shader untouched.
 const MICRO_TILE = 0.25;              // metres covered by one repeat of a micro-detail texture
 const skinDetail = new WeakMap();     // normalMap.source → { field, width, height, micro }
@@ -440,6 +448,7 @@ function closeUpDetail(normalMap, hgt, detail) {
     field.minFilter = THREE.LinearFilter;
   }
   skinDetail.set(normalMap.source, { field, width: W, height: H, micro: detail.micro });
+  microDetail(detail.micro);          // painted now, on the boot screen, not at the first frame that needs it
   installDetailShader();
 }
 
@@ -457,11 +466,12 @@ const microDetail = (kind) => once(`micro.${kind}`, () => {
     for (let i = 0; i < hgt.length; i++) hgt[i] = Math.abs(hgt[i] - 0.5) * 2;
     slope = 26;
   } else {
-    // sprayed paint: orange-peel ripple, 0.6 to 2.5 mm
-    hgt = fbm(N, { seed: 91, octaves: 3, base: 96, gain: 0.6 });
+    // sprayed paint: a faint orange-peel ripple, 0.5 to 2 mm
+    hgt = fbm(N, { seed: 91, octaves: 3, base: 128, gain: 0.7 });
     slope = 2.6;
   }
-  const var1 = fbm(N, { seed: 93, octaves: 2, base: 64, gain: 0.6 }), var2 = fbm(N, { seed: 95, octaves: 2, base: 160, gain: 0.5 });
+  // (the roughness and tone variation is the same fine noise for every family: made once)
+  const [var1, var2] = once('micro.var', () => [fbm(N, { seed: 93, octaves: 2, base: 64, gain: 0.6 }), fbm(N, { seed: 95, octaves: 2, base: 160, gain: 0.5 })]);
   const byte = (v) => (v < 0 ? 0 : v > 1 ? 255 : v * 255 + 0.5) | 0;
   for (let y = 0; y < N; y++) {
     const ya = ((y + N - 1) % N) * N, yb = ((y + 1) % N) * N, o = (N - 1 - y) * N * 4;      // bottom row first
@@ -484,8 +494,8 @@ const microDetail = (kind) => once(`micro.${kind}`, () => {
 // strengths per family: x seam slope, y fastener-edge slope (both scaled by the material's normalScale),
 // z micro normal slope, w micro roughness swing; tone: micro albedo swing
 const MICRO = {
-  paint: { q: [0.9, 0.8, 0.5, 0.16], tone: 0.045 },
-  foil: { q: [0.9, 0.8, 0.5, 0.3], tone: 0.06 },
+  paint: { q: [1.1, 1.0, 0.1, 0.12], tone: 0.03 },       // micro normal: rms slope 0.035 (matte paint, not a textured coating)
+  foil: { q: [1.1, 1.0, 0.5, 0.3], tone: 0.06 },
 };
 
 const DETAIL_PARS = /* glsl */`
@@ -496,7 +506,7 @@ uniform float crispTone;           // micro albedo swing
 #ifdef CRISP_FIELD
 uniform sampler2D crispField;      // R: signed distance to seam grooves, G: to fastener heads (0.5 = edge, +-4 texels)
 #endif
-float crispW;                      // 0: the painted maps are sharp enough (texel <= pixel) ... 1: magnified
+float crispW;                      // seams: 0 while the painted map is sharp enough (texel <= pixel) ... 1 magnified
 vec2 crispN;                       // tangent-space normal slope to add (seams and fasteners, then micro)
 float crispKeep;                   // share of the painted normal map kept
 float crispRough;
@@ -508,10 +518,20 @@ const DETAIL_BEGIN = /* glsl */`
 		vec2 crispT = vNormalMapUv * crispP.xy;
 		float crispTpp = max( max( length( dFdx( crispT ) ), length( dFdy( crispT ) ) ), 1e-4 );   // map texels per screen pixel
 		crispW = 1.0 - smoothstep( 0.5, 1.0, crispTpp );
-		vec4 crispM = texture2D( crispMicro, vNormalMapUv * crispP.zw );
-		crispN = ( crispM.rg * 2.0 - 1.0 ) * crispQ.z * crispW;
-		crispRough = 1.0 + ( crispM.b - 0.5 ) * crispQ.w * crispW;
-		crispAlbedo = 1.0 + ( crispM.a - 0.5 ) * crispTone * crispW;
+		// micro layer: in while its own texels are near a pixel or larger, gone by its third mip level
+		vec2 crispU = vNormalMapUv * crispP.zw;
+		vec2 crispUx = dFdx( crispU ), crispUy = dFdy( crispU );
+		float crispWm = 1.0 - smoothstep( 1.0, 4.0, max( length( crispUx ), length( crispUy ) ) * 1024.0 );
+		// ... and only where the surface's UVs are near isotropic (a stretched mapping would smear the grain into
+		// streaks): lengths of the surface gradients of u and v, from the screen derivatives of position and UV
+		vec3 crispPx = dFdx( vViewPosition ), crispPy = dFdy( vViewPosition );
+		float crispE1 = dot( crispPx, crispPx ), crispE2 = dot( crispPy, crispPy ), crispE3 = dot( crispPx, crispPy );
+		vec2 crispG = ( crispE2 * crispUx * crispUx - 2.0 * crispE3 * crispUx * crispUy + crispE1 * crispUy * crispUy ) / max( crispE1 * crispE2 - crispE3 * crispE3, 1e-24 );
+		crispWm *= smoothstep( 0.4, 0.75, sqrt( max( min( crispG.x, crispG.y ), 0.0 ) / max( max( crispG.x, crispG.y ), 1e-24 ) ) );
+		vec4 crispM = texture2D( crispMicro, crispU );
+		crispN = ( crispM.rg * 2.0 - 1.0 ) * crispQ.z * crispWm;
+		crispRough = 1.0 + ( crispM.b - 0.5 ) * crispQ.w * crispWm;
+		crispAlbedo = 1.0 + ( crispM.a - 0.5 ) * crispTone * crispWm;
 		crispKeep = 1.0;
 		#ifdef CRISP_FIELD
 			vec2 crispE = 0.5 / crispP.xy;
@@ -527,8 +547,8 @@ const DETAIL_BEGIN = /* glsl */`
 				crispS *= normalScale;
 			#endif
 			crispN += crispS * crispW;
-			crispKeep = 1.0 - crispW;
-			crispAlbedo *= 1.0 - 0.12 * crispW * crispIn;
+			crispKeep = 1.0 - 0.7 * crispW;              // a third of the painted (soft) relief stays, as the dishing round the sharp line
+			crispAlbedo *= 1.0 - crispW * ( 0.26 * crispIn + 0.12 * crispRim );                   // shade in the gap and round the head
 		#endif
 	}
 `;
@@ -698,7 +718,7 @@ export function decalTexture(key, w, h, draw) {
   return once(`decal.${key}`, () => {
     const W = w * DETAIL, H = h * DETAIL;
     const c = canvas(W, H);
-    const ctx = c.getContext('2d', { willReadFrequently: true });      // read straight back: keep it off the GPU
+    const ctx = c.getContext('2d', CPU);
     ctx.scale(DETAIL, DETAIL);
     draw(ctx, w, h);
     const px = ctx.getImageData(0, 0, W, H).data;

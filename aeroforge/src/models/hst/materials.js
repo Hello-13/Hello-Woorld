@@ -7,7 +7,7 @@
 // core's specular antialiasing has something to work with; nothing here emits light.
 
 import * as THREE from 'three';
-import { mliSurface } from '../../engine/surface.js';
+import { mliSurface, textureDetail } from '../../engine/surface.js';
 import { rng } from '../../engine/materials.js';
 
 const cache = new Map();
@@ -16,10 +16,14 @@ const once = (key, make) => {
   return cache.get(key);
 };
 
-function canvasTex(w, h, draw, { repeat = [1, 1], srgb = true } = {}) {
+function canvasTex(w, h, draw, { repeat = [1, 1], srgb = true, hires = false } = {}) {
+  // hires: painted at the texture-detail multiple (2 on Ultra / 4K) with the same drawing, so lines keep their width
+  const k = hires ? textureDetail() : 1;
   const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  draw(c.getContext('2d'), w, h);
+  c.width = w * k; c.height = h * k;
+  const ctx = c.getContext('2d');
+  ctx.scale(k, k);
+  const t0 = performance.now(); draw(ctx, w, h); (globalThis.__texMs ??= {})[`hst.${w}x${h}x${k}.${Object.keys(globalThis.__texMs).length}`] = Math.round(performance.now() - t0);   // TEMP-TIMING
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.repeat.set(...repeat);
@@ -122,18 +126,25 @@ export const HM = {
   /** Silvered Teflon MLI on the light shield, forward shell and aft shroud. */
   mli: (v = 0) => (v ? variant(HM.mli(), `mli${v}`, [0.37 * v, 0.23 * v]) : once('mli', () => {
     const n = mliSurface({ seed: 41 });
-    const map = canvasTex(1024, 1024, mliAlbedo(5), { repeat: [2, 1] });
-    const normalMap = n.normalMap.clone(); normalMap.repeat.set(14, 4); normalMap.needsUpdate = true;
-    const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(9, 3); roughnessMap.needsUpdate = true;
-    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.22, 0.22), roughness: 0.6, metalness: 0.55, side: THREE.DoubleSide });
+    const map = canvasTex(1024, 1024, mliAlbedo(5), { repeat: [2, 1], hires: true });
+    // crinkle tiles near square on the shells this covers (half-shells 4.9 m of arc × 4.0 m and 6.6 m × 3.5 m): the
+    // same number of tiles as the earlier (14, 4), which stretched each crease about three times along the tube
+    const normalMap = n.normalMap.clone(); normalMap.repeat.set(9, 6); normalMap.needsUpdate = true;
+    const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(6, 4.5); roughnessMap.needsUpdate = true;
+    const m = new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.22, 0.22), roughness: 0.6, metalness: 0.55, side: THREE.DoubleSide });
+    m.userData.microTiles = [2.2, 2.7];       // micro-detail tiles per crinkle tile (0.54 × 0.67 m over 0.25 m)
+    return m;
   })),
   /** Light shield blanket: panel seams run lengthwise, more weathering toward the aperture. */
   mliShield: (v = 0) => (v ? variant(HM.mliShield(), `mliShield${v}`, [0.41 * v, 0.17 * v]) : once('mliShield', () => {
     const n = mliSurface({ seed: 41 });
-    const map = canvasTex(1024, 1024, mliAlbedo(9, { base: [190, 194, 199], seamsU: [0.14, 0.47, 0.79], seamsV: [0.62], patches: 8 }), { repeat: [2, 1] });
-    const normalMap = n.normalMap.clone(); normalMap.repeat.set(16, 4); normalMap.needsUpdate = true;
-    const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(10, 3); roughnessMap.needsUpdate = true;
-    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.25, 0.25), roughness: 0.62, metalness: 0.55, side: THREE.DoubleSide });
+    const map = canvasTex(1024, 1024, mliAlbedo(9, { base: [190, 194, 199], seamsU: [0.14, 0.47, 0.79], seamsV: [0.62], patches: 8 }), { repeat: [2, 1], hires: true });
+    // square crinkle tiles on the light shield's half-shells (4.9 m of arc × 4.0 m); as many tiles as the earlier (16, 4)
+    const normalMap = n.normalMap.clone(); normalMap.repeat.set(9, 7); normalMap.needsUpdate = true;
+    const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(6, 5); roughnessMap.needsUpdate = true;
+    const m = new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.25, 0.25), roughness: 0.62, metalness: 0.55, side: THREE.DoubleSide });
+    m.userData.microTiles = [2.2, 2.3];
+    return m;
   })),
   /** Aft shroud and guider doors: the same silvered Teflon MLI as the shroud, plain, over one tile per metre. */
   shroudDoor: () => once('shroudDoor', () => {
@@ -141,7 +152,9 @@ export const HM = {
     const map = canvasTex(1024, 1024, mliAlbedo(13, { base: [192, 196, 201], seamsU: [0.5], seamsV: [], patches: 0, scale: 5 }));
     const normalMap = n.normalMap.clone(); normalMap.repeat.set(1.7, 1.7); normalMap.needsUpdate = true;
     const roughnessMap = n.roughnessMap.clone(); roughnessMap.repeat.set(0.7, 0.7); roughnessMap.needsUpdate = true;
-    return new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.15, 0.15), roughness: 0.6, metalness: 0.55 });
+    const m = new THREE.MeshStandardMaterial({ color: 0xffffff, map, normalMap, roughnessMap, normalScale: new THREE.Vector2(0.15, 0.15), roughness: 0.6, metalness: 0.55 });
+    m.userData.microTiles = [2.4, 2.4];       // one tile per metre of door (see above): crinkle tile 0.59 m
+    return m;
   }),
   /** Dark radome of the conical log-spiral low-gain antennas. */
   radome: () => once('radome', () => new THREE.MeshStandardMaterial({ color: 0x4e5257, roughness: 0.62, metalness: 0.25 })),
@@ -229,7 +242,8 @@ export const HM = {
         ctx.fillRect(i * cw + gap, j * ch + ch * 0.5, cw - gap * 2, 1);
       }
       ctx.strokeStyle = '#c6cbd0'; ctx.lineWidth = 10; ctx.strokeRect(5, 5, w - 10, h - 10);
-    });
+    }, { hires: true });      // 1024 × 2048 on Ultra / 4K: 800 × 1170 texels per metre of panel
+    map.anisotropy = 16;
     return new THREE.MeshStandardMaterial({ color: 0xffffff, map, roughness: 0.26, metalness: 0.4 });
   }),
   /** SA3 back: white-painted honeycomb substrate. */

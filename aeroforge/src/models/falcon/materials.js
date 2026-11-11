@@ -7,11 +7,11 @@
 // curved shells so highlights stay stable.
 
 import * as THREE from 'three';
-import { tankSkin, carbonWeave, concrete } from '../../engine/surface.js';
+import { tankSkin, carbonWeave, concrete, closeUpDetailOn, closeUpDetailKey, applyCloseUpDetail, outlineField } from '../../engine/surface.js';
 import { rng } from '../../engine/materials.js';
 
 const cache = new Map();
-const once = (k, make) => { if (!cache.has(k)) cache.set(k, make()); return cache.get(k); };
+const once = (k, make) => { if (!cache.has(k)) { const t0 = performance.now(); cache.set(k, make()); (globalThis.__texMs ??= {})['falcon.' + k] = Math.round(performance.now() - t0); } return cache.get(k); };   // TEMP-TIMING
 
 // White exterior finishes. The launch-pad look adds three floodlights to the dawn sky and sun, which
 // lift the lower white skins past the renderer's bloom threshold (diffuse HDR luminance ≈ 2.1
@@ -36,6 +36,44 @@ function canvasTex(w, h, draw, { srgb = true } = {}) {
   return t;
 }
 
+// Stage paint in close-ups (Ultra / 4K detail with the crisp switch on). The paint canvas wraps 11.5 m of
+// circumference and the stage's whole length, so anything with a hard edge painted into it is soft from a few
+// metres. The hard-edged parts are therefore left out of the canvas and drawn by the tank material's shader:
+// the weld seams analytically from their heights, the wordmark from its own coverage + distance-field
+// texture (same position, size, font and ink). Soot, streaks and mottle stay painted, at twice the size.
+const stageExtras = new WeakMap();     // paint map → { seams, word }
+const STAGE_W = 512, STAGE_H = 2048;   // the paint canvas's logical size: seams and wordmark are laid out in its pixels
+const SEAM_INK = [132, 138, 144, 0.5], SEAM_PX = 3;
+
+/** The wordmark alone: { tex (R coverage, G distance field), rect (u0, v0, 1/du, 1/dv on the paint map), size, ink }. */
+const wordMark = (word) => once(`word.${JSON.stringify(word)}`, () => {
+  const size = Math.round(word.size || 64), len = (word.v1 - word.v0) * STAGE_H;      // paint-canvas pixels along the text
+  const pad = 0.04 * len, half = 0.65 * size;                                         // clear margins round the lettering
+  const W = 2048, H = 512;
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.translate(W / 2, H / 2);
+  ctx.scale(W / (len + 2 * pad), H / (2 * half));
+  ctx.fillStyle = '#fff';
+  ctx.font = `700 ${size}px "Archivo", "Arial", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.scale(len / ctx.measureText(word.text).width, 1);      // stretched to the requested length, as on the canvas
+  ctx.fillText(word.text, 0, 0);
+  const px = ctx.getImageData(0, 0, W, H).data, al = new Uint8Array(W * H);
+  for (let i = 0; i < al.length; i++) al[i] = px[i * 4 + 3];
+  const sdf = outlineField(al, W, H, 255, false), rg = new Uint8Array(W * H * 2);
+  for (let i = 0; i < al.length; i++) { rg[i * 2] = al[i]; rg[i * 2 + 1] = sdf[i]; }
+  const tex = new THREE.DataTexture(rg, W, H, THREE.RGFormat, THREE.UnsignedByteType);
+  tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true; tex.anisotropy = 16; tex.needsUpdate = true;
+  // the text reads up the stage: its length runs along v, its height along u
+  const du = (2 * half) / STAGE_W, dv = (len + 2 * pad) / STAGE_H;
+  const ink = new THREE.Color(word.color || '#111317');
+  return { tex, rect: new THREE.Vector4((word.u ?? 0.5) - du / 2, (word.v0 + word.v1) / 2 - dv / 2, 1 / du, 1 / dv), size: new THREE.Vector2(W, H), ink };
+});
+
 /**
  * Stage paint: v runs 0 → 1 up the stage (canvas bottom → top), u = 0.5 faces +z.
  * seams: heights (0..1) of circumferential friction-stir welds between barrel sections.
@@ -44,7 +82,10 @@ function canvasTex(w, h, draw, { srgb = true } = {}) {
  */
 export function stagePaint(key, { seams = [], soot = 0, streaks = 0, word = null, seed = 3, base = '#d9dcde' } = {}) {
   return once(`paint.${key}`, () => {
-    const map = canvasTex(512, 2048, (ctx, w, h) => {
+    const fine = closeUpDetailOn(), k = fine ? 2 : 1;
+    const map = canvasTex(STAGE_W * k, STAGE_H * k, (ctx) => {
+      const w = STAGE_W, h = STAGE_H;
+      ctx.scale(k, k);
       ctx.fillStyle = base;
       ctx.fillRect(0, 0, w, h);
       const r = rng(seed);
@@ -71,8 +112,9 @@ export function stagePaint(key, { seams = [], soot = 0, streaks = 0, word = null
         ctx.fillStyle = sg;
         ctx.fillRect(x, y0, 2 + r() * 7, len);
       }
-      ctx.strokeStyle = 'rgba(132,138,144,0.5)';
-      ctx.lineWidth = 3;
+      if (fine) return;                 // seams and wordmark: drawn sharp by the tank material's shader
+      ctx.strokeStyle = `rgba(${SEAM_INK})`;
+      ctx.lineWidth = SEAM_PX;
       for (const s of seams) { const y = h * (1 - s); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
       if (word) {
         ctx.save();
@@ -92,8 +134,72 @@ export function stagePaint(key, { seams = [], soot = 0, streaks = 0, word = null
       }
     });
     map.flipY = true;
+    map.anisotropy = 16;
+    if (fine) stageExtras.set(map, { seams, word: word ? wordMark(word) : null });
     return map;
   });
+}
+
+const STAGE_PARS = /* glsl */`
+uniform float stageSeams[ 12 ];    // weld heights (v); unused entries far outside 0..1
+uniform float stageSeamW;          // half-width of a weld line (v)
+uniform vec4 stageSeamInk;         // display-space colour and opacity of a weld line
+#ifdef STAGE_WORD
+uniform sampler2D stageWord;       // R coverage, G distance field (0.5 = outline)
+uniform vec4 stageWordRect;        // u0, v0, 1 / du, 1 / dv of the wordmark's patch on the paint map
+uniform vec2 stageWordSize;
+uniform vec3 stageWordInk;
+#endif
+`;
+const STAGE_MAP = /* glsl */`
+#ifdef USE_MAP
+	vec4 sampledDiffuseColor = texture2D( map, vMapUv );
+	{
+		// composite as the paint canvas did, in display space
+		vec3 stageC = pow( max( sampledDiffuseColor.rgb, vec3( 0.0 ) ), vec3( 0.4545 ) );
+		float stageD = 10.0;
+		for ( int i = 0; i < 12; i ++ ) stageD = min( stageD, abs( vMapUv.y - stageSeams[ i ] ) );
+		float stageP = max( fwidth( vMapUv.y ), 1e-7 );
+		float stageLine = clamp( ( stageSeamW - stageD ) / stageP + 0.5, 0.0, 1.0 ) - clamp( ( - stageSeamW - stageD ) / stageP + 0.5, 0.0, 1.0 );
+		stageC = mix( stageC, stageSeamInk.rgb, stageSeamInk.a * stageLine );
+		#ifdef STAGE_WORD
+			vec2 stageUv = vec2( ( vMapUv.y - stageWordRect.y ) * stageWordRect.w, ( vMapUv.x - stageWordRect.x ) * stageWordRect.z );
+			vec2 stageM = texture2D( stageWord, stageUv ).rg;
+			vec2 stageT = stageUv * stageWordSize;
+			float stageTpp = max( length( dFdx( stageT ) ), length( dFdy( stageT ) ) );     // wordmark texels per screen pixel
+			float stageG = max( length( vec2( dFdx( stageM.g ), dFdy( stageM.g ) ) ), 1e-5 );
+			float stageSharp = clamp( ( stageM.g - 0.5 ) / stageG + 0.5, 0.0, 1.0 );
+			stageC = mix( stageC, stageWordInk, mix( stageSharp, stageM.r, smoothstep( 0.6, 1.2, stageTpp ) ) );
+		#endif
+		sampledDiffuseColor.rgb = pow( stageC, vec3( 2.2 ) );
+	}
+	diffuseColor *= sampledDiffuseColor;
+#endif
+`;
+
+/** Draw a stage paint map's weld seams and wordmark in the material's shader (see stageExtras). */
+function stageShader(material, extras) {
+  const g = (v) => Math.pow(Math.max(v, 0), 0.4545);
+  const seams = new Float32Array(12).fill(-10);
+  extras.seams.slice(0, 12).forEach((v, i) => { seams[i] = v; });
+  const seamInk = new THREE.Color().setRGB(SEAM_INK[0] / 255, SEAM_INK[1] / 255, SEAM_INK[2] / 255, THREE.SRGBColorSpace);
+  const word = extras.word;
+  material.onBeforeCompile = (shader) => {
+    applyCloseUpDetail(material, shader);
+    shader.uniforms.stageSeams = { value: seams };
+    shader.uniforms.stageSeamW = { value: SEAM_PX / 2 / STAGE_H };
+    shader.uniforms.stageSeamInk = { value: new THREE.Vector4(g(seamInk.r), g(seamInk.g), g(seamInk.b), SEAM_INK[3]) };
+    if (word) {
+      shader.uniforms.stageWord = { value: word.tex };
+      shader.uniforms.stageWordRect = { value: word.rect };
+      shader.uniforms.stageWordSize = { value: word.size };
+      shader.uniforms.stageWordInk = { value: new THREE.Vector3(g(word.ink.r), g(word.ink.g), g(word.ink.b)) };
+    }
+    shader.fragmentShader = (word ? '#define STAGE_WORD\n' : '') + shader.fragmentShader
+      .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\n' + STAGE_PARS)
+      .replace('#include <map_fragment>', STAGE_MAP);
+  };
+  material.customProgramCacheKey = () => `falcon-stage${word ? '-word' : ''}.${closeUpDetailKey(material)}`;
 }
 
 /**
@@ -105,10 +211,15 @@ export function stagePaint(key, { seams = [], soot = 0, streaks = 0, word = null
 export function tankMaterial(paintMap, lengthM) {
   const sk = tankSkin();
   const normalMap = sk.normalMap.clone(); normalMap.repeat.set(10, lengthM / 3.4); normalMap.wrapT = THREE.RepeatWrapping; normalMap.needsUpdate = true;
-  return paint(new THREE.MeshStandardMaterial({
+  const m = paint(new THREE.MeshStandardMaterial({
     color: 0xffffff, map: paintMap, normalMap, normalScale: new THREE.Vector2(0.5, 0.5),
     roughness: 0.68, metalness: 0.02,
   }));
+  // micro-detail tiling: the normal map's tile is 1.15 m of circumference (11.5 m / 10) by 3.4 m of length
+  m.userData.microTiles = [1.15 / 0.25, 3.4 / 0.25];
+  const extras = stageExtras.get(paintMap);
+  if (extras) stageShader(m, extras);
+  return m;
 }
 
 function carbonSet(rx, ry) {

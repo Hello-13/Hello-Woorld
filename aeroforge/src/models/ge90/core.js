@@ -576,7 +576,7 @@ export function buildCore(ctx) {
   }, [trf, trfStruts]).userData.part.stationTemp = '5';
 
   // ====================================================================== exhaust
-  const nozzle = cut(cutLathe([[0.975, -5.1], [0.968, -5.3], [0.905, -5.48], [0.782, -5.65], [0.724, -5.65], [0.842, -5.5], [0.893, -5.4], [0.905, -5.4], [0.94, -5.38], [0.945, -5.12]], GM.heat(0.75), { seg: 80 }));
+  const nozzle = cut(cutLathe([[0.975, -5.1], [0.968, -5.3], [0.905, -5.48], [0.782, -5.65], [0.724, -5.65], [0.842, -5.5], [0.893, -5.4], [0.905, -5.4], [0.94, -5.38], [0.945, -5.12]], GM.heat(0.75), { seg: 128 }));
   P('Core exhaust nozzle', {
     system: 'Propulsion', material: 'Inconel 625 sheet', mass: 120,
     explode: [0, -2.2, 0],
@@ -584,7 +584,7 @@ export function buildCore(ctx) {
   }, nozzle).userData.part.stationTemp = '9';
   const plugLine = [[0.56, -5.36], [0.548, -5.46], [0.515, -5.6], [0.462, -5.75], [0.39, -5.92], [0.3, -6.08], [0.2, -6.23], [0.1, -6.38], [0.03, -6.46], [0.001, PLUG_TIP]];
   const plugProf = plugLine.concat(plugLine.slice(0, -1).reverse().map(([r, y]) => [Math.max(0.001, r - 0.01), y - 0.004]));
-  const plug = cut(cutLathe(plugProf, GM.heat(0.85), { seg: 72 }));
+  const plug = cut(cutLathe(plugProf, GM.heat(0.85), { seg: 128 }));
   P('Centre plug', {
     system: 'Propulsion', material: 'Inconel 625 / titanium cone', mass: 65,
     explode: [0, -2.5, 0],

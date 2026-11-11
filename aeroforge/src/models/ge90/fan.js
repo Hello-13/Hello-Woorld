@@ -48,7 +48,11 @@ export function buildFan(ctx) {
   const spinnerPts = [[0.001, 0.8], [0.05, 0.765], [0.12, 0.68], [0.2, 0.57], [0.28, 0.45], [0.35, 0.33], [0.41, 0.21], [0.45, 0.11], [0.468, 0.03], [0.47, 0.0]];
   const SPIN_STEPS = 6;
   const spinnerCurve = new THREE.CatmullRomCurve3([[-0.05, 0.765], ...spinnerPts].map(([r, y]) => new THREE.Vector3(r, y, 0)), false, 'centripetal');
-  const spinnerGeo = lathe(spinnerCurve.getPoints(spinnerPts.length * SPIN_STEPS).slice(SPIN_STEPS).map((p) => [Math.min(0.47, Math.max(0.001, p.x)), Math.min(0.8, Math.max(0, p.y))]), 128);
+  // The profile is turned from the base to the tip: listed tip first (as it was) the lathe's faces pointed INTO the cone,
+  // so the spinner was culled from the front and the camera looked straight through it into the fan disk. The texture's
+  // v, which the lathe counts from the first point, is turned back so the spiral keeps its place on the cone.
+  const spinnerGeo = lathe(spinnerCurve.getPoints(spinnerPts.length * SPIN_STEPS).slice(SPIN_STEPS).map((p) => [Math.min(0.47, Math.max(0.001, p.x)), Math.min(0.8, Math.max(0, p.y))]).reverse(), 128);
+  for (let i = 0, uv = spinnerGeo.attributes.uv; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i));
   // The GE90 spinner is painted composite, not bare metal: a dielectric with a lowered grazing-angle
   // reflectance, so the key light's glint on its rim no longer blooms like a lamp (it is the
   // silhouette Fresnel that did it, which roughness alone cannot damp)

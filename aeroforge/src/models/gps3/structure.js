@@ -209,6 +209,17 @@ export function buildStructure(P) {
 
   // ------------------------------------------------------------------ multi-layer insulation
   const RECESS = 0.06;
+  // metric UVs for the blankets (one UV unit = one metre on every face), so the crinkle maps tile at one size and
+  // square on a 0.4 m strip and a 2.5 m deck alike; G.silverMLI / G.blackMLI take tiles per metre
+  const metricUv = (g) => {
+    const p = g.attributes.position, n = g.attributes.normal, uv = g.attributes.uv;
+    for (let i = 0; i < p.count; i++) {
+      const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+      if (ax >= ay && ax >= az) uv.setXY(i, p.getY(i), p.getZ(i)); else if (ay >= az) uv.setXY(i, p.getX(i), p.getZ(i)); else uv.setXY(i, p.getX(i), p.getY(i));
+    }
+    return g;
+  };
+  const MLI_PER_M = 0.8;      // crinkle tile 1.25 m
   for (const s of [1, -1]) {
     const sun = s > 0, g = [];
     // flush over the closeout strips (and the web ends), recessed across the tank bay, with returns along the webs
@@ -221,23 +232,29 @@ export function buildStructure(P) {
       desc: sun
         ? 'Silver multi-layer insulation over the Sun-facing face, including the recessed oxidiser-tank bay. Pre-launch images of SV02 show this face silver; the IGS box-wing model takes it to absorb about 44 % of sunlight. Each foil layer reflects heat back, so almost none of the outer layer\'s 100 °C-plus reaches the bus (layer count estimated).'
         : 'Black MLI over the shadow face, the gold-wrapped oxidiser tank included (SV02 pre-launch images). Here the outer layer falls below −100 °C while the tank behind it is kept warm by heaters.',
-    }, mesh(merge(g), sun ? G.silverMLI(1.3) : G.blackMLI(1.4)));
+    }, mesh(metricUv(merge(g)), sun ? G.silverMLI(MLI_PER_M) : G.blackMLI(MLI_PER_M)));
     b.userData.part.thermalRole = sun ? 'sunlit' : 'shadow';
   }
   const eb = P('MLI blanket (Earth deck)', {
     system: 'Thermal control', material: 'Radio-transparent MLI, silver outer layer', mass: 3, skin: true, temp: 250, explode: [0, 0, 1.68],
     desc: 'Silver, radio-transparent blanket on the antenna face (SV02 pre-launch images), so it insulates without blocking the L-band and crosslink signals. From 20,180 km the Earth fills only a 27.8° disc, so this face sees mostly cold space and a little earthshine.',
-  }, mesh(boxG([0, 0, HZ + 0.006], [2 * HX + 0.025, 2 * HY - 0.01, 0.012]), G.silverMLI(1.1)));
+  }, mesh(metricUv(boxG([0, 0, HZ + 0.006], [2 * HX + 0.025, 2 * HY - 0.01, 0.012])), G.silverMLI(MLI_PER_M)));
   eb.userData.part.thermalRole = 'earth';
   const hole = new THREE.Path(); hole.absarc(0, 0, ADAPTER.r + 0.02, 0, Math.PI * 2, true);
   const ab = P('MLI blanket (aft deck)', {
     system: 'Thermal control', material: 'Multi-layer insulation, black outer layer', mass: 2.5, skin: true, temp: 230, explode: [0, 0, -1.6],
     desc: 'Black blanket on the anti-Earth face around the adapter (the box-wing model uses black-MLI optical properties for −Z). With heaters it keeps the propellant lines on the aft deck above hydrazine\'s 2 °C freezing point.',
-  }, mesh(plateG(rect(0, 0, 2 * HX + 0.025, 2 * HY - 0.01), 0.012, -HZ - 0.013, [hole]), G.blackMLI(1.2)));
+  }, mesh(metricUv(plateG(rect(0, 0, 2 * HX + 0.025, 2 * HY - 0.01), 0.012, -HZ - 0.013, [hole])), G.blackMLI(MLI_PER_M)));
   ab.userData.part.thermalRole = 'aft';
+  const adapterWrap = cylG([0, 0, (ADAPTER.z0 + ADAPTER.z1) / 2 - 0.005], ADAPTER.r + 0.014, ADAPTER.z0 - ADAPTER.z1 - 0.03, 'z', 72, ADAPTER.r + 0.014, true);
+  {
+    // the wrap's UVs run once round and once up: scale them to metres (a whole number of tiles round, so the seam closes)
+    const uv = adapterWrap.attributes.uv, round = Math.max(1, Math.round(2 * Math.PI * (ADAPTER.r + 0.014) * MLI_PER_M)) / MLI_PER_M, up = ADAPTER.z0 - ADAPTER.z1 - 0.03;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * round, uv.getY(i) * up);
+  }
   const lb = P('MLI blanket (launch adapter)', {
     system: 'Thermal control', material: 'Multi-layer insulation, black outer layer', mass: 2.5, skin: true, temp: 230, explode: [0, 0, -2.1],
     desc: 'Black blanket around the launch adapter section, as on the manufacturer\'s scale model. It shields the propulsion end from the apogee engine\'s radiant heat; the IGS team noted that the adapter\'s optical properties are unknown.',
-  }, mesh(cylG([0, 0, (ADAPTER.z0 + ADAPTER.z1) / 2 - 0.005], ADAPTER.r + 0.014, ADAPTER.z0 - ADAPTER.z1 - 0.03, 'z', 72, ADAPTER.r + 0.014, true), G.blackMLI(1.6)));
+  }, mesh(adapterWrap, G.blackMLI(MLI_PER_M)));
   lb.userData.part.thermalRole = 'aft';
 }

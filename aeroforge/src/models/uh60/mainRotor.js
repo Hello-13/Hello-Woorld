@@ -11,6 +11,7 @@
 // The rotor turns counter-clockwise seen from above (+y rotation): the advancing blade is on the right.
 
 import * as THREE from 'three';
+import { textureDetail } from '../../engine/surface.js';
 import { mesh } from '../../engine/assembly.js';
 import { loftRings, orientOutward, airfoilLoop, lathe } from '../../engine/geometry.js';
 import { MAT, DEG, V3, merge, box, cyl, tube, pipe, place, unitRod, aimRod, aimFixed, scissor, canvasTex, DEICE } from './common.js';
@@ -110,18 +111,21 @@ function heaterBlanketGeometry() {
 function bladeMaterial() {
   // u runs root → tip, v around the section (LE at v ≈ 0.5): paint, nickel erosion strip, tip cap
   const uTip = (7.61 - 0.92) / (R - 0.92), uRoot = (1.3 - 0.92) / (R - 0.92);
-  const map = canvasTex('uh60.blade', 512, 128, (ctx, w, h) => {
+  // Ultra / 4K: 4096 × 512, i.e. 560 texels per metre of span and 470 round the section (the blade is 7.3 m × 0.53 m chord)
+  const kx = textureDetail() > 1 ? 8 : 1, ky = textureDetail() > 1 ? 4 : 1;
+  const map = canvasTex('uh60.blade', 512 * kx, 128 * ky, (ctx, w, h) => {
     ctx.fillStyle = '#1b1e1d'; ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = '#232725'; ctx.fillRect(uTip * w, 0, w, h);
     ctx.fillStyle = '#7d8388'; ctx.fillRect(0, h * 0.46, w, h * 0.08);
     ctx.fillStyle = '#5a5f62'; ctx.fillRect(0, 0, uRoot * w, h);
-    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(uTip * w - 1, 0, 2, h);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(uTip * w - kx, 0, 2 * kx, h);
   });
-  const orm = canvasTex('uh60.bladeOrm', 512, 128, (ctx, w, h) => {
+  const orm = canvasTex('uh60.bladeOrm', 512 * kx, 128 * ky, (ctx, w, h) => {
     ctx.fillStyle = 'rgb(255,195,12)'; ctx.fillRect(0, 0, w, h);          // G roughness 0.76, B metal 0.05
     ctx.fillStyle = 'rgb(255,100,230)'; ctx.fillRect(0, h * 0.46, w, h * 0.08);
     ctx.fillStyle = 'rgb(255,150,200)'; ctx.fillRect(0, 0, uRoot * w, h);      // root fitting: satin, not mirror
   }, { srgb: false });
+  map.anisotropy = orm.anisotropy = 16;
   return new THREE.MeshStandardMaterial({ map, roughnessMap: orm, metalnessMap: orm, roughness: 1, metalness: 1 });
 }
 

@@ -64,7 +64,8 @@ async function start() {
   const log = new EventLog($('log'));
   // Ultra and 4K paint the large skins and stencils at twice the resolution for 4K close-ups
   // (FX.crisp, ?crisp=0: the close-up sharpening shaders of the skins and decals, see engine/surface.js)
-  setTextureDetail(stage.quality === '4k' || stage.quality === 'ultra' ? 2 : 1, { crisp: FX.crisp });
+  const paintedDetail = stage.quality === '4k' || stage.quality === 'ultra' ? 2 : 1;      // fixed for the session: maps are painted once
+  setTextureDetail(paintedDetail, { crisp: FX.crisp });
 
   for (const f of FLEET) {
     bootLine(`Building ${f.id === 'turbofan' ? 'turbofan rotor stages' : f.id} geometry`);
@@ -202,8 +203,14 @@ async function start() {
   for (const [k, q] of Object.entries(QUALITY)) qualitySel.append(el('option', { value: k, text: q.label }));
   qualitySel.value = stage.quality;
   qualitySel.addEventListener('change', () => { stage.setQuality(qualitySel.value); log.push('VIEW', `Render quality: ${QUALITY[qualitySel.value].label}`); });
+  let detailNoted = false;
   stage.onQualityChange = (k, manual, up, info = {}) => {
     qualitySel.value = k;
+    // the skins and markings were painted at boot for the preset saved then: say once that Ultra / 4K need a reload for theirs
+    if (paintedDetail < 2 && (k === '4k' || k === 'ultra') && !detailNoted) {
+      detailNoted = true;
+      log.push('VIEW', `${QUALITY[k].label} paints sharper skin and marking textures at start-up: reload the page to get them (this session keeps the ones it started with)`, 'warn');
+    }
     if (manual) return;
     if (info.reverted) log.push('VIEW', `4K supersampling would cut the frame rate from ${Math.round(info.base)} to ${Math.round(info.got)} fps, so graphics stay at ${QUALITY[k].label}`, 'ok');
     else if (info.trial) log.push('VIEW', `Trying ${QUALITY[k].label} supersampling: Ultra runs at ${Math.round(info.base)} fps, so this GPU may have headroom`, 'ok');

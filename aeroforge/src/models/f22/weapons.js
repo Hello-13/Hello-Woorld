@@ -19,7 +19,8 @@ const UP = V(0, 1, 0);
 /** Missile along +x, centred on its length: ogive radome, body, mid wings and tail fins. */
 function missile({ length, r, nose, wingSpan = 0, wingRoot = 0, wingAt = 0, finSpan, finRoot, finTip = 0.06, roll = Math.PI / 4 }) {
   // built along +y (tail at y = 0, nose at y = length), then turned to +x
-  const parts = [lathe(ogiveProfile(r, nose, length - nose, 12), 20), new THREE.CylinderGeometry(r, r, length - nose, 20, 1, false).translate(0, (length - nose) / 2, 0)];
+  // (48 round the body and its radome alike, so the two meet vertex to vertex, and 24 steps along the ogive)
+  const parts = [lathe(ogiveProfile(r, nose, length - nose, 24), 48), new THREE.CylinderGeometry(r, r, length - nose, 48, 1, false).translate(0, (length - nose) / 2, 0)];
   const fin = (y0, root, tipC, h) => {
     const V2 = (a, b) => new THREE.Vector2(a, b);
     const sh = new THREE.Shape([V2(y0, r * 0.98), V2(y0 + root, r * 0.98), V2(y0 + root * 0.8, r + h), V2(y0 + root * 0.8 - tipC, r + h)]);
@@ -221,7 +222,7 @@ export function buildWeapons(ctx) {
       for (const [zz, y, t] of AMRAAM_SLOTS) {
         const holder = new THREE.Group();
         const m = mesh(geo, F.missile());
-        const band = mesh(new THREE.CylinderGeometry(0.0905, 0.0905, 0.06, 20).rotateZ(Math.PI / 2).translate(0.9, 0, 0), F.missileBand(), { cast: false });
+        const band = mesh(new THREE.CylinderGeometry(0.0905, 0.0905, 0.06, 48).rotateZ(Math.PI / 2).translate(0.9, 0, 0), F.missileBand(), { cast: false });
         holder.add(m, band);
         holder.position.set(X(FR.AMRAAM_S), y, side * zz);
         // the missile's own fins sit at 45° (×-tail); turn it so they lie at the solved angle t
