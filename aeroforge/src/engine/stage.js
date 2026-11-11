@@ -245,6 +245,7 @@ export class Stage {
     this.time = 0;
     this.reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     this.autoQuality = true;
+    this.fx = FX;                 // effect switches, read by the showroom (imported here, so no module cycle)
 
     const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
     renderer.toneMapping = THREE.AgXToneMapping;
@@ -369,6 +370,14 @@ export class Stage {
     if (this._outlined) this.outline.selectedObjects = this._outlined;
     composer.addPass(this.outline);
     composer.addPass(new ShaderPass(SanitizeShader));     // before bloom, the pass that spreads pixels
+    // depth of field, in HDR before bloom so defocused highlights still glow; disabled unless a
+    // focus is set (Film mode, tour close-ups), and never on the presets without it or with ?dof=0
+    this.bokeh = null;
+    if (FX.dof && q.dof) {
+      this.bokeh = new HalfDepthBokehPass(this.scene, this.camera, { focus: 10, aperture: 0, maxblur: 0.012 }, q.dof);
+      this.bokeh.enabled = false;
+      composer.addPass(this.bokeh);
+    }
     this.bloom = new SoftBloomPass(new THREE.Vector2(2, 2), 0.38, 0.45, 1.9);
     composer.addPass(this.bloom);
     composer.addPass(new OutputPass());
@@ -493,6 +502,60 @@ export class Stage {
 
   onFrame(fn) { this.frameHooks.add(fn); return () => this.frameHooks.delete(fn); }
 
+  // ------------------------------------------------------------------ the lens
+  /** Pull focus to a distance (world units) with an f-number; null relaxes to no depth of field.
+   *  unitMetres converts the scene to metres so the blur follows a real 42 mm-equivalent lens. */
+  setFocus(dist, fnumber = 2.8, { unitMetres = 1 } = {}) {
+    if (dist == null || !(dist > 0)) { this._focusWant = null; return; }
+    this._focusWant = { dist, fnumber, unitMetres };
+    if (this._focus == null) this._focus = { dist, fnumber, unitMetres, amount: 0 };
+  }
+
+  /** Each frame: ease the focus pull (~0.35 s), fade the effect in and out, set the bokeh uniforms. */
+  stepLens(dt) {
+    const pass = this.bokeh;
+    if (!pass) return;
+    const want = this._focusWant;
+    const f = this._focus;
+    if (!f) { pass.enabled = false; return; }
+    const k = 1 - Math.exp(-dt * 8);
+    if (want) {
+      f.dist += (want.dist - f.dist) * k;
+      f.fnumber += (want.fnumber - f.fnumber) * k;
+      f.unitMetres = want.unitMetres;
+      f.amount = Math.min(1, f.amount + dt / 0.6);
+    } else {
+      f.amount -= dt / 0.5;
+      if (f.amount <= 0) { this._focus = null; pass.enabled = false; return; }
+    }
+    // thin-lens circle of confusion: c(D) = (f²/N) · |D − S| / (D (S − f)), f = 41.8 mm (the 32° lens on a
+    // 24 mm frame). The bokeh shader blurs linearly in |D − S|, so it is matched at D = 2S and capped
+    // at the far-field limit c∞ = (f²/N) / (S − f), both in frame heights.
+    const fl = 0.0418, frame = 0.024;
+    const Sm = Math.max(fl * 1.5, f.dist * f.unitMetres);
+    const cInf = Math.min(0.016, (fl * fl / f.fnumber) / ((Sm - fl) * frame)) * f.amount;
+    const u = pass.uniforms;
+    u.focus.value = f.dist;
+    u.maxblur.value = cInf;
+    u.aperture.value = cInf / (2 * f.dist);
+    pass.enabled = cInf > 1e-5;
+  }
+
+  /** Ease the final grade toward the current look's preset (~0.4 s), or hold the neutral one. */
+  stepGrade(dt) {
+    const env = this.env;
+    const name = !FX.grade ? 'neutral' : env?.overlay ? 'neutral' : env?.space ? 'orbit' : env?.look;
+    const target = GRADES[name] || GRADES.neutral;
+    const u = this.grade.uniforms;
+    const k = this._gradeInit ? 1 - Math.exp(-dt * 6) : 1;
+    this._gradeInit = true;
+    for (const key of ['contrast', 'split', 'vignette', 'saturation', 'shoulder', 'toe']) u[key].value += (target[key] - u[key].value) * k;
+    for (const key of ['shadowTint', 'highTint', 'lift']) {
+      const v = u[key].value, t = target[key];
+      v.set(v.x + (t[0] - v.x) * k, v.y + (t[1] - v.y) * k, v.z + (t[2] - v.z) * k);
+    }
+  }
+
   frame() {
     const raw = this.clock.getDelta();
     const dt = Math.min(raw, 0.1);
@@ -517,6 +580,8 @@ export class Stage {
     try {
       this.env.update(dt, this.camera);
       this.grade.uniforms.time.value = this.time;
+      this.stepGrade(dt);
+      this.stepLens(dt);
       this.composer.render();
     } finally { this.endGpuTimer(query); }
     this.labels.render(this.scene, this.camera);

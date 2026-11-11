@@ -366,3 +366,108 @@ export function atmosphereShell(radius) {
   m.userData.fx = true;
   return m;
 }
+
+// ------------------------------------------------------------------------------- contrail
+/**
+ * Contrail factor for an aircraft: condensation trails form where the exhaust's water vapour
+ * freezes, in the cold air above roughly 8 km (the Schmidt–Appleman threshold at mid-latitudes:
+ * −40 °C and below), and need the engine running. 0..1.
+ */
+export function contrailFactor(altitude, { running = 1 } = {}) {
+  const a = Math.min(Math.max((altitude - 7600) / 2000, 0), 1);
+  return a * a * (3 - 2 * a) * Math.min(Math.max(running, 0), 1);
+}
+
+/**
+ * A generic contrail: a ribbon behind an engine nozzle, built in the vehicle's metres along −x
+ * from the mesh origin (nose toward +x), so a vehicle adds it to its nozzle group and places it
+ * at the exit plane. Two crossed strips so it reads from every angle; the trail stays invisible
+ * for the first few tens of metres while the exhaust mixes and cools, widens as the square root
+ * of the distance behind, and thins out toward the far end. Standard transparent material,
+ * normal blending, no depth write; hidden from the AO pass.
+ *
+ *   const c = contrailMesh(); nozzle.add(c); c.position.copy(exit);
+ *   each frame: c.setContrail({ strength: contrailFactor(altitude, { running }), dt, speed })
+ */
+export function contrailMesh({ length = 160, radius = [0.7, 4.2], segments = 48 } = {}) {
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      strength: { value: 0 }, scroll: { value: 0 }, length: { value: length },
+      r0: { value: radius[0] }, r1: { value: radius[1] },
+      light: { value: new THREE.Color(1.0, 0.98, 0.95) }, ambient: { value: new THREE.Color(0.36, 0.48, 0.78) },
+    },
+    vertexShader: /* glsl */`
+      uniform float length; uniform float r0; uniform float r1; attribute float side;
+      varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying float vS;
+      void main() {
+        vUv = uv;
+        float s = clamp(-position.x / length, 0.0, 1.0);        // 0 at the nozzle → 1 at the far end
+        vS = s;
+        float r = mix(r0, r1, sqrt(s));
+        vec3 p = position;
+        p.yz *= r;                                              // the strip is built at unit half-width
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        vN = normalize(normalMatrix * normal);
+        vV = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform float strength; uniform float scroll; uniform float length; uniform vec3 light; uniform vec3 ambient;
+      varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying float vS;
+      float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float vnoise(vec2 p) {
+        vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+      }
+      void main() {
+        float s = vS;
+        float v = vUv.y * 2.0 - 1.0;                            // across the strip, -1..1
+        float facing = min(abs(dot(normalize(vN), normalize(vV))), 1.0);   // the crossed strips share the alpha
+        // the pattern is frozen to the air mass: it streams aft at airspeed
+        float x = (s * length + scroll) / 18.0;
+        float n = vnoise(vec2(x, v * 1.5)) * 0.6 + vnoise(vec2(x * 2.7, v * 3.0 + 7.0)) * 0.4;
+        float form = smoothstep(0.03, 0.22, s);                 // forms some 30 m behind the nozzle
+        float across = 1.0 - smoothstep(0.35, 1.0, abs(v) + (n - 0.5) * 0.5);
+        float far = 1.0 - smoothstep(0.55, 1.0, s);
+        float a = strength * form * across * far * facing * (0.55 + 0.45 * n) * 0.75;
+        vec3 col = light * (0.75 + 0.25 * n) + ambient * 0.35;
+        gl_FragColor = vec4(col, clamp(a, 0.0, 1.0));
+      }`,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+  });
+  const strip = new THREE.PlaneGeometry(length, 2, segments, 1);
+  strip.translate(-length / 2, 0, 0);                           // from the origin aft along −x
+  const cross = strip.clone();
+  cross.rotateX(Math.PI / 2);
+  const g = new THREE.BufferGeometry();
+  const a = strip.attributes, b = cross.attributes;
+  const cat = (name, n) => {
+    const out = new Float32Array(a[name].count * n * 2);
+    out.set(a[name].array, 0); out.set(b[name].array, a[name].count * n);
+    g.setAttribute(name, new THREE.BufferAttribute(out, n));
+  };
+  cat('position', 3); cat('normal', 3); cat('uv', 2);
+  const na = strip.index.count;
+  const idx = new Uint16Array(na * 2);
+  idx.set(strip.index.array, 0);
+  for (let i = 0; i < na; i++) idx[na + i] = cross.index.array[i] + a.position.count;
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  strip.dispose(); cross.dispose();
+  const mesh = new THREE.Mesh(g, mat);
+  mesh.userData.fx = true;
+  mesh.userData.noAO = true;
+  mesh.renderOrder = 9;
+  mesh.frustumCulled = false;
+  mesh.visible = false;
+  /** Per frame: strength 0..1 (see contrailFactor), dt (s), speed (m/s, streams the pattern aft),
+   *  optional light / ambient colours (the sky look's key and sky-light colours). */
+  mesh.setContrail = ({ strength = 0, dt = 0, speed = 0, light = null, ambient = null } = {}) => {
+    const u = mat.uniforms;
+    u.strength.value = strength;
+    u.scroll.value = (u.scroll.value + Math.max(dt, 0) * speed) % 1e5;
+    if (light) u.light.value.set(light);
+    if (ambient) u.ambient.value.set(ambient);
+    mesh.visible = strength > 0.01;
+  };
+  return mesh;
+}

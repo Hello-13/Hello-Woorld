@@ -1,6 +1,8 @@
 // Showroom: the product-photography stage. A procedurally built softbox studio provides crisp
-// image-based reflections; a seamless graphite cyclorama sits behind the subject; a polished
-// floor carries a blurred mirror reflection of the vehicle and soft contact shadows.
+// image-based reflections (a big feathered key softbox the paint shows as a soft rectangle, a cool
+// rim strip, a fill); a seamless graphite cyclorama with a lit horizon sits behind the subject; a
+// polished floor carries a mirror reflection that blurs with the reflected part's height above the
+// floor (read from the reflection's own depth), and soft, edge-masked contact shadows.
 
 import * as THREE from 'three';
 import { Reflector } from 'three/addons/objects/Reflector.js';
@@ -17,29 +19,59 @@ export const SHOWROOM_COLORS = {
 };
 
 // ------------------------------------------------------------------------------- studio IBL
+/** A diffuser panel: white with feathered edges and a gentle hot spot, like a real softbox. */
+function softboxTexture() {
+  const s = 128;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(s, s);
+  for (let y = 0; y < s; y++) {
+    for (let x = 0; x < s; x++) {
+      const u = (x + 0.5) / s, v = (y + 0.5) / s;
+      const fx = Math.min(1, Math.min(u, 1 - u) / 0.14), fy = Math.min(1, Math.min(v, 1 - v) / 0.14);
+      const feather = fx * fx * (3 - 2 * fx) * (fy * fy * (3 - 2 * fy));
+      const hot = 0.82 + 0.18 * Math.exp(-((u - 0.5) ** 2 + (v - 0.5) ** 2) * 6);
+      const k = Math.round(255 * feather * hot);
+      const i = (y * s + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = k; img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 /** A dark room lit by large softboxes, pre-filtered into an environment map. */
 export function showroomEnvironment(pmrem) {
   const s = new THREE.Scene();
-  const room = new THREE.Mesh(new THREE.BoxGeometry(64, 32, 64), new THREE.MeshBasicMaterial({ color: 0x07080a, side: THREE.BackSide }));
+  const room = new THREE.Mesh(new THREE.BoxGeometry(64, 32, 64), new THREE.MeshBasicMaterial({ color: 0x06070a, side: THREE.BackSide }));
   room.position.y = 14;
   s.add(room);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(64, 64), new THREE.MeshBasicMaterial({ color: 0x121418 }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.y = -1.5;
   s.add(floor);
-  const panel = (w, h, intensity, color, pos, rot) => {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), side: THREE.DoubleSide }));
+  const box = softboxTexture();
+  const aim = new THREE.Vector3(0, 3, 0);
+  const panel = (w, h, intensity, color, pos, { rot = null, feather = true } = {}) => {
+    const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), side: THREE.DoubleSide, map: feather ? box : null });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
     m.position.set(...pos);
-    m.rotation.set(...rot);
+    if (rot) m.rotation.set(...rot); else m.lookAt(aim);
     s.add(m);
   };
-  panel(30, 9, 3.1, 0xffffff, [0, 28, 2], [Math.PI / 2, 0, 0]);             // overhead scrim
-  panel(3.2, 18, 3.6, 0xf2f6ff, [-26, 11, 7], [0, Math.PI / 2, 0]);         // left strip
-  panel(3.2, 18, 2.6, 0xf2f6ff, [26, 11, -5], [0, -Math.PI / 2, 0]);        // right strip
-  panel(36, 2.4, 2.8, 0xb7cdf0, [0, 7, -30], [0, 0, 0]);                    // cool rim strip behind
-  panel(22, 2.0, 0.9, 0xffe2c4, [0, 2.5, 30], [0, Math.PI, 0]);             // warm low fill in front
+  const key = new THREE.Vector3(0.42, 0.86, 0.36).normalize().multiplyScalar(24);   // the key light's direction (LOOKS.showroom.sun)
+  panel(16, 11, 5.5, 0xfff6ec, [key.x, key.y, key.z]);                              // key softbox, high front-right
+  panel(12, 8, 1.1, 0xf2f6ff, [-20, 9, 14]);                                        // fill, front-left
+  panel(34, 1.8, 4.5, 0xb7cdf0, [0, 13, -27]);                                      // cool rim strip behind, above
+  panel(3, 14, 2.2, 0xdfe8ff, [26, 10, -8]);                                        // edge light, right rear
+  panel(26, 8, 1.6, 0xffffff, [0, 28, 2], { rot: [Math.PI / 2, 0, 0] });            // overhead scrim
+  panel(22, 2.0, 0.8, 0xffe2c4, [0, 2.2, 30], { rot: [0, Math.PI, 0], feather: false });   // warm low fill in front
   const tex = pmrem.fromScene(s, 0.02).texture;
   s.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); });
+  box.dispose();
   return tex;
 }
 
@@ -65,6 +97,9 @@ function cyclorama() {
         vec3 f = normalize(vec3(fwd.x, 0.0, fwd.z) + vec3(0.0, 1e-4, 0.0));
         float g = max(dot(normalize(vec3(d.x, d.y * 1.8 - 0.12, d.z)), f), 0.0);
         c += glow * pow(g, 5.0) * smoothstep(-0.08, 0.06, d.y);
+        // the lit horizon of a cyclorama: where the key spills onto the curve from floor to wall
+        float band = exp(-pow((d.y - 0.03) / 0.07, 2.0));
+        c += wall * 0.5 * band * (0.35 + 0.65 * pow(g, 2.0));
         gl_FragColor = vec4(c, 1.0);
       }`,
     side: THREE.BackSide, depthWrite: false,
@@ -79,9 +114,14 @@ function cyclorama() {
 }
 
 // ------------------------------------------------------------------------------- polished floor
+// REFLECT: the mirror image is sampled from the Reflector's texture. DEPTHBLUR: its blur radius
+// follows the reflected surface's height above the floor over its view depth, which the Reflector's
+// oblique near plane (the floor) leaves directly in the depth buffer: depth = s·h / (2·w), with s the
+// length of the oblique projection row (`oblique`). Without it, the fixed blur of the first version.
 const floorFrag = /* glsl */`
   uniform vec3 color; uniform sampler2D tDiffuse; uniform float strength; uniform float blur; uniform vec2 texel;
   uniform float fadeRadius; uniform vec3 edgeColor; uniform float pool; uniform float poolRadius;
+  uniform sampler2D tDepth; uniform float oblique; uniform float focalPx; uniform float spread; uniform float maxBlur;
   varying vec4 vUv; varying vec3 vWorld;
   const vec2 P[12] = vec2[](
     vec2(-0.326, -0.406), vec2(-0.840, -0.074), vec2(-0.696, 0.457), vec2(-0.203, 0.621),
@@ -96,7 +136,14 @@ const floorFrag = /* glsl */`
   #ifdef REFLECT
     vec2 uv = vUv.xy / vUv.w;
     vec3 r = vec3(0.0);
-    for (int i = 0; i < 12; i++) r += textureLod(tDiffuse, uv + P[i] * texel * blur, 1.5).rgb;
+    #ifdef DEPTHBLUR
+      float hw = 2.0 * texture2D(tDepth, uv).x / max(oblique, 1e-4);     // height below the floor / view depth
+      float px = clamp(spread * hw * focalPx, 0.0, maxBlur);             // blur radius, reflection texels
+      float lod = max(0.0, log2(max(px, 1.0)) - 0.6);
+      for (int i = 0; i < 12; i++) r += textureLod(tDiffuse, uv + P[i] * texel * px, lod).rgb;
+    #else
+      for (int i = 0; i < 12; i++) r += textureLod(tDiffuse, uv + P[i] * texel * blur, 1.5).rgb;
+    #endif
     r /= 12.0;
     c += r * strength * mix(0.5, 1.0, fres);
   #else
@@ -126,13 +173,38 @@ const floorUniforms = () => ({
   edgeColor: { value: new THREE.Color(SHOWROOM_COLORS.floor) },
   pool: { value: 3.2 },
   poolRadius: { value: 10 },
+  tDepth: { value: null },
+  oblique: { value: 1 },
+  focalPx: { value: 900 },
+  spread: { value: 0.085 },     // tangent of the floor's gloss lobe: a polished, not mirror, deck
+  maxBlur: { value: 40 },
 });
 
 // ------------------------------------------------------------------------------- contact shadows
+/** Soft edge mask so the blurred shadow texture never shows the bounds of its plane. */
+function edgeMask() {
+  const s = 128;
+  const c = document.createElement('canvas');
+  c.width = c.height = s;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(s, s);
+  for (let y = 0; y < s; y++) {
+    for (let x = 0; x < s; x++) {
+      const u = (x + 0.5) / s, v = (y + 0.5) / s;
+      const fx = Math.min(1, Math.min(u, 1 - u) / 0.2), fy = Math.min(1, Math.min(v, 1 - v) / 0.2);
+      const k = Math.round(255 * (fx * fx * (3 - 2 * fx)) * (fy * fy * (3 - 2 * fy)));
+      const i = (y * s + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = k; img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return new THREE.CanvasTexture(c);
+}
+
 /** Soft ambient-occlusion style shadow under the subject: an orthographic depth render from the
  *  floor looking up, blurred twice, laid on the floor (the technique popularised by drei). */
 class ContactShadows {
-  constructor({ width = 30, depth = 30, height = 4.5, size = 512, blur = 1.5, darkness = 1.25, opacity = 0.95 } = {}) {
+  constructor({ width = 30, depth = 30, height = 4.5, size = 512, blur = 1.2, darkness = 1.2, opacity = 0.9 } = {}) {
     this.size = size;
     this.blur = blur;
     this.group = new THREE.Group();
@@ -142,7 +214,7 @@ class ContactShadows {
     this.rtBlur = new THREE.WebGLRenderTarget(size, size);
     this.rtBlur.texture.generateMipmaps = false;
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), new THREE.MeshBasicMaterial({
-      map: this.rt.texture, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide,
+      map: this.rt.texture, alphaMap: edgeMask(), transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide,
     }));
     plane.scale.y = -1;
     plane.renderOrder = 1;
@@ -211,7 +283,7 @@ class ContactShadows {
     renderer.clear();
     renderer.render(this.scene, this.camera);
     this.blurPass(renderer, this.blur);
-    this.blurPass(renderer, this.blur * 0.4);
+    this.blurPass(renderer, this.blur * 0.35);
     renderer.setRenderTarget(prevTarget);
     renderer.setClearColor(prevColor, prevClear);
     renderer.shadowMap.autoUpdate = prevShadow;
@@ -229,6 +301,7 @@ export class Showroom {
   /** stage: provides renderer, camera and the subject holder. */
   constructor(stage) {
     this.stage = stage;
+    this.depthBlur = stage.fx?.studio !== false;      // ?studio=classic keeps the fixed-blur floor
     this.group = new THREE.Group();          // floor + contact shadow (scrolls with the ground)
     this.dome = cyclorama();
     this.dome.visible = false;
@@ -239,10 +312,14 @@ export class Showroom {
       textureWidth: 512, textureHeight: 512, multisample: 0, color: SHOWROOM_COLORS.deck,   // blurred: MSAA would be wasted
       shader: { name: 'ShowroomFloor', uniforms: floorUniforms(), vertexShader: floorVert, fragmentShader: floorFrag },
     });
-    this.reflector.material.defines = { REFLECT: '' };
+    this.reflector.material.defines = this.depthBlur ? { REFLECT: '', DEPTHBLUR: '' } : { REFLECT: '' };
     const rt = this.reflector.getRenderTarget();
     rt.texture.generateMipmaps = true;
     rt.texture.minFilter = THREE.LinearMipmapLinearFilter;
+    if (this.depthBlur) {
+      rt.depthTexture = new THREE.DepthTexture(512, 512);     // the renderer resizes it with the target
+      this.reflector.material.uniforms.tDepth.value = rt.depthTexture;
+    }
     // reflect only during the main beauty render, never during AO / outline / shadow sub-passes;
     // at high frame rates every other frame (the blurred image lags ~4 ms, which nobody can see)
     const reflect = this.reflector.onBeforeRender;
@@ -251,6 +328,11 @@ export class Showroom {
       if (stage.highRate && this.reflected && (stage.frameNo & 1)) return;
       this.reflected = true;
       reflect(renderer, scene, camera, ...rest);
+      if (this.depthBlur) {
+        // the oblique row's scale: depth = s · (height below the floor) / (2 · view depth)
+        const e = this.reflector.camera.projectionMatrix.elements;
+        this.reflector.material.uniforms.oblique.value = Math.hypot(e[2], e[6], e[10] - 1) || 1;
+      }
     };
     this.plain = new THREE.Mesh(geo, new THREE.ShaderMaterial({
       uniforms: floorUniforms(), vertexShader: floorVert, fragmentShader: floorFrag,
@@ -267,6 +349,7 @@ export class Showroom {
     this.reflectScale = 0;
     this.contactEvery = 1;
     this.frame = 0;
+    this._sweeping = false;
     this.setQuality({ reflect: 0.5, contact: 1024 });
   }
 
@@ -289,10 +372,33 @@ export class Showroom {
     const h = Math.max(64, Math.round(c.height * k));
     this.reflected = false;
     this.reflector.getRenderTarget().setSize(w, h);
-    this.reflector.material.uniforms.texel.value.set(1 / w, 1 / h);
+    const u = this.reflector.material.uniforms;
+    u.texel.value.set(1 / w, 1 / h);
+    u.focalPx.value = h / (2 * Math.tan((this.stage.camera.fov * Math.PI) / 360));   // pixel focal length of the reflection
   }
 
   get visible() { return this.group.visible; }
+
+  /** Film mode's light sweep: the softbox rig and the key light turn slowly about the subject
+   *  (±29° over ~70 s), so highlights travel across the paint. Only in the showroom look; off
+   *  restores the look's lighting exactly. */
+  sweep(on, t = 0) {
+    const env = this.stage.env;
+    if (!env?.lights) return;
+    const active = on && env.look === 'showroom' && !env.overlay && !env.space;
+    const key = env.lights.key;
+    if (!active) {
+      if (!this._sweeping) return;
+      this._sweeping = false;
+      env.scene.environmentRotation.set(0, 0, 0);
+      key.position.copy(env.sunDir).multiplyScalar(40);
+      return;
+    }
+    this._sweeping = true;
+    const a = Math.sin(t * 0.09) * 0.5;
+    env.scene.environmentRotation.set(0, a, 0);
+    key.position.copy(env.sunDir).applyAxisAngle(this._up || (this._up = new THREE.Vector3(0, 1, 0)), a).multiplyScalar(40);
+  }
 
   update(camera) {
     this.dome.position.copy(camera.position);

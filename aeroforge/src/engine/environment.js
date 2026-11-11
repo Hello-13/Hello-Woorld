@@ -10,7 +10,7 @@ import { concrete, floorMarkings, fbm } from './surface.js';
 import { rng } from './materials.js';
 import { createEarth, setEarthDetail } from './earth.js';
 import { Showroom, showroomEnvironment } from './showroom.js';
-import { SkyDome, skyEnvironment } from './sky.js';
+import { SkyDome, SKY_TIERS, skyEnvironment } from './sky.js';
 
 const R_EARTH_KM = 6371;
 
@@ -651,10 +651,11 @@ export class Environment {
     this.stars.visible = this.stars.material.uniforms.opacity.value > 0.005;
     this.turn.ringMat.emissiveIntensity = 2.4 + Math.sin(this.stage.time * 1.4) * 0.35;
     if (this.sky.visible) {
-      // the flight sky: deck detail by preset, then the altitude grading carried to the fog and lights
-      const q = this.stage.quality;
-      this.sky.tier = q === 'performance' ? { detail: 0, shadows: 0 } : q === 'balanced' ? { detail: 0, shadows: 1 } : { detail: 1, shadows: 1 };
-      this.sky.update(dt, camera, { altitude: this.altitude, speed: this.cloudSpeed, unitMetres: this.unitMetres, pixels: this.stage.renderSize?.height });
+      // the flight sky: the deck's budget by preset (sky.js SKY_TIERS), then the altitude grading
+      // carried to the fog and lights
+      this.sky.tier = SKY_TIERS[this.stage.quality] || SKY_TIERS.high;
+      const rs = this.stage.renderSize;
+      this.sky.update(dt, camera, { altitude: this.altitude, speed: this.cloudSpeed, unitMetres: this.unitMetres, pixels: rs?.height, width: rs?.width });
       const g = this.sky.grade;
       if (this.scene.fog) {
         this.scene.fog.color.setRGB(g.haze[0], g.haze[1], g.haze[2]);
