@@ -11,6 +11,7 @@ import { rng } from './materials.js';
 import { createEarth, setEarthDetail } from './earth.js';
 import { Showroom, showroomEnvironment } from './showroom.js';
 import { SkyDome, SKY_TIERS, skyEnvironment } from './sky.js';
+import { VolumetricSky } from './skyvol.js';
 
 const R_EARTH_KM = 6371;
 
@@ -314,8 +315,9 @@ export class Environment {
       this.floods.push(s);
     }
 
-    // backdrops: the flight sky (plate above the horizon, procedural cloud deck below it)
-    this.sky = new SkyDome();
+    // backdrops: the flight sky. Volumetric clouds over the sea in a computed atmosphere (skyvol.js);
+    // ?sky=classic or the Film menu keeps the earlier dome (a photographic plate above a cloud deck).
+    this.sky = stage.fx?.sky === false ? new SkyDome() : new VolumetricSky();
     scene.add(this.sky);
     /** Flight state for the sky look, set by the labs each frame: altitude (m) grades the sky and
      *  places the cloud deck; cloudSpeed (m/s, the airspeed) scrolls the deck aft; unitMetres is
@@ -654,6 +656,7 @@ export class Environment {
       // the flight sky: the deck's budget by preset (sky.js SKY_TIERS), then the altitude grading
       // carried to the fog and lights
       this.sky.tier = SKY_TIERS[this.stage.quality] || SKY_TIERS.high;
+      this.sky.quality = this.stage.quality;
       const rs = this.stage.renderSize;
       this.sky.update(dt, camera, { altitude: this.altitude, speed: this.cloudSpeed, unitMetres: this.unitMetres, pixels: rs?.height, width: rs?.width });
       const g = this.sky.grade;

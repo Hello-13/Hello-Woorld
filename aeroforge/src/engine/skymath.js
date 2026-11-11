@@ -83,6 +83,60 @@ export function skyRadiance(dir, sunDir, camAlt, sunColor = [1, 1, 1], n = 10) {
   return inscatter(dir, sunDir, camAlt, { sunColor, n }).light;
 }
 
+// ------------------------------------------------------------------------------- atmosphere, second model
+// The volumetric sky's atmosphere (skyvol.js): Rayleigh and Mie single scattering and ozone
+// absorption on the spherical Earth with the standard sea-level coefficients (Bruneton & Neyret
+// 2008; Hillaire 2020), integrated numerically along the view ray, the sun's optical depth from
+// the Kasten-Young airmass, and the higher orders of scattering as an isotropic source in
+// proportion to the local scattering (Hillaire's multiple-scattering term, as a constant). Nothing
+// is clipped or tinted: the white horizon band, the deep zenith at altitude and the blue veil over
+// distance all come out of the integral. E scales the sun into the scene's linear units.
+export const ATM2 = {
+  R: 6371000, H: 100000,
+  betaR: [5.802e-6, 13.558e-6, 33.1e-6], HR: 8000,
+  betaMs: 1.4e-5, betaMe: 1.55e-5, HM: 1200, g: 0.8,          // a clean maritime aerosol (optical depth 0.019)
+  betaO: [0.65e-6, 1.881e-6, 0.085e-6], ozoneAlt: 25000, ozoneHalf: 15000,
+  E: 11,
+  ms: [0.022, 0.03, 0.046],        // the higher orders' source per unit of scattering: sky light is blue, so they are too
+};
+
+/** In-scattered light (linear rgb) along dir from camAlt (m) out to tEnd metres, and the
+ *  transmittance over that path: the same arithmetic as skyvol.js's GLSL inscatter(). */
+export function inscatter2(dir, sunDir, camAlt, { sunColor = [1, 1, 1], tEnd = Infinity, n = 12 } = {}) {
+  const A = ATM2;
+  const sc = sunColor.isColor ? [sunColor.r, sunColor.g, sunColor.b] : sunColor;
+  const r0 = A.R + camAlt, b = r0 * dir.y, c = (camAlt - A.H) * (2 * A.R + camAlt + A.H);
+  const len = Math.min(tEnd, -b + Math.sqrt(Math.max(b * b - c, 0)));
+  const cosT = dir.x * sunDir.x + dir.y * sunDir.y + dir.z * sunDir.z;
+  const pr = 0.0596831 * (1 + cosT * cosT);
+  const g2 = A.g * A.g;
+  const pm = 0.0795775 * (1 - g2) / Math.pow(Math.max(1 + g2 - 2 * A.g * cosT, 1e-4), 1.5);
+  const xs = airmass(sunDir.y);
+  const tau = [0, 0, 0], L = [0, 0, 0];
+  const dt = len / n;
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) * dt;
+    const h = Math.max(Math.sqrt(Math.max(r0 * r0 + t * t + 2 * r0 * t * dir.y, 0)) - A.R, 0);
+    const rhoR = Math.exp(-h / A.HR), rhoM = Math.exp(-h / A.HM);
+    const rhoO = Math.max(0, 1 - Math.abs(h - A.ozoneAlt) / A.ozoneHalf);
+    const colO = A.ozoneHalf * Math.min(Math.max((A.ozoneAlt + A.ozoneHalf - h) / (2 * A.ozoneHalf), 0), 1);
+    for (let k = 0; k < 3; k++) {
+      const ext = A.betaR[k] * rhoR + A.betaMe * rhoM + A.betaO[k] * rhoO;
+      const tauSun = (A.betaR[k] * A.HR * rhoR + A.betaMe * A.HM * rhoM + A.betaO[k] * colO) * xs;
+      tau[k] += ext * dt * 0.5;
+      const scat = A.betaR[k] * rhoR * pr + A.betaMs * rhoM * pm;
+      const msr = (A.betaR[k] * rhoR + A.betaMs * rhoM) * A.ms[k];
+      L[k] += (Math.exp(-(tau[k] + tauSun)) * scat + Math.exp(-(tau[k] + tauSun * 0.35)) * msr) * dt;
+      tau[k] += ext * dt * 0.5;
+    }
+  }
+  return { light: L.map((v, k) => v * A.E * sc[k]), transm: tau.map((v) => Math.exp(-v)) };
+}
+
+export function skyRadiance2(dir, sunDir, camAlt, sunColor = [1, 1, 1], n = 12) {
+  return inscatter2(dir, sunDir, camAlt, { sunColor, n }).light;
+}
+
 // ------------------------------------------------------------------------------- contrails
 /**
  * Contrail factor for an aircraft: condensation trails form where the exhaust's water vapour

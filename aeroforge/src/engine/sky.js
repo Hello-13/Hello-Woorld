@@ -83,7 +83,7 @@ const vert = /* glsl */`
 // altitude and the aerial perspective toward the deck. The constants are sea-level values; the
 // camera's altitude thins the air above it. SUN_E scales the sun's irradiance into the scene's
 // linear units (the zenith at sea level comes out near the plate's).
-const ATMOSPHERE_GLSL = /* glsl */`
+export const ATMOSPHERE_GLSL = /* glsl */`
   const float R_E = 6371000.0;
   const float H_ATM = 80000.0;
   const vec3 BETA_R = vec3(${ATM.betaR.map((v) => v.toExponential(2)).join(', ')});

@@ -35,20 +35,21 @@ export const QUALITY = {
 const ORDER = ['4k', 'ultra', 'high', 'balanced', 'performance'];
 
 // Cinematic extras, each with an off switch. URL flags win (?film=0 ?dof=0 ?grade=0 ?sweep=0
-// ?drift=0 ?studio=classic), then the saved settings (aeroforge.fx), then these defaults. Off,
+// ?drift=0 ?studio=classic ?sky=classic), then the saved settings (aeroforge.fx), then these defaults. Off,
 // each falls back to the behaviour before it existed: no DoF pass in the chain, the one fixed
 // grade, the fixed-blur showroom floor, no light sweep, no camera drift.
 // studio (depth-blurred floor) and tourDof change the everyday view, so they are opt-in from the Film menu
-export const FX = { film: true, dof: true, grade: true, sweep: true, drift: true, studio: false, tourDof: false };
+export const FX = { film: true, dof: true, grade: true, sweep: true, drift: true, studio: false, tourDof: false, sky: true };
 (function readFlags() {
   try {
     const saved = JSON.parse(localStorage.getItem('aeroforge.fx') || '{}');
-    for (const k of ['dof', 'sweep', 'drift', 'studio', 'tourDof']) if (typeof saved[k] === 'boolean') FX[k] = saved[k];
+    for (const k of ['dof', 'sweep', 'drift', 'studio', 'tourDof', 'sky']) if (typeof saved[k] === 'boolean') FX[k] = saved[k];
   } catch { /* storage blocked or malformed */ }
   try {
     const q = new URLSearchParams(location.search);
     for (const k of ['film', 'dof', 'grade', 'sweep', 'drift', 'tourDof']) if (q.has(k)) FX[k] = !/^(0|off|false|no)$/i.test(q.get(k));
     if (q.has('studio')) FX.studio = !/^(classic|0|off)$/i.test(q.get('studio'));
+    if (q.has('sky')) FX.sky = !/^(classic|0|off)$/i.test(q.get('sky'));
   } catch { /* no location */ }
 })();
 
@@ -279,8 +280,9 @@ export const GRADES = {
   studio: { contrast: 0.12, split: 0.03, vignette: 0.26, shadowTint: [-0.25, 0.02, 0.45], highTint: [0.35, 0.15, -0.25], lift: [0.006, 0.007, 0.009], saturation: 1.0, shoulder: 0.12, toe: 0 },
   // hangar: warm practical lights in the highlights, cool fluorescent shadows, a warm lift
   hangar: { contrast: 0.12, split: 0.045, vignette: 0.26, shadowTint: [-0.3, -0.05, 0.5], highTint: [0.6, 0.28, -0.3], lift: [0.012, 0.01, 0.008], saturation: 1.04, shoulder: 0.08, toe: 0 },
-  // open sky: cool, high-key, airy shadows
-  sky: { contrast: 0.08, split: 0.03, vignette: 0.18, shadowTint: [-0.15, 0.05, 0.4], highTint: [0.1, 0.15, 0.35], lift: [0.02, 0.025, 0.035], saturation: 0.95, shoulder: 0.05, toe: 0 },
+  // open sky: clean daylight; the atmosphere supplies the haze, so the grade adds none (a little
+  // contrast, warm cloud highlights against the blue, a shoulder that keeps the cloud tops' detail)
+  sky: { contrast: 0.16, split: 0.03, vignette: 0.2, shadowTint: [-0.15, 0.03, 0.35], highTint: [0.25, 0.14, -0.05], lift: [0.004, 0.005, 0.008], saturation: 1.06, shoulder: 0.1, toe: 0 },
   // launch pad at dawn: golden low sun, violet shadows
   pad: { contrast: 0.14, split: 0.06, vignette: 0.26, shadowTint: [-0.2, -0.05, 0.45], highTint: [0.7, 0.3, -0.35], lift: [0.012, 0.008, 0.012], saturation: 1.06, shoulder: 0.1, toe: 0 },
   // orbit: hard sun, true blacks (only the deepest tones, so shadowed MLI keeps its earthshine)
@@ -691,6 +693,8 @@ export class Stage {
     const root = vehicle.root;
     const box = solidBounds(root);
     const dir = new THREE.Vector3(...vehicle.view.dir).normalize();
+    // in flight the camera sits lower, so the horizon and the sky are in the frame
+    if (this.env?.sky?.visible) { dir.y = Math.min(dir.y, 0.12); dir.normalize(); }
     const target = box.getCenter(new THREE.Vector3());
     if (vehicle.view.targetY != null) target.y = vehicle.view.targetY;
     // exact fit: the distance at which every corner of the bounding box sits inside the frame
