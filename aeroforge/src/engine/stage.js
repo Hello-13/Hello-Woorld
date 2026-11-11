@@ -38,15 +38,16 @@ const ORDER = ['4k', 'ultra', 'high', 'balanced', 'performance'];
 // ?drift=0 ?studio=classic), then the saved settings (aeroforge.fx), then these defaults. Off,
 // each falls back to the behaviour before it existed: no DoF pass in the chain, the one fixed
 // grade, the fixed-blur showroom floor, no light sweep, no camera drift.
-export const FX = { film: true, dof: true, grade: true, sweep: true, drift: true, studio: true };
+// studio (depth-blurred floor) and tourDof change the everyday view, so they are opt-in from the Film menu
+export const FX = { film: true, dof: true, grade: true, sweep: true, drift: true, studio: false, tourDof: false };
 (function readFlags() {
   try {
     const saved = JSON.parse(localStorage.getItem('aeroforge.fx') || '{}');
-    for (const k of ['dof', 'sweep', 'drift']) if (typeof saved[k] === 'boolean') FX[k] = saved[k];
+    for (const k of ['dof', 'sweep', 'drift', 'studio', 'tourDof']) if (typeof saved[k] === 'boolean') FX[k] = saved[k];
   } catch { /* storage blocked or malformed */ }
   try {
     const q = new URLSearchParams(location.search);
-    for (const k of ['film', 'dof', 'grade', 'sweep', 'drift']) if (q.has(k)) FX[k] = !/^(0|off|false|no)$/i.test(q.get(k));
+    for (const k of ['film', 'dof', 'grade', 'sweep', 'drift', 'tourDof']) if (q.has(k)) FX[k] = !/^(0|off|false|no)$/i.test(q.get(k));
     if (q.has('studio')) FX.studio = !/^(classic|0|off)$/i.test(q.get('studio'));
   } catch { /* no location */ }
 })();

@@ -841,7 +841,7 @@ async function start() {
     app.lab?.update(dt, t);
     stage.controls.autoRotate = app.autoRotate && !stage.tween && !film.active && !(v.state?.launching);
     // tour close-ups pull focus to the step's parts (the lens is otherwise only used by Film mode)
-    if (tour.active && FX.dof && stage.bokeh) {
+    if (tour.active && FX.dof && FX.tourDof && stage.bokeh) {
       const step = tour.steps?.[tour.i];
       if (step !== tourStep) {
         tourStep = step; tourFocus = null;

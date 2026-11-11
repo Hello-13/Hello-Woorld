@@ -301,7 +301,7 @@ export class Showroom {
   /** stage: provides renderer, camera and the subject holder. */
   constructor(stage) {
     this.stage = stage;
-    this.depthBlur = stage.fx?.studio !== false;      // ?studio=classic keeps the fixed-blur floor
+    this.depthBlur = stage.fx?.studio === true;      // ?studio=classic keeps the fixed-blur floor
     this.group = new THREE.Group();          // floor + contact shadow (scrolls with the ground)
     this.dome = cyclorama();
     this.dome.visible = false;
