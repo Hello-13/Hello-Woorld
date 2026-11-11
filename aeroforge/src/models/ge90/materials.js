@@ -16,7 +16,8 @@ const lerp = (a, b, f) => new THREE.Color(a).lerp(new THREE.Color(b), Math.min(1
 export const GM = {
   // the blades' clearcoat is kept low: a sharper one threw the key light back as a bloom hot spot
   composite: () => phys('composite', { color: 0x2b2e33, roughness: 0.5, metalness: 0.05, clearcoat: 0.18, clearcoatRoughness: 0.5 }),
-  tiSheath: () => std('tiSheath', { color: 0xc8ccd0, roughness: 0.36, metalness: 1 }),
+  // the leading-edge sheaths are brushed, not polished: at 0.36 their grazing glints bloomed into two lamps in the fan close-up
+  tiSheath: () => std('tiSheath', { color: 0xc8ccd0, roughness: 0.55, metalness: 1 }),
   titanium: () => std('titanium', { color: 0xb6bcc2, roughness: 0.3, metalness: 1 }),
   ti6246: (i) => std(`hpc${i}`, { color: lerp(0xb6bcc2, 0xab8f62, (i - 3) / 6), roughness: 0.32, metalness: 1 }),
   nickel: () => std('nickel', { color: 0x8a8279, roughness: 0.4, metalness: 0.95 }),
@@ -56,11 +57,14 @@ export const GM = {
   // cut faces of the museum cutaway: the strong red of a sectioned exhibit
   section: () => std('section', { color: 0xc4181c, roughness: 0.58, metalness: 0.04, side: THREE.DoubleSide }),
   // Boeing nacelle paint: the shared skin tile, with less clearcoat (so the key light's reflection
-  // on the white cowl does not bloom like a lamp) and a lighter normal map (flush panel joints)
+  // on the white cowl does not bloom like a lamp), a lowered grazing-angle reflectance (the glint
+  // on the inlet lip's silhouette was the Fresnel term, which roughness and clearcoat cannot damp)
+  // and a lighter normal map (flush panel joints)
   nacelle: () => {
     if (!cache.has('nacelle')) {
       const m = SKIN.nacelle().clone();
       m.clearcoat = 0.2; m.clearcoatRoughness = 0.42; m.roughness = 0.46;
+      m.specularIntensity = 0.25;
       m.normalScale.set(0.12, 0.12);
       cache.set('nacelle', m);
     }

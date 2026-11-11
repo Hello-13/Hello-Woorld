@@ -9,6 +9,7 @@ import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { CopyShader } from 'three/addons/shaders/CopyShader.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
@@ -21,15 +22,43 @@ installShading();   // specular antialiasing and the highlight clamp, before any
 // pixels than this (the 4K preset supersamples a 3840 × 2160 frame onto smaller screens);
 // showroom.reflect: mirror-floor resolution (fraction of the canvas, 0 = off);
 // showroom.contact: contact-shadow map size; contactEvery: refresh every n frames
+// dof: depth-of-field pass available, with its depth render at this fraction of the frame (0 = never)
 export const UHD = 3840 * 2160;
 export const QUALITY = {
-  '4k': { label: '4K', dpr: 4, minPixels: UHD, msaa: 2, ao: 1, shadow: 4096, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
-  ultra: { label: 'Ultra', dpr: 3, msaa: 4, ao: 1, shadow: 4096, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
-  high: { label: 'High', dpr: 2, msaa: 4, ao: 0.5, shadow: 2048, showroom: { reflect: 0.38, contact: 512, contactEvery: 1 } },
-  balanced: { label: 'Balanced', dpr: 1.5, msaa: 4, ao: 0, shadow: 2048, showroom: { reflect: 0, contact: 512, contactEvery: 2 } },
-  performance: { label: 'Performance', dpr: 1, msaa: 0, ao: 0, shadow: 1024, showroom: { reflect: 0, contact: 256, contactEvery: 3 } },
+  '4k': { label: '4K', dpr: 4, minPixels: UHD, msaa: 2, ao: 1, shadow: 4096, dof: 0.5, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
+  ultra: { label: 'Ultra', dpr: 3, msaa: 4, ao: 1, shadow: 4096, dof: 0.5, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
+  high: { label: 'High', dpr: 2, msaa: 4, ao: 0.5, shadow: 2048, dof: 0.5, showroom: { reflect: 0.38, contact: 512, contactEvery: 1 } },
+  balanced: { label: 'Balanced', dpr: 1.5, msaa: 4, ao: 0, shadow: 2048, dof: 0, showroom: { reflect: 0, contact: 512, contactEvery: 2 } },
+  performance: { label: 'Performance', dpr: 1, msaa: 0, ao: 0, shadow: 1024, dof: 0, showroom: { reflect: 0, contact: 256, contactEvery: 3 } },
 };
 const ORDER = ['4k', 'ultra', 'high', 'balanced', 'performance'];
+
+// Cinematic extras, each with an off switch. URL flags win (?film=0 ?dof=0 ?grade=0 ?sweep=0
+// ?drift=0 ?studio=classic), then the saved settings (aeroforge.fx), then these defaults. Off,
+// each falls back to the behaviour before it existed: no DoF pass in the chain, the one fixed
+// grade, the fixed-blur showroom floor, no light sweep, no camera drift.
+export const FX = { film: true, dof: true, grade: true, sweep: true, drift: true, studio: true };
+(function readFlags() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('aeroforge.fx') || '{}');
+    for (const k of ['dof', 'sweep', 'drift']) if (typeof saved[k] === 'boolean') FX[k] = saved[k];
+  } catch { /* storage blocked or malformed */ }
+  try {
+    const q = new URLSearchParams(location.search);
+    for (const k of ['film', 'dof', 'grade', 'sweep', 'drift']) if (q.has(k)) FX[k] = !/^(0|off|false|no)$/i.test(q.get(k));
+    if (q.has('studio')) FX.studio = !/^(classic|0|off)$/i.test(q.get('studio'));
+  } catch { /* no location */ }
+})();
+
+/** Persist a user-settable effect switch (dof, sweep, drift). */
+export function setEffect(name, on) {
+  FX[name] = !!on;
+  try {
+    const saved = JSON.parse(localStorage.getItem('aeroforge.fx') || '{}');
+    saved[name] = !!on;
+    localStorage.setItem('aeroforge.fx', JSON.stringify(saved));
+  } catch { /* storage blocked */ }
+}
 
 // Effects that are smooth by nature stop gaining from resolution well before 4K: ambient
 // occlusion is computed at no more than ~2.4 MP and bloom from no more than a 1440p frame,
@@ -80,6 +109,20 @@ class SoftBloomPass extends UnrealBloomPass {
   setSize(w, h) {
     const k = Math.min(1, Math.sqrt(BLOOM_MAX_PIXELS / Math.max(1, w * h)));
     super.setSize(Math.max(2, Math.round(w * k)), Math.max(2, Math.round(h * k)));
+  }
+}
+
+/** Depth of field (three's BokehPass, in the normal composer order) whose scene-depth render runs
+ *  at a fraction of the frame and never above AO_MAX_PIXELS; the blur itself writes the full frame. */
+class HalfDepthBokehPass extends BokehPass {
+  constructor(scene, camera, params, resScale = 0.5) {
+    super(scene, camera, params);
+    this.resScale = resScale;
+  }
+  setSize(w, h) {
+    const k = Math.min(this.resScale, Math.sqrt(AO_MAX_PIXELS / Math.max(1, w * h)));
+    this.materialBokeh.uniforms.aspect.value = w / h;
+    this.renderTargetDepth.setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
   }
 }
 
@@ -135,17 +178,22 @@ const SanitizeShader = {
     }`,
 };
 
-// Final grade in display space: a touch of lateral chromatic aberration toward the corners, a
-// gentle S-curve, split toning (cool shadows, warm highlights), vignette and fine grain.
+// Final grade in display space (after AgX, which it leaves alone): a touch of lateral chromatic
+// aberration toward the corners, a gentle S-curve, a soft highlight shoulder, lift (shadows are
+// only ever raised, never crushed, except for the orbit look's toe), split toning, saturation,
+// vignette and fine grain. The per-look values live in GRADES and are eased between looks.
 const GradeShader = {
   uniforms: {
     tDiffuse: { value: null }, time: { value: 0 }, vignette: { value: 0.3 }, grain: { value: 0.022 },
     aberration: { value: 0.0008 }, contrast: { value: 0.14 }, split: { value: 0.035 },
+    shadowTint: { value: new THREE.Vector3(-0.35, 0.05, 0.6) }, highTint: { value: new THREE.Vector3(0.5, 0.18, -0.4) },
+    lift: { value: new THREE.Vector3(0, 0, 0) }, saturation: { value: 1 }, shoulder: { value: 0 }, toe: { value: 0 },
   },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse; uniform float time; uniform float vignette; uniform float grain;
     uniform float aberration; uniform float contrast; uniform float split; varying vec2 vUv;
+    uniform vec3 shadowTint, highTint, lift; uniform float saturation, shoulder, toe;
     float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main() {
       vec2 d = vUv - 0.5;
@@ -155,14 +203,38 @@ const GradeShader = {
       c.b = texture2D(tDiffuse, vUv + off).b;
       vec3 x = clamp(c.rgb, 0.0, 1.0);
       c.rgb = mix(c.rgb, x * x * (3.0 - 2.0 * x), contrast);
+      // highlight shoulder: compresses the top of the range toward white without clipping hue
+      c.rgb = c.rgb * (1.0 + shoulder) / (1.0 + shoulder * max(c.rgb, vec3(0.0)));
       float l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
-      c.rgb += vec3(-0.35, 0.05, 0.6) * (1.0 - smoothstep(0.0, 0.45, l)) * split * 0.5;
-      c.rgb += vec3(0.5, 0.18, -0.4) * smoothstep(0.55, 1.0, l) * split;
+      // lift raises the shadows only (fades out by mid-grey); toe rolls the deepest 3 % to true black
+      c.rgb += lift * (1.0 - smoothstep(0.0, 0.5, l));
+      c.rgb *= 1.0 - toe * (1.0 - smoothstep(0.0, 0.03, l));
+      c.rgb += shadowTint * (1.0 - smoothstep(0.0, 0.45, l)) * split * 0.5;
+      c.rgb += highTint * smoothstep(0.55, 1.0, l) * split;
+      l = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+      c.rgb = mix(vec3(l), c.rgb, saturation);
       float v = smoothstep(0.95, 0.25, length(d * vec2(1.15, 1.0)));
       c.rgb *= mix(1.0 - vignette, 1.0, v);
       c.rgb += (hash(mod(gl_FragCoord.xy, 1024.0) + fract(time) * 37.0) - 0.5) * grain;   // per pixel at any resolution
       gl_FragColor = c;
     }`,
+};
+
+// Per-look grades: small tone curves and split tones over the same AgX output. `neutral` is the
+// grade as it was before looks had their own (used with ?grade=0 and in the X-ray / Blueprint rooms).
+export const GRADES = {
+  neutral: { contrast: 0.14, split: 0.035, vignette: 0.3, shadowTint: [-0.35, 0.05, 0.6], highTint: [0.5, 0.18, -0.4], lift: [0, 0, 0], saturation: 1, shoulder: 0, toe: 0 },
+  // studio: neutral colour, deep (not crushed) blacks, a soft shoulder keeping paint highlights in hand
+  showroom: { contrast: 0.12, split: 0.03, vignette: 0.34, shadowTint: [-0.25, 0.02, 0.45], highTint: [0.35, 0.15, -0.25], lift: [0.006, 0.007, 0.009], saturation: 1.0, shoulder: 0.14, toe: 0 },
+  studio: { contrast: 0.12, split: 0.03, vignette: 0.32, shadowTint: [-0.25, 0.02, 0.45], highTint: [0.35, 0.15, -0.25], lift: [0.006, 0.007, 0.009], saturation: 1.0, shoulder: 0.12, toe: 0 },
+  // hangar: warm practical lights in the highlights, cool fluorescent shadows, a warm lift
+  hangar: { contrast: 0.12, split: 0.045, vignette: 0.3, shadowTint: [-0.3, -0.05, 0.5], highTint: [0.6, 0.28, -0.3], lift: [0.012, 0.01, 0.008], saturation: 1.04, shoulder: 0.08, toe: 0 },
+  // open sky: cool, high-key, airy shadows
+  sky: { contrast: 0.08, split: 0.03, vignette: 0.22, shadowTint: [-0.15, 0.05, 0.4], highTint: [0.1, 0.15, 0.35], lift: [0.02, 0.025, 0.035], saturation: 0.95, shoulder: 0.05, toe: 0 },
+  // launch pad at dawn: golden low sun, violet shadows
+  pad: { contrast: 0.14, split: 0.06, vignette: 0.3, shadowTint: [-0.2, -0.05, 0.45], highTint: [0.7, 0.3, -0.35], lift: [0.012, 0.008, 0.012], saturation: 1.06, shoulder: 0.1, toe: 0 },
+  // orbit: hard sun, true blacks (only the deepest tones, so shadowed MLI keeps its earthshine)
+  orbit: { contrast: 0.2, split: 0.02, vignette: 0.26, shadowTint: [-0.1, 0.0, 0.15], highTint: [0.2, 0.1, -0.1], lift: [0, 0, 0], saturation: 0.98, shoulder: 0, toe: 0.35 },
 };
 
 export class Stage {

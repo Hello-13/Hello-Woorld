@@ -3,18 +3,34 @@
 // Kloofendal 43d clear pure sky, tone-mapped by assets/hdri/plates: see CREDITS.md) and, below
 // it, a real-scale cloud deck on the curved Earth: cloud tops a few kilometres under the
 // aircraft, reaching a horizon that dips with altitude (acos(R / (R + h))), lit by the plate's
-// sun. The deck is procedural: tileable fbm noise sampled at five scales from 90 km cells down to
-// 110 m detail, so detail appears as the camera comes closer and the hardware's mip filtering
-// keeps the horizon still. Everything scrolls at airspeed and drifts slowly in its own right.
+// sun, whose disc and aureole the shader adds in HDR (the plate's are clipped).
+//
+// The deck is a height field in metres (clouds.js: Worley convection cells at 1.5 km and 300 m,
+// fbm between them, cauliflower at 60 m and 12 m near the camera, rare towering cumulus up to
+// 1.7 km above the deck). Where the pixel footprint resolves it, the shader ray-marches the view
+// ray against the top-height field (a few steps between the highest tops and the deck base, then
+// a linear refinement), shades the hit with a soft-terminator multiple-scattering approximation,
+// sky light that darkens in the hollows, a short march toward the sun for self-shadowing, silver
+// lining on thin edges toward the sun and blue-grey undersides in the gaps, then fades it into the
+// haze with the altitude's aerial perspective. A thin cirrus veil sits above the aircraft while it
+// flies below 12.6 km, the sun gets a disc, an aureole and a gentle veiling glare when it nears
+// the frame edge, and everything scrolls at airspeed and evolves in two slow noise phases.
+//
+// Quality: SkyDome.tier budgets the deck (relief steps, shadow steps, detail octave, cirrus,
+// ground shadow, flare); environment.js maps the presets to it. `dome.simple = true` recompiles
+// the shader without relief, self-shadow, cirrus and flare: the plate plus a flat shaded deck,
+// the path that was proven on real GPUs before this version.
 //
 // Altitude grades the sky: the zenith darkens and saturates (deep blue at 12 km, near violet at
 // 18 km), the horizon haze thins, and the aerial perspective toward the deck lengthens.
 // The same grading drives the scene's fog and the lights on the aircraft (see skyGrade).
 
 import * as THREE from 'three';
-import { rng } from './materials.js';
+import { cloudNoise, CLOUD_FIELD_GLSL, WRAP, DRIFT_WRAP } from './clouds.js';
 
 export const R_EARTH_M = 6371000;
+/** Cirrus veil altitude (m): the aircraft flies under it below this height. */
+export const CIRRUS_ALT = 12600;
 
 // The plate's highlight shoulder (plates.py): y = K + (1 - K)(1 - exp(-(x - K) / S)) above K.
 const PLATE_KNEE = 0.5, PLATE_SHOULDER = 1.6;
@@ -23,8 +39,8 @@ const PLATE_KNEE = 0.5, PLATE_SHOULDER = 1.6;
 const lerp = THREE.MathUtils.lerp;
 const KEYS = [   // altitude (m) → sky parameters, linear colour
   { h: 0,     zenith: [1.00, 1.00, 1.00], haze: [0.74, 0.79, 0.87], sat: 1.00, beta: 1 / 24000, ambient: [0.40, 0.54, 0.84], skyLight: 0xa6c8ff, key: 0xfff1df },
-  { h: 11000, zenith: [0.56, 0.61, 0.88], haze: [0.66, 0.73, 0.84], sat: 1.18, beta: 1 / 48000, ambient: [0.34, 0.46, 0.76], skyLight: 0x7aa0ee, key: 0xfff6ea },
-  { h: 18000, zenith: [0.34, 0.32, 0.64], haze: [0.52, 0.60, 0.76], sat: 1.30, beta: 1 / 85000, ambient: [0.26, 0.34, 0.64], skyLight: 0x5c6fd2, key: 0xfffaf2 },
+  { h: 11000, zenith: [0.54, 0.60, 0.90], haze: [0.68, 0.75, 0.86], sat: 1.20, beta: 1 / 52000, ambient: [0.36, 0.48, 0.78], skyLight: 0x7aa0ee, key: 0xfff6ea },
+  { h: 18000, zenith: [0.32, 0.31, 0.64], haze: [0.54, 0.62, 0.78], sat: 1.32, beta: 1 / 90000, ambient: [0.27, 0.35, 0.66], skyLight: 0x5c6fd2, key: 0xfffaf2 },
 ];
 const mixArr = (a, b, t) => a.map((v, i) => lerp(v, b[i], t));
 const mixHex = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), t);
@@ -49,70 +65,6 @@ export function skyGrade(altitude) {
   };
 }
 
-// ------------------------------------------------------------------------------- noise
-// Tileable gradient (Perlin) noise summed over octaves, each octave's lattice shifted by a random
-// phase, so no grid shows through: value noise on aligned lattices reads as a checkerboard of
-// cells once the deck is seen in perspective.
-function tileableFbm(size, { seed = 1, octaves = 7, base = 4, gain = 0.5 } = {}) {
-  const r = rng(seed);
-  const out = new Float32Array(size * size);
-  const fade = (t) => t * t * t * (t * (t * 6 - 15) + 10);
-  let amp = 1;
-  for (let o = 0; o < octaves; o++) {
-    const cells = base << o;
-    if (cells > size) break;
-    const gx = new Float32Array(cells * cells), gy = new Float32Array(cells * cells);
-    for (let i = 0; i < gx.length; i++) { const a = r() * Math.PI * 2; gx[i] = Math.cos(a); gy[i] = Math.sin(a); }
-    const ox = r() * cells, oy = r() * cells;
-    const scale = cells / size;
-    for (let y = 0; y < size; y++) {
-      const fy = y * scale + oy, y0 = Math.floor(fy), ty = fy - y0, sy = fade(ty);
-      const ya = ((y0 % cells) + cells) % cells, yb = (ya + 1) % cells;
-      for (let x = 0; x < size; x++) {
-        const fx = x * scale + ox, x0 = Math.floor(fx), tx = fx - x0, sx = fade(tx);
-        const xa = ((x0 % cells) + cells) % cells, xb = (xa + 1) % cells;
-        const i00 = ya * cells + xa, i10 = ya * cells + xb, i01 = yb * cells + xa, i11 = yb * cells + xb;
-        const n00 = gx[i00] * tx + gy[i00] * ty, n10 = gx[i10] * (tx - 1) + gy[i10] * ty;
-        const n01 = gx[i01] * tx + gy[i01] * (ty - 1), n11 = gx[i11] * (tx - 1) + gy[i11] * (ty - 1);
-        const nx0 = n00 + (n10 - n00) * sx, nx1 = n01 + (n11 - n01) * sx;
-        out[y * size + x] += amp * (nx0 + (nx1 - nx0) * sy);
-      }
-    }
-    amp *= gain;
-  }
-  let lo = Infinity, hi = -Infinity;
-  for (const v of out) { if (v < lo) lo = v; if (v > hi) hi = v; }
-  for (let i = 0; i < out.length; i++) out[i] = (out[i] - lo) / (hi - lo);
-  return out;
-}
-
-let noiseTex = null;
-/** Tileable fbm in three channels (different seeds and spectra), mip-mapped and anisotropic so
- *  the GPU filters the deck toward the horizon. */
-function cloudNoise() {
-  if (noiseTex) return noiseTex;
-  const s = 512;
-  const r = tileableFbm(s, { seed: 21, octaves: 7, base: 3, gain: 0.55 });
-  const g = tileableFbm(s, { seed: 47, octaves: 7, base: 2, gain: 0.52 });
-  const b = tileableFbm(s, { seed: 83, octaves: 6, base: 6, gain: 0.6 });
-  const data = new Uint8Array(s * s * 4);
-  for (let i = 0; i < s * s; i++) {
-    data[i * 4] = Math.round(r[i] * 255);
-    data[i * 4 + 1] = Math.round(g[i] * 255);
-    data[i * 4 + 2] = Math.round(b[i] * 255);
-    data[i * 4 + 3] = 255;
-  }
-  const t = new THREE.DataTexture(data, s, s, THREE.RGBAFormat, THREE.UnsignedByteType);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.minFilter = THREE.LinearMipmapLinearFilter;
-  t.magFilter = THREE.LinearFilter;
-  t.generateMipmaps = true;
-  t.anisotropy = 16;
-  t.needsUpdate = true;
-  noiseTex = t;
-  return t;
-}
-
 // ------------------------------------------------------------------------------- shaders
 const vert = /* glsl */`
   varying vec3 vDir;
@@ -128,18 +80,21 @@ const frag = /* glsl */`
   uniform sampler2D noiseTex;
   uniform vec3 sunDir; uniform vec3 sunColor; uniform vec3 skyAmbient;
   uniform vec3 zenithMul; uniform vec3 hazeColor; uniform float satBoost; uniform float hazeBeta;
-  uniform float camH; uniform float deckR; uniform float dip; uniform float hAmp;
-  uniform vec2 camXZ; uniform vec2 shift; uniform float drift;
-  uniform float coverage; uniform float detail; uniform float shadows; uniform float groundHaze;
-  uniform vec3 groundColor; uniform float pixAngle;
+  uniform float camH; uniform float oc; uniform float dip; uniform float hAmp; uniform float towerAmp;
+  uniform vec2 camXZ; uniform vec2 shift; uniform vec2 drift1; uniform vec2 drift2;
+  uniform float coverage; uniform float towers; uniform float detail; uniform float groundHaze;
+  uniform vec3 groundColor; uniform float pixAngle; uniform vec2 resolution;
+  uniform int reliefSteps; uniform int shadowSteps; uniform float groundShadow;
+  uniform float cirrus; uniform float cirrusH; uniform float flare; uniform vec3 sunNdc;
   varying vec3 vDir;
 
   const float PI = 3.14159265;
   const float TWO_PI = 6.2831853;
   const float KNEE = ${PLATE_KNEE.toFixed(3)};
   const float SHOULDER = ${PLATE_SHOULDER.toFixed(3)};
+  const float SUN_R = 0.00465;                         // the sun's angular radius (rad)
 
-  vec2 rot2(vec2 p, float a) { float c = cos(a), s = sin(a); return vec2(c * p.x - s * p.y, s * p.x + c * p.y); }
+  ${CLOUD_FIELD_GLSL}
 
   // the plate's highlight shoulder, undone: the JPG holds radiance 1:1 below the knee and
   // compressed above it, so the sun's aureole comes back as HDR for bloom and tone mapping
@@ -148,6 +103,29 @@ const frag = /* glsl */`
     return mix(y, min(hi, vec3(8.0)), step(KNEE, y));
   }
 
+  // ---------------------------------------------------------------- the ray and the deck sphere
+  // Heights are measured above the deck's base sphere (radius oc - camH); the camera is camH above
+  // it. Along the ray, to second order in t / R (exact to a metre out to the horizon):
+  float rayH(float t, float dy) { return camH + dy * t + t * t * (1.0 - dy * dy) / (2.0 * oc); }
+
+  // Distance along a descending ray (dy < 0) to the height hr < camH; the tangent distance when
+  // the ray never gets down to it, so t is continuous across the horizon.
+  float rayT(float hr, float dy) {
+    float a = (1.0 - dy * dy) / (2.0 * oc);
+    float c = camH - hr;
+    float disc = dy * dy - 4.0 * a * c;
+    if (disc < 0.0) return -dy / max(2.0 * a, 1e-12);
+    return 2.0 * c / max(-dy + sqrt(disc), 1e-6);
+  }
+
+  // the pixel's footprint on the deck at distance t: its size there, stretched by the grazing
+  // angle (geometric mean of along- and across-view, as anisotropic filtering would keep it)
+  float footAt(float t, float dy) {
+    float graz = max(-(dy + t / oc), 0.02);
+    return t * pixAngle / sqrt(graz);
+  }
+
+  // ---------------------------------------------------------------- the sky
   vec3 skyColor(vec3 d, float e) {
     // the plate was shot at ground level with its horizon at e = 0: slide its horizon down to the
     // dipped one, the shift fading out by 30 degrees up so the zenith stays where it is
@@ -165,104 +143,198 @@ const frag = /* glsl */`
       float g = max(dot(d2, sunDir), 0.0);
       col += vec3(1.0, 0.95, 0.85) * (pow(g, 6.0) * 0.25 + pow(g, 60.0) * 1.2);
     }
-    // altitude grading: a darker, bluer zenith and a more saturated sky
+    // altitude grading: a darker, bluer zenith and a more saturated sky; the thin bright band
+    // just above the horizon stays (it is the air below the aircraft, lit from above)
     col *= mix(vec3(1.0), zenithMul, pow(up, 0.6));
     float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
     col = max(mix(vec3(lum), col, satBoost), 0.0);
     // the sky just above the horizon converges on the haze colour the deck fades into
     col = mix(col, hazeColor, smoothstep(0.05, -0.01, e2) * 0.8);
-    // the sun: the plate's disc is clipped, so a small HDR disc and a tight glow stand in for it
-    float ca = dot(d, sunDir);
-    col += sunColor * (smoothstep(0.99994, 0.99999, ca) * 40.0 + pow(max(ca, 0.0), 800.0) * 2.0);
     return col;
   }
 
-  // A noise sample at a tile size (m) with its mip level chosen from the pixel's footprint on
-  // the deck (m), not from screen derivatives: the same filtering on every GPU, no shimmer at
-  // grazing angles and nothing undefined at the horizon branch.
-  vec4 nz(vec2 q, float tile, float foot) {
-    return textureLod(noiseTex, q / tile, log2(max(foot * 512.0 / tile, 1.0)) + 0.5);
+  // The sun: a limb-darkened disc of the true angular size, antialiased over a pixel, and a
+  // circumsolar aureole (forward Mie scattering by the air column) that the plate's own wide glow
+  // continues outward. sin of the angle from the cross product: precise where dot() is not.
+  vec3 sunDisc(vec3 d) {
+    float ca = dot(d, sunDir);
+    if (ca < 0.9) return vec3(0.0);
+    float ang = length(cross(d, sunDir));
+    float disc = 1.0 - smoothstep(SUN_R - pixAngle, SUN_R + pixAngle, ang);
+    float u = clamp(ang / SUN_R, 0.0, 1.0);
+    float limb = 1.0 - 0.55 * (1.0 - sqrt(max(1.0 - u * u, 0.0)));
+    float r = ang / 0.012;
+    float aureole = 0.9 / (1.0 + r * r) + 0.12 / (1.0 + 0.1 * r * r);
+    return sunColor * (disc * limb * 60.0 + aureole * (1.0 - disc));
   }
 
-  // the cloud field at a ground point: coverage (0 clear → 1 solid) and top height (0..1)
-  vec2 cloudField(vec2 q, float foot) {
-    vec2 qr = rot2(q, 0.65);
-    vec2 qd = q + vec2(drift, drift * 0.4);               // the cells' own slow evolution
-    float big  = nz(q + 0.37 * 90000.0, 90000.0, foot).g;                   // open / closed regions
-    float base = nz(qr, 12000.0, foot).r;                                   // the cells, 1–3 km
-    float mid  = nz(qd + 0.11 * 2600.0, 2600.0, foot).g;
-    float fine = nz(rot2(qd, 0.65), 520.0, foot).b;
-    float fine2 = 0.5;
-    if (detail > 0.0) fine2 = nz(qd + 55.0, 110.0, foot).r;
-    // coverage from the large scales (the fine ones only roughen the edges); height from all of them
-    float f = base * 0.56 + mid * 0.3 + fine * 0.1 + (fine2 - 0.5) * 0.04 * detail + 0.04;
-    float thr = 0.66 - coverage * 0.34 + (0.5 - big) * 0.4;
-    float cov = smoothstep(thr - 0.04, thr + 0.2, f);
-    float h = cov * (0.35 + 0.3 * mid + 0.35 * fine) + (fine2 - 0.5) * 0.18 * detail * cov;
-    return vec2(cov, h);
+  // A thin cirrus veil far above the aircraft: fibrous, streaked along the wind, patchy, brighter
+  // toward the sun, thinning into the haze toward the horizon.
+  vec3 cirrusLayer(vec3 d, vec3 col) {
+    if (cirrus < 0.5 || cirrusH < 300.0 || d.y < 0.004) return col;
+    float t = cirrusH / max(d.y, 0.004);
+    vec2 q = d.xz * t + camXZ + shift;
+    float foot = t * pixAngle / sqrt(max(d.y, 0.03));
+    float mask = nz(q + 21000.0, T_REGION, foot).r;
+    vec4 S = nz(vec2(q.x * 0.5, q.y * 2.0) + 777.0, T_LAND, foot);
+    float a = smoothstep(0.46, 0.82, S.b * 0.5 + S.g * 0.2 + mask * 0.38) * 0.34;
+    a *= smoothstep(300.0, 1800.0, cirrusH) * smoothstep(0.004, 0.05, d.y);
+    float fwd = pow(max(dot(d, sunDir), 0.0), 8.0);
+    vec3 cc = sunColor * (0.78 + 0.9 * fwd) + skyAmbient * 0.35;
+    float fog = 1.0 - exp(-t * hazeBeta * 0.5);
+    cc = mix(cc, hazeColor, fog);
+    return mix(col, cc, a * (1.0 - 0.8 * fog));
   }
 
-  vec3 deckColor(vec3 d, float t, float oc) {
-    vec3 p = d * t;                                     // the cloud-top point, metres from the camera
-    vec2 q = p.xz + camXZ + shift;                      // ground-fixed coordinates, scrolled at airspeed
-    vec3 N0 = normalize(vec3(p.x, p.y + oc, p.z));      // the deck sphere's normal
-    // the pixel's footprint on the deck: its size at this distance, stretched by the grazing angle
-    // (geometric mean of along- and across-view, as anisotropic filtering would keep)
-    float foot = t * pixAngle / sqrt(max(abs(dot(d, N0)), 0.03));
-    vec2 cf = cloudField(q, foot);
-    float cov = cf.x, h = cf.y;
-    // shading normal from the height field's slope, sampled a growing step apart with distance
-    // (ground-space differences: stable at every angle, unlike screen-space derivatives)
-    float dq = max(45.0, t * 0.0025);
-    float hx = cloudField(q + vec2(dq, 0.0), foot).y, hz = cloudField(q + vec2(0.0, dq), foot).y;
-    vec3 N = normalize(N0 + vec3(-(hx - h) * hAmp / dq, 0.0, -(hz - h) * hAmp / dq));
-
-    // lit tops: a wide soft terminator (the tops scatter), sky light from above, the hollows
-    // between the lumps in shadow, darker thin edges
-    float lit = smoothstep(-0.2, 0.7, dot(N, sunDir));
-    float hollow = 0.4 + 0.6 * smoothstep(0.0, 0.8, h);
-    vec3 cloud = sunColor * (lit * 1.35 * hollow + 0.04) + skyAmbient * (0.5 + 0.5 * N.y) * (0.3 + 0.4 * hollow);
-    float thick = smoothstep(0.03, 0.7, cov);
-    cloud *= mix(0.7, 1.0, thick);
-    cloud = mix(cloud * vec3(0.88, 0.93, 1.0), cloud, thick);
-    // silver lining: the thin edges glow when the view runs toward the sun
-    float fwd = pow(max(dot(d, sunDir), 0.0), 12.0);
-    cloud += sunColor * fwd * (1.0 - thick) * cov * 2.2;
-
-    // the ground through the gaps: land / sea far below, under a deep column of hazy air, in the
-    // deck's own shadow where the sun is behind cloud
-    float land = nz(q + 0.7 * 40000.0, 40000.0, foot).b;
-    vec3 ground = mix(groundColor * 0.75, groundColor * 1.3, land);
-    if (shadows > 0.5) {
-      vec2 qs = q + sunDir.xz / max(sunDir.y, 0.25) * 2200.0;
-      ground *= 1.0 - 0.55 * cloudField(qs, foot).x;
+  // ---------------------------------------------------------------- the deck
+  vec3 deckColor(vec3 d, float e) {
+    float dy = d.y;
+    float t0 = rayT(0.0, dy);                                    // the deck's base
+    vec2 q0 = d.xz * t0 + camXZ + shift;                         // ground-fixed metres, scrolled at airspeed
+    float foot0 = footAt(t0, dy);
+    vec2 reg = fieldRegion(q0, foot0);
+    float tHit = t0;
+    vec2 qh = q0;
+    float footH = foot0;
+#ifndef SIMPLE
+    // relief: march the ray against the top-height field where the deck is close enough to
+    // resolve it (full by 3.4 degrees below the horizon, none at grazing angles)
+    float w = smoothstep(0.012, 0.06, -(e + dip));
+    if (reliefSteps > 0 && w > 0.001) {
+      float Hmax = hAmp * 1.05 + reg.y * towerAmp;
+      float tA = rayT(Hmax, dy);
+      float dA = Hmax - fieldCoarse(d.xz * tA + camXZ + shift, footAt(tA, dy), reg).y;
+      float tB = t0, dB = -1.0;
+      bool hit = false;
+      for (int i = 1; i <= 8; i++) {
+        if (i > reliefSteps) break;
+        float fr = float(i) / float(reliefSteps);
+        float hr = Hmax * pow(1.0 - fr, 1.4);                   // steps crowd toward the deck
+        tB = rayT(hr, dy);
+        dB = hr - fieldCoarse(d.xz * tB + camXZ + shift, footAt(tB, dy), reg).y;
+        if (dB < 0.0) { hit = true; break; }
+        tA = tB; dA = dB;
+      }
+      if (hit) {
+        // linear refinement between the last sample above the field and the first below it
+        float k = clamp(dA / max(dA - dB, 1e-3), 0.0, 1.0);
+        float tR = mix(tA, tB, k);
+        float dR = rayH(tR, dy) - fieldCoarse(d.xz * tR + camXZ + shift, footAt(tR, dy), reg).y;
+        if (dR < 0.0) { k = clamp(dA / max(dA - dR, 1e-3), 0.0, 1.0); tR = mix(tA, tR, k); }
+        else { k = clamp(dR / max(dR - dB, 1e-3), 0.0, 1.0); tR = mix(tR, tB, k); }
+        tHit = mix(t0, tR, w);
+      }
+      qh = d.xz * tHit + camXZ + shift;
+      footH = footAt(tHit, dy);
     }
-    ground = mix(ground, hazeColor * 0.92, groundHaze);
-    vec3 col = mix(ground, cloud, smoothstep(0.0, 0.45, cov));
+#endif
+    vec3 F = fieldFull(qh, footH, reg);
+    float cov = F.x, h = F.y;
+    // shading normal from the height field's slope, sampled a footprint apart (ground-space
+    // differences: stable at every angle, unlike screen-space derivatives)
+    float dq = max(25.0, footH * 1.5);
+    float hx = fieldFull(qh + vec2(dq, 0.0), footH, reg).y;
+    float hz = fieldFull(qh + vec2(0.0, dq), footH, reg).y;
+    vec3 N = normalize(vec3(-(hx - h), dq, -(hz - h)));
+    float ndl = dot(N, sunDir);
 
-    // aerial perspective along the ray to the deck, out to the horizon's haze
-    float fogF = 1.0 - exp(-t * hazeBeta);
+    // self-shadowing: a short march toward the sun over the coarse field
+    float sh = 1.0;
+#ifndef SIMPLE
+    if (shadowSteps > 0) {
+      vec2 run = sunDir.xz / max(sunDir.y, 0.15);
+      float occ = 0.0;
+      for (int i = 1; i <= 4; i++) {
+        if (i > shadowSteps) break;
+        float rise = 40.0 + 60.0 * float(i * i);                 // 100, 280, 580, 1000 m up the sun ray
+        float hs = fieldCoarse(qh + run * rise, footH + rise * 0.4, reg).y;
+        occ += clamp((hs - (h + rise)) / 160.0, 0.0, 1.0);
+      }
+      sh = 1.0 - 0.72 * clamp(occ, 0.0, 1.0);
+    }
+#endif
+
+    // multiple scattering: a wide soft terminator (lit tops are bright and low-contrast), sky
+    // light from above that the hollows between the lumps lose, the powder darkening of creases
+    // seen toward the sun
+    float lit = 0.5 + 0.5 * smoothstep(-0.45, 0.8, ndl);
+    float ao = 0.42 + 0.58 * smoothstep(0.0, 1.0, h / max(hAmp, 1.0));
+    float fwd = pow(max(dot(d, sunDir), 0.0), 6.0);
+    float powder = 1.0 - 0.3 * fwd * (1.0 - ao);
+    vec3 cloud = sunColor * (lit * sh * 1.2 * (0.72 + 0.28 * ao) * powder) + skyAmbient * (0.5 + 0.5 * N.y) * (0.26 + 0.34 * ao);
+    // thin edges: the cloud's shaded flanks and base show through them, blue-grey; toward the
+    // sun the edges light up (silver lining)
+    float thick = smoothstep(0.05, 0.6, cov);
+    vec3 baseCol = skyAmbient * 0.95 + sunColor * 0.16;
+    cloud = mix(baseCol, cloud, thick);
+    float fwd2 = pow(max(dot(d, sunDir), 0.0), 10.0);
+    cloud += sunColor * fwd2 * (1.0 - thick) * smoothstep(0.0, 0.3, cov) * 2.0;
+
+    // the ground through the gaps: land / sea far below under a deep column of hazy air, in the
+    // deck's own shadow where the sun is behind cloud
+    float land = nz(q0 + 0.7 * T_LAND, T_LAND, foot0).b;
+    vec3 ground = mix(groundColor * 0.7, groundColor * 1.25, land);
+    if (groundShadow > 0.5) {
+      vec2 qs = q0 + sunDir.xz / max(sunDir.y, 0.25) * 1800.0;
+      ground *= 1.0 - 0.5 * fieldCoarse(qs, foot0, reg).x;
+    }
+    ground = mix(ground, hazeColor * 0.88, groundHaze);
+    vec3 col = mix(ground, cloud, smoothstep(0.0, 0.4, cov));
+
+    // aerial perspective along the ray to the hit, out to the horizon's haze; the air between
+    // the aircraft and the deck lays a light veil even straight down
+    float fogF = 1.0 - 0.9 * exp(-tHit * hazeBeta);
     return mix(col, hazeColor, fogF);
+  }
+
+  // A gentle lens response when the sun nears the frame edge: veiling glare falling off across
+  // the frame and one soft ghost on the far side of the centre. Nothing when the sun is well
+  // inside the frame or far outside it.
+  vec3 lensFlare(vec3 col) {
+    if (flare < 0.5 || sunNdc.z < 0.5) return col;
+    float edge = max(abs(sunNdc.x), abs(sunNdc.y));
+    float k = smoothstep(0.55, 1.0, edge) * (1.0 - smoothstep(1.15, 1.7, edge));
+    if (k <= 0.0) return col;
+    vec2 res = max(resolution, vec2(1.0));
+    vec2 fc = gl_FragCoord.xy / res * 2.0 - 1.0;
+    float aspect = res.x / res.y;
+    vec2 dv = (fc - sunNdc.xy) * vec2(aspect, 1.0);
+    col += sunColor * k * 0.09 / (1.0 + 2.5 * dot(dv, dv));
+    vec2 g = (fc + sunNdc.xy * 0.55) * vec2(aspect, 1.0);
+    col += vec3(0.85, 0.93, 1.0) * k * 0.05 * smoothstep(0.17, 0.02, length(g));
+    return col;
   }
 
   void main() {
     vec3 d = normalize(vDir);
     float e = asin(clamp(d.y, -1.0, 1.0));
-    // ray / deck-sphere: the camera sits camH above a sphere of radius deckR; a ray that misses
-    // takes the tangent distance, so t is continuous across the horizon
-    float oc = deckR + camH;
-    float b = oc * d.y;
-    float c = camH * (2.0 * deckR + camH);
-    float disc = b * b - c;
-    float tH = sqrt(c);
-    float t = (d.y < 0.0 && disc > 0.0) ? -b - sqrt(disc) : tH;
     vec3 col;
-    if (e < -dip) col = deckColor(d, t, oc);
-    else col = skyColor(d, e);
-    gl_FragColor = vec4(col, 1.0);
+    if (e < -dip) {
+      col = deckColor(d, e);
+    } else {
+      col = skyColor(d, e);
+#ifndef SIMPLE
+      col = cirrusLayer(d, col);
+#endif
+      col += sunDisc(d);
+    }
+#ifndef SIMPLE
+    col = lensFlare(col);
+#endif
+    gl_FragColor = vec4(max(col, 0.0), 1.0);
   }`;
 
 // ------------------------------------------------------------------------------- the dome
+/** Quality tiers for the deck: relief = ray-march steps (0 = flat), shadow = self-shadow steps,
+ *  detail = the 12 m octave, cirrus / groundShadow / flare = 0 | 1. */
+export const SKY_TIERS = {
+  '4k':        { relief: 6, shadow: 4, detail: 1, cirrus: 1, groundShadow: 1, flare: 1 },
+  ultra:       { relief: 6, shadow: 4, detail: 1, cirrus: 1, groundShadow: 1, flare: 1 },
+  high:        { relief: 4, shadow: 3, detail: 1, cirrus: 1, groundShadow: 1, flare: 1 },
+  balanced:    { relief: 0, shadow: 2, detail: 0, cirrus: 1, groundShadow: 1, flare: 1 },
+  performance: { relief: 0, shadow: 0, detail: 0, cirrus: 0, groundShadow: 0, flare: 0 },
+};
+
 export class SkyDome extends THREE.Mesh {
   constructor() {
     const uniforms = {
@@ -270,17 +342,21 @@ export class SkyDome extends THREE.Mesh {
       noiseTex: { value: null },
       sunDir: { value: new THREE.Vector3(0.5, 0.7, 0.5).normalize() },
       sunColor: { value: new THREE.Color(1.0, 0.96, 0.9) },
-      skyAmbient: { value: new THREE.Color(0.34, 0.46, 0.76) },
+      skyAmbient: { value: new THREE.Color(0.36, 0.48, 0.78) },
       zenithMul: { value: new THREE.Vector3(1, 1, 1) },
-      hazeColor: { value: new THREE.Color(0.66, 0.73, 0.84) },
-      satBoost: { value: 1 }, hazeBeta: { value: 1 / 48000 },
-      camH: { value: 3000 }, deckR: { value: R_EARTH_M + 8000 }, dip: { value: 0.03 }, hAmp: { value: 700 },
-      camXZ: { value: new THREE.Vector2() }, shift: { value: new THREE.Vector2() }, drift: { value: 0 },
-      coverage: { value: 0.55 }, detail: { value: 1 }, shadows: { value: 1 }, groundHaze: { value: 0.6 },
-      groundColor: { value: new THREE.Color(0.22, 0.27, 0.35) }, pixAngle: { value: 5e-4 },
+      hazeColor: { value: new THREE.Color(0.68, 0.75, 0.86) },
+      satBoost: { value: 1 }, hazeBeta: { value: 1 / 52000 },
+      camH: { value: 3000 }, oc: { value: R_EARTH_M + 11000 }, dip: { value: 0.03 }, hAmp: { value: 700 }, towerAmp: { value: 1700 },
+      camXZ: { value: new THREE.Vector2() }, shift: { value: new THREE.Vector2() },
+      drift1: { value: new THREE.Vector2() }, drift2: { value: new THREE.Vector2() },
+      coverage: { value: 0.55 }, towers: { value: 1 }, detail: { value: 1 }, groundHaze: { value: 0.6 },
+      groundColor: { value: new THREE.Color(0.2, 0.25, 0.34) }, pixAngle: { value: 5e-4 },
+      resolution: { value: new THREE.Vector2(1920, 1080) },
+      reliefSteps: { value: 6 }, shadowSteps: { value: 4 }, groundShadow: { value: 1 },
+      cirrus: { value: 1 }, cirrusH: { value: 1600 }, flare: { value: 1 }, sunNdc: { value: new THREE.Vector3(0, 0, 0) },
     };
     const mat = new THREE.ShaderMaterial({
-      uniforms, vertexShader: vert, fragmentShader: frag,
+      uniforms, vertexShader: vert, fragmentShader: frag, defines: {},
       side: THREE.BackSide, depthWrite: false, depthTest: false, fog: false,
     });
     super(new THREE.SphereGeometry(1000, 48, 24), mat);
@@ -291,14 +367,34 @@ export class SkyDome extends THREE.Mesh {
     this.userData.noAO = true;
     this.visible = false;
     this.shift = 0;          // metres flown
-    this.drift = 0;          // seconds of cloud evolution
+    this.drift1 = new THREE.Vector2();   // the two noise phases (m)
+    this.drift2 = new THREE.Vector2();
     this.grade = skyGrade(11000);
     /** Cloud amount 0..1 (0.55: a broken stratocumulus field with open lanes). */
     this.coverage = 0.55;
     /** Cloud tops this far below the aircraft (m), clamped so the deck stays above the ground. */
     this.deckDrop = 3000;
-    /** Noise tier: detail 0/1 adds the 110 m octave; shadows 0/1 adds the deck's shadow on the ground. */
-    this.tier = { detail: 1, shadows: 1 };
+    /** Towering cumulus islands on (1) or off (0). */
+    this.towers = 1;
+    /** Quality tier (see SKY_TIERS). */
+    this.tier = { ...SKY_TIERS.ultra };
+    this._simple = false;
+    // the proven fallback can be forced without code: localStorage 'aeroforge.simplesky' = '1'
+    let forced = false;
+    try { forced = localStorage.getItem('aeroforge.simplesky') === '1'; } catch { /* storage blocked */ }
+    if (forced || SkyDome.simpleDefault) this.simple = true;
+    this._sunWorld = new THREE.Vector3();
+  }
+
+  /** Fallback: the plate and a flat shaded deck only (no relief march, self-shadow, cirrus or
+   *  flare), compiled as a separate shader variant. */
+  get simple() { return this._simple; }
+  set simple(v) {
+    v = !!v;
+    if (v === this._simple) return;
+    this._simple = v;
+    if (v) this.material.defines.SIMPLE = 1; else delete this.material.defines.SIMPLE;
+    this.material.needsUpdate = true;
   }
 
   /** The photographic plate (an sRGB equirectangular texture) and its rotation about y (rad). */
@@ -316,11 +412,13 @@ export class SkyDome extends THREE.Mesh {
 
   /**
    * Per frame. altitude: aircraft altitude (m); speed: airspeed (m/s), the deck scrolls aft at it;
-   * unitMetres: metres per scene unit (camera offsets become real distances); camera: the stage camera.
+   * unitMetres: metres per scene unit (camera offsets become real distances); camera: the stage
+   * camera; pixels / width: the frame's height and width in device pixels.
    */
-  update(dt, camera, { altitude = 11000, speed = 0, unitMetres = 1.7, pixels = 1080 } = {}) {
+  update(dt, camera, { altitude = 11000, speed = 0, unitMetres = 1.7, pixels = 1080, width = 1920 } = {}) {
     const u = this.uniforms;
     if (!u.noiseTex.value) u.noiseTex.value = cloudNoise();
+    dt = Math.min(Math.max(dt || 0, 0), 0.25);
     this.position.copy(camera.position);
     const g = this.grade = skyGrade(altitude);
     u.zenithMul.value.fromArray(g.zenith);
@@ -329,27 +427,48 @@ export class SkyDome extends THREE.Mesh {
     u.satBoost.value = g.sat;
     u.hazeBeta.value = g.beta;
     // the deck: tops deckDrop below the aircraft, never below 400 m; the camera's own height adds on
+    const camAlt = altitude + camera.position.y * unitMetres;
     const deckTop = Math.max(altitude - this.deckDrop, 400);
-    const camH = Math.max(altitude - deckTop + camera.position.y * unitMetres, 250);
+    const camH = Math.max(camAlt - deckTop, 250);
     const deckR = R_EARTH_M + deckTop;
     u.camH.value = camH;
-    u.deckR.value = deckR;
-    u.dip.value = Math.acos(deckR / (deckR + camH));
-    u.hAmp.value = 620 + 140 * this.tier.detail;
+    u.oc.value = deckR + camH;
+    u.dip.value = Math.acos(Math.min(deckR / (deckR + camH), 1));
+    u.hAmp.value = 620 + 120 * this.tier.detail;
+    u.towerAmp.value = 1700;
+    u.towers.value = this.towers;
     u.groundHaze.value = THREE.MathUtils.clamp(0.4 + deckTop / 14000, 0.4, 0.88);
     u.camXZ.value.set(camera.position.x * unitMetres, camera.position.z * unitMetres);
     u.pixAngle.value = (camera.fov * Math.PI / 180) / Math.max(pixels, 1);
+    u.resolution.value.set(Math.max(width, 1), Math.max(pixels, 1));
+    u.cirrusH.value = CIRRUS_ALT - camAlt;
     // scroll: the aircraft flies toward +x (every model's nose), so the ground passes toward -x;
-    // the noise tiles every 90 km in x (the largest scale's period), so the shift wraps there
-    this.shift = (this.shift + dt * speed) % 90000;
-    this.drift += dt * 1.2;
+    // every noise tile divides the wrap period, so the wrap is invisible
+    this.shift = (this.shift + dt * speed) % WRAP;
     u.shift.value.set(this.shift, 0);
-    u.drift.value = this.drift % 90000;
+    // two phases of slow evolution: the lumps move against the cells at about a metre a second
+    const wrap = (v, p) => ((v % p) + p) % p;
+    this.drift1.set(wrap(this.drift1.x + dt * 0.9, DRIFT_WRAP.mid), wrap(this.drift1.y + dt * 0.35, DRIFT_WRAP.mid));
+    this.drift2.set(wrap(this.drift2.x - dt * 0.25, DRIFT_WRAP.cells), wrap(this.drift2.y + dt * 0.5, DRIFT_WRAP.cells));
+    u.drift1.value.copy(this.drift1);
+    u.drift2.value.copy(this.drift2);
     u.coverage.value = this.coverage;
-    u.detail.value = this.tier.detail;
-    u.shadows.value = this.tier.shadows;
+    // tiers
+    const t = this.tier;
+    u.reliefSteps.value = Math.min(Math.max(t.relief | 0, 0), 8);
+    u.shadowSteps.value = Math.min(Math.max(t.shadow | 0, 0), 4);
+    u.detail.value = t.detail ? 1 : 0;
+    u.groundShadow.value = t.groundShadow ? 1 : 0;
+    u.cirrus.value = t.cirrus ? 1 : 0;
+    u.flare.value = t.flare ? 1 : 0;
+    // the sun on screen (NDC), for the lens response
+    const s = this._sunWorld.copy(u.sunDir.value).multiplyScalar(1000).add(camera.position).project(camera);
+    const front = s.z < 1 && s.z > -1 && Number.isFinite(s.x) && Number.isFinite(s.y);
+    u.sunNdc.value.set(front ? s.x : 0, front ? s.y : 0, front ? 1 : 0);
   }
 }
+/** Construct every dome in the simple fallback (set before the stage boots). */
+SkyDome.simpleDefault = false;
 
 /**
  * Image-based lighting for the sky look: the pure-sky HDR above the horizon and the lit cloud
