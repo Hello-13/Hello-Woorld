@@ -75,6 +75,61 @@ const vert = /* glsl */`
     gl_Position.z = gl_Position.w * 0.99999;           // always at the far plane, whatever the dome's radius
   }`;
 
+// Single-scattering atmosphere (Rayleigh + Mie) on the spherical Earth, with the sun's optical
+// depth from the Chapman / Kasten-Young airmass, marched in a handful of steps: the sky at any
+// altitude and the aerial perspective toward the deck. The constants are sea-level values; the
+// camera's altitude thins the air above it. SUN_E scales the sun's irradiance into the scene's
+// linear units (the zenith at sea level comes out near the plate's).
+const ATMOSPHERE_GLSL = /* glsl */`
+  const float R_E = 6371000.0;
+  const float H_ATM = 80000.0;
+  const vec3 BETA_R = vec3(5.8e-6, 13.5e-6, 33.1e-6);
+  const float H_R = 8000.0;
+  const float BETA_M = 3.0e-6;
+  const float H_M = 1500.0;
+  const float MIE_G = 0.76;
+  const float SUN_E = 19.0;
+
+  float airmass(float sinE) {
+    float e = degrees(asin(clamp(sinE, -1.0, 1.0)));
+    return 1.0 / max(sinE + 0.15 * pow(max(e + 3.885, 0.1), -1.253), 0.02);
+  }
+
+  // in-scattered light along d from the camera to distance tEnd (or the top of the atmosphere),
+  // n samples; transm returns the transmittance over that path
+  vec3 inscatter(vec3 d, float tEnd, int n, out vec3 transm) {
+    float r0 = R_E + camAlt;
+    float b = r0 * d.y;
+    float c = r0 * r0 - (R_E + H_ATM) * (R_E + H_ATM);
+    float tTop = -b + sqrt(max(b * b - c, 0.0));
+    float len = min(tEnd, tTop);
+    float cosT = dot(d, sunDir);
+    float pr = 0.0596831 * (1.0 + cosT * cosT);
+    float g2 = MIE_G * MIE_G;
+    float pm = 0.0795775 * (1.0 - g2) / pow(max(1.0 + g2 - 2.0 * MIE_G * cosT, 1e-4), 1.5);
+    float xs = airmass(sunDir.y);
+    vec3 tau = vec3(0.0), L = vec3(0.0);
+    float dt = len / float(max(n, 1));
+    for (int i = 0; i < 10; i++) {
+      if (i >= n) break;
+      float t = (float(i) + 0.5) * dt;
+      float h = max(sqrt(max(r0 * r0 + t * t + 2.0 * r0 * t * d.y, 0.0)) - R_E, 0.0);
+      float rhoR = exp(-h / H_R);
+      float rhoM = exp(-h / H_M) + 0.004 * exp(-h / 25000.0);      // a thin background aerosol
+      vec3 ext = BETA_R * rhoR + vec3(BETA_M * 1.1 * rhoM);
+      vec3 tauSun = (BETA_R * H_R * rhoR + vec3(BETA_M * 1.1 * H_M * rhoM)) * xs;
+      tau += ext * dt * 0.5;
+      vec3 T = exp(-(tau + tauSun));
+      L += T * (BETA_R * rhoR * pr + vec3(BETA_M * rhoM * pm)) * dt;
+      tau += ext * dt * 0.5;
+    }
+    transm = exp(-tau);
+    // multiple scattering: a pale lift in proportion to the optical depth along the view
+    L += (1.0 - transm) * vec3(0.02, 0.024, 0.03);
+    return L * sunColor * SUN_E * hazeGain;
+  }
+`;
+
 const frag = /* glsl */`
   uniform sampler2D plate; uniform float hasPlate; uniform float plateRot; uniform float plateGain;
   uniform sampler2D noiseTex;
@@ -86,6 +141,7 @@ const frag = /* glsl */`
   uniform vec3 groundColor; uniform float pixAngle; uniform vec2 resolution;
   uniform int reliefSteps; uniform int shadowSteps; uniform float groundShadow;
   uniform float cirrus; uniform float cirrusH; uniform float flare; uniform vec3 sunNdc;
+  uniform float camAlt; uniform float plateW; uniform float hazeGain;
   varying vec3 vDir;
 
   const float PI = 3.14159265;
@@ -95,6 +151,7 @@ const frag = /* glsl */`
   const float SUN_R = 0.00465;                         // the sun's angular radius (rad)
 
   ${CLOUD_FIELD_GLSL}
+  ${ATMOSPHERE_GLSL}
 
   // the plate's highlight shoulder, undone: the JPG holds radiance 1:1 below the knee and
   // compressed above it, so the sun's aureole comes back as HDR for bloom and tone mapping
@@ -150,7 +207,17 @@ const frag = /* glsl */`
     col = max(mix(vec3(lum), col, satBoost), 0.0);
     // the sky just above the horizon converges on the haze colour the deck fades into
     col = mix(col, hazeColor, smoothstep(0.05, -0.01, e2) * 0.8);
+#ifdef SIMPLE
     return col;
+#else
+    if (plateW >= 0.999) return col;
+    // at altitude the sky is computed: Rayleigh and Mie single scattering through the air above
+    // the aircraft, so it is as dark, blue and clear as the altitude makes it, with the horizon
+    // band that the dense air below lays along the limb
+    vec3 tr;
+    vec3 sky = inscatter(d, 1e9, 10, tr);
+    return mix(sky, col, plateW);
+#endif
   }
 
   // The sun: a limb-darkened disc of the true angular size, antialiased over a pixel, and a
@@ -257,7 +324,7 @@ const frag = /* glsl */`
     // multiple scattering: a wide soft terminator (lit tops are bright and low-contrast), sky
     // light from above that the hollows between the lumps lose, the powder darkening of creases
     // seen toward the sun
-    float lit = 0.5 + 0.5 * smoothstep(-0.45, 0.8, ndl);
+    float lit = 0.2 + 0.8 * smoothstep(-0.25, 0.7, ndl);
     float ao = 0.42 + 0.58 * smoothstep(0.0, 1.0, h / max(hAmp, 1.0));
     float fwd = pow(max(dot(d, sunDir), 0.0), 6.0);
     float powder = 1.0 - 0.3 * fwd * (1.0 - ao);
@@ -281,10 +348,17 @@ const frag = /* glsl */`
     ground = mix(ground, hazeColor * 0.88, groundHaze);
     vec3 col = mix(ground, cloud, smoothstep(0.0, 0.3, cov));
 
-    // aerial perspective along the ray to the hit, out to the horizon's haze; the air between
-    // the aircraft and the deck lays a light veil even straight down
+#ifdef SIMPLE
+    // aerial perspective along the ray to the hit, out to the horizon's haze
     float fogF = 1.0 - 0.9 * exp(-tHit * hazeBeta);
     return mix(col, hazeColor, fogF);
+#else
+    // aerial perspective: the deck seen through the air between it and the aircraft, attenuated
+    // and veiled by the same scattering as the sky, so the far deck dissolves into the horizon band
+    vec3 tr;
+    vec3 air = inscatter(d, tHit, 6, tr);
+    return col * tr + air;
+#endif
   }
 
   // A gentle lens response when the sun nears the frame edge: veiling glare falling off across
@@ -324,6 +398,41 @@ const frag = /* glsl */`
     gl_FragColor = vec4(max(col, 0.0), 1.0);
   }`;
 
+// ------------------------------------------------------------------------------- JS twin
+const ATM = { R: 6371000, H: 80000, betaR: [5.8e-6, 13.5e-6, 33.1e-6], HR: 8000, betaM: 3.0e-6, HM: 1500, g: 0.76, E: 19 };
+function airmass(sinE) {
+  const e = THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(sinE, -1, 1)));
+  return 1 / Math.max(sinE + 0.15 * Math.pow(Math.max(e + 3.885, 0.1), -1.253), 0.02);
+}
+/** The sky's radiance (linear rgb) in direction dir (unit, y up) for a camera at camAlt (m),
+ *  the same single-scattering model as the shader; sunColor is a THREE.Color or [r, g, b]. */
+export function skyRadiance(dir, sunDir, camAlt, sunColor = [1, 1, 1], gain = 1, n = 10) {
+  const sc = sunColor.isColor ? [sunColor.r, sunColor.g, sunColor.b] : sunColor;
+  const r0 = ATM.R + camAlt, b = r0 * dir.y, c = r0 * r0 - (ATM.R + ATM.H) ** 2;
+  const len = -b + Math.sqrt(Math.max(b * b - c, 0));
+  const cosT = dir.x * sunDir.x + dir.y * sunDir.y + dir.z * sunDir.z;
+  const pr = 0.0596831 * (1 + cosT * cosT);
+  const g2 = ATM.g * ATM.g;
+  const pm = 0.0795775 * (1 - g2) / Math.pow(Math.max(1 + g2 - 2 * ATM.g * cosT, 1e-4), 1.5);
+  const xs = airmass(sunDir.y);
+  const tau = [0, 0, 0], L = [0, 0, 0];
+  const dt = len / n;
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) * dt;
+    const h = Math.max(Math.sqrt(Math.max(r0 * r0 + t * t + 2 * r0 * t * dir.y, 0)) - ATM.R, 0);
+    const rhoR = Math.exp(-h / ATM.HR), rhoM = Math.exp(-h / ATM.HM) + 0.004 * Math.exp(-h / 25000);
+    for (let k = 0; k < 3; k++) {
+      const ext = ATM.betaR[k] * rhoR + ATM.betaM * 1.1 * rhoM;
+      const tauSun = (ATM.betaR[k] * ATM.HR * rhoR + ATM.betaM * 1.1 * ATM.HM * rhoM) * xs;
+      tau[k] += ext * dt * 0.5;
+      L[k] += Math.exp(-(tau[k] + tauSun)) * (ATM.betaR[k] * rhoR * pr + ATM.betaM * rhoM * pm) * dt;
+      tau[k] += ext * dt * 0.5;
+    }
+  }
+  const ms = [0.02, 0.024, 0.03];
+  return L.map((v, k) => (v + (1 - Math.exp(-tau[k])) * ms[k]) * sc[k] * ATM.E * gain);
+}
+
 // ------------------------------------------------------------------------------- the dome
 /** Quality tiers for the deck: relief = ray-march steps (0 = flat), shadow = self-shadow steps,
  *  detail = the 12 m octave, cirrus / groundShadow / flare = 0 | 1. */
@@ -354,6 +463,7 @@ export class SkyDome extends THREE.Mesh {
       resolution: { value: new THREE.Vector2(1920, 1080) },
       reliefSteps: { value: 6 }, shadowSteps: { value: 4 }, groundShadow: { value: 1 },
       cirrus: { value: 1 }, cirrusH: { value: 1600 }, flare: { value: 1 }, sunNdc: { value: new THREE.Vector3(0, 0, 0) },
+      camAlt: { value: 11000 }, plateW: { value: 0 }, hazeGain: { value: 1 },
     };
     const mat = new THREE.ShaderMaterial({
       uniforms, vertexShader: vert, fragmentShader: frag, defines: {},
@@ -384,6 +494,9 @@ export class SkyDome extends THREE.Mesh {
     try { forced = localStorage.getItem('aeroforge.simplesky') === '1'; } catch { /* storage blocked */ }
     if (forced || SkyDome.simpleDefault) this.simple = true;
     this._sunWorld = new THREE.Vector3();
+    this._tmpDir = new THREE.Vector3();
+    /** Aerial perspective gain (1 = the model's own; above it, a stronger veil toward the deck). */
+    this.hazeGain = 1.4;
   }
 
   /** Fallback: the plate and a flat shaded deck only (no relief march, self-shadow, cirrus or
@@ -442,6 +555,24 @@ export class SkyDome extends THREE.Mesh {
     u.pixAngle.value = (camera.fov * Math.PI / 180) / Math.max(pixels, 1);
     u.resolution.value.set(Math.max(width, 1), Math.max(pixels, 1));
     u.cirrusH.value = CIRRUS_ALT - camAlt;
+    u.camAlt.value = camAlt;
+    // the plate (a ground-level photograph) carries the sky near the ground; from 2.5 km up the
+    // computed atmosphere takes over, fully by 7 km
+    const aw = THREE.MathUtils.smoothstep(camAlt, 2500, 7000);
+    u.plateW.value = 1 - aw;
+    u.hazeGain.value = this.hazeGain;
+    if (aw > 0) {
+      // the horizon colour (for the scene fog) and the sky light on the cloud tops, from the same model
+      const sun = u.sunDir.value, sc = u.sunColor.value;
+      const hz = skyRadiance(this._tmpDir.set(-sun.x, 0, -sun.z).normalize().multiplyScalar(0.9995).setY(0.03).normalize(), sun, camAlt, sc, this.hazeGain);
+      const z = skyRadiance(this._tmpDir.set(0, 1, 0), sun, camAlt, sc, this.hazeGain);
+      const m = skyRadiance(this._tmpDir.set(sun.x, 0.5, sun.z).normalize(), sun, camAlt, sc, this.hazeGain);
+      const amb = [0, 1, 2].map((i) => (z[i] * 0.3 + m[i] * 0.4 + hz[i] * 0.3) * 1.6);
+      g.haze = g.haze.map((v, i) => lerp(v, hz[i], aw));
+      g.ambient = g.ambient.map((v, i) => lerp(v, amb[i], aw));
+      u.hazeColor.value.setRGB(g.haze[0], g.haze[1], g.haze[2]);
+      u.skyAmbient.value.setRGB(g.ambient[0], g.ambient[1], g.ambient[2]);
+    }
     // scroll: the aircraft flies toward +x (every model's nose), so the ground passes toward -x;
     // every noise tile divides the wrap period, so the wrap is invisible
     this.shift = (this.shift + dt * speed) % WRAP;
