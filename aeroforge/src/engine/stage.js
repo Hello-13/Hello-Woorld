@@ -10,6 +10,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { CopyShader } from 'three/addons/shaders/CopyShader.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
@@ -20,15 +21,19 @@ installShading();   // specular antialiasing and the highlight clamp, before any
 
 // dpr: render at the screen's native pixel density up to this cap; minPixels: never draw fewer
 // pixels than this (the 4K preset supersamples a 3840 × 2160 frame onto smaller screens);
+// aoMax: the ambient-occlusion pass's pixel cap (default AO_MAX_PIXELS; 4K and Ultra run it at the
+// frame's own resolution, so it lays no coarser stair-steps over the edges); smaa: morphological
+// antialiasing of the finished, tone-mapped frame (MSAA resolves in linear HDR, which leaves bright
+// edges stepped);
 // showroom.reflect: mirror-floor resolution (fraction of the canvas, 0 = off);
 // showroom.contact: contact-shadow map size; contactEvery: refresh every n frames
 // dof: depth-of-field pass available, with its depth render at this fraction of the frame (0 = never;
 // 1 = full resolution, so the in-focus plane and its edges stay pixel-sharp at 4K)
 export const UHD = 3840 * 2160;
 export const QUALITY = {
-  '4k': { label: '4K', dpr: 4, minPixels: UHD, msaa: 2, ao: 1, shadow: 4096, dof: 1, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
-  ultra: { label: 'Ultra', dpr: 3, msaa: 4, ao: 1, shadow: 4096, dof: 1, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
-  high: { label: 'High', dpr: 2, msaa: 4, ao: 0.5, shadow: 2048, dof: 1, showroom: { reflect: 0.38, contact: 512, contactEvery: 1 } },
+  '4k': { label: '4K', dpr: 4, minPixels: UHD, msaa: 2, ao: 1, aoMax: 8.4e6, smaa: true, shadow: 8192, dof: 1, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
+  ultra: { label: 'Ultra', dpr: 3, msaa: 4, ao: 1, aoMax: 8.4e6, smaa: true, shadow: 4096, dof: 1, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
+  high: { label: 'High', dpr: 2, msaa: 4, ao: 0.5, smaa: true, shadow: 2048, dof: 1, showroom: { reflect: 0.38, contact: 512, contactEvery: 1 } },
   balanced: { label: 'Balanced', dpr: 1.5, msaa: 4, ao: 0, shadow: 2048, dof: 0, showroom: { reflect: 0, contact: 512, contactEvery: 2 } },
   performance: { label: 'Performance', dpr: 1, msaa: 0, ao: 0, shadow: 1024, dof: 0, showroom: { reflect: 0, contact: 256, contactEvery: 3 } },
 };
@@ -39,15 +44,15 @@ const ORDER = ['4k', 'ultra', 'high', 'balanced', 'performance'];
 // each falls back to the behaviour before it existed: no DoF pass in the chain, the one fixed
 // grade, the fixed-blur showroom floor, no light sweep, no camera drift.
 // studio (depth-blurred floor) and tourDof change the everyday view, so they are opt-in from the Film menu
-export const FX = { film: true, dof: true, grade: true, sweep: true, drift: true, studio: false, tourDof: false, sky: true };
+export const FX = { film: true, dof: true, grade: true, sweep: true, drift: true, studio: false, tourDof: false, sky: true, aa: true, crisp: true };
 (function readFlags() {
   try {
     const saved = JSON.parse(localStorage.getItem('aeroforge.fx') || '{}');
-    for (const k of ['dof', 'sweep', 'drift', 'studio', 'tourDof', 'sky']) if (typeof saved[k] === 'boolean') FX[k] = saved[k];
+    for (const k of ['dof', 'sweep', 'drift', 'studio', 'tourDof', 'sky', 'crisp']) if (typeof saved[k] === 'boolean') FX[k] = saved[k];
   } catch { /* storage blocked or malformed */ }
   try {
     const q = new URLSearchParams(location.search);
-    for (const k of ['film', 'dof', 'grade', 'sweep', 'drift', 'tourDof']) if (q.has(k)) FX[k] = !/^(0|off|false|no)$/i.test(q.get(k));
+    for (const k of ['film', 'dof', 'grade', 'sweep', 'drift', 'tourDof', 'aa', 'crisp']) if (q.has(k)) FX[k] = !/^(0|off|false|no)$/i.test(q.get(k));
     if (q.has('studio')) FX.studio = !/^(classic|0|off)$/i.test(q.get('studio'));
     if (q.has('sky')) FX.sky = !/^(classic|0|off)$/i.test(q.get('sky'));
   } catch { /* no location */ }
@@ -93,6 +98,7 @@ class SceneAOPass extends GTAOPass {
   constructor(scene, camera, w, h) {
     super(scene, camera, w, h);
     this.resScale = 0.5;
+    this.maxPixels = AO_MAX_PIXELS;
   }
   overrideVisibility() {
     super.overrideVisibility();
@@ -102,7 +108,7 @@ class SceneAOPass extends GTAOPass {
     });
   }
   setSize(w, h) {
-    const k = Math.min(this.resScale, Math.sqrt(AO_MAX_PIXELS / Math.max(1, w * h)));
+    const k = Math.min(this.resScale, Math.sqrt(this.maxPixels / Math.max(1, w * h)));
     super.setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
   }
 }
@@ -391,8 +397,10 @@ export class Stage {
     const q = QUALITY[this.quality];
     this.renderer.setPixelRatio(this.pixelRatioFor(q));
     const key = this.lights.key;
-    if (key.shadow.mapSize.x !== q.shadow) {
-      key.shadow.mapSize.set(q.shadow, q.shadow);
+    // the 8192 map only where the GPU is plainly a large one (its texture limit says so)
+    const shadowSize = Math.min(q.shadow, this.renderer.capabilities.maxTextureSize >= 16384 ? 8192 : 4096);
+    if (key.shadow.mapSize.x !== shadowSize) {
+      key.shadow.mapSize.set(shadowSize, shadowSize);
       key.shadow.map?.dispose();
       key.shadow.map = null;
     }
@@ -409,6 +417,7 @@ export class Stage {
     if (q.ao) {
       const ao = new SceneAOPass(this.scene, this.camera, 2, 2);
       ao.resScale = q.ao;
+      ao.maxPixels = q.aoMax || AO_MAX_PIXELS;
       ao.blendIntensity = 1.0;
       ao.updateGtaoMaterial({ radius: 0.9, distanceExponent: 1.6, thickness: 1.2, scale: 1.0, samples: q.ao >= 1 ? 16 : 12, distanceFallOff: 1, screenSpaceRadius: false });
       ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 16 });
@@ -435,6 +444,9 @@ export class Stage {
     this.bloom = new SoftBloomPass(new THREE.Vector2(2, 2), 0.38, 0.45, 1.9);
     composer.addPass(this.bloom);
     composer.addPass(new OutputPass());
+    // display-space antialiasing, on the tone-mapped frame and before the grade's dither (?aa=0)
+    this.smaa = null;
+    if (FX.aa && q.smaa) { this.smaa = new SMAAPass(2, 2); composer.addPass(this.smaa); }
     this.grade = new ShaderPass(GradeShader);
     composer.addPass(this.grade);
     if (this.container) this.resize();
@@ -506,6 +518,8 @@ export class Stage {
     this.renderer.setSize(w, h, false);
     this.beauty.setSamples(this.msaaFor(QUALITY[this.quality]));
     this.composer.setSize(w, h);
+    // chromatic aberration is a lens trait measured in pixels: never more than half a pixel at the corners
+    this.grade.uniforms.aberration.value = Math.min(0.0008, 0.5 / Math.max(this.renderSize.width, 1));
     this.labels.setSize(w, h);
     this.env.showroom.resize();
     this.camera.aspect = w / h;
@@ -631,6 +645,8 @@ export class Stage {
     // frame rates every other frame (the key light is fixed, so only moving parts lag, by ~4 ms)
     this.renderer.shadowMap.autoUpdate = false;
     this.renderer.shadowMap.needsUpdate = !this.highRate || (this.frameNo & 1) === 0;
+    // the shadow map covers the vehicle on the stage, not a fixed area (re-measured a few times a second)
+    if (this.frameNo % 12 === 1) this.env.fitShadow(this.holder.visible && this.holder.children.length ? solidBounds(this.holder) : null);
     const query = this.beginGpuTimer();
     try {
       this.env.update(dt, this.camera);

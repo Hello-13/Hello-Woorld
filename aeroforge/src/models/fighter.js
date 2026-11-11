@@ -112,7 +112,10 @@ export function buildFighter() {
     // keep only the faces turned toward the projection: where a thin surface (a wing's trailing edge, a fin) lies
     // wholly inside the box, the far skin would otherwise carry a mirrored copy
     const g = d.geometry, P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv;
-    const dir = new THREE.Vector3(...opts.dir).normalize(), n = new THREE.Vector3();
+    // (the decal's geometry is in the part's own frame by now, so the projection direction has to be turned into that
+    // frame too: the fins are rotated parts, and compared against the model-frame direction the left fin's outer face
+    // read as facing away, which left its tail code with no faces at all)
+    const dir = new THREE.Vector3(...opts.dir).normalize().transformDirection(part.matrixWorld.clone().invert()), n = new THREE.Vector3();
     const keep = [];
     for (let i = 0; i < P.count; i += 3) {
       n.set(0, 0, 0);

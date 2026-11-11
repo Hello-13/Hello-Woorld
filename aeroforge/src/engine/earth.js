@@ -79,11 +79,17 @@ const detailGLSL = /* glsl */`
   }
   // n: unit direction from the planet centre. Returns (detail about -0.5..0.5, strength 0..1).
   vec2 mapDetail(vec3 n, float seed) {
-    float tpp = length(fwidth(n)) / 7.67e-4;           // 8K texels (2π / 8192 rad) per pixel
+    float px = length(fwidth(n));                      // a pixel's size on the unit sphere
+    float tpp = px / 7.67e-4;                          // 8K texels (2π / 8192 rad) per pixel
     float k = 1.0 - smoothstep(0.35, 1.2, tpp);
     if (k <= 0.0) return vec2(0.0);
     vec3 p = n * 2600.0 + seed;
     float v = dGrad(p) * 0.55 + dGrad(p * 2.03) * 0.3 + dGrad(p * 4.07) * 0.15;
+    // two finer octaves (300 m and 150 m) once a pixel is small enough to hold them: low orbit
+    float w4 = smoothstep(2.0, 5.0, 1.0 / (2600.0 * 8.11 * px));
+    float w5 = smoothstep(2.0, 5.0, 1.0 / (2600.0 * 16.3 * px));
+    if (w4 > 0.0) v += dGrad(p * 8.11) * 0.1 * w4;
+    if (w5 > 0.0) v += dGrad(p * 16.3) * 0.07 * w5;
     return vec2(v, k);
   }`;
 
@@ -126,8 +132,23 @@ const surfaceFrag = /* glsl */`
 
     vec3 albedo = texture2D(dayMap, vUv).rgb;
     vec2 gd = mapDetail(normalize(vObj), 91.0);
-    albedo *= 1.0 + gd.x * gd.y * 0.22;
     float water = texture2D(waterMap, vUv).r;
+    if (gd.y > 0.0) {
+      // Magnified (low orbit), the 4K water mask and the day map both smear the coast over many
+      // pixels. Redraw it: the mask's half-way contour, roughened by the detail noise, thresholded
+      // a pixel wide; land and sea colours un-mixed across the smear by the mask's own value.
+      float coast = 4.0 * water * (1.0 - water);                 // 1 on the smeared coast, 0 inland and at sea
+      float wr = water + gd.x * 0.45 * coast;
+      float aw = max(fwidth(wr) * 0.8, 1e-4);
+      float crisp = smoothstep(0.5 - aw, 0.5 + aw, wr);
+      const vec3 sea = vec3(0.012, 0.035, 0.085);
+      vec3 land = clamp((albedo - water * sea) / max(1.0 - water, 0.3), 0.0, 1.0);
+      float m = gd.y * smoothstep(0.03, 0.3, coast);
+      albedo = mix(albedo, mix(land, mix(sea, albedo, 0.35), crisp), m);
+      water = mix(water, crisp, m);
+    }
+    // the detail belongs to the land (fields, forest edges, ridges); the sea keeps only a trace
+    albedo *= 1.0 + gd.x * gd.y * mix(0.34, 0.1, water);
     float cloud = texture2D(cloudMap, vUv + vec2(cloudShift, 0.0)).r;
     float cloudShadow = texture2D(cloudMap, vUv + vec2(cloudShift + 0.0015, 0.0008)).r;
     cloud = smoothstep(0.08, 0.85, cloud);

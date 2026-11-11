@@ -203,6 +203,16 @@ export function hingedMesh(geometry, material, p0, p1) {
   };
 }
 
+/**
+ * Segments round a circle of radius r (metres) so that its polygon stays within `tol` of the true circle:
+ * by default 0.2 mm, half a pixel of a 3840-pixel frame 1.5 m wide, where a silhouette still reads as round.
+ * In steps of 4, between min and max. (A 0.47 m tyre gets 96, a 5 cm strut 36, a 6 mm pin 16.)
+ */
+export function roundSegments(r, { tol = 0.0002, min = 12, max = 96 } = {}) {
+  const n = Math.PI / Math.acos(Math.max(-1, 1 - tol / Math.max(Math.abs(r), tol)));
+  return Math.min(max, Math.max(min, Math.ceil(n / 4 - 1e-9) * 4));
+}
+
 /** Lathe from [r, y] pairs (revolves around +Y). */
 export function lathe(profile, segments = 48, phiStart = 0, phiLength = Math.PI * 2) {
   const pts = profile.map(([r, y]) => new THREE.Vector2(Math.max(r, 0.0001), y));

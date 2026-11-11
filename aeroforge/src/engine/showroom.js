@@ -43,8 +43,10 @@ function softboxTexture() {
   return t;
 }
 
-/** A dark room lit by large softboxes, pre-filtered into an environment map. */
-export function showroomEnvironment(pmrem) {
+/** A dark room lit by large softboxes, pre-filtered into an environment map. size: the map's cube
+ *  face in pixels; above 256 (the 4K and Ultra presets) the room is rendered to a cube of that
+ *  size first, so the softboxes' reflections in a canopy or a lens stay sharp-edged at 4K. */
+export function showroomEnvironment(pmrem, { renderer = null, size = 256 } = {}) {
   const s = new THREE.Scene();
   const room = new THREE.Mesh(new THREE.BoxGeometry(64, 32, 64), new THREE.MeshBasicMaterial({ color: 0x06070a, side: THREE.BackSide }));
   room.position.y = 14;
@@ -69,7 +71,15 @@ export function showroomEnvironment(pmrem) {
   panel(3, 14, 2.2, 0xdfe8ff, [26, 10, -8]);                                        // edge light, right rear
   panel(26, 8, 1.6, 0xffffff, [0, 28, 2], { rot: [Math.PI / 2, 0, 0] });            // overhead scrim
   panel(22, 2.0, 0.8, 0xffe2c4, [0, 2.2, 30], { rot: [0, Math.PI, 0], feather: false });   // warm low fill in front
-  const tex = pmrem.fromScene(s, 0.02).texture;
+  let tex;
+  if (renderer && size > 256) {
+    const rt = new THREE.WebGLCubeRenderTarget(size, { type: THREE.HalfFloatType, generateMipmaps: false });
+    new THREE.CubeCamera(0.1, 100, rt).update(renderer, s);
+    tex = pmrem.fromCubemap(rt.texture).texture;
+    rt.dispose();
+  } else {
+    tex = pmrem.fromScene(s, 0.02).texture;
+  }
   s.traverse((o) => { o.geometry?.dispose(); o.material?.dispose(); });
   box.dispose();
   return tex;
@@ -393,7 +403,7 @@ export class Showroom {
     const c = this.stage.renderer.domElement;
     // the floor blurs most of its reflection, so past ~2.4 MP (1.2 MP with the fixed blur) extra
     // resolution is invisible; the contact zone is sharp, so the depth-blurred floor gets the higher cap
-    const k = Math.min(this.reflectScale, Math.sqrt((this.depthBlur ? 2.4e6 : 1.2e6) / Math.max(1, c.width * c.height)));
+    const k = Math.min(this.reflectScale, Math.sqrt((this.depthBlur || this.reflectScale >= 0.5 ? 2.4e6 : 1.2e6) / Math.max(1, c.width * c.height)));
     const w = Math.max(64, Math.round(c.width * k));
     const h = Math.max(64, Math.round(c.height * k));
     this.reflected = false;

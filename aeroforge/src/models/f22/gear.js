@@ -10,6 +10,7 @@
 
 import * as THREE from 'three';
 import { mesh } from '../../engine/assembly.js';
+import { roundSegments } from '../../engine/geometry.js';
 import { F } from './materials.js';
 import * as FR from './frame.js';
 import { merge, slab, hinge, toothedGrid, platePoly } from './util.js';
@@ -22,18 +23,23 @@ const S3 = (p, side = 1) => V(X(p[0]), p[1], side * p[2]);
 /** Station direction → model direction (s runs opposite to x). */
 const D3 = (d, side = 1) => V(-d[0], d[1], side * d[2]).normalize();
 
+/** A round cylinder (as THREE.CylinderGeometry) with as many segments as its radius needs to look round up close. */
+const cylR = (rTop, rBottom, h) => new THREE.CylinderGeometry(rTop, rBottom, h, roundSegments(Math.max(rTop, rBottom)));
+
 /** Tyre + hub + brake (optional) about the local z axis. */
 function wheelGeos(R, W, brake) {
   const tube = Math.min(W * 0.5, R * 0.32);
-  const tyre = new THREE.TorusGeometry(R - tube, tube, 14, 40);
+  // segment counts for a 4K close-up: 96 round the tread (0.25 mm off a true circle on the 0.47 m main tyre), the rim
+  // and hub on the same 96 so the bead line sits on the tyre's own vertices, 36 round the tyre's section
+  const tyre = new THREE.TorusGeometry(R - tube, tube, 36, 96);
   tyre.scale(1, 1, (W * 0.5) / tube);
   // cast hub, both faces alike: the rim flange inside the tyre bead, a dished face recessed behind it with eight
   // raised spokes and dark lightening openings between them, and a central boss with its bolt circle
   const prof = [[0.001, 0.3], [0.17, 0.3], [0.19, 0.24], [0.43, 0.2], [0.46, 0.36], [0.5, 0.4], [0.53, 0.4], [0.53, 0]].map(([r, z]) => [r * R, z * W]);
   // (ordered from the inboard face to the outboard one, so the lathe's faces point outward)
   const half = [...prof, ...prof.slice(0, -1).reverse().map(([r, z]) => [r, -z])].reverse().map(([r, z]) => new THREE.Vector2(r, z));
-  const hub = new THREE.LatheGeometry(half, 36).rotateX(Math.PI / 2);
-  const cap = new THREE.CylinderGeometry(R * 0.08, R * 0.1, W * 0.68, 14).rotateX(Math.PI / 2);
+  const hub = new THREE.LatheGeometry(half, 96).rotateX(Math.PI / 2);
+  const cap = new THREE.CylinderGeometry(R * 0.08, R * 0.1, W * 0.68, 36).rotateX(Math.PI / 2);
   const spokes = [], holes = [];
   for (const f of [1, -1]) {
     for (let k = 0; k < 8; k++) {
@@ -41,7 +47,7 @@ function wheelGeos(R, W, brake) {
       // spoke rib from the boss to the rim, standing 0.06 W off the dish
       spokes.push(new THREE.BoxGeometry(R * 0.06, R * 0.27, W * 0.08).translate(0, R * 0.3, f * W * 0.24).rotateZ(a));
       // opening between this spoke and the next, just proud of the dish
-      holes.push(new THREE.CircleGeometry(R * 0.055, 12).rotateY(f > 0 ? 0 : Math.PI).translate(0, R * 0.315, f * (W * 0.215 + 0.002)).rotateZ(a + Math.PI / 8));
+      holes.push(new THREE.CircleGeometry(R * 0.055, 32).rotateY(f > 0 ? 0 : Math.PI).translate(0, R * 0.315, f * (W * 0.215 + 0.002)).rotateZ(a + Math.PI / 8));
     }
     for (let k = 0; k < 10; k++) {
       const a = (k / 10) * Math.PI * 2;
@@ -50,14 +56,14 @@ function wheelGeos(R, W, brake) {
   }
   const out = { tyre, hub: merge([hub, ...spokes]), holes: merge(holes), cap };
   // (the carbon heat stack inside the hub, narrower than the dished faces so it stays hidden behind them)
-  if (brake) out.brake = new THREE.CylinderGeometry(R * 0.42, R * 0.42, W * 0.36, 24).rotateX(Math.PI / 2);
+  if (brake) out.brake = new THREE.CylinderGeometry(R * 0.42, R * 0.42, W * 0.36, 72).rotateX(Math.PI / 2);
   return out;
 }
 
-/** Cylinder between two Vector3 points. */
+/** Cylinder between two Vector3 points (at least `seg` segments round, more where its radius needs them). */
 function rodV(a, b, r, seg = 10) {
   const len = a.distanceTo(b);
-  const g = new THREE.CylinderGeometry(r, r, len, seg);
+  const g = new THREE.CylinderGeometry(r, r, len, Math.max(seg, roundSegments(r)));
   g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(UP, b.clone().sub(a).normalize()));
   const m = a.clone().add(b).multiplyScalar(0.5);
   return g.translate(m.x, m.y, m.z);
@@ -75,7 +81,7 @@ function boxAlong(c, ex, ey, ez, sx, sy, sz) {
 }
 
 /** A unit-length rod mesh (along +y, centred) that `place` stretches between two points. */
-function unitRod(r, mat, seg = 10) { return mesh(new THREE.CylinderGeometry(r, r, 1, seg), mat); }
+function unitRod(r, mat, seg = 10) { return mesh(new THREE.CylinderGeometry(r, r, 1, Math.max(seg, roundSegments(r))), mat); }
 const tmpD = new THREE.Vector3(), tmpM = new THREE.Vector3();
 function place(m, a, b, len = null) {
   tmpD.subVectors(b, a);
@@ -168,8 +174,8 @@ export function buildGear(ctx) {
     {
       const g = legGroup(), sl = slideGroup(g.inner);
       const c = at(0.645, -0.095);
-      const body = merge([new THREE.CylinderGeometry(0.05, 0.045, 0.06, 16).rotateZ(Math.PI / 2).translate(c.x + 0.03, c.y, c.z), new THREE.BoxGeometry(0.06, 0.03, 0.04).translate(c.x - 0.01, c.y, c.z)]);
-      const lamp = new THREE.Mesh(new THREE.CircleGeometry(0.04, 16).rotateY(Math.PI / 2).translate(c.x + 0.061, c.y, c.z), new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xfff2d8, emissiveIntensity: 0 }));
+      const body = merge([cylR(0.05, 0.045, 0.06).rotateZ(Math.PI / 2).translate(c.x + 0.03, c.y, c.z), new THREE.BoxGeometry(0.06, 0.03, 0.04).translate(c.x - 0.01, c.y, c.z)]);
+      const lamp = new THREE.Mesh(new THREE.CircleGeometry(0.04, 32).rotateY(Math.PI / 2).translate(c.x + 0.061, c.y, c.z), new THREE.MeshStandardMaterial({ color: 0x222222, emissive: 0xfff2d8, emissiveIntensity: 0 }));
       lamp.userData.fx = true;
       sl.add(mesh(body, F.lens()), lamp);
       anim.taxiLight = lamp.material;
@@ -200,7 +206,7 @@ export function buildGear(ctx) {
       }, g.pivot);
     }
     // torque links behind the strut: a scissor from the cylinder's lower collar to the fork, folding as the oleo shortens
-    const tq = { g: legGroup(), up: unitRod(0.018, F.steel()), lo: unitRod(0.018, F.steel()), pin: mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.08, 8).rotateX(Math.PI / 2), F.steel()) };
+    const tq = { g: legGroup(), up: unitRod(0.018, F.steel()), lo: unitRod(0.018, F.steel()), pin: mesh(cylR(0.02, 0.02, 0.08).rotateX(Math.PI / 2), F.steel()) };
     tq.g.inner.add(tq.up, tq.lo, tq.pin);
     const tqA = at(0.385, 0.075), tqB0 = at(0.635, 0.06), tqL = 0.135, tqTmp = new THREE.Vector3(), tqK = new THREE.Vector3();
     P('Nose gear torque links', {
@@ -234,7 +240,7 @@ export function buildGear(ctx) {
     {
       const Fp = S3(NF.brace.fit), Ad = at(NF.brace.at, -0.075), dD = Fp.distanceTo(Ad), l1 = NF.brace.alpha * dD, l2 = dD - l1;
       const up = unitRod(0.028, F.gear()), lo = unitRod(0.026, F.gear()), lock = mesh(new THREE.BoxGeometry(0.06, 0.06, 0.07), F.yellow());
-      const fit = mesh(merge([new THREE.BoxGeometry(0.09, NW.roof - Fp.y + 0.02, 0.12).translate(Fp.x, (NW.roof + Fp.y) / 2, 0), new THREE.CylinderGeometry(0.02, 0.02, 0.14, 8).rotateX(Math.PI / 2).translate(Fp.x, Fp.y, 0)]), F.tiDull());
+      const fit = mesh(merge([new THREE.BoxGeometry(0.09, NW.roof - Fp.y + 0.02, 0.12).translate(Fp.x, (NW.roof + Fp.y) / 2, 0), cylR(0.02, 0.02, 0.14).rotateX(Math.PI / 2).translate(Fp.x, Fp.y, 0)]), F.tiDull());
       P('Nose gear drag brace & downlock', {
         system: 'Landing gear', material: 'Steel two-piece folding brace, spring-loaded downlock', mass: 18,
         explode: [0.6, -0.55, 0.55],
@@ -262,7 +268,7 @@ export function buildGear(ctx) {
       const Rs = lp(at(Lg - FR.noseShrink(1), 0, -0.15), 1);
       const zU = NF.uplock.z, top = NW.roof, bot = Rs.y + 0.04;
       const g = [new THREE.BoxGeometry(0.07, top - bot, 0.04).translate(Rs.x, (top + bot) / 2, zU), new THREE.BoxGeometry(0.1, 0.05, 0.05).translate(Rs.x, bot + 0.01, zU + 0.02),
-        new THREE.TorusGeometry(0.03, 0.01, 6, 14, Math.PI * 1.2).rotateZ(-Math.PI * 0.1).translate(Rs.x, Rs.y, -0.15)];
+        new THREE.TorusGeometry(0.03, 0.01, 12, 28, Math.PI * 1.2).rotateZ(-Math.PI * 0.1).translate(Rs.x, Rs.y, -0.15)];
       P('Nose gear uplock', {
         system: 'Landing gear', material: 'Steel hook with hydraulic release and manual (free-fall) release', mass: 3,
         explode: [0.0, 0.35, -0.35],
@@ -274,7 +280,7 @@ export function buildGear(ctx) {
     {
       const sC = NW.front + 0.08, zC = -(NW.wall - 0.015);
       const g = [FR.boxS(sC, -0.30, zC, 0.12, 0.10, 0.03), FR.boxS(sC + 0.12, -0.30, zC, 0.08, 0.08, 0.03)];
-      const k = [new THREE.CylinderGeometry(0.008, 0.008, 0.03, 8).rotateX(Math.PI / 2).translate(X(sC), -0.28, zC + 0.03), new THREE.CylinderGeometry(0.015, 0.015, 0.03, 10).rotateX(Math.PI / 2).translate(X(sC + 0.12), -0.30, zC + 0.03)];
+      const k = [cylR(0.008, 0.008, 0.03).rotateX(Math.PI / 2).translate(X(sC), -0.28, zC + 0.03), cylR(0.015, 0.015, 0.03).rotateX(Math.PI / 2).translate(X(sC + 0.12), -0.30, zC + 0.03)];
       P('External canopy switch & manual drive adapter', {
         system: 'Crew systems', material: 'Switch box and 3/8 in square-drive adapter in the nose-wheel well', mass: 1,
         explode: [0.9, -0.5, -0.6],
@@ -286,7 +292,7 @@ export function buildGear(ctx) {
       system: 'Landing gear', material: 'Titanium bearing housings on the well side walls', mass: 6,
       explode: [0.1, -0.2, 0.6],
       desc: 'Bearing housings on both side walls of the well at its aft end carry the nose leg\'s trunnion cross-tube; the leg pivots here as it swings forward.',
-    }, mesh(merge([-1, 1].map((sd) => new THREE.CylinderGeometry(0.06, 0.06, 0.035, 14).rotateX(Math.PI / 2).translate(T.x, T.y, sd * (NW.wall + 0.0075)))), F.tiDull()));
+    }, mesh(merge([-1, 1].map((sd) => cylR(0.06, 0.06, 0.035).rotateX(Math.PI / 2).translate(T.x, T.y, sd * (NW.wall + 0.0075)))), F.tiDull()));
   }
 
   // ================================================================== main gears (swing outward and up into the wing roots)
@@ -347,7 +353,7 @@ export function buildGear(ctx) {
     // torque links on the aft side of the leg
     const sT = legGroup();
     sT.inner.add(mesh(merge([rodV(at(0.44, 0.09), at(0.60, 0.19), 0.022), rodV(at(0.60, 0.19), at(0.76, 0.07), 0.022),
-      new THREE.CylinderGeometry(0.026, 0.026, 0.1, 8).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(UP, out)).translate(...at(0.60, 0.19).toArray())]), F.steel()));
+      cylR(0.026, 0.026, 0.1).applyQuaternion(new THREE.Quaternion().setFromUnitVectors(UP, out)).translate(...at(0.60, 0.19).toArray())]), F.steel()));
     P(`Main gear torque links (${R})`, {
       system: 'Landing gear', material: 'Forged steel scissor links', mass: 8,
       explode: [0.55, -1.2, 0.5 * side],
@@ -453,7 +459,7 @@ export function buildGear(ctx) {
       const r = [c[0] + n[0] * (Wm * 0.5 + 0.02), c[1] + n[1] * (Wm * 0.5 + 0.02), c[2] + n[2] * (Wm * 0.5 + 0.02)];
       const Rp = S3(r), [bx, , bz] = MF.uplock.box, yTop = Math.min(0.16, FR.topAt(r[0], Math.abs(r[2])) - 0.025);
       const g = [new THREE.BoxGeometry(bx, yTop - Rp.y - 0.015, bz).translate(Rp.x, (yTop + Rp.y + 0.015) / 2, Rp.z + side * 0.03),
-        new THREE.TorusGeometry(0.04, 0.012, 6, 14, Math.PI * 1.25).rotateZ(-Math.PI * 0.62).rotateX(Math.PI / 2).translate(Rp.x, Rp.y + 0.005, Rp.z)];
+        new THREE.TorusGeometry(0.04, 0.012, 12, 28, Math.PI * 1.25).rotateZ(-Math.PI * 0.62).rotateX(Math.PI / 2).translate(Rp.x, Rp.y + 0.005, Rp.z)];
       P(`Main gear uplock (${R})`, {
         system: 'Landing gear', material: 'Steel hook, hydraulic and free-fall release', mass: 6,
         explode: [-0.4, 0.45, 0.4 * side],
@@ -465,7 +471,7 @@ export function buildGear(ctx) {
     // Gear Wheel Well on each respective side"; its picture shows guarded switches for the side-bay, main-bay and EW doors)
     {
       const sP = W.s0 + 0.015, yP = -0.40, zP = side * 1.45, g = [FR.boxS(sP, yP, zP, 0.03, 0.13, 0.17)], k = [];
-      for (const dy of [0.03, -0.03]) for (const dz of [-0.05, 0, 0.05]) k.push(new THREE.CylinderGeometry(0.007, 0.007, 0.03, 8).rotateZ(Math.PI / 2).translate(X(sP + 0.03), yP + dy, zP + dz));
+      for (const dy of [0.03, -0.03]) for (const dz of [-0.05, 0, 0.05]) k.push(cylR(0.007, 0.007, 0.03).rotateZ(Math.PI / 2).translate(X(sP + 0.03), yP + dy, zP + dz));
       P(`Weapons-bay door safing panel (${R})`, {
         system: 'Weapons', material: 'Guarded safing switches on a panel in the wheel well', mass: 1,
         explode: [0.4, -0.6, 1.1 * side],
@@ -476,8 +482,8 @@ export function buildGear(ctx) {
     // ports, on the well's front wall by the door frame
     if (side < 0) {
       const sP = W.s0 + 0.015, yP = -0.56, zP = -1.40, g = [FR.boxS(sP, yP, zP, 0.03, 0.16, 0.22)], k = [];
-      for (const dz of [-0.06, 0, 0.06]) k.push(new THREE.CylinderGeometry(0.008, 0.008, 0.03, 8).rotateZ(Math.PI / 2).translate(X(sP + 0.03), yP + 0.04, zP + dz));
-      for (const dz of [-0.045, 0.045]) k.push(new THREE.CylinderGeometry(0.02, 0.02, 0.025, 12).rotateZ(Math.PI / 2).translate(X(sP + 0.025), yP - 0.035, zP + dz));
+      for (const dz of [-0.06, 0, 0.06]) k.push(cylR(0.008, 0.008, 0.03).rotateZ(Math.PI / 2).translate(X(sP + 0.03), yP + 0.04, zP + dz));
+      for (const dz of [-0.045, 0.045]) k.push(cylR(0.02, 0.02, 0.025).rotateZ(Math.PI / 2).translate(X(sP + 0.025), yP - 0.035, zP + dz));
       P('Left main-well service panel', {
         system: 'Electrical', material: 'Switch panel with guarded toggles and PMA connectors', mass: 2,
         explode: [0.4, -0.9, -1.0],
@@ -616,7 +622,7 @@ export function buildGear(ctx) {
     const h0 = 14.0, h1 = 16.3, hy = -0.56, hy1 = Math.max(hy, -FR.bD(h1) + 0.1);
     const g = [rodV(V(X(h0), hy, 0), V(X(h1), hy1, 0), 0.04, 10)];
     g.push(new THREE.BoxGeometry(0.14, 0.08, 0.16).rotateZ(-Math.atan2(hy1 - hy, h1 - h0)).translate(X(h1 - 0.03), hy1 - 0.02, 0));
-    g.push(new THREE.CylinderGeometry(0.05, 0.05, 0.2, 12).rotateX(Math.PI / 2).translate(X(h0), hy, 0));
+    g.push(cylR(0.05, 0.05, 0.2).rotateX(Math.PI / 2).translate(X(h0), hy, 0));
     const a = [rodV(V(X(h0 + 0.2), hy + 0.05, 0), V(X(h0 + 0.7), hy + 0.1, 0), 0.035, 10), rodV(V(X(h0 - 0.08), hy + 0.08, 0), V(X(h0 + 0.2), hy + 0.05, 0), 0.02, 8)];
     P('Arresting hook', {
       system: 'Landing gear', material: 'Steel shank and hook point, hydraulic hold-down / damper', mass: 40,

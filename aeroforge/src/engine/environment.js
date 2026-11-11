@@ -6,13 +6,15 @@
 import * as THREE from 'three';
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import { skyDome, gridFloor } from './effects.js';
-import { concrete, floorMarkings, fbm } from './surface.js';
+import { concrete, fbm } from './surface.js';
 import { rng } from './materials.js';
 import { createEarth, setEarthDetail } from './earth.js';
 import { Showroom, showroomEnvironment } from './showroom.js';
 import { SkyDome, SKY_TIERS, skyEnvironment } from './sky.js';
 import { VolumetricSky } from './skyvol.js';
+import { BackdropBand } from './backdrop.js';
 
+const _fitM = new THREE.Matrix4(), _fitV = new THREE.Vector3(), _fitUp = new THREE.Vector3(0, 1, 0);
 const WHITE = new THREE.Color(1, 1, 1);
 
 const R_EARTH_KM = 6371;
@@ -25,7 +27,7 @@ export const LOOKS = {
     key: { color: 0xfff8f0, intensity: 2.1 }, hemi: [0x9fb4cc, 0x0c0e11, 0.16], rim: 1.7, rim2: 0.9,
   },
   hangar: {
-    label: 'Hangar', hdri: 'warehouse', hdriSun: [0.57, 51], background: 'hdri', plate: 'warehouse', plateGain: 0.79, bgIntensity: 0.34, envIntensity: 0.95,
+    label: 'Hangar', hdri: 'warehouse', hdriSun: [0.57, 51], background: 'hdri', plate: 'warehouse', band: 'warehouse', plateGain: 0.79, bgIntensity: 0.34, envIntensity: 0.95,
     exposure: 1.12, bgRotation: 0.2, floor: 'hangar', turntable: true,
     key: { color: 0xfff2df, intensity: 2.4 }, hemi: [0xbfd2ff, 0x3a3630, 0.25], rim: 0.6,
   },
@@ -44,7 +46,7 @@ export const LOOKS = {
     key: { color: 0xfff6ea, intensity: 3.6 }, hemi: [0x7aa0ee, 0xd9d3c9, 0.7], rim: 0.0,
   },
   pad: {
-    label: 'Launch pad', hdri: 'dawn', hdriSun: [0.79, 3.9], background: 'hdri', plate: 'dawn', plateGain: 1.9, bgIntensity: 0.85, bgRotation: 1.12, envIntensity: 0.8,
+    label: 'Launch pad', hdri: 'dawn', hdriSun: [0.79, 3.9], background: 'hdri', plate: 'dawn', band: 'dawn', plateGain: 1.9, bgIntensity: 0.85, bgRotation: 1.12, envIntensity: 0.8,
     exposure: 1.0, floor: 'pad', turntable: false, fog: [0x8a7f8c, 0.0011],
     key: { color: 0xffb27a, intensity: 2.0 }, hemi: [0x8a9ac8, 0x3a3228, 0.35], rim: 0.0, floods: true,
   },
@@ -117,8 +119,9 @@ function radialFade(inner = 0.55, outer = 1) {
 
 // Hangar bay markings drawn analytically in plane coordinates (metres): the two 13 m lines, the
 // 10.2 m ring and the hatched keep-out band, each antialiased over one pixel at any distance and
-// faded to its average coverage where the hatching gets finer than a pixel. The canvas texture
-// keeps the stencil text and tie-down points. Matches floorMarkings() in surface.js.
+// faded to its average coverage where the hatching gets finer than a pixel, and the tie-down
+// points on their 6 m grid. The stencil text is a quad of its own (bayText). Matches
+// floorMarkings() in surface.js.
 const BAY_MARKINGS = /* glsl */`
   varying vec2 vMark;
   float bayFill(float d, float w) { return 1.0 - smoothstep(-w, w, d); }
@@ -133,8 +136,57 @@ const BAY_MARKINGS = /* glsl */`
     float stripe = bayFill(abs(fract(s + 0.5) - 0.5) * period - 0.09, 0.7 * foot);
     stripe = mix(stripe, 0.36, smoothstep(0.15, 0.45, foot / period));
     cov = max(cov, stripe * band);
-    return vec4(0.807, 0.479, 0.0129, cov * 0.92);     // rgba(232, 184, 30, 0.92), linear
+    vec4 mk = vec4(0.807, 0.479, 0.0129, cov * 0.92);  // rgba(232, 184, 30, 0.92), linear
+    // tie-down points: dark 9 cm discs every 6 m out to 36 m, none on the turntable
+    vec2 gc = floor(p / 6.0 + 0.5) * 6.0;
+    float dd = length(p - gc) - 0.09;
+    float da = bayFill(dd, 0.7 * fwidth(dd)) * 0.9 * step(11.0, length(gc)) * step(max(abs(gc.x), abs(gc.y)), 36.5);
+    float a = da + mk.a * (1.0 - da);
+    return vec4((vec3(0.0212) * da + mk.rgb * mk.a * (1.0 - da)) / max(a, 1e-4), a);
   }`;
+
+/** The bay's stencil text on a quad of its own, 290 pixels per metre (the floor-wide texture it
+ *  used to share had 51). Local +y of the returned mesh's plane points to world -z once laid flat. */
+function bayText() {
+  const W = 14, H = 1.3, m = 4096 / W;
+  const c = document.createElement('canvas');
+  c.width = 4096; c.height = Math.round(H * m);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = 'rgba(232,184,30,0.85)';
+  ctx.font = `700 ${0.9 * m}px "Chakra Petch", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('BAY 07 · KEEP CLEAR', c.width / 2, 0.95 * m);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 16;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshStandardMaterial({ map: t, transparent: true, roughness: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 }));
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set(0, 0.005, 11.7);       // the baseline 12 m in front of the bay's centre, as before
+  mesh.receiveShadow = true;
+  mesh.renderOrder = -1;
+  return mesh;
+}
+
+/** Fine grain for a tiled ground texture seen from close: the same map again at 5.4 times the
+ *  frequency, as a brightness variation about its own average, faded in only where the base tile is
+ *  magnified (so the look from a distance is untouched). */
+function groundDetail(mat, texels = 1024) {
+  mat.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+      {
+        float tpp = length(fwidth(vMapUv)) * ${texels.toFixed(1)};          // texels per pixel
+        float k = 1.0 - smoothstep(0.3, 1.0, tpp);
+        if (k > 0.0) {
+          vec2 duv = vMapUv * 5.37 + vec2(0.31, 0.17);
+          float fine = dot(texture2D(map, duv).rgb, vec3(0.3333));
+          float mean = dot(texture2D(map, duv, 9.0).rgb, vec3(0.3333));
+          diffuseColor.rgb *= 1.0 + (fine / max(mean, 0.05) - 1.0) * k * 0.8;
+        }
+      }`);
+  };
+  mat.customProgramCacheKey = () => `ground-detail-${texels}`;
+  return mat;
+}
 
 function hangarFloor() {
   const g = new THREE.Group();
@@ -145,12 +197,13 @@ function hangarFloor() {
     color: 0xb8bcc0, map: c.map, roughnessMap: c.roughnessMap, normalMap: c.normalMap, normalScale: new THREE.Vector2(0.4, 0.4),
     roughness: 1, metalness: 0.0, alphaMap: radialFade(0.42, 1), transparent: true,
   });
+  groundDetail(mat);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
   floor.rotation.x = -Math.PI / 2;
   floor.receiveShadow = true;
   floor.renderOrder = -2;
   const markMat = new THREE.MeshStandardMaterial({
-    map: floorMarkings(window.matchMedia?.('(pointer: coarse)').matches ? 2048 : 4096, size, { geometric: false }), transparent: true, roughness: 0.6, alphaMap: radialFade(0.35, 0.8), depthWrite: false,
+    transparent: true, roughness: 0.6, alphaMap: radialFade(0.35, 0.8), depthWrite: false,
     polygonOffset: true, polygonOffsetFactor: -2,
   });
   markMat.onBeforeCompile = (sh) => {
@@ -160,11 +213,9 @@ function hangarFloor() {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>\n${BAY_MARKINGS}`)
       .replace('#include <map_fragment>', `#include <map_fragment>
-        {   // analytic markings over the text / tie-down texture ("over" compositing, straight alpha)
+        {   // the markings are drawn here, analytically (straight alpha)
           vec4 mk = bayMarkings(vMark);
-          float a = mk.a + diffuseColor.a * (1.0 - mk.a);
-          diffuseColor.rgb = (mk.rgb * mk.a + diffuseColor.rgb * diffuseColor.a * (1.0 - mk.a)) / max(a, 1e-4);
-          diffuseColor.a = a;
+          diffuseColor = vec4(mk.rgb, mk.a * opacity);
         }`);
   };
   const marks = new THREE.Mesh(new THREE.PlaneGeometry(size, size), markMat);
@@ -172,7 +223,7 @@ function hangarFloor() {
   marks.position.y = 0.004;
   marks.receiveShadow = true;
   marks.renderOrder = -1;
-  g.add(floor, marks);
+  g.add(floor, marks, bayText());
   g.position.y = -0.36;
   return g;
 }
@@ -207,7 +258,7 @@ function studioCove() {
 function padGround() {
   const g = new THREE.Group();
   const c = concrete({ seed: 11 });
-  const apronMat = new THREE.MeshStandardMaterial({ color: 0x7c7a74, map: c.map, roughnessMap: c.roughnessMap, normalMap: c.normalMap, roughness: 1, alphaMap: radialFade(0.5, 1), transparent: true });
+  const apronMat = groundDetail(new THREE.MeshStandardMaterial({ color: 0x7c7a74, map: c.map, roughnessMap: c.roughnessMap, normalMap: c.normalMap, roughness: 1, alphaMap: radialFade(0.5, 1), transparent: true }));
   for (const t of [c.map, c.roughnessMap, c.normalMap]) t.repeat.set(8, 8);
   const apron = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), apronMat);
   apron.rotation.x = -Math.PI / 2;
@@ -240,15 +291,17 @@ function padGround() {
 function turntable() {
   const g = new THREE.Group();
   // machined, hard-anodised turntable with concentric tool marks
-  const s = 1024;
+  const s = 2048;
   const cv = document.createElement('canvas'); cv.width = cv.height = s;
   const ctx = cv.getContext('2d');
   ctx.fillStyle = '#808080'; ctx.fillRect(0, 0, s, s);
-  for (let r = 4; r < s / 2; r += 3) {
+  ctx.lineWidth = 2;
+  for (let r = 8; r < s / 2; r += 6) {
     ctx.strokeStyle = `rgba(${Math.random() > 0.5 ? 255 : 0},${Math.random() > 0.5 ? 255 : 0},128,0.03)`;
     ctx.beginPath(); ctx.arc(s / 2, s / 2, r, 0, Math.PI * 2); ctx.stroke();
   }
   const rough = new THREE.CanvasTexture(cv);
+  rough.anisotropy = 16;
   const deckMat = new THREE.MeshStandardMaterial({ color: 0x15181b, metalness: 0.25, roughness: 0.78, roughnessMap: rough });
   const deck = new THREE.Mesh(new THREE.CylinderGeometry(8.4, 8.4, 0.18, 128), deckMat);
   deck.position.y = -0.09;
@@ -321,6 +374,10 @@ export class Environment {
     // backdrops: the flight sky. Volumetric clouds over the sea in a computed atmosphere (skyvol.js);
     // ?sky=classic or the Film menu keeps the earlier dome (a photographic plate above a cloud deck).
     this.sky = stage.fx?.sky === false ? new SkyDome() : new VolumetricSky();
+    // the 16K band of the hangar and pad backdrops (4K / Ultra presets), over the scene's own background
+    this.band = new BackdropBand();
+    scene.add(this.band);
+    this.bands = new Map();
     /** The sun in flight (volumetric sky): elevation above the horizon and azimuth, in degrees
      *  (azimuth from the aircraft's nose, +x, toward its right wing, +z). Kept between visits. */
     this.flightSun = { elevation: 30, azimuth: 150 };
@@ -396,6 +453,20 @@ export class Environment {
     return this.plates.get(key);
   }
 
+  /** The two halves of a backdrop's 16K central band (see backdrop.js), or null. */
+  loadBand(name) {
+    if (!this.bands.has(name)) {
+      const one = (h) => new THREE.TextureLoader().loadAsync(`assets/hdri/${name}-16k-${h}.jpg`).then((t) => {
+        t.colorSpace = THREE.SRGBColorSpace;
+        t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+        t.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+        return t;
+      });
+      this.bands.set(name, Promise.all([one('a'), one('b')]).catch((e) => { console.warn('Backdrop band failed', name, e); return null; }));
+    }
+    return this.bands.get(name);
+  }
+
   /** 8K backdrops and Earth maps for the 4K / Ultra presets, when the GPU takes 8K textures. */
   setDetail(hires) {
     hires = hires && this.renderer.capabilities.maxTextureSize >= 8192;
@@ -404,6 +475,13 @@ export class Environment {
     this.platesHires = hires;
     const L = LOOKS[this.look];
     if (L?.plate) this.showBackdrop(this.look);
+    // the studio's environment map is sized by the preset too: rebuild it at the new size
+    if (this.showroomEnv) {
+      const old = this.showroomEnv;
+      this.showroomEnv = showroomEnvironment(this.pmrem, { renderer: this.renderer, size: hires ? 1024 : 256 });
+      if (this.scene.environment === old) this.scene.environment = this.showroomEnv;
+      old.dispose();
+    }
   }
 
   /** Put an HDRI look's backdrop behind the scene (plate when it has one, else the HDR itself). */
@@ -422,6 +500,9 @@ export class Environment {
     const plate = L.plate ? await this.loadPlate(L.plate) : null;
     if (this.look !== name || this.overlay || this.space || L.background !== 'hdri') return;
     this.scene.background = plate || h?.equirect || null;
+    if (plate && L.band && this.platesHires) {
+      this.loadBand(L.band).then((halves) => { if (halves && this.look === name && this.scene.background === plate) this.band.set(plate, halves[0], halves[1]); });
+    }
     this.scene.backgroundBlurriness = 0;
     this.bgGain = plate ? L.plateGain : 1;
     this.scene.backgroundIntensity = L.bgIntensity * this.bgGain;
@@ -499,6 +580,40 @@ export class Environment {
   /** Per-vehicle lighting adjustments, { [look]: { hemi, key, rim, rim2, envIntensity, exposure } }, merged over
    *  LOOKS by applyLook. A vehicle that sets none (null) gets the look exactly as defined above. */
   setVehicleLighting(over) { this.vehicleLighting = over || null; }
+
+  /**
+   * Fit the key light's shadow frustum to the subject's world bounds (a Box3), so the shadow map's
+   * texels go where the vehicle is instead of over a fixed 30 × 30 units. Never wider than that
+   * default; it grows at once when the subject does (exploded view, a turning rotor) and shrinks
+   * only when the subject is well inside it, and its edges sit on whole texels, so the map does not
+   * crawl from frame to frame.
+   */
+  fitShadow(box) {
+    const key = this.lights.key, cam = key.shadow.camera, R = 15;
+    let l = -R, r = R, b = -R, t = R;
+    if (box && !box.isEmpty()) {
+      const m = _fitM.lookAt(key.position, key.target.position, _fitUp).invert();
+      l = b = Infinity; r = t = -Infinity;
+      for (let i = 0; i < 8; i++) {
+        _fitV.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).sub(key.position).applyMatrix4(m);
+        l = Math.min(l, _fitV.x); r = Math.max(r, _fitV.x); b = Math.min(b, _fitV.y); t = Math.max(t, _fitV.y);
+      }
+      const px = (r - l) * 0.05 + 0.25, py = (t - b) * 0.05 + 0.25;
+      l = Math.max(l - px, -R); r = Math.min(r + px, R); b = Math.max(b - py, -R); t = Math.min(t + py, R);
+      if (!(r - l > 0.5 && t - b > 0.5)) { l = -R; r = R; b = -R; t = R; }      // the subject has left the stage (a launch)
+    }
+    const c = this._shadowFit || (this._shadowFit = { l: -R, r: R, b: -R, t: R });
+    const grow = l < c.l - 1e-3 || r > c.r + 1e-3 || b < c.b - 1e-3 || t > c.t + 1e-3;
+    const shrink = (r - l) < (c.r - c.l) * 0.82 || (t - b) < (c.t - c.b) * 0.82;
+    if (!grow && !shrink) return;
+    if (grow && !shrink) { l = Math.min(l, c.l); r = Math.max(r, c.r); b = Math.min(b, c.b); t = Math.max(t, c.t); }
+    // whole texels of the coarsest map in use, so a refit does not shift the pattern by a fraction
+    const q = 30 / 1024;
+    c.l = Math.max(Math.floor(l / q) * q, -R); c.r = Math.min(Math.ceil(r / q) * q, R);
+    c.b = Math.max(Math.floor(b / q) * q, -R); c.t = Math.min(Math.ceil(t / q) * q, R);
+    cam.left = c.l; cam.right = c.r; cam.bottom = c.b; cam.top = c.t;
+    cam.updateProjectionMatrix();
+  }
 
   /** Direction to the flight sun (unit vector). */
   flightSunDir(out = new THREE.Vector3()) {
@@ -589,7 +704,7 @@ export class Environment {
         this.scene.environmentRotation.set(0, L.bgRotation || 0, 0);
       });
     } else if (L.env === 'showroom') {
-      this.showroomEnv = this.showroomEnv || showroomEnvironment(this.pmrem);
+      this.showroomEnv = this.showroomEnv || showroomEnvironment(this.pmrem, { renderer: this.renderer, size: this.platesHires ? 1024 : 256 });
       this.scene.environment = this.showroomEnv;
       this.scene.environmentRotation.set(0, 0, 0);
     } else {
@@ -680,6 +795,7 @@ export class Environment {
   update(dt, camera) {
     if (this.showroom.dome.visible || this.floors.showroom.visible) this.showroom.update(camera);
     this.sky.position.copy(camera.position);
+    this.band.sync(this.scene);
     this.stars.position.copy(camera.position);
     this.gradient.position.copy(camera.position);
     this.stars.material.uniforms.dpr.value = this.renderer.getPixelRatio();

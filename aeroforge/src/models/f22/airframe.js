@@ -352,11 +352,44 @@ export function buildAirframe(ctx) {
     mass: 300, explode: [0, -1.25, 0],
     desc: 'Wraps the intake trunks and the belly. Below the wing roots the trunk sides lean inboard about 39° from the vertical down to the flat bottom, whose outer corners are only about 2.5 m apart (NAWDC front and back views), on the line of the inlets\' outer walls; over the main wheel wells the upper side bulges out to meet the wing root. The openings for the main weapons bay, both side bays and the main-gear wells are cut here; their doors close flush with saw-toothed edges.',
   }, [mesh(FR.gridSurface(rM, { closed: true, keep: keepB(stM, false) }), F.skin()), mesh(wellPatch.trunk, F.skin())]);
+  // Joggle lips at S_BE. The nozzles' external flaps start 4 mm inside the aft deck's and the belly's trailing edges
+  // (propulsion.js), and the skins are single surfaces, so from behind one looked through that 4 mm step into the engine
+  // bay: bright specks along the joint. A strip hangs from each skin's own edge vertices (so the seam has no crack),
+  // 45 mm deep and leaning 6 mm forward, clear of the flaps' front faces; it spans the gap the skin's edge is open over,
+  // from the stinger to the booms, and shows only as the riser of the step. Nothing of the outline moves.
+  const edgeLip = (upper) => {
+    const ring = rAft[rAft.length - 1], H = FR.ringB(FR.S_BE);
+    const [j0, j1] = upper ? [0, H.nUp - 1] : [H.nUp + H.nWall - 1, H.half - 1];
+    const z0 = FR.STINGER.half, z1 = FR.ENG_Z + 0.51, deep = upper ? -0.045 : 0.045;
+    const edge = [];
+    for (let j = j0; j < j1; j++) {
+      let a = ring[j], b = ring[j + 1];
+      if (a[2] > b[2]) [a, b] = [b, a];
+      if (b[2] <= z0 || a[2] >= z1 || b[2] - a[2] < 1e-9) continue;
+      const cut = (z) => { const t = (z - a[2]) / (b[2] - a[2]); return [a[0], a[1] + (b[1] - a[1]) * t, z]; };
+      edge.push([a[2] < z0 ? cut(z0) : a, b[2] > z1 ? cut(z1) : b]);
+    }
+    const pos = [], uv = [], idx = [];
+    for (const side of [1, -1]) {
+      for (const [a, b] of edge) {
+        const k = pos.length / 3;
+        for (const p of [a, b]) { pos.push(p[0], p[1], side * p[2], p[0] + 0.006, p[1] + deep, side * p[2]); uv.push(-p[0], p[2], -p[0] - 0.006, p[2] + 0.045); }
+        // (faces aft: the order turns over between the deck and the belly, and again on the mirrored side)
+        if ((side > 0) === upper) idx.push(k, k + 1, k + 2, k + 2, k + 1, k + 3); else idx.push(k, k + 2, k + 1, k + 2, k + 3, k + 1);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    return g;
+  };
   P('Aft fuselage upper skin', {
     system: 'Skin & fairings', skin: true, material: 'Titanium and high-temperature composite panels, engine-bay access doors',
     mass: 230, explode: [-0.6, 1.5, 0],
     desc: 'Covers the engine bays between the vertical tails, with access panels over the accessory drives and engine-bay equipment. The engines themselves come out downward, through the lower engine-change doors.',
-  }, mesh(FR.gridSurface(rAft, { closed: true, keep: keepB(stAft, true) }), F.skin()));
+  }, [mesh(FR.gridSurface(rAft, { closed: true, keep: keepB(stAft, true) }), F.skin()), mesh(edgeLip(true), F.skin(), { cast: false })]);
   // behind S_BE: a boom each side of the nozzles, cut off at 43° in plan under the stabilator, and the stinger
   const boomRing = (s, side) => {
     const zi = FR.boomInner(s), w = FR.bW(s), D = FR.bD(s), wb = FR.bWb(s);
@@ -395,7 +428,7 @@ export function buildAirframe(ctx) {
     system: 'Skin & fairings', skin: true, material: 'Titanium panels (hot structure beside the nozzles)',
     mass: 210, explode: [-0.6, -1.3, 0],
     desc: 'The underside of the engine bays, the two tail booms that run aft beside the nozzles to the stabilators, and the stinger between the nozzles that houses the arresting hook. The nozzles end inside the booms, which shield them from the side. Titanium is used where exhaust heat would soften aluminium or composites; the two large engine-change doors are cut into the underside.',
-  }, [mesh(merge([FR.gridSurface(rAft, { closed: true, keep: keepB(stAft, false) }), ...booms, FR.gridSurface(stg, { closed: true, uv: 'n' }), capAft(stg[stg.length - 1])]), F.skin())]);
+  }, [mesh(merge([FR.gridSurface(rAft, { closed: true, keep: keepB(stAft, false) }), ...booms, FR.gridSurface(stg, { closed: true, uv: 'n' }), capAft(stg[stg.length - 1])]), F.skin()), mesh(edgeLip(false), F.skin(), { cast: false })]);
 
   // lower engine-change doors: each F119 is lowered out of its bay on a trailer
   for (const side of [1, -1]) {

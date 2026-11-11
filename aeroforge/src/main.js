@@ -63,7 +63,8 @@ async function start() {
   window.__aeroforge = { stage, modes, FLEET, section, get app() { try { return app; } catch { return undefined; } } };   // undefined until boot has made it
   const log = new EventLog($('log'));
   // Ultra and 4K paint the large skins and stencils at twice the resolution for 4K close-ups
-  setTextureDetail(stage.quality === '4k' || stage.quality === 'ultra' ? 2 : 1);
+  // (FX.crisp, ?crisp=0: the close-up sharpening shaders of the skins and decals, see engine/surface.js)
+  setTextureDetail(stage.quality === '4k' || stage.quality === 'ultra' ? 2 : 1, { crisp: FX.crisp });
 
   for (const f of FLEET) {
     bootLine(`Building ${f.id === 'turbofan' ? 'turbofan rotor stages' : f.id} geometry`);

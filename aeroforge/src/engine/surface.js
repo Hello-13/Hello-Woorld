@@ -7,7 +7,7 @@ import { rng } from './materials.js';
 
 const cache = new Map();
 const once = (key, make) => {
-  if (!cache.has(key)) cache.set(key, make());
+  if (!cache.has(key)) { const t0 = performance.now(); cache.set(key, make()); (globalThis.__texMs ??= {})[key] = Math.round(performance.now() - t0); }   // TEMP-TIMING
   return cache.get(key);
 };
 
@@ -44,7 +44,11 @@ export function fbm(size, { seed = 1, octaves = 5, base = 4, gain = 0.5 } = {}) 
 // Resolution multiplier for the large procedural skins and the decals: 2 at Ultra / 4K so panel
 // lines, fasteners and stencils stay sharp in close-ups on 4K screens.
 let DETAIL = 1;
-export function setTextureDetail(k) { DETAIL = k; }
+// crisp: distance-field edges for decals and skin seams plus micro-detail in close-ups (FX.crisp, ?crisp=0 turns the
+// shader side off; the maps are then used exactly as painted)
+let CRISP = true;
+export function setTextureDetail(k, { crisp = true } = {}) { DETAIL = k; CRISP = !!crisp; }
+export const crispOn = () => CRISP;
 
 function canvas(w, h = w) {
   const c = document.createElement('canvas');
@@ -390,16 +394,123 @@ export function floorMarkings(size = 2048, worldSize = 80, { geometric = true } 
   });
 }
 
-/** Text / insignia decal on a transparent canvas. */
+// ------------------------------------------------------------------------------- decals
+const SDF_SPREAD = 4;                 // texels either side of the edge covered by a decal's distance field
+const decalFields = new WeakMap();    // texture.source → { sdf, width, height, ink }
+
+/** The distance field painted with a decal texture (null for opaque tiles): { sdf, width, height, ink }. */
+export const decalSdf = (texture) => (texture && decalFields.get(texture.source)) || null;
+
+/**
+ * Signed distance (in texels, clamped to ±SDF_SPREAD) from each texel centre to the outline where the
+ * alpha channel crosses `half`. The outline is traced through the canvas's antialiased coverage
+ * (marching squares), so it sits at sub-texel accuracy. Returns bytes, 128 = on the edge, bottom row first.
+ */
+function alphaSdf(px, W, H, half) {
+  const S = SDF_SPREAD, d2 = new Float32Array(W * H).fill(S * S);
+  const seg = (x0, y0, x1, y1) => {
+    const xa = Math.max(0, Math.ceil(Math.min(x0, x1) - S)), xb = Math.min(W - 1, Math.floor(Math.max(x0, x1) + S));
+    const ya = Math.max(0, Math.ceil(Math.min(y0, y1) - S)), yb = Math.min(H - 1, Math.floor(Math.max(y0, y1) + S));
+    const dx = x1 - x0, dy = y1 - y0, l2 = dx * dx + dy * dy || 1e-9;
+    for (let y = ya; y <= yb; y++) for (let x = xa, i = y * W + xa; x <= xb; x++, i++) {
+      let t = ((x - x0) * dx + (y - y0) * dy) / l2;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const ex = x0 + t * dx - x, ey = y0 + t * dy - y, q = ex * ex + ey * ey;
+      if (q < d2[i]) d2[i] = q;
+    }
+  };
+  const p = new Float64Array(8);
+  for (let y = 0; y < H - 1; y++) for (let x = 0, i = y * W; x < W - 1; x++, i++) {
+    const a = px[i * 4 + 3] - half, b = px[i * 4 + 7] - half, c = px[(i + W) * 4 + 3] - half, d = px[(i + W) * 4 + 7] - half;
+    const A = a > 0, B = b > 0, C = c > 0, D = d > 0;
+    if (A === B && B === C && C === D) continue;
+    let n = 0;
+    if (A !== B) { p[n++] = x + a / (a - b); p[n++] = y; }
+    if (B !== D) { p[n++] = x + 1; p[n++] = y + b / (b - d); }
+    if (C !== D) { p[n++] = x + c / (c - d); p[n++] = y + 1; }
+    if (A !== C) { p[n++] = x; p[n++] = y + a / (a - c); }
+    seg(p[0], p[1], p[2], p[3]);
+    if (n === 8) seg(p[4], p[5], p[6], p[7]);
+  }
+  const out = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0, i = y * W, o = (H - 1 - y) * W; x < W; x++, i++, o++) {
+    const dist = Math.sqrt(d2[i]) / (2 * S);
+    out[o] = Math.round(255 * (px[i * 4 + 3] > half ? 0.5 + dist : 0.5 - dist));
+  }
+  return out;
+}
+
+/**
+ * Straight-alpha decal pixels with the ink's colour carried into every transparent texel (each takes the
+ * colour of the nearest inked texel), so bilinear filtering and the mip chain blend ink with ink instead of
+ * with transparent black: no dark fringe round light lettering. Returns RGBA bytes, bottom row first.
+ */
+function bleedInk(px, W, H, half) {
+  const N = W * H, dist = new Float32Array(N), out = new Uint8Array(N * 4), src = new Int32Array(N);
+  for (let i = 0; i < N; i++) { const ink = px[i * 4 + 3] > half; dist[i] = ink ? 0 : 1e9; src[i] = ink ? i : -1; }
+  const pass = (y0, y1, dy, x0, x1, dx) => {
+    for (let y = y0; y !== y1; y += dy) for (let x = x0; x !== x1; x += dx) {
+      const i = y * W + x;
+      if (dist[i] === 0) continue;
+      const yy = y - dy, xx = x - dx, rowOk = yy >= 0 && yy < H;
+      let best = dist[i], from = src[i];
+      if (xx >= 0 && xx < W && dist[i - dx] + 1 < best) { best = dist[i - dx] + 1; from = src[i - dx]; }
+      if (rowOk) {
+        const j = yy * W + x;
+        if (dist[j] + 1 < best) { best = dist[j] + 1; from = src[j]; }
+        if (xx >= 0 && xx < W && dist[j - dx] + 1.4142 < best) { best = dist[j - dx] + 1.4142; from = src[j - dx]; }
+        if (x + dx >= 0 && x + dx < W && dist[j + dx] + 1.4142 < best) { best = dist[j + dx] + 1.4142; from = src[j + dx]; }
+      }
+      dist[i] = best; src[i] = from;
+    }
+  };
+  pass(0, H, 1, 0, W, 1);
+  pass(H - 1, -1, -1, W - 1, -1, -1);
+  for (let y = 0; y < H; y++) for (let x = 0, i = y * W, o = (H - 1 - y) * W * 4; x < W; x++, i++, o += 4) {
+    const k = (src[i] < 0 ? i : src[i]) * 4;
+    out[o] = px[k]; out[o + 1] = px[k + 1]; out[o + 2] = px[k + 2]; out[o + 3] = px[i * 4 + 3];
+  }
+  return out;
+}
+
+/**
+ * Text / insignia decal on a transparent canvas (an opaque drawing is returned as a plain tile).
+ * A transparent decal comes back with its ink colour bled into the clear texels and, kept beside it
+ * (decalSdf), a distance field of its outline: decal materials use the field to draw a sharp antialiased
+ * edge when the texture is magnified (engine/decals.js, crispDecal).
+ */
 export function decalTexture(key, w, h, draw) {
   return once(`decal.${key}`, () => {
-    const c = canvas(w * DETAIL, h * DETAIL);
+    const W = w * DETAIL, H = h * DETAIL;
+    const c = canvas(W, H);
     const ctx = c.getContext('2d');
     ctx.scale(DETAIL, DETAIL);
     draw(ctx, w, h);
-    const t = new THREE.CanvasTexture(c);
+    const px = ctx.getImageData(0, 0, W, H).data;
+    const hist = new Uint32Array(256);
+    for (let i = 3; i < px.length; i += 4) hist[px[i]]++;
+    if (hist[255] === W * H || hist[0] === W * H) {
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 16;
+      return t;
+    }
+    // the ink's own alpha: the commonest value among the well-covered texels (edges and overlaps are rarer)
+    let top = 255;
+    while (!hist[top]) top--;
+    let ink = top;
+    for (let a = top; a > top / 2; a--) if (hist[a] > hist[ink]) ink = a;
+    const t = new THREE.DataTexture(bleedInk(px, W, H, ink / 2), W, H, THREE.RGBAFormat, THREE.UnsignedByteType);
     t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 8;
+    t.magFilter = THREE.LinearFilter;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.generateMipmaps = true;
+    t.anisotropy = 16;
+    t.needsUpdate = true;
+    const sdf = new THREE.DataTexture(alphaSdf(px, W, H, ink / 2), W, H, THREE.RedFormat, THREE.UnsignedByteType);
+    sdf.magFilter = sdf.minFilter = THREE.LinearFilter;
+    sdf.needsUpdate = true;
+    decalFields.set(t.source, { sdf, width: W, height: H, ink: ink / 255 });
     return t;
   });
 }

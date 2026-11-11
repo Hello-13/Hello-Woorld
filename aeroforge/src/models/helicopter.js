@@ -15,6 +15,7 @@
 import * as THREE from 'three';
 import { Assembly } from '../engine/assembly.js';
 import { decalTexture } from '../engine/surface.js';
+import { crispDecal } from '../engine/decals.js';
 import { DEG, TAIL, MAT } from './uh60/common.js';
 import { buildFuselage, surfNormal, stencil } from './uh60/fuselage.js';
 import { buildMainRotor } from './uh60/mainRotor.js';
@@ -80,7 +81,7 @@ export function buildHelicopter() {
 
   // markings: painted straight onto the tail-cone surface
   const tc = byName('Tail cone skin');
-  for (const side of [1, -1]) tc.add(stencil(armyText(), { x0: -6.9, x1: -4.3, a0: -0.25, a1: 0.55, side, nx: 24 }));
+  for (const side of [1, -1]) { const st = stencil(armyText(), { x0: -6.9, x1: -4.3, a0: -0.25, a1: 0.55, side, nx: 24 }); crispDecal(st.material); tc.add(st); }
 
   A.finalize();
 

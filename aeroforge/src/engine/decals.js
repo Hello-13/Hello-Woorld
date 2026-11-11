@@ -3,7 +3,51 @@
 
 import * as THREE from 'three';
 import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
-import { decalTexture } from './surface.js';
+import { decalTexture, decalSdf, crispOn } from './surface.js';
+
+// Sharp decal edges. A decal's map carries its ink as filtered coverage, which is right when the texture is
+// minified (the mip chain averages it) but goes soft once a texel covers several pixels. Its distance field
+// (surface.js, decalSdf) stays sharp at any magnification: the edge is rebuilt from the field, one pixel wide,
+// and takes over from the map's own alpha as the decal's texels grow past a pixel.
+const CRISP_DECAL_PARS = /* glsl */`
+uniform sampler2D crispSdf;
+uniform vec2 crispSdfSize;
+uniform float crispInk;
+`;
+const CRISP_DECAL_MAP = /* glsl */`
+#ifdef USE_MAP
+	vec4 sampledDiffuseColor = texture2D( map, vMapUv );
+	{
+		vec2 crispT = vMapUv * crispSdfSize;
+		float crispTpp = max( length( dFdx( crispT ) ), length( dFdy( crispT ) ) );      // decal texels per screen pixel
+		float crispD = texture2D( crispSdf, vMapUv ).r;
+		float crispG = max( length( vec2( dFdx( crispD ), dFdy( crispD ) ) ), 1e-5 );   // field change per pixel
+		float crispA = clamp( ( crispD - 0.5 ) / crispG + 0.5, 0.0, 1.0 ) * crispInk;
+		sampledDiffuseColor.a = mix( crispA, sampledDiffuseColor.a, smoothstep( 0.6, 1.2, crispTpp ) );
+	}
+	diffuseColor *= sampledDiffuseColor;
+#endif
+`;
+
+/**
+ * Give a decal / stencil material (a lit built-in material whose map came from decalTexture) the
+ * distance-field edge. No-op when the map has no field or the crisp switch is off (FX.crisp, ?crisp=0).
+ */
+export function crispDecal(material) {
+  const f = crispOn() ? decalSdf(material.map) : null;
+  if (!f) return material;
+  const size = new THREE.Vector2(f.width, f.height);
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.crispSdf = { value: f.sdf };
+    shader.uniforms.crispSdfSize = { value: size };
+    shader.uniforms.crispInk = { value: f.ink };
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\n' + CRISP_DECAL_PARS)
+      .replace('#include <map_fragment>', CRISP_DECAL_MAP);
+  };
+  material.customProgramCacheKey = () => 'crisp-decal';
+  return material;
+}
 
 /**
  * Project a decal onto `target` (world matrices must be current). The decal mesh is returned
@@ -21,11 +65,11 @@ export function decal(target, texture, { at, dir, size, angle = 0, color = 0xfff
   e.setFromQuaternion(q);
   const g = new DecalGeometry(target, p, e, new THREE.Vector3(...size));
   if (into) { into.updateMatrixWorld(true); g.applyMatrix4(into.matrixWorld.clone().invert()); }
-  const mat = new THREE.MeshStandardMaterial({
+  const mat = crispDecal(new THREE.MeshStandardMaterial({
     map: texture, color, transparent: true, opacity, depthWrite: false, roughness, metalness,
     polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
     emissive: emissive ? new THREE.Color(color) : new THREE.Color(0), emissiveMap: emissive ? texture : null, emissiveIntensity: emissive,
-  });
+  }));
   const d = new THREE.Mesh(g, mat);
   d.userData.decal = true;
   d.receiveShadow = true;

@@ -320,15 +320,16 @@ export function buildCockpit(ctx) {
   // ------------------------------------------------------------------ pilot
   {
     const S = SEAT_S, s = [], hm = [];
-    s.push(new THREE.CapsuleGeometry(0.17, 0.42, 6, 12).rotateZ(0.32).translate(X(S + 0.04), 0.5, 0));  // torso
+    s.push(new THREE.CapsuleGeometry(0.17, 0.42, 12, 40).rotateZ(0.32).translate(X(S + 0.04), 0.5, 0));  // torso
     for (const side of [1, -1]) {
       // hip → knee → heel ≈ 0.45 + 0.45 m, heel on the floor near the pedals
-      s.push(FR.pipe([[S - 0.02, 0.22, side * 0.12], [S - 0.25, 0.3, side * 0.13], [S - 0.48, 0.34, side * 0.15], [S - 0.68, 0.18, side * 0.165], [S - 0.84, 0.04, side * 0.17]], 0.065, 8, 16));  // legs
-      s.push(FR.pipe([[S + 0.07, 0.72, side * 0.2], [S - 0.13, 0.45, side * 0.27], [S - 0.42, 0.4, side * 0.37]], 0.045, 8, 12));    // arms to stick / throttles
+      s.push(FR.pipe([[S - 0.02, 0.22, side * 0.12], [S - 0.25, 0.3, side * 0.13], [S - 0.48, 0.34, side * 0.15], [S - 0.68, 0.18, side * 0.165], [S - 0.84, 0.04, side * 0.17]], 0.065, 24, 32));  // legs
+      s.push(FR.pipe([[S + 0.07, 0.72, side * 0.2], [S - 0.13, 0.45, side * 0.27], [S - 0.42, 0.4, side * 0.37]], 0.045, 20, 24));    // arms to stick / throttles
     }
-    hm.push(new THREE.SphereGeometry(0.15, 20, 14).translate(X(S - 0.02), 0.99, 0));
-    const visor = new THREE.SphereGeometry(0.152, 18, 10, -Math.PI / 2 - 0.9, 1.8, Math.PI * 0.32, Math.PI * 0.3).rotateY(Math.PI).translate(X(S - 0.02), 0.99, 0);
-    const mask = new THREE.CylinderGeometry(0.045, 0.06, 0.1, 10).rotateZ(Math.PI / 2).translate(X(S - 0.16), 0.92, 0);
+    // (tessellated for a 4K close-up through the canopy: the helmet's outline stays within 0.2 mm of a true sphere)
+    hm.push(new THREE.SphereGeometry(0.15, 64, 40).translate(X(S - 0.02), 0.99, 0));
+    const visor = new THREE.SphereGeometry(0.152, 28, 14, -Math.PI / 2 - 0.9, 1.8, Math.PI * 0.32, Math.PI * 0.3).rotateY(Math.PI).translate(X(S - 0.02), 0.99, 0);
+    const mask = new THREE.CylinderGeometry(0.045, 0.06, 0.1, 40).rotateZ(Math.PI / 2).translate(X(S - 0.16), 0.92, 0);
     P('Pilot', {
       system: 'Crew systems', material: 'Pressure-breathing / anti-g ensemble, helmet', mass: 100,
       explode: [0, 2.6, 0],
