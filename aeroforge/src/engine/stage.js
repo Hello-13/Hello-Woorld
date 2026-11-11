@@ -22,12 +22,13 @@ installShading();   // specular antialiasing and the highlight clamp, before any
 // pixels than this (the 4K preset supersamples a 3840 × 2160 frame onto smaller screens);
 // showroom.reflect: mirror-floor resolution (fraction of the canvas, 0 = off);
 // showroom.contact: contact-shadow map size; contactEvery: refresh every n frames
-// dof: depth-of-field pass available, with its depth render at this fraction of the frame (0 = never)
+// dof: depth-of-field pass available, with its depth render at this fraction of the frame (0 = never;
+// 1 = full resolution, so the in-focus plane and its edges stay pixel-sharp at 4K)
 export const UHD = 3840 * 2160;
 export const QUALITY = {
-  '4k': { label: '4K', dpr: 4, minPixels: UHD, msaa: 2, ao: 1, shadow: 4096, dof: 0.5, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
-  ultra: { label: 'Ultra', dpr: 3, msaa: 4, ao: 1, shadow: 4096, dof: 0.5, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
-  high: { label: 'High', dpr: 2, msaa: 4, ao: 0.5, shadow: 2048, dof: 0.5, showroom: { reflect: 0.38, contact: 512, contactEvery: 1 } },
+  '4k': { label: '4K', dpr: 4, minPixels: UHD, msaa: 2, ao: 1, shadow: 4096, dof: 1, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
+  ultra: { label: 'Ultra', dpr: 3, msaa: 4, ao: 1, shadow: 4096, dof: 1, showroom: { reflect: 0.5, contact: 1024, contactEvery: 1 } },
+  high: { label: 'High', dpr: 2, msaa: 4, ao: 0.5, shadow: 2048, dof: 1, showroom: { reflect: 0.38, contact: 512, contactEvery: 1 } },
   balanced: { label: 'Balanced', dpr: 1.5, msaa: 4, ao: 0, shadow: 2048, dof: 0, showroom: { reflect: 0, contact: 512, contactEvery: 2 } },
   performance: { label: 'Performance', dpr: 1, msaa: 0, ao: 0, shadow: 1024, dof: 0, showroom: { reflect: 0, contact: 256, contactEvery: 3 } },
 };
@@ -112,15 +113,58 @@ class SoftBloomPass extends UnrealBloomPass {
   }
 }
 
-/** Depth of field (three's BokehPass, in the normal composer order) whose scene-depth render runs
- *  at a fraction of the frame and never above AO_MAX_PIXELS; the blur itself writes the full frame. */
-class HalfDepthBokehPass extends BokehPass {
-  constructor(scene, camera, params, resScale = 0.5) {
+// The 41-tap kernel of three's BokehShader, as offsets scaled by the pixel's blur (outer ring 0.4).
+const BOKEH_TAPS = (() => {
+  const ring = [[0, 0.4], [0.15, 0.37], [0.29, 0.29], [-0.37, 0.15], [0.4, 0], [0.37, -0.15], [0.29, -0.29], [-0.15, -0.37],
+    [0, -0.4], [-0.15, 0.37], [-0.29, 0.29], [0.37, 0.15], [-0.4, 0], [-0.37, -0.15], [-0.29, -0.29], [0.15, -0.37]];
+  const r9 = [[0.15, 0.37], [-0.37, 0.15], [0.37, -0.15], [-0.15, -0.37], [-0.15, 0.37], [0.37, 0.15], [-0.37, -0.15], [0.15, -0.37]].map(([x, y]) => [x * 0.9, y * 0.9]);
+  const r7 = [[0.29, 0.29], [0.4, 0], [0.29, -0.29], [0, -0.4], [-0.29, 0.29], [-0.4, 0], [-0.29, -0.29], [0, 0.4]].map(([x, y]) => [x * 0.7, y * 0.7]);
+  const r4 = r7.map(([x, y]) => [(x / 0.7) * 0.4, (y / 0.7) * 0.4]);
+  return [...ring, ...r9, ...r7, ...r4].map(([x, y]) => `vec2(${x.toFixed(4)}, ${y.toFixed(4)})`).join(', ');
+})();
+
+/** Depth of field: three's BokehPass in the normal composer order, with two changes to its
+ *  shader only. (1) Each tap is weighted by whether the sampled pixel's own blur disc reaches this
+ *  pixel (scatter-as-gather), so a sharp subject never bleeds a halo into the defocused background
+ *  and a pixel in focus is an exact copy of the beauty frame. (2) The scene-depth render can run at
+ *  a fraction of the frame (resScale; 1 on the presets that carry the pass). */
+class LensPass extends BokehPass {
+  constructor(scene, camera, params, resScale = 1) {
     super(scene, camera, params);
     this.resScale = resScale;
+    this.materialBokeh.fragmentShader = /* glsl */`
+      #include <common>
+      varying vec2 vUv;
+      uniform sampler2D tColor; uniform sampler2D tDepth;
+      uniform float maxblur, aperture, nearClip, farClip, focus, aspect;
+      #include <packing>
+      const vec2 TAPS[40] = vec2[](${BOKEH_TAPS});
+      float blurAt(vec2 uv) {
+        float z = perspectiveDepthToViewZ(unpackRGBAToDepth(texture2D(tDepth, uv)), nearClip, farClip);
+        return clamp((focus + z) * aperture, -maxblur, maxblur);
+      }
+      void main() {
+        vec2 aspectcorrect = vec2(1.0, aspect);
+        float dofblur = blurAt(vUv);
+        vec4 col = texture2D(tColor, vUv);
+        float wsum = 1.0;
+        if (abs(dofblur) > 1e-6) {
+          for (int i = 0; i < 40; i++) {
+            vec2 o = TAPS[i] * aspectcorrect * dofblur;
+            vec2 uv = vUv + o;
+            float reach = abs(blurAt(uv)) * 0.4;                 // the tap's own disc radius, in uv
+            float w = smoothstep(length(o) * 0.85, length(o) * 1.05, reach + 1e-5);
+            col += texture2D(tColor, uv) * w;
+            wsum += w;
+          }
+        }
+        gl_FragColor = col / wsum;
+        gl_FragColor.a = 1.0;
+      }`;
+    this.materialBokeh.needsUpdate = true;
   }
   setSize(w, h) {
-    const k = Math.min(this.resScale, Math.sqrt(AO_MAX_PIXELS / Math.max(1, w * h)));
+    const k = this.resScale;
     this.materialBokeh.uniforms.aspect.value = w / h;
     this.renderTargetDepth.setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
   }
@@ -181,10 +225,11 @@ const SanitizeShader = {
 // Final grade in display space (after AgX, which it leaves alone): a touch of lateral chromatic
 // aberration toward the corners, a gentle S-curve, a soft highlight shoulder, lift (shadows are
 // only ever raised, never crushed, except for the orbit look's toe), split toning, saturation,
-// vignette and fine grain. The per-look values live in GRADES and are eased between looks.
+// vignette and a per-pixel dither (grain held at about one 8-bit step, so gradients never band
+// and it never reads as grain). The per-look values live in GRADES and are eased between looks.
 const GradeShader = {
   uniforms: {
-    tDiffuse: { value: null }, time: { value: 0 }, vignette: { value: 0.3 }, grain: { value: 0.022 },
+    tDiffuse: { value: null }, time: { value: 0 }, vignette: { value: 0.3 }, grain: { value: 0.008 },
     aberration: { value: 0.0008 }, contrast: { value: 0.14 }, split: { value: 0.035 },
     shadowTint: { value: new THREE.Vector3(-0.35, 0.05, 0.6) }, highTint: { value: new THREE.Vector3(0.5, 0.18, -0.4) },
     lift: { value: new THREE.Vector3(0, 0, 0) }, saturation: { value: 1 }, shoulder: { value: 0 }, toe: { value: 0 },
@@ -225,16 +270,16 @@ const GradeShader = {
 export const GRADES = {
   neutral: { contrast: 0.14, split: 0.035, vignette: 0.3, shadowTint: [-0.35, 0.05, 0.6], highTint: [0.5, 0.18, -0.4], lift: [0, 0, 0], saturation: 1, shoulder: 0, toe: 0 },
   // studio: neutral colour, deep (not crushed) blacks, a soft shoulder keeping paint highlights in hand
-  showroom: { contrast: 0.12, split: 0.03, vignette: 0.34, shadowTint: [-0.25, 0.02, 0.45], highTint: [0.35, 0.15, -0.25], lift: [0.006, 0.007, 0.009], saturation: 1.0, shoulder: 0.14, toe: 0 },
-  studio: { contrast: 0.12, split: 0.03, vignette: 0.32, shadowTint: [-0.25, 0.02, 0.45], highTint: [0.35, 0.15, -0.25], lift: [0.006, 0.007, 0.009], saturation: 1.0, shoulder: 0.12, toe: 0 },
+  showroom: { contrast: 0.12, split: 0.03, vignette: 0.26, shadowTint: [-0.25, 0.02, 0.45], highTint: [0.35, 0.15, -0.25], lift: [0.006, 0.007, 0.009], saturation: 1.0, shoulder: 0.14, toe: 0 },
+  studio: { contrast: 0.12, split: 0.03, vignette: 0.26, shadowTint: [-0.25, 0.02, 0.45], highTint: [0.35, 0.15, -0.25], lift: [0.006, 0.007, 0.009], saturation: 1.0, shoulder: 0.12, toe: 0 },
   // hangar: warm practical lights in the highlights, cool fluorescent shadows, a warm lift
-  hangar: { contrast: 0.12, split: 0.045, vignette: 0.3, shadowTint: [-0.3, -0.05, 0.5], highTint: [0.6, 0.28, -0.3], lift: [0.012, 0.01, 0.008], saturation: 1.04, shoulder: 0.08, toe: 0 },
+  hangar: { contrast: 0.12, split: 0.045, vignette: 0.26, shadowTint: [-0.3, -0.05, 0.5], highTint: [0.6, 0.28, -0.3], lift: [0.012, 0.01, 0.008], saturation: 1.04, shoulder: 0.08, toe: 0 },
   // open sky: cool, high-key, airy shadows
-  sky: { contrast: 0.08, split: 0.03, vignette: 0.22, shadowTint: [-0.15, 0.05, 0.4], highTint: [0.1, 0.15, 0.35], lift: [0.02, 0.025, 0.035], saturation: 0.95, shoulder: 0.05, toe: 0 },
+  sky: { contrast: 0.08, split: 0.03, vignette: 0.18, shadowTint: [-0.15, 0.05, 0.4], highTint: [0.1, 0.15, 0.35], lift: [0.02, 0.025, 0.035], saturation: 0.95, shoulder: 0.05, toe: 0 },
   // launch pad at dawn: golden low sun, violet shadows
-  pad: { contrast: 0.14, split: 0.06, vignette: 0.3, shadowTint: [-0.2, -0.05, 0.45], highTint: [0.7, 0.3, -0.35], lift: [0.012, 0.008, 0.012], saturation: 1.06, shoulder: 0.1, toe: 0 },
+  pad: { contrast: 0.14, split: 0.06, vignette: 0.26, shadowTint: [-0.2, -0.05, 0.45], highTint: [0.7, 0.3, -0.35], lift: [0.012, 0.008, 0.012], saturation: 1.06, shoulder: 0.1, toe: 0 },
   // orbit: hard sun, true blacks (only the deepest tones, so shadowed MLI keeps its earthshine)
-  orbit: { contrast: 0.2, split: 0.02, vignette: 0.26, shadowTint: [-0.1, 0.0, 0.15], highTint: [0.2, 0.1, -0.1], lift: [0, 0, 0], saturation: 0.98, shoulder: 0, toe: 0.35 },
+  orbit: { contrast: 0.2, split: 0.02, vignette: 0.22, shadowTint: [-0.1, 0.0, 0.15], highTint: [0.2, 0.1, -0.1], lift: [0, 0, 0], saturation: 0.98, shoulder: 0, toe: 0.35 },
 };
 
 export class Stage {
@@ -374,7 +419,7 @@ export class Stage {
     // focus is set (Film mode, tour close-ups), and never on the presets without it or with ?dof=0
     this.bokeh = null;
     if (FX.dof && q.dof) {
-      this.bokeh = new HalfDepthBokehPass(this.scene, this.camera, { focus: 10, aperture: 0, maxblur: 0.012 }, q.dof);
+      this.bokeh = new LensPass(this.scene, this.camera, { focus: 10, aperture: 0, maxblur: 0.012 }, q.dof);
       this.bokeh.enabled = false;
       composer.addPass(this.bokeh);
     }

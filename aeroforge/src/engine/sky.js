@@ -27,6 +27,9 @@
 
 import * as THREE from 'three';
 import { cloudNoise, CLOUD_FIELD_GLSL, WRAP, DRIFT_WRAP } from './clouds.js';
+import { ATM, SKY_TIERS, skyRadiance } from './skymath.js';
+
+export { SKY_TIERS, skyRadiance };
 
 export const R_EARTH_M = 6371000;
 /** Cirrus veil altitude (m): the aircraft flies under it below this height. */
@@ -83,12 +86,16 @@ const vert = /* glsl */`
 const ATMOSPHERE_GLSL = /* glsl */`
   const float R_E = 6371000.0;
   const float H_ATM = 80000.0;
-  const vec3 BETA_R = vec3(5.8e-6, 13.5e-6, 33.1e-6);
-  const float H_R = 8000.0;
-  const float BETA_M = 3.0e-6;
-  const float H_M = 1500.0;
-  const float MIE_G = 0.76;
-  const float SUN_E = 19.0;
+  const vec3 BETA_R = vec3(${ATM.betaR.map((v) => v.toExponential(2)).join(', ')});
+  const float H_R = ${ATM.HR.toFixed(1)};
+  const float BETA_M = ${ATM.betaM.toExponential(2)};
+  const float H_M = ${ATM.HM.toFixed(1)};
+  const float MIE_G = ${ATM.g.toFixed(3)};
+  const float SUN_E = ${ATM.E.toFixed(2)};
+  const float SS_CLIP = ${ATM.clip.toFixed(3)};
+  const float MIE_BG = ${ATM.bg.toFixed(4)};
+  const float K_MS = ${ATM.kms.toFixed(3)};
+  const vec3 MS_COL = vec3(${ATM.ms.map((v) => v.toFixed(3)).join(', ')});
 
   float airmass(float sinE) {
     float e = degrees(asin(clamp(sinE, -1.0, 1.0)));
@@ -108,25 +115,28 @@ const ATMOSPHERE_GLSL = /* glsl */`
     float g2 = MIE_G * MIE_G;
     float pm = 0.0795775 * (1.0 - g2) / pow(max(1.0 + g2 - 2.0 * MIE_G * cosT, 1e-4), 1.5);
     float xs = airmass(sunDir.y);
-    vec3 tau = vec3(0.0), L = vec3(0.0);
+    vec3 tau = vec3(0.0), LR = vec3(0.0); float LM = 0.0;
     float dt = len / float(max(n, 1));
     for (int i = 0; i < 10; i++) {
       if (i >= n) break;
       float t = (float(i) + 0.5) * dt;
       float h = max(sqrt(max(r0 * r0 + t * t + 2.0 * r0 * t * d.y, 0.0)) - R_E, 0.0);
       float rhoR = exp(-h / H_R);
-      float rhoM = exp(-h / H_M) + 0.004 * exp(-h / 25000.0);      // a thin background aerosol
+      float rhoM = exp(-h / H_M) + MIE_BG * exp(-h / 25000.0);      // the thin background aerosol
       vec3 ext = BETA_R * rhoR + vec3(BETA_M * 1.1 * rhoM);
       vec3 tauSun = (BETA_R * H_R * rhoR + vec3(BETA_M * 1.1 * H_M * rhoM)) * xs;
       tau += ext * dt * 0.5;
       vec3 T = exp(-(tau + tauSun));
-      L += T * (BETA_R * rhoR * pr + vec3(BETA_M * rhoM * pm)) * dt;
+      LR += T * BETA_R * rhoR * pr * dt;
+      LM += T.g * BETA_M * rhoM * pm * dt;
       tau += ext * dt * 0.5;
     }
-    transm = exp(-tau);
-    // multiple scattering: a pale lift in proportion to the optical depth along the view
-    L += (1.0 - transm) * vec3(0.02, 0.024, 0.03);
-    return L * sunColor * SUN_E * hazeGain;
+    transm = exp(-(tau + K_MS * tau.g));
+    // the higher orders of scattering: the Rayleigh light is soft-clipped (a deep path whitens and
+    // dims), the Mie aureole stays HDR for the bloom, a pale lift grows with the optical depth
+    vec3 ss = LR * SUN_E;
+    ss = SS_CLIP * (1.0 - exp(-ss / SS_CLIP));
+    return (ss + vec3(LM * SUN_E) + (1.0 - transm) * MS_COL) * sunColor;
   }
 `;
 
@@ -243,8 +253,11 @@ const frag = /* glsl */`
     vec2 q = d.xz * t + camXZ + shift;
     float foot = t * pixAngle / sqrt(max(d.y, 0.03));
     float mask = nz(q + 21000.0, T_REGION, foot).r;
-    vec4 S = nz(vec2(q.x * 0.5, q.y * 2.0) + 777.0, T_LAND, foot);
-    float a = smoothstep(0.46, 0.82, S.b * 0.5 + S.g * 0.2 + mask * 0.38) * 0.34;
+    vec4 S = nz(vec2(q.x * 0.5, q.y * 2.0) + 777.0, T_CIRRUS, foot);
+    // fibres: the same streaked lookup at 3 km and 600 m, so the veil keeps structure up close
+    float fib = nz(vec2(q.x * 0.25, q.y * 2.0) + 311.0, T_CFIBRE, foot).b;
+    float fib2 = nz(vec2(q.x * 0.25, q.y * 2.0) + 97.0, T_CFINE, foot).g;
+    float a = smoothstep(0.46, 0.82, S.b * 0.42 + S.g * 0.14 + mask * 0.3 + fib * 0.1 + fib2 * 0.04) * 0.34;
     a *= smoothstep(300.0, 1800.0, cirrusH) * smoothstep(0.004, 0.05, d.y);
     float fwd = pow(max(dot(d, sunDir), 0.0), 8.0);
     vec3 cc = sunColor * (0.78 + 0.9 * fwd) + skyAmbient * 0.35;
@@ -357,7 +370,8 @@ const frag = /* glsl */`
     // and veiled by the same scattering as the sky, so the far deck dissolves into the horizon band
     vec3 tr;
     vec3 air = inscatter(d, tHit, 6, tr);
-    return col * tr + air;
+    tr = pow(tr, vec3(hazeGain));
+    return col * tr + air * hazeGain;
 #endif
   }
 
@@ -398,52 +412,7 @@ const frag = /* glsl */`
     gl_FragColor = vec4(max(col, 0.0), 1.0);
   }`;
 
-// ------------------------------------------------------------------------------- JS twin
-const ATM = { R: 6371000, H: 80000, betaR: [5.8e-6, 13.5e-6, 33.1e-6], HR: 8000, betaM: 3.0e-6, HM: 1500, g: 0.76, E: 19 };
-function airmass(sinE) {
-  const e = THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(sinE, -1, 1)));
-  return 1 / Math.max(sinE + 0.15 * Math.pow(Math.max(e + 3.885, 0.1), -1.253), 0.02);
-}
-/** The sky's radiance (linear rgb) in direction dir (unit, y up) for a camera at camAlt (m),
- *  the same single-scattering model as the shader; sunColor is a THREE.Color or [r, g, b]. */
-export function skyRadiance(dir, sunDir, camAlt, sunColor = [1, 1, 1], gain = 1, n = 10) {
-  const sc = sunColor.isColor ? [sunColor.r, sunColor.g, sunColor.b] : sunColor;
-  const r0 = ATM.R + camAlt, b = r0 * dir.y, c = r0 * r0 - (ATM.R + ATM.H) ** 2;
-  const len = -b + Math.sqrt(Math.max(b * b - c, 0));
-  const cosT = dir.x * sunDir.x + dir.y * sunDir.y + dir.z * sunDir.z;
-  const pr = 0.0596831 * (1 + cosT * cosT);
-  const g2 = ATM.g * ATM.g;
-  const pm = 0.0795775 * (1 - g2) / Math.pow(Math.max(1 + g2 - 2 * ATM.g * cosT, 1e-4), 1.5);
-  const xs = airmass(sunDir.y);
-  const tau = [0, 0, 0], L = [0, 0, 0];
-  const dt = len / n;
-  for (let i = 0; i < n; i++) {
-    const t = (i + 0.5) * dt;
-    const h = Math.max(Math.sqrt(Math.max(r0 * r0 + t * t + 2 * r0 * t * dir.y, 0)) - ATM.R, 0);
-    const rhoR = Math.exp(-h / ATM.HR), rhoM = Math.exp(-h / ATM.HM) + 0.004 * Math.exp(-h / 25000);
-    for (let k = 0; k < 3; k++) {
-      const ext = ATM.betaR[k] * rhoR + ATM.betaM * 1.1 * rhoM;
-      const tauSun = (ATM.betaR[k] * ATM.HR * rhoR + ATM.betaM * 1.1 * ATM.HM * rhoM) * xs;
-      tau[k] += ext * dt * 0.5;
-      L[k] += Math.exp(-(tau[k] + tauSun)) * (ATM.betaR[k] * rhoR * pr + ATM.betaM * rhoM * pm) * dt;
-      tau[k] += ext * dt * 0.5;
-    }
-  }
-  const ms = [0.02, 0.024, 0.03];
-  return L.map((v, k) => (v + (1 - Math.exp(-tau[k])) * ms[k]) * sc[k] * ATM.E * gain);
-}
-
 // ------------------------------------------------------------------------------- the dome
-/** Quality tiers for the deck: relief = ray-march steps (0 = flat), shadow = self-shadow steps,
- *  detail = the 12 m octave, cirrus / groundShadow / flare = 0 | 1. */
-export const SKY_TIERS = {
-  '4k':        { relief: 6, shadow: 4, detail: 1, cirrus: 1, groundShadow: 1, flare: 1 },
-  ultra:       { relief: 6, shadow: 4, detail: 1, cirrus: 1, groundShadow: 1, flare: 1 },
-  high:        { relief: 4, shadow: 3, detail: 1, cirrus: 1, groundShadow: 1, flare: 1 },
-  balanced:    { relief: 0, shadow: 2, detail: 0, cirrus: 1, groundShadow: 1, flare: 1 },
-  performance: { relief: 0, shadow: 0, detail: 0, cirrus: 0, groundShadow: 0, flare: 0 },
-};
-
 export class SkyDome extends THREE.Mesh {
   constructor() {
     const uniforms = {
@@ -552,7 +521,8 @@ export class SkyDome extends THREE.Mesh {
     u.towers.value = this.towers;
     u.groundHaze.value = THREE.MathUtils.clamp(0.4 + deckTop / 14000, 0.4, 0.88);
     u.camXZ.value.set(camera.position.x * unitMetres, camera.position.z * unitMetres);
-    u.pixAngle.value = (camera.fov * Math.PI / 180) / Math.max(pixels, 1);
+    const fullH = camera.view?.enabled ? camera.view.fullHeight : pixels;    // a view-offset tile keeps the full frame's pixel angle
+    u.pixAngle.value = (camera.fov * Math.PI / 180) / Math.max(fullH, 1);
     u.resolution.value.set(Math.max(width, 1), Math.max(pixels, 1));
     u.cirrusH.value = CIRRUS_ALT - camAlt;
     u.camAlt.value = camAlt;
@@ -564,9 +534,9 @@ export class SkyDome extends THREE.Mesh {
     if (aw > 0) {
       // the horizon colour (for the scene fog) and the sky light on the cloud tops, from the same model
       const sun = u.sunDir.value, sc = u.sunColor.value;
-      const hz = skyRadiance(this._tmpDir.set(-sun.x, 0, -sun.z).normalize().multiplyScalar(0.9995).setY(0.03).normalize(), sun, camAlt, sc, this.hazeGain);
-      const z = skyRadiance(this._tmpDir.set(0, 1, 0), sun, camAlt, sc, this.hazeGain);
-      const m = skyRadiance(this._tmpDir.set(sun.x, 0.5, sun.z).normalize(), sun, camAlt, sc, this.hazeGain);
+      const hz = skyRadiance(this._tmpDir.set(-sun.x, 0, -sun.z).normalize().setY(0.03).normalize(), sun, camAlt, sc);
+      const z = skyRadiance(this._tmpDir.set(0, 1, 0), sun, camAlt, sc);
+      const m = skyRadiance(this._tmpDir.set(sun.x, 0.5, sun.z).normalize(), sun, camAlt, sc);
       const amb = [0, 1, 2].map((i) => (z[i] * 0.3 + m[i] * 0.4 + hz[i] * 0.3) * 1.6);
       g.haze = g.haze.map((v, i) => lerp(v, hz[i], aw));
       g.ambient = g.ambient.map((v, i) => lerp(v, amb[i], aw));

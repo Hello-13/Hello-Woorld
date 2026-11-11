@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { rng } from './materials.js';
+import { contrailFactor } from './skymath.js';
 
 // ------------------------------------------------------------------------------- x-ray
 export function xrayMaterial(color = 0x5fd4ff, power = 2.2, base = 0.035) {
@@ -368,15 +369,7 @@ export function atmosphereShell(radius) {
 }
 
 // ------------------------------------------------------------------------------- contrail
-/**
- * Contrail factor for an aircraft: condensation trails form where the exhaust's water vapour
- * freezes, in the cold air above roughly 8 km (the Schmidt–Appleman threshold at mid-latitudes:
- * −40 °C and below), and need the engine running. 0..1.
- */
-export function contrailFactor(altitude, { running = 1 } = {}) {
-  const a = Math.min(Math.max((altitude - 7600) / 2000, 0), 1);
-  return a * a * (3 - 2 * a) * Math.min(Math.max(running, 0), 1);
-}
+export { contrailFactor };
 
 /**
  * A generic contrail: a ribbon behind an engine nozzle, built in the vehicle's metres along −x

@@ -138,7 +138,7 @@ const floorFrag = /* glsl */`
     vec3 r = vec3(0.0);
     #ifdef DEPTHBLUR
       float hw = 2.0 * texture2D(tDepth, uv).x / max(oblique, 1e-4);     // height below the floor / view depth
-      float px = clamp(spread * hw * focalPx, 0.0, maxBlur);             // blur radius, reflection texels
+      float px = clamp(spread * hw * focalPx, 0.75, maxBlur);            // blur radius, reflection texels (never a hard texel)
       float lod = max(0.0, log2(max(px, 1.0)) - 0.6);
       for (int i = 0; i < 12; i++) r += textureLod(tDiffuse, uv + P[i] * texel * px, lod).rgb;
     #else
@@ -391,8 +391,9 @@ export class Showroom {
   resize() {
     if (!this.reflectScale) return;
     const c = this.stage.renderer.domElement;
-    // the floor blurs its reflection, so past ~1.2 MP extra resolution is invisible
-    const k = Math.min(this.reflectScale, Math.sqrt(1.2e6 / Math.max(1, c.width * c.height)));
+    // the floor blurs most of its reflection, so past ~2.4 MP (1.2 MP with the fixed blur) extra
+    // resolution is invisible; the contact zone is sharp, so the depth-blurred floor gets the higher cap
+    const k = Math.min(this.reflectScale, Math.sqrt((this.depthBlur ? 2.4e6 : 1.2e6) / Math.max(1, c.width * c.height)));
     const w = Math.max(64, Math.round(c.width * k));
     const h = Math.max(64, Math.round(c.height * k));
     this.reflected = false;

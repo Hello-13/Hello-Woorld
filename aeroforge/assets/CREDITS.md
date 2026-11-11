@@ -10,7 +10,7 @@
 | `dawn-8k.jpg`, `dawn-4k.jpg` | Launch-pad look, backdrop | Poly Haven's tonemapped 8K JPG of the same HDRI; the 4K copy is a Lanczos downscale |
 | `studio.exr` (2048 × 1024) | Studio look, lighting | Poly Haven [Studio Small 03](https://polyhaven.com/a/studio_small_03), 2K EXR |
 | `sky.exr` (1024 × 512, 5.0 MB) | Open-sky look, lighting | Poly Haven [Kloofendal 43d Clear (Pure Sky)](https://polyhaven.com/a/kloofendal_43d_clear_puresky), 1K EXR |
-| `sky-8k.jpg` (8192 × 4096, 1.1 MB), `sky-4k.jpg` (4096 × 2048, 0.3 MB) | Open-sky look, the sky above the horizon | The same HDRI's 8K Radiance HDR, tone-mapped by our own plates script: radiance kept 1:1 up to 0.5, rolled off above it with a luminance shoulder y = K + (1 − K)(1 − e^−(x−K)/1.6) that the sky shader (src/engine/sky.js) inverts, so the sun's aureole decodes back to HDR; triangular dither before quantisation; the 4K copy is a Lanczos downscale |
+| `sky-8k.jpg` (8192 × 4096, 1.1 MB), `sky-4k.jpg` (4096 × 2048, 0.3 MB) | Open-sky look, the sky above the horizon below 7 km altitude and in the `simple` fallback (at cruise the sky is computed: src/engine/skymath.js) | The same HDRI's 8K Radiance HDR, tone-mapped by our own plates script: radiance kept 1:1 up to 0.5, rolled off above it with a luminance shoulder y = K + (1 − K)(1 − e^−(x−K)/1.6) that the sky shader (src/engine/sky.js) inverts, so the sun's aureole decodes back to HDR; triangular dither before quantisation; the 4K copy is a Lanczos downscale |
 
 Poly Haven assets are released under CC0. The 8K backdrops load for the 4K and Ultra graphics
 presets on GPUs that accept 8192-pixel textures; other presets use the 4K copies. The cloud deck
