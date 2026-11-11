@@ -30,7 +30,7 @@ test('the program has keys for the reveal, the orbit, every detail and the pull-
   assert.ok(Number.isInteger(prog.turns));
   // the hero key frames the whole subject at the hero distance
   const hero = prog.keys[1];
-  assert.ok(Math.abs(Math.exp(hero[2]) - prog.hero.dist) < 1e-9);
+  assert.ok(Math.abs(Math.exp(hero[2]) - prog.hero.dist * 0.95) < 1e-6);
   assert.ok(prog.hero.dist > 10 && prog.hero.dist < 60, `hero distance ${prog.hero.dist}`);
 });
 

@@ -16,7 +16,8 @@ import { QuizPlayer } from './learn/quiz.js';
 import { SectionCut, AXES, AXIS_ORDER } from './engine/section.js';
 import { PartSearch } from './ui/search.js';
 import { SYSTEMS, systemColor } from './engine/systems.js';
-import { QUALITY } from './engine/stage.js';
+import { QUALITY, FX, setEffect } from './engine/stage.js';
+import { Film } from './engine/film.js';
 import { setTextureDetail } from './engine/surface.js';
 import { EventLog } from './ui/log.js';
 import { el, fmt, segmented } from './ui/dom.js';
@@ -88,8 +89,9 @@ async function start() {
 
   const app = {
     current: null, entry: null, lab: null, mode: 'studio', explode: 0, explodeTarget: 0,
-    labels: false, autoRotate: !stage.reducedMotion, selected: null, hovered: null, orbit: false, isolated: false, tab: 'lab',
+    labels: false, autoRotate: !stage.reducedMotion, selected: null, hovered: null, orbit: false, isolated: false, tab: 'lab', filming: false,
   };
+  let film = null;   // the Film-mode camera program, made once the tour and quiz exist (it yields to both)
 
   // ------------------------------------------------------------------ DOM refs
   const fleetList = $('fleet-list');
@@ -278,6 +280,7 @@ async function start() {
   function updateViewShift() {
     if (narrow()) { stage.setViewShift(0); stage.frameCover = 0; stage.frameCoverY = 0; return; }
     const w = Math.max(1, stage.container.clientWidth), h = Math.max(1, stage.container.clientHeight);
+    if (app.filming) { stage.setViewShift(0, 0); stage.frameCover = 0; stage.frameCoverY = 68 / h; return; }   // Film hides the chrome: the whole frame is the shot
     const right = dossierOpen() ? dossier.offsetWidth / w : 0;
     const left = tour.active || quiz.active ? 0.15 : dossierOpen() ? (app.orbit ? 0.13 : 0.07) : 0.14;
     // The colour legend (Systems / Thermal / Pressure) narrows the free view's framing but does not
@@ -291,7 +294,7 @@ async function start() {
     stage.frameCoverY = top + bottom;
   }
   const reframe = () => {
-    if (!tour.active && !quiz.active && !app.orbit && !app.current?.state?.launching) stage.frameVehicle(app.current);
+    if (!tour.active && !quiz.active && !app.orbit && !film?.active && !app.current?.state?.launching) stage.frameVehicle(app.current);
   };
   window.addEventListener('resize', () => updateViewShift());
 
@@ -407,6 +410,7 @@ async function start() {
     log: (src, msg, level) => log.push(src, msg, level),
     onStart: () => {
       if (quiz.active) quiz.stop({ silent: true });
+      film?.stop('tour');
       selectPart(null); setAutoRotate(false); document.body.classList.add('is-touring');
       app.sysFocus = null;
       callouts.setVisible(true);
@@ -466,6 +470,7 @@ async function start() {
     systemColor,
     log: (src, msg, level) => log.push(src, msg, level),
     onStart: () => {
+      film?.stop('quiz');
       selectPart(null); isolate(false); setAutoRotate(false); setExplode(0);
       app.sysFocus = null; callouts.setFilter(null); callouts.setMuted(true);   // labels would give the answers away
       hoverTip.hidden = true;
@@ -483,6 +488,59 @@ async function start() {
   });
   const startQuiz = () => { if (app.orbit) return; if (tour.active) tour.stop({ silent: true }); quiz.start(); };
   quizBtn.addEventListener('click', () => (quiz.active ? quiz.stop() : startQuiz()));
+
+  // ------------------------------------------------------------------ film mode (cinematic camera)
+  const filmBtn = $('film'), filmGroup = $('film-group'), filmHint = $('film-hint');
+  let hintTimer = null;
+  film = new Film(stage, {
+    boundsOf: (o) => { const b = solidBounds(o); return b.isEmpty() ? null : { min: [b.min.x, b.min.y, b.min.z], max: [b.max.x, b.max.y, b.max.z] }; },
+    subject: () => {
+      const v = app.current;
+      if (!v || app.orbit || tour.active || quiz.active || v.state?.launching) return null;
+      return { id: app.entry.id, root: v.root, parts: v.parts, view: v.view, floor: !!LOOKS[app.look]?.floor, unitMetres: 1 / (v._fitScale || 1) };
+    },
+    settings: FX,
+    onStart: () => {
+      document.body.classList.add('is-filming');
+      pressed(filmBtn, true);
+      hoverTip.hidden = true;
+      search.close();
+      filmHint.hidden = false;
+      filmHint.classList.remove('is-faded');
+      clearTimeout(hintTimer);
+      hintTimer = setTimeout(() => filmHint.classList.add('is-faded'), 5000);
+      log.push('VIEW', 'Film · a slow camera program around the vehicle; drag, scroll or press F to take it back', 'ok');
+    },
+    onStop: (reason) => {
+      app.filming = false;
+      document.body.classList.remove('is-filming');
+      pressed(filmBtn, false);
+      filmHint.hidden = true;
+      clearTimeout(hintTimer);
+      updateViewShift();
+      if (reason === 'user' && app.current && !app.orbit) stage.frameVehicle(app.current);
+      if (reason === 'user' || reason === 'input') log.push('VIEW', 'Film off · camera back to you');
+    },
+  });
+  function toggleFilm() {
+    if (film.active) { film.stop('user'); return; }
+    if (!FX.film) return;
+    app.filming = true;
+    updateViewShift();                         // the program frames for the whole window, so compute that first
+    if (!film.start()) { app.filming = false; updateViewShift(); }
+  }
+  if (!FX.film) filmGroup.hidden = true;
+  filmBtn.addEventListener('click', toggleFilm);
+  for (const box of filmGroup.querySelectorAll('input[data-fx]')) {
+    box.checked = !!FX[box.dataset.fx];
+    box.addEventListener('change', () => { setEffect(box.dataset.fx, box.checked); log.push('VIEW', `Film: ${box.parentElement.textContent.trim()} ${box.checked ? 'on' : 'off'}`); });
+  }
+  if (!stage.bokeh) { const d = filmGroup.querySelector('input[data-fx="dof"]'); if (d) { d.disabled = true; d.parentElement.title = 'Depth of field needs the High, Ultra or 4K graphics preset'; } }
+  stage.onQualityChange = ((prev) => (k, manual, up, info) => {
+    prev?.(k, manual, up, info);
+    const d = filmGroup.querySelector('input[data-fx="dof"]');
+    if (d) d.disabled = !stage.bokeh;
+  })(stage.onQualityChange);
 
   // ------------------------------------------------------------------ section cut
   const secToggle = $('section'), secTools = $('section-tools'), secCut = $('section-cut'), secOut = $('section-out');
@@ -519,7 +577,7 @@ async function start() {
     onClose: () => { document.body.classList.remove('is-searching'); app.hovered = null; refreshOutline(); },
   });
   $('search-open').addEventListener('click', () => { if (!quiz.active && !app.orbit) search.toggle(); });
-  Object.assign(window.__aeroforge, { quiz, search, picker });
+  Object.assign(window.__aeroforge, { quiz, search, picker, get film() { return film; } });
 
   // ------------------------------------------------------------------ inspector: specs & parts
   const massText = (info) => (info.mass == null ? '—' : info.massSource ? `${fmt.n(info.mass)} kg` : `≈ ${fmt.n(info.mass)} kg (estimate)`);
@@ -654,6 +712,7 @@ async function start() {
     if (app.entry === f) return;
     if (tour.active) tour.stop({ silent: true });
     if (quiz.active) quiz.stop({ silent: true });
+    film?.stop('select');
     search.reset();
     app.lab?.dispose();
     if (app.orbit) setOrbitMode(false);
@@ -735,6 +794,10 @@ async function start() {
   window.addEventListener('keydown', (e) => {
     if (e.target.closest?.('input[type="text"], input[type="search"], textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return;
     if (quiz.active && e.key === 'Escape') { quiz.stop(); return; }
+    if (film.active) {
+      if (e.key === 'Escape') { film.stop('user'); return; }
+      if (e.key.toLowerCase() !== 'f') film.stop('input');     // any other key hands the camera back, then does its job
+    }
     if (tour.active) {
       if (e.key === 'ArrowRight') { tour.next(); e.preventDefault(); return; }
       if (e.key === 'ArrowLeft') { tour.prev(); e.preventDefault(); return; }
@@ -748,7 +811,7 @@ async function start() {
     else if (k === 'x') setExplode(app.explodeTarget > 0.5 ? 0 : 1);
     else if (k === 'l') labelsBtn.click();
     else if (k === 'r') resetBtn.click();
-    else if (k === 'f' && document.fullscreenEnabled) toggleFull();
+    else if (k === 'f') { if (e.shiftKey) { if (document.fullscreenEnabled) toggleFull(); } else toggleFilm(); }
     else if (k === 't') { if (quiz.active) quiz.stop(); else startQuiz(); }
     else if (k === 'c') setSection(!section.enabled);
     else if (e.key === '/') { if (!quiz.active && !app.orbit) { search.show(); e.preventDefault(); } }
@@ -761,6 +824,7 @@ async function start() {
   // ------------------------------------------------------------------ frame loop
   let clockAcc = 1;
   let calloutAcc = 0;
+  let tourStep = null, tourFocus = null;
   stage.onFrame((dt, t) => {
     const v = app.current;
     if (!v) return;
@@ -774,7 +838,22 @@ async function start() {
     modes.tick(t);
     tour.update(dt);
     app.lab?.update(dt, t);
-    stage.controls.autoRotate = app.autoRotate && !stage.tween && !(v.state?.launching);
+    stage.controls.autoRotate = app.autoRotate && !stage.tween && !film.active && !(v.state?.launching);
+    // tour close-ups pull focus to the step's parts (the lens is otherwise only used by Film mode)
+    if (tour.active && FX.dof && stage.bokeh) {
+      const step = tour.steps?.[tour.i];
+      if (step !== tourStep) {
+        tourStep = step; tourFocus = null;
+        const focus = (step?.focus || []).map((n) => v.parts.find((p) => p.userData.part.name === n)).filter(Boolean);
+        if (focus.length) {
+          const box = new THREE.Box3();
+          for (const p of focus) box.union(solidBounds(p));
+          if (!box.isEmpty()) tourFocus = box.getBoundingSphere(new THREE.Sphere());
+        }
+      }
+      if (tourFocus) stage.setFocus(stage.camera.position.distanceTo(tourFocus.center), 2.4, { unitMetres: 1 / (v._fitScale || 1) });
+      else stage.setFocus(null);
+    } else if (tourStep) { tourStep = null; tourFocus = null; if (!film.active) stage.setFocus(null); }
     calloutAcc += dt;
     // labels on, or a tour step showing its parts; every frame while the camera flies or the view eases
     if (callouts.visible && (calloutAcc > 0.1 || stage.tween || stage.shifting)) {

@@ -264,7 +264,7 @@ const frag = /* glsl */`
     vec3 cloud = sunColor * (lit * sh * 1.2 * (0.72 + 0.28 * ao) * powder) + skyAmbient * (0.5 + 0.5 * N.y) * (0.26 + 0.34 * ao);
     // thin edges: the cloud's shaded flanks and base show through them, blue-grey; toward the
     // sun the edges light up (silver lining)
-    float thick = smoothstep(0.05, 0.6, cov);
+    float thick = smoothstep(0.12, 0.7, cov);
     vec3 baseCol = skyAmbient * 0.95 + sunColor * 0.16;
     cloud = mix(baseCol, cloud, thick);
     float fwd2 = pow(max(dot(d, sunDir), 0.0), 10.0);
@@ -279,7 +279,7 @@ const frag = /* glsl */`
       ground *= 1.0 - 0.5 * fieldCoarse(qs, foot0, reg).x;
     }
     ground = mix(ground, hazeColor * 0.88, groundHaze);
-    vec3 col = mix(ground, cloud, smoothstep(0.0, 0.4, cov));
+    vec3 col = mix(ground, cloud, smoothstep(0.0, 0.3, cov));
 
     // aerial perspective along the ray to the hit, out to the horizon's haze; the air between
     // the aircraft and the deck lays a light veil even straight down

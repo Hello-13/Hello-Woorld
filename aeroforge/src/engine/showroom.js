@@ -314,11 +314,32 @@ export class Showroom {
     });
     this.reflector.material.defines = this.depthBlur ? { REFLECT: '', DEPTHBLUR: '' } : { REFLECT: '' };
     const rt = this.reflector.getRenderTarget();
-    rt.texture.generateMipmaps = true;
-    rt.texture.minFilter = THREE.LinearMipmapLinearFilter;
     if (this.depthBlur) {
       rt.depthTexture = new THREE.DepthTexture(512, 512);     // the renderer resizes it with the target
       this.reflector.material.uniforms.tDepth.value = rt.depthTexture;
+      // The floor reads a mip chain of the reflection, and one NaN / Inf pixel in it (a part's
+      // shader under the mirrored camera) poisons every coarser mip over it into an aligned black
+      // block. So the mirror image is copied once through a NaN guard into the texture the floor
+      // samples, and mipmaps are built from that copy.
+      rt.texture.generateMipmaps = false;
+      this.clean = new THREE.WebGLRenderTarget(512, 512, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+      this.cleanMat = new THREE.ShaderMaterial({
+        uniforms: { tDiffuse: { value: rt.texture } },
+        vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: /* glsl */`
+          uniform sampler2D tDiffuse; varying vec2 vUv;
+          void main() {
+            vec4 c = texture2D(tDiffuse, vUv);
+            bool ok = all(lessThan(abs(c), vec4(60000.0))) && !any(isnan(c)) && !any(isinf(c));
+            gl_FragColor = ok ? c : vec4(0.0, 0.0, 0.0, 1.0);
+          }`,
+        depthTest: false, depthWrite: false,
+      });
+      this.cleanQuad = new FullScreenQuad(this.cleanMat);
+      this.reflector.material.uniforms.tDiffuse.value = this.clean.texture;
+    } else {
+      rt.texture.generateMipmaps = true;
+      rt.texture.minFilter = THREE.LinearMipmapLinearFilter;
     }
     // reflect only during the main beauty render, never during AO / outline / shadow sub-passes;
     // at high frame rates every other frame (the blurred image lags ~4 ms, which nobody can see)
@@ -332,6 +353,10 @@ export class Showroom {
         // the oblique row's scale: depth = s · (height below the floor) / (2 · view depth)
         const e = this.reflector.camera.projectionMatrix.elements;
         this.reflector.material.uniforms.oblique.value = Math.hypot(e[2], e[6], e[10] - 1) || 1;
+        const prev = renderer.getRenderTarget();
+        renderer.setRenderTarget(this.clean);
+        this.cleanQuad.render(renderer);
+        renderer.setRenderTarget(prev);
       }
     };
     this.plain = new THREE.Mesh(geo, new THREE.ShaderMaterial({
@@ -372,6 +397,7 @@ export class Showroom {
     const h = Math.max(64, Math.round(c.height * k));
     this.reflected = false;
     this.reflector.getRenderTarget().setSize(w, h);
+    this.clean?.setSize(w, h);
     const u = this.reflector.material.uniforms;
     u.texel.value.set(1 / w, 1 / h);
     u.focalPx.value = h / (2 * Math.tan((this.stage.camera.fov * Math.PI) / 360));   // pixel focal length of the reflection

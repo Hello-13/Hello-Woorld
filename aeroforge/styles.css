@@ -723,6 +723,36 @@ body.is-touring #quiz-start { display: none; }
   .seg-btn { padding: 6px 9px; }
   .toggle span:last-child { font-size: 10.5px; }
 }
+/* ------------------------------------------------------------------ film mode */
+.film-group { position: relative; display: inline-flex; }
+.nav-film[aria-pressed="true"] { background: var(--text); color: var(--ink-on-light); border-color: var(--text); }
+.film-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 20; min-width: 200px;
+  display: grid; gap: 9px; padding: 12px 14px;
+  background: rgba(6, 9, 14, 0.92); border: 1px solid var(--line); border-radius: 3px; backdrop-filter: blur(14px);
+  opacity: 0; visibility: hidden; transform: translateY(-4px);
+  transition: opacity 0.2s, transform 0.2s, visibility 0.2s;
+}
+.film-group:hover .film-menu, .film-group:focus-within .film-menu { opacity: 1; visibility: visible; transform: none; }
+.film-menu-title { font: 500 10px/1 var(--font-data); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.film-menu label { display: flex; align-items: center; gap: 10px; font: 500 12px/1.2 var(--font-ui); color: var(--soft); cursor: pointer; white-space: nowrap; }
+.film-menu label:has(input:disabled) { color: var(--muted); cursor: default; }
+.film-menu input { accent-color: var(--accent); margin: 0; }
+.film-hint {
+  position: absolute; z-index: 3; left: var(--gutter); bottom: calc(var(--fleet-h) + 18px); margin: 0;
+  font: 500 11px/1.4 var(--font-data); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+  opacity: 0; pointer-events: none; transition: opacity 0.6s var(--ease);
+}
+body.is-filming .film-hint { opacity: 1; }
+body.is-filming .film-hint.is-faded { opacity: 0; }
+body.is-filming .hero, body.is-filming .view-bar, body.is-filming .hud-tools, body.is-filming .hud-legend, body.is-filming .part-card,
+body.is-filming .fleet, body.is-filming .stage-shade, body.is-filming .label-layer, body.is-filming .hover-tip {
+  opacity: 0 !important; pointer-events: none; transition: opacity 0.9s var(--ease);
+}
+body.is-filming .nav { opacity: 0.6; transition: opacity 0.4s; }
+body.is-filming .nav:hover, body.is-filming .nav:focus-within { opacity: 1; }
+body.is-filming .fleet { pointer-events: none; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

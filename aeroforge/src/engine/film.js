@@ -182,7 +182,7 @@ export function buildProgram(s) {
     }
     az += drift;
     const elev = clamp(Math.asin(clamp(o[1] / R, -1, 1)) * 0.55 + (floor ? 0.16 : 0.04), floor ? 0.05 : -0.35, 0.62);
-    const dist = Math.max(minDist, det.radius * 1.8, (det.radius / Math.sin(fovMin / 2)) * 1.25);
+    const dist = Math.max(minDist, det.radius * 2.0, (det.radius / Math.sin(fovMin / 2)) * 1.5);
     const p = place(det.center, az, elev, dist);
     return K(p.az, p.el, p.dist, det.center, det.center, 1);
   };
@@ -197,7 +197,7 @@ export function buildProgram(s) {
     push(K(p.az, p.el, p.dist, low(0.12), C, 0.55), 8.5);
   }
   // 1  … pulling back into the hero framing
-  push(K(az0, el0, d0, C, C, 0.15), 7);
+  push(K(az0, el0, d0 * 0.95, C, C, 0.15), 7);
   // 2–3  a slow orbit at a low angle
   { const p = place(C, az0 - 0.8, lowEl + 0.03, d0 * 0.92); push(K(p.az, p.el, p.dist, C, C, 0.2), 10); }
   { const p = place(low(0.1), az0 - 1.7, lowEl, d0 * 0.82); push(K(p.az, p.el, p.dist, low(0.1), C, 0.3), 10); }

@@ -166,8 +166,8 @@ export const CLOUD_FIELD_GLSL = /* glsl */`
     vec4 M = nz(q + drift1, T_MID, foot);
     float f = A.r * 0.5 + M.g * 0.32 + A.a * 0.18;
     float thr = 0.64 - coverage * 0.34 + (0.5 - reg.x) * 0.4;
-    float cov = smoothstep(thr - 0.05, thr + 0.22, f);
-    float lump = A.a * 0.6 + M.a * 0.4;
+    float cov = smoothstep(thr - 0.03, thr + 0.1, f);      // a narrow transition: distinct cells and gaps, not grey mush
+    float lump = A.a * 0.75 + M.a * 0.25;
     float h = cov * (0.28 + 0.47 * lump + 0.25 * M.g) * hAmp;
     h += reg.y * cov * (0.4 + 0.6 * A.a) * towerAmp;       // the towers stand on the cells
     return vec3(cov, h, lump);
@@ -179,11 +179,11 @@ export const CLOUD_FIELD_GLSL = /* glsl */`
     vec3 c = fieldCoarse(q, foot, reg);
     vec4 F = nz(q + drift1 + 211.0, T_FINE, foot);
     float edge = smoothstep(0.0, 0.35, c.x);
-    float cov = clamp(c.x + (F.b - 0.5) * 0.28 * edge, 0.0, 1.0);
-    float h = c.y + ((F.a - 0.5) * 0.24 + (F.b - 0.5) * 0.1) * hAmp * cov;
+    float cov = clamp(c.x + (F.b - 0.5) * 0.35 * edge, 0.0, 1.0);
+    float h = c.y + ((F.a - 0.5) * 0.055 + (F.b - 0.5) * 0.03) * hAmp * cov;   // bumps about a third as high as they are wide
     if (detail > 0.5) {
       float f2 = nz(q + drift1 + 55.0, T_DETAIL, foot).a;
-      h += (f2 - 0.5) * 0.09 * hAmp * cov;
+      h += (f2 - 0.5) * 0.012 * hAmp * cov;
     }
     return vec3(cov, h, c.z);
   }

@@ -33,7 +33,16 @@
     <label class="quality" for="quality"><span class="quality-label">Graphics</span> <select id="quality"></select></label>
     <span class="nav-fps" id="perf"><b id="res">--</b> <span class="nav-mp" id="mp"></span><span class="nav-sep" aria-hidden="true">·</span><b id="fps">--</b> fps</span>
     <button type="button" class="nav-full nav-search" id="search-open" aria-keyshortcuts="/" title="Find a part (/)"><span>Find a part</span><kbd>/</kbd></button>
-    <button type="button" class="nav-full" id="fullscreen" aria-pressed="false" hidden>Full screen</button>
+    <div class="film-group" id="film-group">
+      <button type="button" class="nav-full nav-film" id="film" aria-pressed="false" aria-keyshortcuts="f" title="Film: a slow cinematic camera around the vehicle (F)">Film</button>
+      <div class="film-menu" role="group" aria-label="Film options">
+        <span class="film-menu-title">Film options</span>
+        <label><input type="checkbox" data-fx="dof"> Depth of field</label>
+        <label><input type="checkbox" data-fx="sweep"> Light sweep (showroom)</label>
+        <label><input type="checkbox" data-fx="drift"> Handheld drift</label>
+      </div>
+    </div>
+    <button type="button" class="nav-full" id="fullscreen" aria-pressed="false" title="Full screen (Shift+F)" hidden>Full screen</button>
   </div>
 </header>
 
@@ -71,6 +80,7 @@
     </div>
   </div>
 
+  <p class="film-hint" id="film-hint" hidden>Film · drag, scroll or press F to take the camera back</p>
   <div class="search-palette" id="search" role="dialog" aria-label="Find a part" hidden></div>
   <aside class="part-card" id="part-card" aria-live="polite" hidden></aside>
   <aside class="tour-card" id="tour" aria-live="polite" hidden></aside>
