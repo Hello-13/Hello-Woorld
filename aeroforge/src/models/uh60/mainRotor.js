@@ -221,7 +221,7 @@ export function buildMainRotor({ A, parent }) {
     return new THREE.ExtrudeGeometry(sh, { depth: 0.04, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 2, curveSegments: 6 });
   })();
   const hubParts = [
-    place(lathe([[0.001, -0.2], [0.13, -0.2], [0.16, -0.15], [0.27, -0.13], [0.29, -0.1], [0.29, 0.12], [0.26, 0.15], [0.2, 0.17], [0.001, 0.17]], 40), [0, 0, 0]),
+    place(lathe([[0.001, -0.2], [0.13, -0.2], [0.16, -0.15], [0.27, -0.13], [0.29, -0.1], [0.29, 0.12], [0.26, 0.15], [0.2, 0.17], [0.001, 0.17]], 96), [0, 0, 0]),
   ];
   for (let k = 0; k < 12; k++) {          // hub-to-shaft bolts on the top flange
     const a = (k / 12) * Math.PI * 2;
@@ -290,7 +290,7 @@ export function buildMainRotor({ A, parent }) {
   const pinG = merge([
     cyl(0.03, 0.03, 0.22, [0.84 - E, 0, 0.06], 'y', 14), cyl(0.03, 0.03, 0.22, [0.98 - E, 0, -0.06], 'y', 14),   // expandable pins
     cyl(0.04, 0.04, 0.02, [0.84 - E, 0.12, 0.06], 'y', 14), cyl(0.04, 0.04, 0.02, [0.98 - E, 0.12, -0.06], 'y', 14),
-    new THREE.TorusGeometry(0.03, 0.006, 6, 14).translate(0.84 - E, 0.16, 0.06), new THREE.TorusGeometry(0.03, 0.006, 6, 14).translate(0.98 - E, 0.16, -0.06),   // pull rings
+    new THREE.TorusGeometry(0.03, 0.006, 6, 20).translate(0.84 - E, 0.16, 0.06), new THREE.TorusGeometry(0.03, 0.006, 6, 20).translate(0.98 - E, 0.16, -0.06),   // pull rings
   ]);
   const cuffPart = P('Blade cuffs & quick-release pins', {
     material: 'Titanium cuff clevis, steel quick-release expandable pins', mass: 9, count: 4, explode: [0, UPX + 0.1, 0],
@@ -318,7 +318,7 @@ export function buildMainRotor({ A, parent }) {
   // rotating scissors' knees. The arcs and their pins lie against the underside of each arm's bottom
   // plate; each droop-stop block and antiflap stop is bolted to the outboard face of the arm's bridge,
   // under and over the spindle
-  for (let k = 0; k < 4; k++) stops.push(new THREE.TorusGeometry(0.31, 0.022, 8, 10, 0.8).rotateZ(-0.4).rotateX(Math.PI / 2).rotateY((k * Math.PI) / 2).translate(0, -0.1645, 0));
+  for (let k = 0; k < 4; k++) stops.push(new THREE.TorusGeometry(0.31, 0.022, 16, 16, 0.8).rotateZ(-0.4).rotateX(Math.PI / 2).rotateY((k * Math.PI) / 2).translate(0, -0.1645, 0));
   onArms(stops, merge([box(0.114, 0.05, 0.1, [0.579, -0.12, 0]), box(0.098, 0.04, 0.09, [0.571, 0.115, 0]), cyl(0.024, 0.024, 0.12, [0.33, -0.1665, 0], 'x', 8), cyl(0.012, 0.012, 0.13, [0.595, -0.12, 0], 'z', 8)]));
   P('Droop stops & flap restrainers', {
     material: 'Steel stops with centrifugal-weight latches, heated hinge pins', mass: 8, count: 4, explode: [0, UPX + 0.4, 0.0],
@@ -329,7 +329,7 @@ export function buildMainRotor({ A, parent }) {
   // spindle eye at L0, with the pressurised reservoir and its indicator on the side (local +x).
   const DL0 = 0.515;
   // rod-end eye at height y on a linkage built along +y; its pin along local z, or x for the dampers
-  const eye = (y, r = 0.026, ax = 'z') => [new THREE.TorusGeometry(r, 0.011, 6, 14).rotateY(ax === 'x' ? Math.PI / 2 : 0).translate(0, y, 0), cyl(0.012, 0.012, 0.05, [0, y, 0], ax, 8)];
+  const eye = (y, r = 0.026, ax = 'z') => [new THREE.TorusGeometry(r, 0.011, 8, 20).rotateY(ax === 'x' ? Math.PI / 2 : 0).translate(0, y, 0), cyl(0.012, 0.012, 0.05, [0, y, 0], ax, 8)];
   const damperG = merge([
     ...eye(0, 0.026, 'x'), cyl(0.03, 0.03, 0.04, [0, 0.045, 0], 'y', 12),
     cyl(0.05, 0.05, 0.25, [0, 0.19, 0], 'y', 18), cyl(0.056, 0.056, 0.03, [0, 0.08, 0], 'y', 18), cyl(0.056, 0.056, 0.03, [0, 0.3, 0], 'y', 18),
@@ -415,7 +415,7 @@ export function buildMainRotor({ A, parent }) {
   }, [mesh(merge([cyl(0.095, 0.095, 0.82, [0, -0.32, 0], 'y', 24), cyl(0.13, 0.13, 0.05, [0, -0.08, 0], 'y', 24)]), MAT.steel())]);
 
   // ------------------------------------------------------------------ swashplates
-  const rotRing = [orientOutward(lathe([[0.25, -0.025], [0.3, -0.025], [0.3, 0.025], [0.25, 0.025], [0.25, -0.025]], 36))];
+  const rotRing = [orientOutward(lathe([[0.25, -0.025], [0.3, -0.025], [0.3, 0.025], [0.25, 0.025], [0.25, -0.025]], 96))];
   for (const i of blades) {
     const a = (i * Math.PI) / 2 + PHI_H;
     const armG = box(RS - 0.28, 0.045, 0.08, [(RS + 0.28) / 2, 0, 0]); armG.rotateY(a); rotRing.push(armG);
@@ -435,7 +435,7 @@ export function buildMainRotor({ A, parent }) {
     system: 'Rotor system', material: 'Steel duplex angular-contact ball bearing', mass: 6, explode: [0, 1.12, 0],
     desc: 'The bearing between the two plates: its inner race sits on the stationary plate and its outer race in the rotating plate, so the rotating plate can spin at 258 rpm while copying every tilt and height change of the stationary one. About 0.5 m across.',
   }, [mesh(merge([orientOutward(lathe([[0.2, -0.06], [0.212, -0.06], [0.212, 0.0], [0.2, 0.0], [0.2, -0.06]], 36)), orientOutward(lathe([[0.238, -0.06], [0.25, -0.06], [0.25, 0.0], [0.238, 0.0], [0.238, -0.06]], 36))]), MAT.steel()), mesh(merge(balls), MAT.steel())], swash);
-  const statRing = [orientOutward(lathe([[0.135, -0.12], [0.34, -0.12], [0.34, -0.06], [0.212, -0.06], [0.212, -0.04], [0.15, -0.04], [0.135, -0.06], [0.135, -0.12]], 36))];
+  const statRing = [orientOutward(lathe([[0.135, -0.12], [0.34, -0.12], [0.34, -0.06], [0.212, -0.06], [0.212, -0.04], [0.15, -0.04], [0.135, -0.06], [0.135, -0.12]], 96))];
   for (const a of SERVO_AZ) {
     statRing.push(box(RV - 0.3, 0.05, 0.09, [(RV + 0.3) / 2 + 0.02, -0.09, 0]).rotateY(a));
     statRing.push(box(0.06, 0.06, 0.012, [RV, -0.1, 0.03]).rotateY(a), box(0.06, 0.06, 0.012, [RV, -0.1, -0.03]).rotateY(a));   // servo clevis cheeks

@@ -3,7 +3,7 @@
 // main-rotor shaft axis passes through x = 0 at the hub (3.33 m up).
 
 import * as THREE from 'three';
-import { mergeGeometries } from '../../engine/geometry.js';
+import { mergeGeometries, roundSegments } from '../../engine/geometry.js';
 import { aircraftSkin } from '../../engine/surface.js';
 
 export const DEG = Math.PI / 180;
@@ -89,21 +89,33 @@ export function place(g, [x, y, z] = [0, 0, 0], [rx, ry, rz] = [0, 0, 0], order 
 }
 
 export const box = (w, h, d, at, rot) => place(new THREE.BoxGeometry(w, h, d), at, rot);
-/** Cylinder along +y by default; axis: 'x' | 'y' | 'z'. */
+/**
+ * Segments for a round part of radius r: at least what the caller asked for, and enough for the radius to look
+ * round in a 4K close-up (roundSegments, held to 0.3 mm here: the helicopter has some 500 cylinders and the triangle
+ * budget does not stretch to 0.2 mm on all of them; the wheels, rotor hub and swashplates ask for more themselves).
+ * Six or fewer is a shape, not a resolution (hexagonal nuts and bolt heads, square sections, faceted fairings), and
+ * is kept as given.
+ */
+const roundSeg = (seg, r) => (seg <= 6 ? seg : Math.max(seg, roundSegments(r, { tol: 0.0003 })));
+
+/** Cylinder along +y by default; axis: 'x' | 'y' | 'z'. seg ≤ 6 makes a prism; more is a round part (see roundSeg). */
 export function cyl(r0, r1, h, at = [0, 0, 0], axis = 'y', seg = 16, open = false) {
-  const g = new THREE.CylinderGeometry(r1, r0, h, seg, 1, open);
+  const g = new THREE.CylinderGeometry(r1, r0, h, roundSeg(seg, Math.max(r0, r1)), 1, open);
   if (axis === 'x') g.rotateZ(-Math.PI / 2);
   else if (axis === 'z') g.rotateX(Math.PI / 2);
   g.translate(...at);
   return g;
 }
-export const sphere = (r, at, ws = 14, hs = 10) => place(new THREE.SphereGeometry(r, ws, hs), at);
+export const sphere = (r, at, ws = 14, hs = 10) => place(new THREE.SphereGeometry(r, Math.max(ws, roundSegments(r)), Math.max(hs, roundSegments(r) / 2)), at);
 
-/** Cylinder from p0 to p1 (arrays or Vector3). */
+/**
+ * Cylinder from p0 to p1 (arrays or Vector3): a round rod or tube, whatever count is asked for (at least that many).
+ * A rod shows its count only at its ends, so it is held to 0.45 mm (12 round a 12 mm seat tube, 24 round a 5 cm strut).
+ */
 export function tube(p0, p1, r = 0.02, seg = 8) {
   const a = p0.isVector3 ? p0.clone() : V3(...p0), b = p1.isVector3 ? p1.clone() : V3(...p1);
   const len = a.distanceTo(b);
-  const g = new THREE.CylinderGeometry(r, r, Math.max(len, 1e-4), seg);
+  const g = new THREE.CylinderGeometry(r, r, Math.max(len, 1e-4), Math.max(seg, roundSegments(r, { tol: 0.00045 })));
   const q = new THREE.Quaternion().setFromUnitVectors(V3(0, 1, 0), b.clone().sub(a).normalize());
   g.applyQuaternion(q);
   const m = a.add(b).multiplyScalar(0.5);
@@ -114,7 +126,10 @@ export function tube(p0, p1, r = 0.02, seg = 8) {
 /** Bent pipe through a list of points (hydraulic/fuel lines, harnesses). */
 export function pipe(points, r = 0.012, seg = 6) {
   const curve = new THREE.CatmullRomCurve3(points.map((p) => (p.isVector3 ? p : V3(...p))), false, 'centripetal');
-  return new THREE.TubeGeometry(curve, Math.max(8, points.length * 6), r, seg, false);
+  // (a duct of 1.5 cm radius or more gets enough sides to stay within a millimetre of round: 12 round a 2 cm duct, 16
+  // round a 3 cm one. Thinner hoses and lines are seen from the side, where the count does not show, and five or
+  // fewer is the cheap section of the airframe's frames and stringers: both stay as asked, for the triangle budget.)
+  return new THREE.TubeGeometry(curve, Math.max(8, points.length * 6), r, seg <= 5 || r < 0.015 ? seg : Math.max(seg, roundSegments(r, { tol: 0.001, min: 8 })), false);
 }
 
 /** Rectangular bar from p0 to p1 with width w (perpendicular, horizontal-ish) and height h. */
@@ -142,7 +157,7 @@ export function mirror(g) {
 }
 
 /** Unit cylinder (radius 1, height 1, along +y from 0 to 1) for rods re-aimed every frame. */
-export const unitRod = (seg = 10) => new THREE.CylinderGeometry(1, 1, 1, seg).translate(0, 0.5, 0);
+export const unitRod = (seg = 10) => new THREE.CylinderGeometry(1, 1, 1, seg <= 6 ? seg : Math.max(seg, 24)).translate(0, 0.5, 0);
 const _up = V3(0, 1, 0), _d = V3();
 /** Aim a unitRod mesh from a to b (in the mesh parent's frame) with radius r. */
 export function aimRod(m, a, b, r) {

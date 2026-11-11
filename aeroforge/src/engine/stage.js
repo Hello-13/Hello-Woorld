@@ -48,7 +48,7 @@ export const FX = { film: true, dof: true, grade: true, sweep: true, drift: true
 (function readFlags() {
   try {
     const saved = JSON.parse(localStorage.getItem('aeroforge.fx') || '{}');
-    for (const k of ['dof', 'sweep', 'drift', 'studio', 'tourDof', 'sky', 'crisp']) if (typeof saved[k] === 'boolean') FX[k] = saved[k];
+    for (const k of ['dof', 'sweep', 'drift', 'studio', 'tourDof', 'sky', 'crisp', 'aa']) if (typeof saved[k] === 'boolean') FX[k] = saved[k];
   } catch { /* storage blocked or malformed */ }
   try {
     const q = new URLSearchParams(location.search);

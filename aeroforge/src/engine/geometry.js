@@ -216,6 +216,11 @@ export function roundSegments(r, { tol = 0.0002, min = 12, max = 96 } = {}) {
 /** Lathe from [r, y] pairs (revolves around +Y). */
 export function lathe(profile, segments = 48, phiStart = 0, phiLength = Math.PI * 2) {
   const pts = profile.map(([r, y]) => new THREE.Vector2(Math.max(r, 0.0001), y));
+  // a solid of revolution is round: it gets at least the segments that keep its largest radius within half a
+  // millimetre of a true circle (in proportion for a part turn; the triangle budget does not stretch to the 0.2 mm
+  // of roundSegments' default on every lathe, so wheels, hubs and spinners ask for their own counts). Eight or fewer
+  // is a deliberate polygon and is kept.
+  if (segments > 8) segments = Math.max(segments, Math.ceil((roundSegments(Math.max(...pts.map((p) => p.x)), { tol: 0.0005 }) * Math.abs(phiLength)) / (Math.PI * 2) - 1e-9));
   return new THREE.LatheGeometry(pts, segments, phiStart, phiLength);
 }
 

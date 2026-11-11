@@ -14,10 +14,11 @@ import { halfWidthAt, section } from './fuselage.js';
 const AXLE = { x: 2.3, y: 0.33, z: 1.355 };   // track 2.71 m
 
 /** Tyre of outer radius r and width w whose beads (radius `bead`) seat on the wheel's rim. */
-function tire(r, w, bead, seg = 36) {
+function tire(r, w, bead, seg = 96) {
+  // (96 round the tread and 24 round the section: both within a quarter of a millimetre of the true curves, for 4K close-ups)
   const prof = [];
-  for (let k = 0; k <= 12; k++) {
-    const a = -Math.PI / 2 + (Math.PI * k) / 12;
+  for (let k = 0; k <= 24; k++) {
+    const a = -Math.PI / 2 + (Math.PI * k) / 24;
     prof.push([r - w * 0.32 + Math.cos(a) * w * 0.32, Math.sin(a) * w * 0.5]);
   }
   prof.unshift([bead, -w * 0.46]);
@@ -75,7 +76,7 @@ export function buildGear({ A, P }) {
     }, holder);
     oleos.push({ pistonGroup, dir: bot.clone().sub(top).normalize() });
     const wheel = [tire(0.33, 0.25, 0.15)];   // beads seated inside the rim flanges
-    const hubG = [cyl(0.16, 0.16, 0.24, [0, 0, 0], 'z', 24), cyl(0.07, 0.07, 0.26, [0, 0, 0], 'z', 16)];
+    const hubG = [cyl(0.16, 0.16, 0.24, [0, 0, 0], 'z', 96), cyl(0.07, 0.07, 0.26, [0, 0, 0], 'z', 48)];   // the rim on the tyre's own 96
     for (const g of wheel) g.translate(AXLE.x, AXLE.y, zW);
     for (const g of hubG) g.translate(AXLE.x, AXLE.y, zW);
     P(`Main wheel & tyre ${R}`, {
@@ -104,7 +105,7 @@ export function buildGear({ A, P }) {
   P('Tail wheel & tyre', {
     system: 'Landing gear', material: 'Aluminium wheel, 15 × 6 class tyre (size approximate)', mass: 10, explode: [0, -1.3, 0],
     desc: 'A single castoring tail wheel, about 8.8 m behind the main wheels. It keeps the tail rotor clear of the ground on landing.',
-  }, [mesh(tire(0.22, 0.15, 0.1).translate(tw.x, tw.y, 0), MAT.rubber()), mesh(cyl(0.11, 0.11, 0.145, [tw.x, tw.y, 0], 'z', 18), MAT.casting())]);
+  }, [mesh(tire(0.22, 0.15, 0.1).translate(tw.x, tw.y, 0), MAT.rubber()), mesh(cyl(0.11, 0.11, 0.145, [tw.x, tw.y, 0], 'z', 96), MAT.casting())]);
   P('Tail wheel lock actuator', {
     system: 'Landing gear', material: 'Electrically actuated lock pin at the swivel', mass: 2, explode: [0.3, -0.4, 0.4],
     desc: 'A cockpit switch drives a pin into the swivel to hold the tail wheel straight for take-off, running landings and parking on slopes; unlocked, the wheel castors freely.',
