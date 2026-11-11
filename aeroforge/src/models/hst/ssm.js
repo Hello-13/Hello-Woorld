@@ -116,7 +116,7 @@ export function buildSSM(P) {
   const doorPivot = new THREE.Group();
   doorPivot.position.set(ST.door, RAD.shell + 0.07, 0);
   const rDoor = 1.56;
-  const leaf = new THREE.CylinderGeometry(rDoor, rDoor, 0.07, 72, 1, false);
+  const leaf = new THREE.CylinderGeometry(rDoor, rDoor, 0.07, 144, 1, false);
   leaf.rotateZ(-Math.PI / 2).translate(0.035, -(RAD.shell + 0.07), 0);
   const leafMesh = mesh(leaf, [HM.al(), HM.mli(), HM.black()]);
   const ribs = [];
@@ -447,9 +447,9 @@ export function buildSSM(P) {
   out.wheels = [];
   const wheel = (k, n, x, tilt, label = false) => {
     const g = new THREE.Group();
-    const housing = mesh(new THREE.CylinderGeometry(0.295, 0.295, 0.2, 40), HM.box());
-    const flangeM = mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.03, 40).translate(0, -0.1, 0), HM.al());
-    const rotor = mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.07, 32), HM.rotor());
+    const housing = mesh(new THREE.CylinderGeometry(0.295, 0.295, 0.2, 88), HM.box());
+    const flangeM = mesh(new THREE.CylinderGeometry(0.31, 0.31, 0.03, 88).translate(0, -0.1, 0), HM.al());
+    const rotor = mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.07, 80), HM.rotor());
     const spokes = mesh(merge([0, 1, 2].map((i) => new THREE.BoxGeometry(0.5, 0.05, 0.04).rotateY((i * Math.PI) / 3).translate(0, 0.05, 0))), HM.ti());
     const rot = new THREE.Group();
     rot.add(rotor, spokes);
@@ -648,8 +648,8 @@ export function buildSSM(P) {
   const pins = [];
   for (const p of [60, 180, 300]) {
     pins.push(new THREE.BoxGeometry(0.12, 0.22, 0.22).translate(...az(deg(p), 1.55, -0.06)));
-    pins.push(new THREE.CylinderGeometry(0.045, 0.045, 0.26, 16).rotateZ(Math.PI / 2).translate(...az(deg(p), 1.55, -0.24)));
-    pins.push(new THREE.SphereGeometry(0.07, 16, 10).translate(...az(deg(p), 1.55, -0.38)));
+    pins.push(new THREE.CylinderGeometry(0.045, 0.045, 0.26, 36).rotateZ(Math.PI / 2).translate(...az(deg(p), 1.55, -0.24)));
+    pins.push(new THREE.SphereGeometry(0.07, 40, 24).translate(...az(deg(p), 1.55, -0.38)));
   }
   P('Berthing pins', {
     system: 'Structure', material: 'Titanium Flight Support System pins', mass: 15, count: 3, temp: 262, explode: [-3.6, 0, 0],
@@ -730,8 +730,8 @@ export function buildSSM(P) {
     const [, y0, z0] = az(p, FACE + 0.03);
     tr.push(atPhi(p, new THREE.BoxGeometry(0.5, 0.06, 0.5).translate(XT, FACE + 0.06, 0)));                 // reinforced fitting
     tr.push(new THREE.BoxGeometry(0.24, 0.28, 0.2).translate(XT, y0 + 0.02, z0 + s * 0.12));                // block squaring the tilted face to the pin
-    tr.push(new THREE.CylinderGeometry(0.075, 0.075, 0.42, 20).rotateX(Math.PI / 2).translate(XT, y0, z0 + s * 0.42));
-    tr.push(new THREE.CylinderGeometry(0.11, 0.11, 0.06, 20).rotateX(Math.PI / 2).translate(XT, y0, z0 + s * 0.64));
+    tr.push(new THREE.CylinderGeometry(0.075, 0.075, 0.42, 44).rotateX(Math.PI / 2).translate(XT, y0, z0 + s * 0.42));
+    tr.push(new THREE.CylinderGeometry(0.11, 0.11, 0.06, 52).rotateX(Math.PI / 2).translate(XT, y0, z0 + s * 0.64));
   }
   P('Aft trunnion pins', {
     system: 'Structure', material: 'Titanium trunnion pins on reinforced fittings', mass: 40, count: 2, temp: 270, explode: [0, -0.3, 0],

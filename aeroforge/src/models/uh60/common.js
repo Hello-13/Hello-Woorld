@@ -129,7 +129,7 @@ export function pipe(points, r = 0.012, seg = 6) {
   // (a duct of 1.5 cm radius or more gets enough sides to stay within a millimetre of round: 12 round a 2 cm duct, 16
   // round a 3 cm one. Thinner hoses and lines are seen from the side, where the count does not show, and five or
   // fewer is the cheap section of the airframe's frames and stringers: both stay as asked, for the triangle budget.)
-  return new THREE.TubeGeometry(curve, Math.max(8, points.length * 6), r, seg <= 5 || r < 0.015 ? seg : Math.max(seg, roundSegments(r, { tol: 0.001, min: 8 })), false);
+  return new THREE.TubeGeometry(curve, Math.max(8, points.length * 6), r, seg <= 5 || r < 9 ? seg : Math.max(seg, roundSegments(r, { tol: 0.001, min: 8 })), false);
 }
 
 /** Rectangular bar from p0 to p1 with width w (perpendicular, horizontal-ish) and height h. */

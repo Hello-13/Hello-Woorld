@@ -433,7 +433,7 @@ function closeUpDetail(normalMap, hgt, detail) {
     const px = hgt.getContext('2d').getImageData(0, 0, W, H).data, N = W * H;
     const cut = new Uint8Array(N), up = new Uint8Array(N);
     for (let i = 0, k = 0; i < N; i++, k += 4) { const v = px[k]; if (v < 128) cut[i] = 128 - v; else up[i] = v - 128; }
-    const a = alphaSdf(cut, W, H, detail.cut || 255), b = alphaSdf(up, W, H, detail.raised || 255);
+    const a = outlineField(cut, W, H, detail.cut || 255), b = outlineField(up, W, H, detail.raised || 255);
     const rg = new Uint8Array(N * 2);
     for (let i = 0; i < N; i++) { rg[i * 2] = a[i]; rg[i * 2 + 1] = b[i]; }
     field = dataTex(rg, W, H, THREE.RGFormat);
@@ -533,6 +533,38 @@ const DETAIL_BEGIN = /* glsl */`
 	}
 `;
 
+/** True when the close-up extras are being built (crisp switch on, Ultra / 4K detail). */
+export const closeUpDetailOn = () => FINE();
+const detailOf = (m) => (m.normalMap ? skinDetail.get(m.normalMap.source) : undefined);
+/** Program-cache key of a material's close-up detail ('' when it has none). */
+export const closeUpDetailKey = (material) => { const d = detailOf(material); return d ? (d.field ? 'crisp-skin-field' : 'crisp-skin') : ''; };
+
+/**
+ * Add the close-up detail code to a lit built-in material's shader (from its onBeforeCompile). Done
+ * automatically for materials without a hook of their own; one with its own hook calls this first and
+ * includes closeUpDetailKey in its customProgramCacheKey. Returns false when the material has no detail.
+ */
+export function applyCloseUpDetail(material, shader) {
+  const d = detailOf(material);
+  if (!d) return false;
+  const maps = THREE.ShaderChunk.normal_fragment_maps, scale = /mapN\.xy\s*\*=\s*normalScale\s*;/;
+  if (!scale.test(maps)) { console.warn('AEROFORGE surface: ShaderChunk.normal_fragment_maps has changed; close-up detail not applied'); return false; }
+  const fam = MICRO[d.micro] || MICRO.paint, rep = material.normalMap.repeat, m = material.userData.microTiles;
+  // micro tiles per unit of the map's UV: the map's UVs are metric unless the material says otherwise (userData.microTiles)
+  const mx = m ? m[0] : 1 / (rep.x * MICRO_TILE), my = m ? m[1] : 1 / (rep.y * MICRO_TILE);
+  shader.uniforms.crispMicro = { value: microDetail(d.micro) };
+  shader.uniforms.crispP = { value: new THREE.Vector4(d.width, d.height, mx, my) };
+  shader.uniforms.crispQ = { value: new THREE.Vector4(...fam.q) };
+  shader.uniforms.crispTone = { value: fam.tone };
+  if (d.field) shader.uniforms.crispField = { value: d.field };
+  shader.fragmentShader = (d.field ? '#define CRISP_FIELD\n' : '') + shader.fragmentShader
+    .replace('#include <normalmap_pars_fragment>', '#include <normalmap_pars_fragment>\n' + DETAIL_PARS)
+    .replace('#include <map_fragment>', DETAIL_BEGIN + '\n#include <map_fragment>\n\tdiffuseColor.rgb *= crispAlbedo;')
+    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n\troughnessFactor = clamp( roughnessFactor * crispRough, 0.0, 1.0 );')
+    .replace('#include <normal_fragment_maps>', maps.replace(scale, 'mapN.xy = mapN.xy * normalScale * crispKeep + crispN;'));
+  return true;
+}
+
 let detailShader = false;
 /** Hook the built-in lit materials once: those whose normal map carries close-up detail get the extra shader code. */
 function installDetailShader() {
@@ -540,31 +572,10 @@ function installDetailShader() {
   detailShader = true;
   const proto = THREE.MeshStandardMaterial.prototype;      // MeshPhysicalMaterial inherits
   const own = (m) => Object.prototype.hasOwnProperty.call(m, 'onBeforeCompile');
-  const find = (m) => (m.normalMap && !own(m) ? skinDetail.get(m.normalMap.source) : undefined);
   const stock = proto.customProgramCacheKey;
-  proto.customProgramCacheKey = function () {
-    const d = find(this);
-    return d ? (d.field ? 'crisp-skin-field' : 'crisp-skin') : own(this) ? stock.call(this) : '';
-  };
-  proto.onBeforeCompile = function (shader) {
-    const d = find(this);
-    if (!d) return;
-    const maps = THREE.ShaderChunk.normal_fragment_maps, scale = /mapN\.xy\s*\*=\s*normalScale\s*;/;
-    if (!scale.test(maps)) { console.warn('AEROFORGE surface: ShaderChunk.normal_fragment_maps has changed; close-up detail not applied'); return; }
-    const fam = MICRO[d.micro] || MICRO.paint, rep = this.normalMap.repeat, m = this.userData.microTiles;
-    // micro tiles per unit of the map's UV: the map's UVs are metric unless the material says otherwise (userData.microTiles)
-    const mx = m ? m[0] : 1 / (rep.x * MICRO_TILE), my = m ? m[1] : 1 / (rep.y * MICRO_TILE);
-    shader.uniforms.crispMicro = { value: microDetail(d.micro) };
-    shader.uniforms.crispP = { value: new THREE.Vector4(d.width, d.height, mx, my) };
-    shader.uniforms.crispQ = { value: new THREE.Vector4(...fam.q) };
-    shader.uniforms.crispTone = { value: fam.tone };
-    if (d.field) shader.uniforms.crispField = { value: d.field };
-    shader.fragmentShader = (d.field ? '#define CRISP_FIELD\n' : '') + shader.fragmentShader
-      .replace('#include <normalmap_pars_fragment>', '#include <normalmap_pars_fragment>\n' + DETAIL_PARS)
-      .replace('#include <map_fragment>', DETAIL_BEGIN + '\n#include <map_fragment>\n\tdiffuseColor.rgb *= crispAlbedo;')
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n\troughnessFactor = clamp( roughnessFactor * crispRough, 0.0, 1.0 );')
-      .replace('#include <normal_fragment_maps>', maps.replace(scale, 'mapN.xy = mapN.xy * normalScale * crispKeep + crispN;'));
-  };
+  // (a material with a hook of its own keeps three's behaviour: its key is that hook's source)
+  proto.customProgramCacheKey = function () { return own(this) ? stock.call(this) : closeUpDetailKey(this); };
+  proto.onBeforeCompile = function (shader) { applyCloseUpDetail(this, shader); };
 }
 
 // ------------------------------------------------------------------------------- decals
@@ -579,9 +590,10 @@ export const decalSdf = (texture) => (texture && decalFields.get(texture.source)
  * coverage channel `al` (one byte per texel, top row first; `ink` = the value of solid ink). The outline is recovered from the canvas's antialiased
  * coverage at sub-texel accuracy: a partly covered texel fixes the edge's distance from its centre along the
  * coverage gradient (Gustavson, "Anti-aliased Euclidean distance transform", 2011), and that short piece of
- * edge is what nearby texels measure their distance to. Returns bytes, 128 = on the edge, bottom row first.
+ * edge is what nearby texels measure their distance to. Returns bytes, 128 = on the edge, bottom row first
+ * (flip = false: top row first).
  */
-function alphaSdf(al, W, H, ink) {
+export function outlineField(al, W, H, ink, flip = true) {
   const S = SDF_SPREAD, S2 = S * S, d2 = new Float32Array(W * H).fill(S2);
   const seg = (x0, y0, x1, y1) => {
     const xa = Math.max(0, Math.ceil(Math.min(x0, x1) - S)), xb = Math.min(W - 1, Math.floor(Math.max(x0, x1) + S));
@@ -619,7 +631,7 @@ function alphaSdf(al, W, H, ink) {
     if (y + 1 < H) { const b = al[i + W]; if (on ? b === 0 : b >= ink) seg(x - 0.5, y + 0.5, x + 0.5, y + 0.5); }
   }
   const out = new Uint8Array(W * H), half = ink / 2, k = 127.5 / S;
-  for (let y = 0; y < H; y++) for (let x = 0, i = y * W, o = (H - 1 - y) * W; x < W; x++, i++, o++) {
+  for (let y = 0; y < H; y++) for (let x = 0, i = y * W, o = (flip ? H - 1 - y : y) * W; x < W; x++, i++, o++) {
     const q = d2[i], inside = al[i] > half;
     out[o] = q >= S2 ? (inside ? 255 : 0) : Math.round(127.5 + (inside ? k : -k) * Math.sqrt(q));
   }
@@ -711,7 +723,7 @@ export function decalTexture(key, w, h, draw) {
     t.anisotropy = 16;
     t.needsUpdate = true;
     if (FINE()) {
-      const sdf = new THREE.DataTexture(alphaSdf(al, W, H, ink), W, H, THREE.RedFormat, THREE.UnsignedByteType);
+      const sdf = new THREE.DataTexture(outlineField(al, W, H, ink), W, H, THREE.RedFormat, THREE.UnsignedByteType);
       sdf.magFilter = sdf.minFilter = THREE.LinearFilter;
       sdf.needsUpdate = true;
       decalFields.set(t.source, { sdf, width: W, height: H, ink: ink / 255 });

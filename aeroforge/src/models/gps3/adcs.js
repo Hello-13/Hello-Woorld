@@ -30,11 +30,11 @@ export function buildADCS(P) {
     g.position.set(x, WHEEL_Y, z);
     g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
     const housing = mesh(merge([
-      new THREE.CylinderGeometry(0.15, 0.15, 0.1, 36), new THREE.CylinderGeometry(0.06, 0.08, 0.03, 20).translate(0, 0.065, 0),
-      new THREE.CylinderGeometry(0.165, 0.165, 0.012, 36).translate(0, -0.056, 0),
+      new THREE.CylinderGeometry(0.15, 0.15, 0.1, 64), new THREE.CylinderGeometry(0.06, 0.08, 0.03, 44).translate(0, 0.065, 0),
+      new THREE.CylinderGeometry(0.165, 0.165, 0.012, 64).translate(0, -0.056, 0),
     ]), G.gunmetal());
     const rotor = new THREE.Group();
-    const rim = mesh(merge([new THREE.CylinderGeometry(0.13, 0.13, 0.06, 32, 1, true), new THREE.CylinderGeometry(0.035, 0.035, 0.07, 12)]), G.silverBox());
+    const rim = mesh(merge([new THREE.CylinderGeometry(0.13, 0.13, 0.06, 64, 1, true), new THREE.CylinderGeometry(0.035, 0.035, 0.07, 28)]), G.silverBox());
     const mark = mesh(boxG([0.1, 0, 0], [0.05, 0.062, 0.02]), G.alodine());
     rotor.add(rim, mark);
     g.add(housing, rotor);

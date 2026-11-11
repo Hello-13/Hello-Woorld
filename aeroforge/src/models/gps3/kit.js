@@ -3,7 +3,7 @@
 // re-exported here for the building modules.
 
 import * as THREE from 'three';
-import { mergeGeometries, lathe } from '../../engine/geometry.js';
+import { mergeGeometries, lathe, roundSegments } from '../../engine/geometry.js';
 import { mesh } from '../../engine/assembly.js';
 import { G } from './materials.js';
 
@@ -20,6 +20,9 @@ export function boxG(c, s) {
 
 /** Cylinder geometry along an axis ('x' | 'y' | 'z') centred at c. r is the −axis end radius, r2 the +axis end. */
 export function cylG(c, r, h, axis = 'z', seg = 24, r2 = r, open = false) {
+  // (a round part gets at least the segments that keep it within 0.3 mm of a circle in a 4K close-up; six or fewer
+  // is a deliberate prism, a hexagonal nut or boss, and is kept)
+  if (seg > 6) seg = Math.max(seg, roundSegments(Math.max(r, r2), { tol: 0.0003 }));
   const g = new THREE.CylinderGeometry(r2, r, h, seg, 1, open);   // Three's cylinder runs along +Y, top radius first
   if (axis === 'x') g.rotateZ(-Math.PI / 2);
   else if (axis === 'z') g.rotateX(Math.PI / 2);
@@ -37,7 +40,8 @@ export function capsuleG(c, r, L, axis = 'z', radial = 48, cap = 14) {
 /** Cylinder between two points. */
 export function rodG(a, b, r, seg = 10) {
   const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b);
-  const g = new THREE.CylinderGeometry(r, r, A.distanceTo(B), seg, 1);
+  // (a round rod: at least the segments that keep it within 0.45 mm of a circle; four or fewer is a square bar)
+  const g = new THREE.CylinderGeometry(r, r, A.distanceTo(B), seg <= 4 ? seg : Math.max(seg, roundSegments(r, { tol: 0.00045 })), 1);
   g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), B.clone().sub(A).normalize()));
   const m = A.add(B).multiplyScalar(0.5);
   return g.translate(m.x, m.y, m.z);
